@@ -11,7 +11,8 @@ import {
   signOut as fbSignOut, updateProfile
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, onSnapshot, increment, serverTimestamp
+  getFirestore, doc, getDoc, setDoc, onSnapshot, increment, serverTimestamp,
+  runTransaction, collection, getDocs, query, orderBy
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -76,6 +77,7 @@ function emit(){
   try{ window.dispatchEvent(new CustomEvent('omaopa:change',{detail:snapshot()})); }catch(e){}
   for(const cb of listeners){ try{ cb(snapshot()); }catch(e){} }
   renderOverlay();
+  try{ if(typeof rwBk!=='undefined' && rwBk.classList.contains('show')) renderRewards(); }catch(e){}
 }
 
 // ---------- poin ----------
@@ -291,10 +293,139 @@ bk.querySelector('#ooX').onclick = closeLogin;
 bk.addEventListener('click', e=>{ if(e.target===bk) closeLogin(); });
 
 // ============================================================
+//  REWARD / VOUCHER
+// ============================================================
+const REWARDS = [
+  { id:'d5',  cost:100, title:'Diskon 5%' },
+  { id:'d10', cost:150, title:'Diskon 10%' },
+  { id:'ft',  cost:200, title:'Gratis topping 1 malmil', note:'tiap pembelian 3 malmil' },
+  { id:'d15', cost:250, title:'Diskon 15%' },
+  { id:'fm',  cost:350, title:'Gratis malmil polos', note:'tiap transaksi Rp50.000' },
+  { id:'tb',  cost:500, title:'Gratis totebag', note:'tiap pembelian ogura topping' }
+];
+function genCode(){
+  const t = Date.now().toString(36).toUpperCase().slice(-4);
+  const r = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4).padEnd(4,'X');
+  return 'OO-'+t+r;
+}
+async function redeem(rewardId){
+  if(!user) throw {message:'Masuk dulu untuk menukar poin.'};
+  const rw = REWARDS.find(x=>x.id===rewardId); if(!rw) throw {message:'Voucher tidak ditemukan.'};
+  const uref = doc(db,'users',user.uid);
+  const vref = doc(collection(db,'users',user.uid,'vouchers'));
+  const code = genCode();
+  await runTransaction(db, async (tx)=>{
+    const us = await tx.get(uref);
+    const cur = (us.exists() && typeof us.data().points==='number') ? us.data().points : 0;
+    if(cur < rw.cost) throw {message:'Poin belum cukup.'};
+    tx.set(uref, { points: cur - rw.cost, updatedAt: serverTimestamp() }, {merge:true});
+    tx.set(vref, { rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, code:code, status:'aktif', createdAt: serverTimestamp() });
+  });
+  return code;
+}
+async function listVouchers(){
+  if(!user) return [];
+  try{
+    const q = query(collection(db,'users',user.uid,'vouchers'), orderBy('createdAt','desc'));
+    const snap = await getDocs(q);
+    const arr=[]; snap.forEach(d=>arr.push(Object.assign({id:d.id}, d.data())));
+    return arr;
+  }catch(e){ return []; }
+}
+
+const styleR = document.createElement('style');
+styleR.textContent = `
+.rw-pts{display:block;width:max-content;margin:6px auto 12px;background:#fff;border:2px solid #F1E4CC;border-radius:999px;padding:6px 16px;font-weight:900;color:#7A5A12}
+.rw-item{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid #EFE2C4;border-radius:14px;padding:10px 12px;margin-bottom:9px}
+.rw-info{flex:1;min-width:0}
+.rw-t{font-weight:800;color:${CO};font-size:.92rem}
+.rw-n{font-size:.72rem;color:#9a7a5e;font-weight:700;margin-top:1px}
+.rw-c{font-size:.72rem;font-weight:900;color:#C98A1B;text-align:right;margin-bottom:4px}
+.rw-btn{border:none;background:${K};color:${CO};font-weight:900;border-radius:10px;padding:7px 14px;font-size:.84rem;cursor:pointer;box-shadow:0 2px 0 ${KD};font-family:inherit}
+.rw-btn:active{transform:translateY(2px);box-shadow:0 0 0 ${KD}}
+.rw-btn[disabled]{background:#EFEDE6;color:#A9A498;box-shadow:none;cursor:default}
+.rw-voucher{background:#fff;border:2px dashed #E0B100;border-radius:14px;padding:11px 13px;margin-bottom:9px}
+.rw-vt{font-weight:800;color:${CO};font-size:.9rem}
+.rw-vc{font-family:monospace;font-size:1.05rem;font-weight:800;letter-spacing:1px;color:#7A5A12;margin:3px 0}
+.rw-vs{display:inline-block;font-size:.7rem;font-weight:900;border-radius:999px;padding:2px 9px}
+.rw-vs.aktif{background:#E7F6E7;color:#2E7D32}
+.rw-vs.terpakai{background:#F1EDE6;color:#9a8b78}
+.rw-empty{text-align:center;color:#b59a7e;font-weight:700;font-size:.85rem;padding:18px 6px}
+.rw-banner{background:#E7F6E7;color:#2E7D32;border-radius:11px;padding:9px 11px;font-size:.82rem;font-weight:800;text-align:center;margin-bottom:10px}
+`;
+document.head.appendChild(styleR);
+
+const rwBk = document.createElement('div');
+rwBk.className='oo-bk';
+rwBk.innerHTML = `<div class="oo-card" style="position:relative">
+  <button class="oo-x" id="rwX">×</button>
+  <div class="oo-h">Tukar Poin 🎁</div>
+  <div class="rw-pts" id="rwPts">🪙 0 poin</div>
+  <div class="oo-tabs">
+    <div class="oo-tab" data-rt="katalog">Katalog</div>
+    <div class="oo-tab" data-rt="voucher">Voucher Saya</div>
+  </div>
+  <div id="rwBanner"></div>
+  <div id="rwBody"></div>
+</div>`;
+function mountRw(){ if(!document.body.contains(rwBk)) document.body.appendChild(rwBk); }
+if(document.body) mountRw(); else document.addEventListener('DOMContentLoaded', mountRw);
+let rwTab='katalog', rwBanner='';
+function openRewards(){ mountRw(); rwTab='katalog'; rwBanner=''; renderRewards(); rwBk.classList.add('show'); }
+function closeRewards(){ rwBk.classList.remove('show'); rwBanner=''; }
+rwBk.querySelector('#rwX').onclick = closeRewards;
+rwBk.addEventListener('click', e=>{ if(e.target===rwBk) closeRewards(); });
+rwBk.querySelectorAll('.oo-tab').forEach(t=> t.onclick = ()=>{ rwTab=t.dataset.rt; rwBanner=''; renderRewards(); });
+
+function renderRewards(){
+  const rp=rwBk.querySelector('#rwPts'); if(rp) rp.innerHTML='🪙 '+points+' poin';
+  rwBk.querySelectorAll('.oo-tab').forEach(t=> t.classList.toggle('on', t.dataset.rt===rwTab));
+  const ban=rwBk.querySelector('#rwBanner'); if(ban) ban.innerHTML = rwBanner? `<div class="rw-banner">${rwBanner}</div>`:'';
+  const body=rwBk.querySelector('#rwBody'); if(!body) return;
+  if(rwTab==='katalog'){
+    body.innerHTML = REWARDS.map(rw=>{
+      const can = !!user && points>=rw.cost;
+      const label = !user ? 'Masuk' : (points>=rw.cost ? 'Tukar' : 'Kurang');
+      const dis = (!user) ? '' : (points>=rw.cost ? '' : 'disabled');
+      return `<div class="rw-item"><div class="rw-info"><div class="rw-t">${rw.title}</div>${rw.note?`<div class="rw-n">${rw.note}</div>`:''}</div>`
+        +`<div><div class="rw-c">${rw.cost} poin</div><button class="rw-btn" data-rid="${rw.id}" ${dis}>${label}</button></div></div>`;
+    }).join('') + `<div class="oo-mini">Tukarkan kode voucher ke kasir Oma Opa saat membeli.</div>`;
+  } else {
+    body.innerHTML = `<div class="rw-empty">Memuat voucher…</div>`;
+    listVouchers().then(list=>{
+      if(rwTab!=='voucher') return;
+      if(!user){ body.innerHTML = `<div class="rw-empty">Masuk dulu untuk melihat voucher kamu.</div>`; return; }
+      if(!list.length){ body.innerHTML = `<div class="rw-empty">Belum ada voucher.<br>Tukarkan poin di tab Katalog ya!</div>`; return; }
+      body.innerHTML = list.map(v=>{
+        const st = (v.status==='terpakai')?'terpakai':'aktif';
+        return `<div class="rw-voucher"><div class="rw-vt">${v.title||'Voucher'}</div>`
+          +`${v.note?`<div class="rw-n">${v.note}</div>`:''}`
+          +`<div class="rw-vc">${v.code||'-'}</div>`
+          +`<span class="rw-vs ${st}">${st==='aktif'?'Aktif':'Sudah dipakai'}</span></div>`;
+      }).join('');
+    });
+  }
+}
+rwBk.querySelector('#rwBody').addEventListener('click', async (e)=>{
+  const b=e.target.closest('[data-rid]'); if(!b) return;
+  if(!user){ closeRewards(); openLogin(); return; }
+  const rid=b.dataset.rid; const rw=REWARDS.find(x=>x.id===rid); if(!rw) return;
+  if(points<rw.cost){ rwBanner='Poin belum cukup.'; renderRewards(); return; }
+  if(!window.confirm('Tukar '+rw.cost+' poin untuk "'+rw.title+'"?')) return;
+  b.disabled=true; b.textContent='…';
+  try{
+    const code = await redeem(rid);
+    rwTab='voucher'; rwBanner='Berhasil! Kode voucher: '+code+' — tunjukkan ke kasir.'; renderRewards();
+  }catch(err){ rwBanner=(err&&err.message)||'Gagal menukar.'; renderRewards(); }
+});
+
+// ============================================================
 //  API publik
 // ============================================================
 window.OmaOpa = {
   openLogin, closeLogin,
+  openRewards, closeRewards,
+  redeem, listVouchers,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'' } : null,
   getPoints: ()=> points,

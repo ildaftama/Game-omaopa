@@ -109,8 +109,8 @@
 
 <div class="nav">
   <div class="on"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.7 11 12 4.3 20.3 11"/><path d="M6 10v8.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V10"/><path d="M10 19.5v-4.5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4.5"/></svg></span>Beranda</div>
-  <div data-soon><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9.5" rx="4.5"/><path d="M7.5 11.6v2.8M6.1 13h2.8"/><circle cx="15.4" cy="12" r="1.05"/><circle cx="17.6" cy="14.4" r="1.05"/></svg></span>Game</div>
-  <div data-soon><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="10" width="15.6" height="9.3" rx="1.8"/><path d="M4.2 13.4h15.6M12 10v9.3"/><path d="M12 10C12 10 10.6 6 8.6 6.5 6.9 6.9 8.2 9.7 12 10Z"/><path d="M12 10C12 10 13.4 6 15.4 6.5 17.1 6.9 15.8 9.7 12 10Z"/></svg></span>Reward</div>
+  <div id="navGame" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9.5" rx="4.5"/><path d="M7.5 11.6v2.8M6.1 13h2.8"/><circle cx="15.4" cy="12" r="1.05"/><circle cx="17.6" cy="14.4" r="1.05"/></svg></span>Game</div>
+  <div id="navReward" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4.2" y="10" width="15.6" height="9.3" rx="1.8"/><path d="M4.2 13.4h15.6M12 10v9.3"/><path d="M12 10C12 10 10.6 6 8.6 6.5 6.9 6.9 8.2 9.7 12 10Z"/><path d="M12 10C12 10 13.4 6 15.4 6.5 17.1 6.9 15.8 9.7 12 10Z"/></svg></span>Reward</div>
   <div id="navProfil" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.8" r="3.4"/><path d="M5.5 19.3a6.5 6.5 0 0 1 13 0"/></svg></span>Profil</div>
 </div>
 
@@ -118,8 +118,11 @@
 <script>
   try{ document.getElementById('coin').textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){ document.getElementById('coin').textContent='0'; }
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
-  document.getElementById('rewardBtn').addEventListener('click',function(e){e.preventDefault();soon();});
+  function openRewards(){ if(window.OmaOpa){ window.OmaOpa.openRewards(); } else { soon(); } }
+  document.getElementById('rewardBtn').addEventListener('click',function(e){e.preventDefault();openRewards();});
   document.querySelectorAll('[data-soon]').forEach(function(el){el.addEventListener('click',soon);});
+  var nr=document.getElementById('navReward'); if(nr) nr.addEventListener('click',openRewards);
+  var ng=document.getElementById('navGame'); if(ng) ng.addEventListener('click',function(){ var g=document.querySelector('.games'); if(g) g.scrollIntoView({behavior:'smooth',block:'start'}); });
   function openLogin(){ if(window.OmaOpa){ window.OmaOpa.openLogin(); } else { alert('Sedang menyiapkan login, coba lagi sebentar…'); } }
   var lh=document.getElementById('loginHint'); if(lh) lh.addEventListener('click',openLogin);
   var np=document.getElementById('navProfil'); if(np) np.addEventListener('click',openLogin);
