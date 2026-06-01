@@ -28,7 +28,7 @@
   .brand h1{font-family:'Fredoka';font-weight:700;font-size:1.12rem;color:var(--coklat);line-height:1;}
   .brand p{font-size:.68rem;color:#9a7a5e;font-weight:700;letter-spacing:.5px;}
   .meta{display:flex;gap:8px;align-items:center;}
-  #lvlPill{background:var(--kuning,#FACC1A);color:var(--coklat,#613925);font-weight:900;font-size:1rem;letter-spacing:.3px;border:2px solid var(--kuning-d,#E0B100);padding:4px 12px;box-shadow:0 2px 0 var(--kuning-d,#E0B100);}
+  #lvlPill{background:var(--kuning,#FACC1A);color:var(--coklat,#613925);font-weight:900;font-size:.9rem;letter-spacing:.2px;border:2px solid var(--kuning-d,#E0B100);padding:3px 9px;box-shadow:0 2px 0 var(--kuning-d,#E0B100);}
   .pill{background:#fff;border-radius:999px;padding:5px 12px;font-family:'Fredoka';font-weight:600;
     font-size:.95rem;color:var(--coklat);box-shadow:0 3px 10px var(--shadow);display:flex;align-items:center;gap:4px;}
   .pill.danger{color:var(--merah);animation:blink .6s steps(2) infinite;}
@@ -159,12 +159,33 @@
   .star{width:22px;height:22px;}
   .brand h1{font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .brand p{white-space:nowrap;}
-  .meta{flex:0 0 auto;flex-wrap:nowrap;gap:5px;}
+  .meta{flex:0 0 auto;flex-wrap:nowrap;gap:4px;}
   .pill{white-space:nowrap;font-size:.8rem;padding:4px 8px;font-variant-numeric:tabular-nums;}
   #clock{min-width:62px;justify-content:center;}
   .meta .pill:nth-child(2){min-width:50px;justify-content:center;}
   #soundBtn,#musicBtn{padding:4px 6px;}
-  .brand .logo{height:32px;width:auto;display:block;}
+  .brand .logo{height:24px;width:auto;display:block;max-width:42vw;object-fit:contain;}
+  /* ---- extra compact: muat penuh di portrait HP ---- */
+  .app{max-width:430px;}
+  body{padding:6px 9px 10px;}
+  .stage{margin-bottom:4px;padding:3px;}
+  .stage svg{max-height:94px;}
+  .order{padding:6px 9px;margin-bottom:5px;gap:8px;}
+  .cust{width:38px;height:38px;}
+  .order-text{font-size:.85rem;}
+  .order-icons svg{height:21px;}
+  .sec{margin:1px 2px 2px;font-size:.68rem;}
+  .grid-bolu,.grid-top{gap:5px;margin-bottom:5px;}
+  .card{padding:3px 4px 4px;}
+  .card svg{height:33px;}
+  .grid-top .card svg{height:29px;}
+  .card .nm{font-size:.62rem;}
+  .slots{margin-bottom:4px;gap:5px;}
+  .slot{height:29px;font-size:.74rem;}
+  .slot svg{height:22px;}
+  button.act{padding:9px;font-size:.9rem;}
+  .clear{padding:9px 13px;}
+  .hint{margin-top:3px;font-size:.66rem;}
 </style>
 </head>
 <body>
@@ -577,7 +598,10 @@ const SND={
   good :()=>[587,740,880,1175].forEach((f,i)=>tone(f,0.22,'sine',0.07,i*0.08)),
   bad  :()=>{tone(440,0.22,'sine',0.07,0,null,330);tone(294,0.34,'sine',0.07,0.12,null,233);},
   end  :()=>[523,659,784,1047].forEach((f,i)=>tone(f,0.26,'sine',0.08,i*0.13)),
-  combo:(n)=>{const base=523+Math.min(n,9)*42;[0,1,2].forEach(i=>tone(base+i*170,0.15,'triangle',0.07,i*0.045));tone(base+540,0.2,'sine',0.05,0.15);},
+  combo:(n)=>{const base=523+Math.min(n,9)*40;const v=(Math.random()*3)|0;
+    if(v===0){[0,1,2].forEach(i=>tone(base+i*160,0.14,'triangle',0.07,i*0.045));tone(base+520,0.2,'sine',0.05,0.14);}
+    else if(v===1){[0,1,2,3].forEach(i=>tone(base+i*120,0.11,'square',0.05,i*0.04));tone(base+360,0.18,'sine',0.05,0.18);}
+    else{tone(base,0.1,'sine',0.07);tone(base*1.5,0.12,'triangle',0.06,0.06);tone(base*2,0.17,'sine',0.05,0.13);}},
 };
 function toggleSound(){
   soundOn=!soundOn; ensureAudio();
@@ -601,10 +625,10 @@ function showCombo(n){
   const word=tier[(Math.random()*tier.length)|0];
   const hue=n>=8?'#E0556E':(n>=4?'#F2922B':'#E0B100');
   const el=document.createElement('div');
-  el.innerHTML='<div style="font-size:1.25rem;font-weight:900;color:'+hue+';text-shadow:0 2px 0 #fff,0 3px 9px rgba(0,0,0,.18)">COMBO x'+n+' 🔥</div><div style="font-size:.92rem;font-weight:900;color:#613925;margin-top:2px;text-shadow:0 1px 0 #fff">'+word+'</div>';
+  el.innerHTML='<div style="font-size:.82rem;font-weight:900;color:'+hue+';letter-spacing:.3px">COMBO x'+n+' 🔥</div><div style="font-size:1.24rem;font-weight:900;color:#613925;margin-top:1px;line-height:1.08">'+word+'</div>';
   const spots=['left:10px;top:19%;text-align:left','right:10px;top:19%;text-align:right','left:8px;top:30%;text-align:left','right:8px;top:30%;text-align:right','left:8px;top:43%;text-align:left','right:8px;top:43%;text-align:right','left:10px;bottom:27%;text-align:left','right:10px;bottom:27%;text-align:right'];
   const spot=spots[(Math.random()*spots.length)|0];
-  el.style.cssText='position:fixed;z-index:55;pointer-events:none;max-width:44vw;animation:comboGen 1.1s ease forwards;'+spot;
+  el.style.cssText='position:fixed;z-index:55;pointer-events:none;max-width:46vw;background:rgba(255,255,255,.94);border:2px solid '+hue+';border-radius:13px;padding:6px 11px;box-shadow:0 5px 16px rgba(0,0,0,.2);animation:comboGen 1.1s ease forwards;'+spot;
   layer.appendChild(el);
   if(SND&&SND.combo){ try{ensureAudio(); SND.combo(n);}catch(e){} }
   setTimeout(function(){ el.remove(); }, 1200);
