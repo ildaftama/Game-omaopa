@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Outlet Oma Opa — Topping Bolu</title>
@@ -250,7 +254,7 @@
     <h2 style="margin-bottom:2px">Pilih Level</h2>
     <p style="margin:0 0 10px">🪙 Poin kamu: <b id="lvlPts">0</b> <button id="acctBtn" style="margin-left:6px;border:1.5px solid #E7D8BE;background:#fff;color:#613925;font-weight:800;border-radius:9px;padding:3px 10px;font-size:.78rem;cursor:pointer;font-family:inherit">Masuk</button></p>
     <div id="lvlGrid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:7px;max-height:46vh;overflow:auto;padding:2px"></div>
-    <a href="index.html" style="display:inline-block;margin-top:12px;color:#613925;font-weight:600;text-decoration:none">‹ Kembali ke menu</a>
+    <a href="index.html?v=5" style="display:inline-block;margin-top:12px;color:#613925;font-weight:600;text-decoration:none">‹ Kembali ke menu</a>
   </div>
 </div>
 
@@ -942,7 +946,7 @@ document.getElementById('serveBtn').addEventListener('click',serve);
 document.getElementById('lvlGrid').addEventListener('click',e=>{const b=e.target.closest('[data-lvl]');if(!b)return;ensureAudio();SND.blip();startLevel(parseInt(b.dataset.lvl,10));});
 showLevelSelect();
 </script>
-<script type="module" src="core-omaopa.js"></script>
+<script type="module" src="core-omaopa.js?v=5"></script>
 <script>
   (function(){
     function paintAcct(s){

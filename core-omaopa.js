@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, onSnapshot, increment, serverTimestamp,
-  runTransaction, collection, getDocs, query, orderBy
+  runTransaction, collection, getDocs, query, orderBy, where
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -33,6 +33,20 @@ setPersistence(auth, browserLocalPersistence).catch(()=>{});
 const LS_PTS = 'omaopa_points';        // cermin dompet (dipakai game utk tampilan)
 const LS_UNSYNCED = 'omaopa_unsynced'; // poin yg didapat saat belum login (digabung saat login)
 const PHONE_DOMAIN = '@phone.omaopa.fun';
+
+// URL Google Apps Script (Web App) untuk rekap data member ke Spreadsheet.
+// Kosongkan '' kalau belum dipakai. Isi setelah deploy Apps Script (lihat panduan).
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbxQ3dpVue_N0sjHzMnwsYe9Rxl3R1JxhnoOGVgwGNfjijm_PNBrJ17P2X9eGMloGZF8/exec';
+function pushToSheet(row){
+  try{
+    if(!SHEET_URL || SHEET_URL.indexOf('http')!==0) return;
+    fetch(SHEET_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify(row)
+    }).catch(()=>{});
+  }catch(e){}
+}
 
 let user = null, profile = null, points = 0, unsubDoc = null, mergedOnce = false;
 const listeners = [];
@@ -156,6 +170,15 @@ async function registerPhonePin(data){
   user = res.user;
   try{ await updateProfile(user,{displayName:name.trim()}); }catch(e){}
   await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, occupation, consent:true, provider:'phone', profileComplete:true });
+  pushToSheet({
+    waktu: new Date().toISOString(),
+    uid: user.uid,
+    nama: name.trim(),
+    no_hp: normPhone(phone),
+    gender: gender,
+    usia: age,
+    pekerjaan: occupation
+  });
 }
 async function doSignOut(){ await fbSignOut(auth); }
 
@@ -312,25 +335,39 @@ async function redeem(rewardId){
   if(!user) throw {message:'Masuk dulu untuk menukar poin.'};
   const rw = REWARDS.find(x=>x.id===rewardId); if(!rw) throw {message:'Voucher tidak ditemukan.'};
   const uref = doc(db,'users',user.uid);
-  const vref = doc(collection(db,'users',user.uid,'vouchers'));
   const code = genCode();
+  const vref = doc(db,'vouchers',code);
+  const nm = (profile&&profile.name)||user.displayName||'';
   await runTransaction(db, async (tx)=>{
     const us = await tx.get(uref);
     const cur = (us.exists() && typeof us.data().points==='number') ? us.data().points : 0;
     if(cur < rw.cost) throw {message:'Poin belum cukup.'};
     tx.set(uref, { points: cur - rw.cost, updatedAt: serverTimestamp() }, {merge:true});
-    tx.set(vref, { rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, code:code, status:'aktif', createdAt: serverTimestamp() });
+    tx.set(vref, { code:code, uid:user.uid, name:nm, rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, status:'aktif', createdAt: serverTimestamp() });
   });
   return code;
 }
 async function listVouchers(){
   if(!user) return [];
   try{
-    const q = query(collection(db,'users',user.uid,'vouchers'), orderBy('createdAt','desc'));
+    const q = query(collection(db,'vouchers'), where('uid','==',user.uid));
     const snap = await getDocs(q);
     const arr=[]; snap.forEach(d=>arr.push(Object.assign({id:d.id}, d.data())));
+    arr.sort((a,b)=>{ const ta=(a.createdAt&&a.createdAt.seconds)||0, tb=(b.createdAt&&b.createdAt.seconds)||0; return tb-ta; });
     return arr;
   }catch(e){ return []; }
+}
+async function isStaff(){
+  if(!user) return false;
+  try{ const s = await getDoc(doc(db,'staff',user.uid)); return s.exists(); }catch(e){ return false; }
+}
+async function findVoucher(code){
+  code=(code||'').trim().toUpperCase(); if(!code) return null;
+  try{ const s = await getDoc(doc(db,'vouchers',code)); return s.exists()? Object.assign({code:s.id}, s.data()) : null; }catch(e){ return null; }
+}
+async function markVoucherUsed(code){
+  code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
+  await setDoc(doc(db,'vouchers',code), { status:'terpakai', usedAt: serverTimestamp() }, {merge:true});
 }
 
 const styleR = document.createElement('style');
@@ -426,6 +463,7 @@ window.OmaOpa = {
   openLogin, closeLogin,
   openRewards, closeRewards,
   redeem, listVouchers,
+  isStaff, findVoucher, markVoucherUsed,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'' } : null,
   getPoints: ()=> points,
