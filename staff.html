@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Kasir — Oma Opa Cakery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --kuning:#FACC1A; --kuning-d:#E0B100; --coklat:#613925; --cream:#FFF8EC; }
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
+    background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream);
+    min-height:100vh; padding:18px 14px 40px; }
+  .wrap{ max-width:440px; margin:0 auto; }
+  .head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .head h1{ font-family:'Fredoka'; font-size:1.2rem; margin:0; color:var(--coklat); }
+  .head .badge{ font-size:.66rem; font-weight:900; background:var(--kuning); color:#5A3A05; padding:2px 9px; border-radius:999px; }
+  .card{ background:#fff; border:2px solid #EFE2C4; border-radius:18px; padding:16px; margin-bottom:14px; }
+  .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  label{ font-size:.78rem; font-weight:800; color:#8a6a3a; display:block; margin:0 0 5px; }
+  input{ width:100%; border:2px solid #E7D8BE; border-radius:12px; padding:13px; font-size:1.1rem; font-family:monospace; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--coklat); }
+  input:focus{ outline:none; border-color:var(--kuning); }
+  .btn{ width:100%; border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:1rem; border-radius:13px; padding:13px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; margin-top:10px; }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--kuning-d); }
+  .btn[disabled]{ opacity:.55; }
+  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #E7D8BE; box-shadow:none; }
+  .btn.danger{ background:#2E7D32; color:#fff; box-shadow:0 3px 0 #1B5E20; }
+  .res{ border-radius:14px; padding:14px; margin-top:14px; }
+  .res .t{ font-weight:900; font-size:1.05rem; }
+  .res .n{ font-size:.82rem; font-weight:700; opacity:.85; margin-top:2px; }
+  .res .row{ font-size:.82rem; margin-top:7px; }
+  .ok{ background:#E7F6E7; border:2px solid #B7E0B7; }
+  .warn{ background:#FFF3D6; border:2px solid #F2D98A; }
+  .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; }
+  .pill{ display:inline-block; font-size:.72rem; font-weight:900; border-radius:999px; padding:3px 11px; }
+  .pill.aktif{ background:#2E7D32; color:#fff; }
+  .pill.terpakai{ background:#9a8b78; color:#fff; }
+  .uid{ font-family:monospace; font-size:.8rem; background:#F1E4CC; border-radius:8px; padding:6px 9px; word-break:break-all; margin-top:6px; }
+  a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>Kasir Oma Opa</h1><span class="badge">STAFF</span>
+  </div>
+  <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
+  <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
+</div>
+
+<script type="module" src="core-omaopa.js?v=42"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+(function(){
+  var panel = document.getElementById('panel');
+  var busy = false, scanner = null, scanning = false;
+  var EARN_PER_POINT = 4000;
+  function rp(n){ try{ return 'Rp'+Number(n).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
+  async function stopScan(){ if(scanner && scanning){ try{ await scanner.stop(); }catch(e){} scanning=false; } }
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function fmtDate(ts){ try{ if(ts&&ts.seconds){ return new Date(ts.seconds*1000).toLocaleString('id-ID'); } }catch(e){} return '-'; }
+
+  async function refresh(){
+    await stopScan();
+    if(!window.OmaOpa){ panel.innerHTML = '<div class="muted">Menyiapkan…</div>'; return; }
+    var u = window.OmaOpa.getUser();
+    if(!u){
+      panel.innerHTML = '<div class="muted">Halaman khusus kasir. Silakan masuk dengan akun staff.</div>'
+        + '<button class="btn" id="loginBtn">Masuk</button>';
+      document.getElementById('loginBtn').onclick = function(){ window.OmaOpa.openLogin(); };
+      return;
+    }
+    panel.innerHTML = '<div class="muted">Memeriksa akses staff…</div>';
+    var staff = false;
+    try{ staff = await window.OmaOpa.isStaff(); }catch(e){ staff=false; }
+    if(!staff){
+      panel.innerHTML = '<div class="t" style="font-weight:900;color:#C0392B">Akun ini belum terdaftar sebagai staff.</div>'
+        + '<div class="muted" style="margin-top:8px">Minta admin menambahkan UID berikut ke daftar staff:</div>'
+        + '<div class="uid">'+esc(u.uid)+'</div>'
+        + '<button class="btn sec" id="outBtn" style="margin-top:12px">Keluar / ganti akun</button>';
+      document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} };
+      return;
+    }
+    // staff OK -> verify UI
+    var outlet=''; try{ outlet = await window.OmaOpa.getStaffOutlet(); }catch(e){}
+    panel.innerHTML =
+        '<div class="muted" style="margin-bottom:12px">Outlet: <b style="color:#613925">'+(esc(outlet)||'(belum diatur)')+'</b></div>'
+      + '<button class="btn" id="scanBtn">📷 Scan QR (Member / Voucher)</button>'
+      + '<div id="reader" style="display:none;margin-top:12px;border-radius:14px;overflow:hidden"></div>'
+      + '<div style="text-align:center;margin:16px 0 8px;color:#b59a7e;font-weight:800;font-size:.8rem">— atau input manual —</div>'
+      + '<label>Kode voucher</label>'
+      + '<input id="code" placeholder="OO-XXXXXXXX" autocomplete="off" autocapitalize="characters">'
+      + '<button class="btn sec" id="checkBtn">Cek voucher</button>'
+      + '<div id="out"></div>'
+      + '<div style="text-align:right;margin-top:14px"><a class="link" id="logoutStaff" href="#">Keluar staff</a></div>';
+    document.getElementById('scanBtn').onclick = toggleScan;
+    var input = document.getElementById('code');
+    document.getElementById('checkBtn').onclick = function(){ doCheck(input.value); };
+    input.addEventListener('keydown', function(e){ if(e.key==='Enter') doCheck(input.value); });
+    document.getElementById('logoutStaff').onclick = async function(e){ e.preventDefault(); await stopScan(); try{ await window.OmaOpa.signOut(); }catch(e){} };
+  }
+
+  async function toggleScan(){
+    var btn=document.getElementById('scanBtn'), rd=document.getElementById('reader');
+    if(scanning){ await stopScan(); rd.style.display='none'; btn.textContent='📷 Scan QR (Member / Voucher)'; return; }
+    if(typeof Html5Qrcode==='undefined'){ var o=document.getElementById('out'); if(o) o.innerHTML='<div class="res bad">Scanner belum termuat. Cek koneksi internet lalu coba lagi.</div>'; return; }
+    rd.style.display='block'; rd.innerHTML=''; btn.textContent='■ Tutup kamera';
+    if(!scanner) scanner=new Html5Qrcode('reader');
+    try{
+      await scanner.start({facingMode:'environment'}, {fps:10, qrbox:230}, onScan, function(){});
+      scanning=true;
+    }catch(e){
+      rd.style.display='none'; btn.textContent='📷 Scan QR (Member / Voucher)';
+      var out=document.getElementById('out'); if(out) out.innerHTML='<div class="res bad">Tidak bisa akses kamera: '+esc((e&&e.message)||'izin ditolak')+'. Pastikan situs dibuka via https & izin kamera diberikan.</div>';
+    }
+  }
+
+  async function onScan(text){
+    await stopScan();
+    var rd=document.getElementById('reader'); if(rd) rd.style.display='none';
+    var btn=document.getElementById('scanBtn'); if(btn) btn.textContent='📷 Scan QR (Member / Voucher)';
+    text=(text||'').trim();
+    if(/^OMAOPA:MEMBER:/i.test(text)){ showMember(text.replace(/^OMAOPA:MEMBER:/i,'')); return; }
+    if(/^OMAOPA:VOUCHER:/i.test(text)){ doCheck(text.replace(/^OMAOPA:VOUCHER:/i,'')); return; }
+    if(/^OO-/i.test(text)){ doCheck(text); return; }
+    var out=document.getElementById('out'); if(out) out.innerHTML='<div class="res warn">QR tidak dikenali. Pastikan ini QR Kartu Member / Voucher Oma Opa.</div>';
+  }
+
+  async function showMember(uid){
+    var out=document.getElementById('out'); if(!out) return;
+    out.innerHTML='<div class="muted" style="margin-top:12px">Mengambil data member…</div>';
+    var m=null; try{ m=await window.OmaOpa.getMemberByUid(uid); }catch(e){}
+    if(!m){ out.innerHTML='<div class="res bad">Member tidak ditemukan.</div><button class="btn sec" id="again">Kembali</button>'; var ag=document.getElementById('again'); if(ag) ag.onclick=function(){refresh();}; return; }
+    out.innerHTML='<div class="res ok"><div class="t">'+esc(m.name||'Member')+'</div>'
+      +'<div class="row">Poin sekarang: <b>'+m.points+'</b></div></div>'
+      +'<label style="margin-top:12px">Nominal belanja (Rp)</label>'
+      +'<input id="nom" inputmode="numeric" placeholder="cth: 50000" style="text-transform:none;font-family:inherit;letter-spacing:0">'
+      +'<div class="muted" style="margin-top:6px">'+rp(EARN_PER_POINT)+' = 1 poin</div>'
+      +'<button class="btn" id="giveBtn">＋ Beri Poin</button>'
+      +'<button class="btn sec" id="cancelM" style="margin-top:8px">Batal</button>';
+    var nom=document.getElementById('nom'); nom.focus();
+    nom.addEventListener('input',function(){ var n=parseInt((nom.value||'').replace(/\D/g,''),10)||0; var p=Math.floor(n/EARN_PER_POINT); document.getElementById('giveBtn').textContent = p>0 ? ('＋ Beri '+p+' poin ('+rp(n)+')') : '＋ Beri Poin'; });
+    document.getElementById('cancelM').onclick=function(){ refresh(); };
+    document.getElementById('giveBtn').onclick=async function(ev){
+      if(busy) return; var n=parseInt((nom.value||'').replace(/\D/g,''),10)||0;
+      if(n<=0){ nom.focus(); return; }
+      busy=true; var b=ev.target; b.disabled=true; b.textContent='Memproses…';
+      try{
+        var r=await window.OmaOpa.awardPoints(uid, n);
+        out.innerHTML='<div class="res ok"><div class="t">✓ '+r.points+' poin ditambahkan</div>'
+          +'<div class="row">'+esc(m.name||'Member')+' — belanja '+rp(n)+'</div>'
+          +'<div class="row">Total poin sekarang: <b>'+r.newTotal+'</b></div>'
+          +(r.outlet?'<div class="row">Outlet: '+esc(r.outlet)+'</div>':'')+'</div>'
+          +'<button class="btn sec" id="again">Selesai</button>';
+        document.getElementById('again').onclick=function(){ refresh(); };
+      }catch(e){
+        out.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'coba lagi')+'</div><button class="btn sec" id="again">Kembali</button>';
+        var ag=document.getElementById('again'); if(ag) ag.onclick=function(){ refresh(); };
+      }
+      busy=false;
+    };
+  }
+
+  async function doCheck(code){
+    var out = document.getElementById('out'); if(!out) return;
+    code = (code||'').trim().toUpperCase();
+    if(!code){ out.innerHTML = '<div class="res bad">Masukkan kode voucher dulu.</div>'; return; }
+    out.innerHTML = '<div class="muted" style="margin-top:12px">Mencari…</div>';
+    var v = null;
+    try{ v = await window.OmaOpa.findVoucher(code); }catch(e){ v=null; }
+    if(!v){ out.innerHTML = '<div class="res bad">Voucher <b>'+esc(code)+'</b> tidak ditemukan.</div>'; return; }
+    var used = (v.status==='terpakai');
+    var cls = used ? 'warn' : 'ok';
+    var html = '<div class="res '+cls+'">'
+      + '<div class="t">'+esc(v.title||'Voucher')+'</div>'
+      + (v.note?'<div class="n">'+esc(v.note)+'</div>':'')
+      + '<div class="row">Kode: <b>'+esc(v.code)+'</b></div>'
+      + '<div class="row">Pemilik: <b>'+esc(v.name||'-')+'</b></div>'
+      + '<div class="row">Status: <span class="pill '+(used?'terpakai':'aktif')+'">'+(used?'SUDAH DIPAKAI':'AKTIF')+'</span></div>';
+    if(used){ html += '<div class="row">Dipakai: '+fmtDate(v.usedAt)+'</div>'; }
+    html += '</div>';
+    if(!used){ html += '<button class="btn danger" id="useBtn">✓ Tandai TERPAKAI</button>'; }
+    out.innerHTML = html;
+    if(!used){
+      document.getElementById('useBtn').onclick = async function(ev){
+        if(busy) return; busy=true;
+        var b=ev.target; b.disabled=true; b.textContent='Memproses…';
+        try{
+          await window.OmaOpa.markVoucherUsed(v.code);
+          out.innerHTML = '<div class="res ok"><div class="t">✓ Voucher berhasil dipakai</div>'
+            + '<div class="row">'+esc(v.title||'')+' — <b>'+esc(v.code)+'</b></div>'
+            + '<div class="n" style="margin-top:6px">Berikan benefit ke pelanggan ya.</div></div>'
+            + '<button class="btn sec" id="again">Cek voucher lain</button>';
+          document.getElementById('again').onclick = function(){ refresh(); };
+        }catch(e){
+          out.innerHTML = '<div class="res bad">Gagal menandai: '+esc((e&&e.message)||'coba lagi')+'</div>';
+        }
+        busy=false;
+      };
+    }
+  }
+
+  window.addEventListener('omaopa:ready', refresh);
+  window.addEventListener('omaopa:change', refresh);
+  // fallback kalau core sudah siap sebelum listener terpasang
+  setTimeout(refresh, 800);
+})();
+</script>
+</body>
+</html>

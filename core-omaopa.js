@@ -365,9 +365,50 @@ async function findVoucher(code){
   code=(code||'').trim().toUpperCase(); if(!code) return null;
   try{ const s = await getDoc(doc(db,'vouchers',code)); return s.exists()? Object.assign({code:s.id}, s.data()) : null; }catch(e){ return null; }
 }
+async function getStaffOutlet(){
+  if(!user) return '';
+  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(s.exists()){ const d=s.data(); return d.outlet||d.name||''; } }catch(e){}
+  return '';
+}
 async function markVoucherUsed(code){
   code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
-  await setDoc(doc(db,'vouchers',code), { status:'terpakai', usedAt: serverTimestamp() }, {merge:true});
+  const outlet=await getStaffOutlet();
+  await setDoc(doc(db,'vouchers',code), { status:'terpakai', usedAt: serverTimestamp(), usedOutlet:outlet, usedBy:(user?user.uid:'') }, {merge:true});
+}
+async function getMemberByUid(uid){
+  uid=(uid||'').trim(); if(!uid) return null;
+  try{ const s=await getDoc(doc(db,'users',uid)); if(!s.exists()) return null; const d=s.data();
+    return { uid:uid, name:d.name||'', phone:d.phone||'', points:(typeof d.points==='number')?d.points:0 }; }
+  catch(e){ return null; }
+}
+const EARN_PER_POINT = 4000;   // Rp per 1 poin
+async function awardPoints(uid, nominal){
+  uid=(uid||'').trim(); nominal=Math.max(0, Math.floor(Number(nominal)||0));
+  if(!uid) throw {message:'UID kosong.'};
+  if(nominal<=0) throw {message:'Nominal belanja tidak valid.'};
+  const pts=Math.floor(nominal/EARN_PER_POINT);
+  if(pts<=0) throw {message:'Belanja minimal Rp'+EARN_PER_POINT.toLocaleString('id-ID')+' untuk dapat 1 poin.'};
+  const outlet=await getStaffOutlet();
+  const uref=doc(db,'users',uid); let newTotal=0;
+  await runTransaction(db, async (tx)=>{
+    const us=await tx.get(uref);
+    if(!us.exists()) throw {message:'Member tidak ditemukan.'};
+    const cur=(typeof us.data().points==='number')?us.data().points:0;
+    newTotal=cur+pts;
+    tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
+    const tref=doc(collection(db,'transactions'));
+    tx.set(tref,{ uid:uid, nominal:nominal, points:pts, outlet:outlet, staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
+  });
+  return { points:pts, newTotal:newTotal, outlet:outlet };
+}
+function ensureQRLib(){
+  return new Promise((res,rej)=>{
+    if(window.QRCode) return res();
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload=()=>res(); s.onerror=()=>rej(new Error('QR lib gagal dimuat'));
+    document.head.appendChild(s);
+  });
 }
 
 const styleR = document.createElement('style');
@@ -438,8 +479,11 @@ function renderRewards(){
         return `<div class="rw-voucher"><div class="rw-vt">${v.title||'Voucher'}</div>`
           +`${v.note?`<div class="rw-n">${v.note}</div>`:''}`
           +`<div class="rw-vc">${v.code||'-'}</div>`
-          +`<span class="rw-vs ${st}">${st==='aktif'?'Aktif':'Sudah dipakai'}</span></div>`;
+          +`<span class="rw-vs ${st}">${st==='aktif'?'Aktif':'Sudah dipakai'}</span>`
+          +(st==='aktif'?`<div class="vqr" data-vq="${v.code}" style="width:122px;height:122px;margin:9px auto 0;background:#fff;border:1.5px solid #F1E4CC;border-radius:11px;display:flex;align-items:center;justify-content:center"></div>`:'')
+          +`</div>`;
       }).join('');
+      ensureQRLib().then(()=>{ body.querySelectorAll('.vqr').forEach(el=>{ if(el.dataset.done)return; el.dataset.done='1'; el.innerHTML=''; try{ new QRCode(el,{text:'OMAOPA:VOUCHER:'+el.dataset.vq, width:114, height:114, correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }); }).catch(()=>{});
     });
   }
 }
@@ -456,14 +500,42 @@ rwBk.querySelector('#rwBody').addEventListener('click', async (e)=>{
   }catch(err){ rwBanner=(err&&err.message)||'Gagal menukar.'; renderRewards(); }
 });
 
+// ====== Kartu Member (QR) ======
+const mcBk = document.createElement('div');
+mcBk.className='oo-bk';
+mcBk.innerHTML = `<div class="oo-card" style="position:relative;text-align:center">
+  <button class="oo-x" id="mcX">×</button>
+  <div class="oo-h">Kartu Member 🎫</div>
+  <div id="mcName" style="font-weight:900;color:${CO};font-size:1.05rem;margin-bottom:2px"></div>
+  <div class="rw-pts" id="mcPts">🪙 0 poin</div>
+  <div id="mcQR" style="width:200px;height:200px;margin:6px auto 8px;background:#fff;border:2px solid #F1E4CC;border-radius:14px;display:flex;align-items:center;justify-content:center"></div>
+  <div class="oo-mini">Tunjukkan QR ini ke kasir buat dapat poin tiap belanja.</div>
+</div>`;
+function mountMc(){ if(!document.body.contains(mcBk)) document.body.appendChild(mcBk); }
+if(document.body) mountMc(); else document.addEventListener('DOMContentLoaded', mountMc);
+mcBk.querySelector('#mcX').onclick = ()=> mcBk.classList.remove('show');
+mcBk.addEventListener('click', e=>{ if(e.target===mcBk) mcBk.classList.remove('show'); });
+async function openMemberCard(){
+  if(!user){ openLogin(); return; }
+  mountMc();
+  mcBk.querySelector('#mcName').textContent=(profile&&profile.name)||'Member';
+  mcBk.querySelector('#mcPts').innerHTML='🪙 '+points+' poin';
+  const box=mcBk.querySelector('#mcQR'); box.innerHTML='<span style="color:#b59a7e;font-weight:700;font-size:.8rem">Memuat QR…</span>';
+  mcBk.classList.add('show');
+  try{ await ensureQRLib(); box.innerHTML=''; new QRCode(box,{text:'OMAOPA:MEMBER:'+user.uid, width:188, height:188, correctLevel:QRCode.CorrectLevel.M}); }
+  catch(e){ box.innerHTML='<span style="color:#C0392B;font-weight:700;font-size:.8rem">QR gagal dimuat</span>'; }
+}
+
 // ============================================================
 //  API publik
 // ============================================================
 window.OmaOpa = {
   openLogin, closeLogin,
   openRewards, closeRewards,
+  openMemberCard,
   redeem, listVouchers,
   isStaff, findVoucher, markVoucherUsed,
+  getMemberByUid, awardPoints, getStaffOutlet,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'' } : null,
   getPoints: ()=> points,

@@ -75,7 +75,7 @@
   <h2 class="sec">Pilih permainan</h2>
   <div class="games">
 
-    <a class="gcard" href="topping.html?v=5">
+    <a class="gcard" href="topping.html?v=42">
       <div class="gicon" style="background:#FCEFC2"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M10 17h16l-1.8 11.6a2.2 2.2 0 0 1-2.2 1.9H14a2.2 2.2 0 0 1-2.2-1.9L10 17Z" fill="#F2C14E" stroke="#C98A1B" stroke-width="1.5"/><path d="M8.5 17c0-4.7 4.3-8.5 9.5-8.5S27.5 12.3 27.5 17H8.5Z" fill="#7A4A2B"/><circle cx="18" cy="6.6" r="2.2" fill="#E24B4A"/></svg></div>
       <div class="gname">Menopping Asik!</div>
       <div class="gdesc">Selesaikan pesanan customer dan dapatkan pointnya.</div>
@@ -109,6 +109,12 @@
     <span style="color:#E4CBA8">›</span>
   </a>
 
+  <a class="reward" href="#" id="memberCardBtn">
+    <span class="ra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><rect x="6.5" y="7.5" width="5" height="5" rx="1"/><path d="M14 8h3.5M14 11h3.5M7 15h10"/></svg></span>
+    <span class="rt">Kartu Member (QR saya)</span>
+    <span style="color:#E4CBA8">›</span>
+  </a>
+
 </div>
 
 <div class="nav">
@@ -118,7 +124,7 @@
   <div id="navProfil" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.8" r="3.4"/><path d="M5.5 19.3a6.5 6.5 0 0 1 13 0"/></svg></span>Profil</div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=5"></script>
+<script type="module" src="core-omaopa.js?v=42"></script>
 <script>
   try{ document.getElementById('coin').textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){ document.getElementById('coin').textContent='0'; }
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -130,8 +136,10 @@
   var WA_MSG='Halo Oma Opa Cakery, saya mau pesan 😊';
   var nps=document.getElementById('navPesan'); if(nps) nps.addEventListener('click',function(){ window.open('https://wa.me/'+WA_CS+'?text='+encodeURIComponent(WA_MSG),'_blank'); });
   function openLogin(){ if(window.OmaOpa){ window.OmaOpa.openLogin(); } else { alert('Sedang menyiapkan login, coba lagi sebentar…'); } }
+  function openMemberCard(){ if(window.OmaOpa){ window.OmaOpa.openMemberCard(); } else { soon(); } }
+  var mcb=document.getElementById('memberCardBtn'); if(mcb) mcb.addEventListener('click',function(e){e.preventDefault();openMemberCard();});
   var lh=document.getElementById('loginHint'); if(lh) lh.addEventListener('click',openLogin);
-  var np=document.getElementById('navProfil'); if(np) np.addEventListener('click',openLogin);
+  var np=document.getElementById('navProfil'); if(np) np.addEventListener('click',function(){ if(window.OmaOpa && window.OmaOpa.getUser && window.OmaOpa.getUser()){ openMemberCard(); } else { openLogin(); } });
   window.addEventListener('omaopa:change',function(e){
     var s=e.detail||{}; var el=document.getElementById('loginHint'); if(!el) return;
     if(s.user){ el.innerHTML='👋 Hai, '+(s.user.name||'Sahabat')+' <span style="margin-left:auto;font-weight:800;color:#C98A1B">'+(s.points||0)+' poin ›</span>'; }
