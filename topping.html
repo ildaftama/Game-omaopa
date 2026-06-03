@@ -279,8 +279,7 @@
 
   <div class="sec"><b>1.</b> Pilih bolunya</div>
   <div class="grid-bolu" id="boluGrid"></div>
-  <div class="sec"><b>2.</b> Pasang 2 topping, lalu sajikan</div>
-  <div class="slots" id="slots"></div>
+  <div class="sec"><b>2.</b> Ketuk topping buat pasang · gesek buat isi ulang</div>
   <div class="grid-top" id="topGrid"></div>
 
   <div class="actions">
@@ -539,7 +538,7 @@ function custBubble(rect, text, kind, pos){
   const tf = below ? 'translate(-50%,0)' : 'translate(-50%,-100%)';
   const b=document.createElement('div');
   b.textContent=stripEmoji(text);
-  b.style.cssText='position:fixed;z-index:60;left:'+(rect.left+rect.width/2)+'px;top:'+topPx+'px;transform:'+tf+';background:'+bg+';color:'+fg+';border:2px solid '+bd+';border-radius:13px;padding:4px 10px;font-weight:800;font-size:.78rem;white-space:nowrap;box-shadow:0 5px 14px rgba(0,0,0,.18);pointer-events:none;animation:reactPop 1.7s ease forwards';
+  b.style.cssText='position:fixed;z-index:60;left:'+(rect.left+rect.width/2)+'px;top:'+topPx+'px;transform:'+tf+';background:'+bg+';color:'+fg+';border:2px solid '+bd+';border-radius:13px;padding:4px 10px;font-weight:800;font-size:.74rem;white-space:nowrap;box-shadow:0 5px 14px rgba(0,0,0,.18);pointer-events:none;opacity:.95;animation:reactPop 1.7s ease forwards';
   layer.appendChild(b);
   setTimeout(()=>b.remove(),1700);
 }
@@ -553,7 +552,7 @@ function reactCustomer(o){
     el.classList.remove('cust-sad','cust-happy'); void el.offsetWidth; el.classList.add('cust-sad');
     rect=el.getBoundingClientRect();
   }
-  custBubble(rect, P.fail[(Math.random()*P.fail.length)|0], P.mood==='angry'?'angry':'sad');
+  custBubble(rect, P.fail[(Math.random()*P.fail.length)|0], P.mood==='angry'?'angry':'sad', 'below');
 }
 
 /* ---- BOLU ART ---- */
@@ -701,15 +700,12 @@ function renderTopGrid(){
     const dis=full&&!low;
     return `<div class="card${dis?' dis':''}" data-top="${k}" style="touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none">`
       +`<svg id="sic-${k}" viewBox="-60 -34 120 88" style="${low?'opacity:.34':''}">${toppingMarkup(k,false)}</svg>`
-      +`<div class="nm">${low?'<span style="color:#E24B4A">Tahan untuk isi</span>':TOP[k].name}</div>`
+      +`<div class="nm">${low?'<span style="color:#E24B4A">⟷ Gesek buat isi</span>':TOP[k].name}</div>`
       +`<div style="height:5px;background:#EEE3C8;border-radius:3px;margin-top:3px;overflow:hidden"><div id="sbar-${k}" style="height:100%;width:${pct}%;background:${low?'#E24B4A':'var(--kuning)'};transition:width .1s"></div></div>`
       +`</div>`;
   }).join('');
 }
-function renderSlots(){
-  document.getElementById('slots').innerHTML=[0,1].map(i=>{const k=state.toppings[i];
-    return k?`<div class="slot filled"><svg viewBox="-58 -34 116 84">${toppingMarkup(k,false)}</svg>${TOP[k].name}</div>`:`<div class="slot">Slot ${i+1}</div>`;}).join('');
-}
+function renderSlots(){ const el=document.getElementById('slots'); if(el) el.innerHTML=''; }
 function updateServe(){ const o=activeTicket(); document.getElementById('serveBtn').disabled=!(o&&state.bolu); }
 function renderAll(){ renderOrder();renderStage();renderBoluGrid();renderTopGrid();renderSlots();updateServe();updateHUD(); }
 
@@ -1128,7 +1124,7 @@ function ticketTimeout(o){
   SND.bad(); fx('shake'); toast('Yah, keburu pergi 😢','bad');
   if(state.queue.length<state.maxConc){ state.queue.push(makeTicket()); state.nextSpawnAt=performance.now()+state.spawnGap*1000; }
   ensureActive(); renderAll();
-  if(!o.special) custBubble(rect, o.baby?BABY_SAD[(Math.random()*BABY_SAD.length)|0]:P.fail[(Math.random()*P.fail.length)|0], (o.baby?'sad':(P.mood==='angry'?'angry':'sad')));
+  if(!o.special) custBubble(rect, o.baby?BABY_SAD[(Math.random()*BABY_SAD.length)|0]:P.fail[(Math.random()*P.fail.length)|0], (o.baby?'sad':(P.mood==='angry'?'angry':'sad')), 'below');
 }
 function scoreServe(ord, bolu, tops){
   const parts=bolu.split('_'), jn=parts[0], rs=parts[1];
@@ -1360,28 +1356,44 @@ document.getElementById('boluGrid').addEventListener('click',e=>{const c=e.targe
 function placeTop(k){
   if(state.over||!activeTicket()) return;
   if(state.toppings.indexOf(k)>=0){ toast('Topping itu sudah dipasang','info'); return; }
-  if((state.stock[k]||0)<1){ toast('Stok '+TOP[k].name+' habis—tahan kartunya untuk isi','info'); return; }
+  if((state.stock[k]||0)<1){ toast('Stok '+TOP[k].name+' habis—gesek kartunya buat isi','info'); return; }
   if(state.toppings.length>=2){ toast('Maks 2 topping. Tekan ↺ untuk reset.','info'); return; }
   ensureAudio(); SND.place(); state.stock[k]=(state.stock[k]||0)-1; state.toppings.push(k);
   if(state.autoFill && state.stock[k]<1){ setTimeout(function(){ if(state.stock){ state.stock[k]=(state.capTop||CAP); const bar=document.getElementById('sbar-'+k); if(bar) bar.style.width='100%'; renderTopGrid(); } }, 700); }
   renderStage();renderTopGrid();renderSlots();updateServe();fx('jelly-pop');
 }
-let _hold=null;
-function _fillTick(k){
-  if(state.over){ _endFill(); return; }
-  state.stock[k]=Math.min((state.capTop||CAP),(state.stock[k]||0)+(state.capTop||CAP)*(60/(state.fillMs||1500)));   // isi ke penuh ~1.5 detik
-  const bar=document.getElementById('sbar-'+k); if(bar) bar.style.width=(state.stock[k]/(state.capTop||CAP)*100)+'%';
+let _drag=null;
+function _topFill(k, amount){
+  const cap=(state.capTop||CAP);
+  state.stock[k]=Math.min(cap,(state.stock[k]||0)+amount);
+  const bar=document.getElementById('sbar-'+k); if(bar) bar.style.width=(state.stock[k]/cap*100)+'%';
   const ic=document.getElementById('sic-'+k); if(ic&&state.stock[k]>=1) ic.style.opacity='1';
-  if(state.stock[k]>=(state.capTop||CAP)){ state.stock[k]=(state.capTop||CAP); _endFill(); renderTopGrid(); }
 }
-function _beginFill(k){ ensureAudio(); if(!_hold) return; _hold.filling=true; if(_hold.iv) clearInterval(_hold.iv); _hold.iv=setInterval(()=>_fillTick(k),60); }
-function _endFill(){ if(_hold&&_hold.iv){ clearInterval(_hold.iv); _hold.iv=null; } }
 (function(){
   const tg=document.getElementById('topGrid');
-  tg.addEventListener('pointerdown',e=>{const c=e.target.closest('[data-top]');if(!c||state.over)return;const k=c.dataset.top;_hold={k,filling:false,iv:null,t:setTimeout(()=>_beginFill(k),160)};});
-  tg.addEventListener('pointerup',()=>{ if(!_hold)return; clearTimeout(_hold.t); if(_hold.filling){ _endFill(); _hold=null; } else { const k=_hold.k; _hold=null; placeTop(k); } });
-  tg.addEventListener('pointercancel',()=>{ if(_hold){ clearTimeout(_hold.t); _endFill(); _hold=null; } });
-  window.addEventListener('pointerup',()=>{ if(_hold){ clearTimeout(_hold.t); _endFill(); _hold=null; } });
+  tg.addEventListener('pointerdown',e=>{
+    const c=e.target.closest('[data-top]'); if(!c||state.over) return;
+    ensureAudio();
+    try{ c.setPointerCapture(e.pointerId); }catch(_){}
+    _drag={k:c.dataset.top, x:e.clientX, y:e.clientY, moved:0, filled:false, beep:0};
+  });
+  tg.addEventListener('pointermove',e=>{
+    if(!_drag) return;
+    const dx=Math.abs(e.clientX-_drag.x)+Math.abs(e.clientY-_drag.y);
+    _drag.x=e.clientX; _drag.y=e.clientY; _drag.moved+=dx;
+    if(_drag.moved>12){
+      _drag.filled=true;
+      const cap=(state.capTop||CAP);
+      const before=state.stock[_drag.k]||0;
+      _topFill(_drag.k, dx*(cap/130));   // gesek ~130px = penuh
+      _drag.beep+=dx;
+      if(_drag.beep>34 && before<cap){ _drag.beep=0; try{SND.place();}catch(_){}}
+    }
+  });
+  function finish(){ if(!_drag) return; const d=_drag; _drag=null; if(d.filled){ renderTopGrid(); } else { placeTop(d.k); } }
+  tg.addEventListener('pointerup',finish);
+  tg.addEventListener('pointercancel',()=>{ if(_drag){ const f=_drag.filled; _drag=null; if(f) renderTopGrid(); } });
+  window.addEventListener('pointerup',()=>{ if(_drag){ const f=_drag.filled; _drag=null; if(f) renderTopGrid(); } });
 })();
 document.getElementById('orderCard').addEventListener('click',e=>{const t=e.target.closest('[data-tid]');if(!t||state.over)return;selectTicket(parseInt(t.dataset.tid,10));});
 document.getElementById('clearBtn').addEventListener('click',()=>{if(state.over)return;ensureAudio();SND.blip();refundToppings();renderStage();renderTopGrid();renderSlots();updateServe();});
@@ -1389,7 +1401,7 @@ document.getElementById('serveBtn').addEventListener('click',serve);
 document.getElementById('lvlGrid').addEventListener('click',e=>{const b=e.target.closest('[data-lvl]');if(!b)return;ensureAudio();SND.blip();startLevel(parseInt(b.dataset.lvl,10));});
 showStart();
 </script>
-<script type="module" src="core-omaopa.js?v=40"></script>
+<script type="module" src="core-omaopa.js?v=41"></script>
 <script>
   (function(){
     function paintAcct(s){
