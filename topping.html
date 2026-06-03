@@ -1191,6 +1191,7 @@ function levelDone(){
   const dv=document.getElementById('dangerVig'); if(dv) dv.classList.remove('on');
   const n=state.level, sc=state.score||0, pts=Math.floor(sc/10);
   setBest(n,sc); if(pts>0) addPoints(pts);
+  try{ if(window.OmaOpa && window.OmaOpa.submitScore) window.OmaOpa.submitScore(sc); }catch(e){}
   const nx=n+1; if(nx<=MAX_LEVEL && sc>=(UNLOCK[nx]||0)) setUnlocked(nx);
   showScore(n, sc, pts);
 }
@@ -1229,12 +1230,16 @@ function showScore(n, sc, pts){
   }
   b+='<button class="act clear" id="retryBtn">Ulangi Level '+n+'</button>';
   b+='<button class="act pick" id="lvlSelBtn2">🎮 Pilih Level</button>';
+  b+='<button class="act pick" id="boardBtn2">🏆 Papan Skor</button>';
   b+='<button class="act clear" id="menuBtn">Menu</button>';
+  b+='<button class="act pick" id="homeBtn2">🏠 Beranda</button>';
   btns.innerHTML=b;
   var nb=document.getElementById('nextBtn'); if(nb) nb.onclick=function(){ startLevel(next<=MAX_LEVEL?next:1); };
   document.getElementById('retryBtn').onclick=function(){ startLevel(n); };
   document.getElementById('lvlSelBtn2').onclick=openLvlSelect;
   document.getElementById('menuBtn').onclick=showStart;
+  var bb2=document.getElementById('boardBtn2'); if(bb2) bb2.onclick=function(){ if(window.OmaOpa&&window.OmaOpa.openScoreboard){ window.OmaOpa.openScoreboard(); } };
+  var hb2=document.getElementById('homeBtn2'); if(hb2) hb2.onclick=function(){ location.href='index.html'; };
   document.getElementById('overlay').classList.add('show');
 }
 function startLevel(n){
@@ -1345,10 +1350,12 @@ function showStart(){
   t.textContent='Menopping Asik! 🧁';
   s.innerHTML='<div style="font-size:.95rem;color:#7A5A12;font-weight:700;line-height:1.35">Layani pelanggan & kejar skor setinggi-tingginya dalam 1 menit. Salah cuma putus combo, bukan game over!</div>';
   sub.innerHTML='<span style="font-size:.8rem;color:#b3a280">10 level • makin tinggi makin chaos 😆</span><div style="font-size:.72rem;color:#9a8a6a;margin-top:8px;font-weight:700">🏪 Outlet kamu</div><div id="startOutlet">'+outletStripHTML()+'</div>';
-  btns.innerHTML='<button class="act serve" id="playBtn">Main ▶</button><button class="act pick" id="lvlSelBtn">🎮 Pilih Level</button><button class="act pick" id="shopBtn">🛒 Toko Outlet</button>';
+  btns.innerHTML='<button class="act serve" id="playBtn">Main ▶</button><button class="act pick" id="lvlSelBtn">🎮 Pilih Level</button><button class="act pick" id="boardBtn">🏆 Papan Skor</button><button class="act pick" id="shopBtn">🛒 Toko Outlet</button><button class="act pick" id="homeBtn">🏠 Beranda</button>';
   document.getElementById('playBtn').onclick=function(){ startLevel(1); };
   document.getElementById('lvlSelBtn').onclick=openLvlSelect;
   document.getElementById('shopBtn').onclick=openShop;
+  var bb=document.getElementById('boardBtn'); if(bb) bb.onclick=function(){ if(window.OmaOpa&&window.OmaOpa.openScoreboard){ window.OmaOpa.openScoreboard(); } };
+  var hb=document.getElementById('homeBtn'); if(hb) hb.onclick=function(){ location.href='index.html'; };
   document.getElementById('overlay').classList.add('show');
 }
 
@@ -1401,7 +1408,7 @@ document.getElementById('serveBtn').addEventListener('click',serve);
 document.getElementById('lvlGrid').addEventListener('click',e=>{const b=e.target.closest('[data-lvl]');if(!b)return;ensureAudio();SND.blip();startLevel(parseInt(b.dataset.lvl,10));});
 showStart();
 </script>
-<script type="module" src="core-omaopa.js?v=44"></script>
+<script type="module" src="core-omaopa.js?v=47"></script>
 <script>
   (function(){
     function paintAcct(s){

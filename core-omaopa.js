@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, onSnapshot, increment, serverTimestamp,
-  runTransaction, collection, getDocs, query, orderBy, where
+  runTransaction, collection, getDocs, query, orderBy, where, limit
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -137,6 +137,7 @@ onAuthStateChanged(auth, async (u)=>{
       profile = data;
       points = (typeof data.points==='number') ? data.points : 0;
       emit();
+      if(d.exists()) mirrorLeaderboard(data.name, points);
     }, ()=>{});
   } else {
     profile = null;
@@ -324,13 +325,29 @@ const REWARDS = [
   { id:'d10',     cost:150,  limit:500, title:'Diskon 10%' },
   { id:'ft',      cost:200,  limit:500, title:'Gratis topping 1 malmil', note:'tiap pembelian 3 malmil' },
   { id:'d15',     cost:250,  limit:500, title:'Diskon 15%' },
-  { id:'fm',      cost:350,  limit:500, title:'Gratis malmil polos', note:'tiap transaksi Rp50.000' },
+  { id:'fm',      cost:350,  limit:500, title:'Gratis malmil polos' },
   { id:'d30',     cost:400,  limit:100, title:'Diskon 30%', note:'maksimal Rp50.000' },
-  { id:'tb',      cost:500,  limit:500, title:'Gratis totebag', note:'tiap pembelian ogura topping' },
   { id:'fmt',     cost:500,  limit:100, title:'Free Malmil Topping' },
   { id:'totebag', cost:750,  limit:200, title:'Tote Bag Oma Opa' },
   { id:'payung',  cost:1000, limit:200, title:'Payung Oma Opa' }
 ];
+function rewardIcon(rw){
+  const id=rw.id; let bg, svg;
+  if(id==='payung'){
+    bg='#FFF3CC';
+    svg='<svg viewBox="0 0 24 24" width="30" height="30" fill="none"><path d="M3 11 Q3 3.2 12 3 Q21 3.2 21 11 Q19 9.3 17 11 Q15 9.3 13 11 Q11 9.3 9 11 Q7 9.3 5 11 Q4 9.5 3 11 Z" fill="#FACC1A" stroke="#E0B100" stroke-width="1" stroke-linejoin="round"/><path d="M12 3 V2.1" stroke="#7A5A12" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="1.8" r=".9" fill="#7A5A12"/><path d="M12 11 V18.2" stroke="#7A5A12" stroke-width="1.6" stroke-linecap="round"/><path d="M12 18.2 Q12 20.4 9.6 20.4 Q8.2 20.4 8.2 19.2" fill="none" stroke="#7A5A12" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  } else if(id==='totebag'){
+    bg='#F3E6D2';
+    svg='<svg viewBox="0 0 24 24" width="30" height="30" fill="none"><path d="M6 8.3h12l1 11.2a1 1 0 0 1-1 1.1H6a1 1 0 0 1-1-1.1Z" fill="#E0B17A" stroke="#A9743C" stroke-width="1.1" stroke-linejoin="round"/><path d="M9 8.5V6.7a3 3 0 0 1 6 0v1.8" stroke="#A9743C" stroke-width="1.6" stroke-linecap="round"/><path d="M9.4 12.5h5.2" stroke="#A9743C" stroke-width="1.3" stroke-linecap="round" opacity=".6"/></svg>';
+  } else if(id==='ft'||id==='fm'||id==='fmt'){
+    bg='#FDEFD3';
+    svg='<svg viewBox="0 0 24 24" width="32" height="32" fill="none"><path d="M4 12h16v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1" stroke-linejoin="round"/><path d="M3.4 12.3C3 8 6.6 5 12 5s9 3 8.6 7.3Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1" stroke-linejoin="round"/><ellipse cx="9" cy="8.2" rx="3.6" ry="1.3" fill="#fff" opacity=".35"/><ellipse cx="9.5" cy="15.4" rx="1" ry="1.3" fill="#5a3b2e"/><ellipse cx="14.5" cy="15.4" rx="1" ry="1.3" fill="#5a3b2e"/><path d="M11 16.7q1 .8 2 0" stroke="#5a3b2e" stroke-width=".9" fill="none" stroke-linecap="round"/><circle cx="7.3" cy="16.1" r=".9" fill="#F4A6B0" opacity=".6"/><circle cx="16.7" cy="16.1" r=".9" fill="#F4A6B0" opacity=".6"/></svg>';
+  } else {
+    bg='#E3F4EE';
+    svg='<svg viewBox="0 0 24 24" width="30" height="30" fill="none"><path d="M12.6 3H20a1 1 0 0 1 1 1v7.4a2 2 0 0 1-.6 1.4l-7.1 7.1a2 2 0 0 1-2.8 0l-6.4-6.4a2 2 0 0 1 0-2.8l7.1-7.1A2 2 0 0 1 12.6 3Z" fill="#7CC9B5" stroke="#3E9B83" stroke-width="1.1" stroke-linejoin="round"/><circle cx="16.8" cy="7.2" r="1.4" fill="#fff"/><path d="M9.3 14.7l5.4-5.4" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/><circle cx="9.7" cy="9.9" r="1.1" fill="#fff"/><circle cx="14.3" cy="14.5" r="1.1" fill="#fff"/></svg>';
+  }
+  return '<div class="rw-ic" style="background:'+bg+'">'+svg+'</div>';
+}
 let rewardStock = {};   // id -> jumlah yang sudah diklaim (claimed)
 async function listRewardStock(){
   try{
@@ -418,6 +435,7 @@ async function awardPoints(uid, nominal){
     const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||'';
     newTotal=cur+pts;
     tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
+    tx.set(doc(db,'leaderboard',uid), { name:mname, points:newTotal, updatedAt:serverTimestamp() }, {merge:true});
     const tref=doc(collection(db,'transactions'));
     tx.set(tref,{ uid:uid, name:mname, nominal:nominal, points:pts, outlet:outlet, staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
   });
@@ -444,6 +462,52 @@ async function listUsedVouchers(outlet){
     arr.sort((a,b)=>b.ts-a.ts); return arr;
   }catch(e){ return []; }
 }
+// ---- leaderboard / skor / riwayat (cermin publik: hanya nama + angka) ----
+function mirrorLeaderboard(name, pts){
+  if(!user) return;
+  try{ setDoc(doc(db,'leaderboard',user.uid), { name:name||'', points:(typeof pts==='number'?pts:0), updatedAt:serverTimestamp() }, {merge:true}); }catch(e){}
+}
+async function listPointLeaderboard(n){
+  n=n||50;
+  try{
+    const q=query(collection(db,'leaderboard'), orderBy('points','desc'), limit(n));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ uid:d.id, name:x.name||'Sahabat', points:(typeof x.points==='number')?x.points:0 }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function submitScore(score){
+  score=Math.round(Number(score)||0);
+  if(!user || score<=0) return null;
+  const nm=(profile&&profile.name)||user.displayName||'';
+  const ref=doc(db,'scores',user.uid);
+  try{
+    const s=await getDoc(ref); const prev=(s.exists()&&typeof s.data().score==='number')?s.data().score:0;
+    if(score>prev){ await setDoc(ref,{ name:nm, score:score, updatedAt:serverTimestamp() },{merge:true}); return {best:score, prev:prev, improved:true}; }
+    return {best:prev, prev:prev, improved:false};
+  }catch(e){ return null; }
+}
+async function listScoreLeaderboard(n){
+  n=n||50;
+  try{
+    const q=query(collection(db,'scores'), orderBy('score','desc'), limit(n));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ uid:d.id, name:x.name||'Pemain', score:(typeof x.score==='number')?x.score:0 }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function listMyTransactions(){
+  if(!user) return [];
+  try{
+    const q=query(collection(db,'transactions'), where('uid','==',user.uid));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, nominal:x.nominal||0, points:x.points||0, outlet:x.outlet||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    arr.sort((a,b)=>b.ts-a.ts); return arr;
+  }catch(e){ return []; }
+}
+function escHtml(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function rpFmt(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
+function dtFmt(ts){ try{ return ts?new Date(ts).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'-'; }catch(e){ return '-'; } }
 function ensureQRLib(){
   return new Promise((res,rej)=>{
     if(window.QRCode) return res();
@@ -474,6 +538,7 @@ styleR.textContent = `
 .rw-empty{text-align:center;color:#b59a7e;font-weight:700;font-size:.85rem;padding:18px 6px}
 .rw-banner{background:#E7F6E7;color:#2E7D32;border-radius:11px;padding:9px 11px;font-size:.82rem;font-weight:800;text-align:center;margin-bottom:10px}
 .rw-item{align-items:stretch}
+.rw-ic{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;align-self:center}
 .rw-act{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:5px;min-width:86px}
 .rw-act .rw-c{margin-bottom:0}
 .rw-stock{font-size:.66rem;font-weight:800;color:#9a7a5e;margin-top:6px}
@@ -481,6 +546,20 @@ styleR.textContent = `
 .rw-bar>span{display:block;height:100%;background:linear-gradient(90deg,#FACC1A,#E0915B);border-radius:999px;transition:width .4s}
 .rw-badge{display:inline-block;font-size:.6rem;font-weight:900;background:#FFE2E2;color:#C0392B;border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:middle}
 .rw-item.rw-out{opacity:.6}
+.lb-body{max-height:60vh;overflow:auto;margin-top:4px}
+.lb-loading,.lb-empty{text-align:center;color:#b59a7e;font-weight:700;font-size:.85rem;padding:22px 8px;line-height:1.5}
+.lb-pts{display:block;width:max-content;margin:2px auto 12px;background:#fff;border:2px solid #F1E4CC;border-radius:999px;padding:6px 16px;font-weight:900;color:#7A5A12}
+.lb-row{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:9px 12px;margin-bottom:7px}
+.lb-row.lb-me{border-color:#FACC1A;background:#FFFBEC}
+.lb-rank{font-weight:900;color:#C98A1B;min-width:28px;text-align:center;font-size:.98rem}
+.lb-name{flex:1;min-width:0;font-weight:800;color:#613925;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-youtag{font-size:.58rem;font-weight:900;background:#FACC1A;color:#5A3A05;border-radius:999px;padding:1px 7px;vertical-align:middle;margin-left:4px}
+.lb-val{font-weight:900;color:#7A5A12;font-size:.9rem;white-space:nowrap}
+.hs-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:9px 12px;margin-bottom:7px}
+.hs-out{font-weight:800;color:#613925;font-size:.9rem}
+.hs-date{font-size:.7rem;color:#9a7a5e;font-weight:700;margin-top:1px}
+.hs-nom{font-weight:900;color:#613925;font-size:.9rem;text-align:right}
+.hs-pts{font-size:.72rem;color:#2E7D32;font-weight:900;text-align:right;margin-top:1px}
 `;
 document.head.appendChild(styleR);
 
@@ -525,6 +604,7 @@ function renderRewards(){
       const pct = lim ? Math.min(100, Math.round(claimed/lim*100)) : 0;
       const stockTxt = remain===null ? '' : (habis ? '🚫 Stok habis' : ('Sisa '+remain+' / '+lim+' pcs'));
       return `<div class="rw-item${habis?' rw-out':''}">`
+        +rewardIcon(rw)
         +`<div class="rw-info"><div class="rw-t">${rw.title}${low?' <span class="rw-badge">Hampir habis!</span>':''}</div>`
         +`${rw.note?`<div class="rw-n">${rw.note}</div>`:''}`
         +`${remain!==null?`<div class="rw-stock">${stockTxt}</div><div class="rw-bar"><span style="width:${pct}%"></span></div>`:''}</div>`
@@ -591,6 +671,53 @@ async function openMemberCard(){
   catch(e){ box.innerHTML='<span style="color:#C0392B;font-weight:700;font-size:.8rem">QR gagal dimuat</span>'; }
 }
 
+// ====== Leaderboard / Riwayat ======
+function makeListOverlay(){
+  const bk=document.createElement('div'); bk.className='oo-bk';
+  bk.innerHTML=`<div class="oo-card" style="position:relative"><button class="oo-x">×</button><div class="oo-h"></div><div class="lb-body"></div></div>`;
+  function mount(){ if(!document.body.contains(bk)) document.body.appendChild(bk); }
+  if(document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
+  bk.querySelector('.oo-x').onclick=()=>bk.classList.remove('show');
+  bk.addEventListener('click',e=>{ if(e.target===bk) bk.classList.remove('show'); });
+  return { bk, mount, head:bk.querySelector('.oo-h'), body:bk.querySelector('.lb-body') };
+}
+const lbO=makeListOverlay(), sbO=makeListOverlay(), hsO=makeListOverlay();
+const MEDAL=['🥇','🥈','🥉'];
+function renderRankList(list, key, emoji){
+  if(!list.length) return '<div class="lb-empty">Belum ada data.<br>Jadilah yang pertama di papan ini! 🚀</div>';
+  const myUid = user? user.uid : null;
+  return list.map((r,i)=>{
+    const me = myUid && r.uid===myUid;
+    const rank = i<3? MEDAL[i] : (i+1);
+    return `<div class="lb-row${me?' lb-me':''}"><div class="lb-rank">${rank}</div>`
+      +`<div class="lb-name">${escHtml(r.name)}${me?' <span class="lb-youtag">kamu</span>':''}</div>`
+      +`<div class="lb-val">${emoji} ${r[key]}</div></div>`;
+  }).join('');
+}
+async function openLeaderboard(){
+  lbO.mount(); lbO.head.textContent='🏆 Peringkat Poin';
+  lbO.body.innerHTML='<div class="lb-loading">Memuat peringkat…</div>'; lbO.bk.classList.add('show');
+  const list=await listPointLeaderboard(50);
+  lbO.body.innerHTML='<div class="oo-mini" style="margin:0 0 10px">Siapa raja poin Oma Opa? Kumpulkan poin biar naik peringkat!</div>'+renderRankList(list,'points','🪙');
+}
+async function openScoreboard(){
+  sbO.mount(); sbO.head.textContent='🏆 Raja Skor Menopping';
+  sbO.body.innerHTML='<div class="lb-loading">Memuat peringkat…</div>'; sbO.bk.classList.add('show');
+  const list=await listScoreLeaderboard(50);
+  sbO.body.innerHTML='<div class="oo-mini" style="margin:0 0 10px">Skor tertinggi para pemain. Pecahkan rekornya!</div>'+renderRankList(list,'score','⭐');
+}
+async function openHistory(){
+  hsO.mount(); hsO.head.textContent='🧾 Riwayat Belanja';
+  if(!user){ hsO.body.innerHTML='<div class="lb-empty">Masuk dulu untuk melihat riwayat belanja & poinmu.</div>'; hsO.bk.classList.add('show'); return; }
+  hsO.body.innerHTML='<div class="lb-pts">🪙 '+points+' poin</div><div class="lb-loading">Memuat riwayat…</div>'; hsO.bk.classList.add('show');
+  const list=await listMyTransactions();
+  let html='<div class="lb-pts">🪙 '+points+' poin</div>';
+  if(!list.length){ html+='<div class="lb-empty">Belum ada transaksi.<br>Belanja di outlet & tunjukkan QR member buat dapat poin! 🛍️</div>'; }
+  else { html+=list.map(x=>`<div class="hs-item"><div><div class="hs-out">${escHtml(x.outlet||'Oma Opa Cakery')}</div><div class="hs-date">${dtFmt(x.ts)}</div></div>`
+      +`<div><div class="hs-nom">${rpFmt(x.nominal)}</div><div class="hs-pts">+${x.points} poin</div></div></div>`).join(''); }
+  hsO.body.innerHTML=html;
+}
+
 // ============================================================
 //  API publik
 // ============================================================
@@ -598,12 +725,14 @@ window.OmaOpa = {
   openLogin, closeLogin,
   openRewards, closeRewards,
   openMemberCard,
+  openLeaderboard, openScoreboard, openHistory,
+  submitScore, listPointLeaderboard, listScoreLeaderboard, listMyTransactions,
   redeem, listVouchers,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers,
   signOut: doSignOut,
-  getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'' } : null,
+  getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'', phone:(profile&&profile.phone)||'' } : null,
   getPoints: ()=> points,
   addPoints,                  // dipanggil game saat dapat poin
   onChange: (cb)=>{ listeners.push(cb); try{ cb(snapshot()); }catch(e){} return ()=>{ const i=listeners.indexOf(cb); if(i>=0) listeners.splice(i,1); }; }
