@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Admin — Oma Opa Cakery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --kuning:#FACC1A; --kuning-d:#E0B100; --coklat:#613925; --cream:#FFF8EC; }
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
+    background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream); min-height:100vh; padding:18px 14px 50px; }
+  .wrap{ max-width:460px; margin:0 auto; }
+  .head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .head h1{ font-family:'Fredoka'; font-size:1.2rem; margin:0; }
+  .badge{ font-size:.66rem; font-weight:900; background:var(--coklat); color:#fff; padding:2px 9px; border-radius:999px; }
+  .card{ background:#fff; border:2px solid #EFE2C4; border-radius:18px; padding:16px; margin-bottom:14px; }
+  .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  label{ font-size:.76rem; font-weight:800; color:#8a6a3a; display:block; margin:10px 0 5px; }
+  input,select{ width:100%; border:2px solid #E7D8BE; border-radius:11px; padding:11px; font-size:.95rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
+  input:focus,select:focus{ outline:none; border-color:var(--kuning); }
+  .btn{ width:100%; border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:.98rem; border-radius:12px; padding:12px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; margin-top:10px; }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--kuning-d); }
+  .btn[disabled]{ opacity:.55; }
+  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #E7D8BE; box-shadow:none; }
+  .btn.green{ background:#2E7D32; color:#fff; box-shadow:0 3px 0 #1B5E20; }
+  .btn.red{ background:#C0392B; color:#fff; box-shadow:0 3px 0 #922B21; }
+  .btn.sm{ width:auto; padding:7px 12px; font-size:.8rem; margin:0; }
+  .tabs{ display:flex; gap:6px; margin-bottom:14px; }
+  .tabs button{ flex:1; border:2px solid #EFE2C4; background:#fff; color:var(--coklat); font-weight:900; font-size:.82rem; border-radius:12px; padding:10px 4px; cursor:pointer; font-family:inherit; }
+  .tabs button.on{ background:var(--coklat); color:#fff; border-color:var(--coklat); }
+  .res{ border-radius:13px; padding:13px; margin-top:12px; }
+  .ok{ background:#E7F6E7; border:2px solid #B7E0B7; } .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; } .warn{ background:#FFF3D6; border:2px solid #F2D98A; }
+  .row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid #F2E8D5; }
+  .row:first-child{ border-top:none; }
+  .grow{ flex:1; min-width:0; }
+  .nm{ font-weight:900; } .sub{ font-size:.76rem; color:#9a7a5e; font-weight:700; }
+  .tag{ font-size:.66rem; font-weight:900; border-radius:999px; padding:3px 9px; }
+  .tag.on{ background:#2E7D32; color:#fff; } .tag.off{ background:#bdae98; color:#fff; }
+  .pts{ font-weight:900; color:#C98A1B; }
+  .uid{ font-family:monospace; font-size:.78rem; background:#F1E4CC; border-radius:8px; padding:6px 9px; word-break:break-all; margin-top:6px; }
+  a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+  .area-h{ font-size:.7rem;font-weight:900;color:#fff;background:var(--coklat);border-radius:8px;padding:5px 10px;margin:12px 0 2px;text-transform:uppercase;letter-spacing:.5px;}
+  .hint{ font-size:.72rem;color:#a98e6e;font-weight:600;margin-top:5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>Admin Oma Opa</h1><span class="badge">MASTER</span></div>
+  <div id="gate" class="card"><div class="muted">Menyiapkan…</div></div>
+  <div id="app" style="display:none">
+    <div class="tabs">
+      <button data-tab="rekap" class="on">📊 Rekap</button>
+      <button data-tab="member">👤 Member</button>
+      <button data-tab="outlet">🏪 Outlet</button>
+    </div>
+    <div id="tab"></div>
+  </div>
+  <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
+</div>
+
+<script src="outlets-data.js?v=48"></script>
+<script type="module" src="core-omaopa.js?v=48"></script>
+<script>
+(function(){
+  var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
+  var tab='rekap', sel=null, busy=false;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
+
+  async function boot(){
+    O=window.OmaOpa; if(!O){ gate.innerHTML='<div class="muted">Menyiapkan…</div>'; return; }
+    var u=O.getUser();
+    if(!u){ gate.innerHTML='<div class="muted">Halaman khusus admin. Silakan masuk dulu.</div><button class="btn" id="lg">Masuk</button>';
+      document.getElementById('lg').onclick=function(){ O.openLogin(); }; app.style.display='none'; return; }
+    gate.innerHTML='<div class="muted">Memeriksa akses admin…</div>';
+    var adm=false; try{ adm=await O.isAdmin(); }catch(e){}
+    if(!adm){ gate.innerHTML='<div style="font-weight:900;color:#C0392B">Akun ini bukan admin.</div>'
+        +'<div class="muted" style="margin-top:8px">Minta admin menandai akun (UID) ini dengan <b>admin: true</b> di koleksi <b>staff</b>:</div>'
+        +'<div class="uid">'+esc(u.uid)+'</div>'
+        +'<button class="btn sec" id="out">Keluar / ganti akun</button>';
+      document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} };
+      app.style.display='none'; return; }
+    gate.style.display='none'; app.style.display='';
+    render();
+  }
+  document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
+    tab=b.getAttribute('data-tab'); document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on'); render();
+  }; });
+  function render(){ if(tab==='rekap') renderRekap(); else if(tab==='member') renderMember(); else renderOutlet(); }
+
+  /* ---------- REKAP ---------- */
+  function renderRekap(){
+    tabEl.innerHTML='<div class="card"><div class="nm">Rekap transaksi & voucher</div>'
+      +'<div class="muted" style="margin:6px 0 12px">Lihat seluruh outlet, filter per outlet & tanggal, lalu export CSV. Sebagai admin kamu otomatis melihat <b>semua outlet</b>.</div>'
+      +'<a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=48">Buka Halaman Rekap →</a></div>';
+  }
+
+  /* ---------- MEMBER ---------- */
+  function renderMember(){
+    tabEl.innerHTML='<div class="card"><div class="nm">Cari member</div>'
+      +'<label>Nama atau No. HP</label><input id="mq" placeholder="cth: Budi / 0812...">'
+      +'<button class="btn" id="mfind">Cari member</button><div id="mlist"></div></div>'
+      +'<div id="mdetail"></div>';
+    var q=document.getElementById('mq');
+    document.getElementById('mfind').onclick=doFind; q.addEventListener('keydown',function(e){ if(e.key==='Enter') doFind(); });
+  }
+  async function doFind(){
+    var q=document.getElementById('mq').value.trim(); var box=document.getElementById('mlist');
+    box.innerHTML='<div class="muted" style="margin-top:10px">Mencari…</div>';
+    var arr=[];
+    try{
+      if(/^[0-9+]/.test(q)){ var one=await O.getMemberByPhone(q); arr=one?[one]:[]; }
+      if(!arr.length){ arr=await O.listMembers(q,500); }
+    }catch(e){ arr=[]; }
+    if(!arr.length){ box.innerHTML='<div class="res warn" style="margin-top:10px">Member tidak ditemukan.</div>'; return; }
+    box.innerHTML=arr.slice(0,40).map(function(m){
+      return '<div class="row"><div class="grow"><div class="nm">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+esc(m.phone||'-')+' · <span class="pts">'+m.points+' poin</span></div></div>'
+        +'<button class="btn sm" data-uid="'+esc(m.uid)+'">Pilih</button></div>'; }).join('')
+      + (arr.length>40?'<div class="hint">Menampilkan 40 dari '+arr.length+'. Persempit pencarian.</div>':'');
+    box.querySelectorAll('[data-uid]').forEach(function(b){ b.onclick=function(){ openMember(b.getAttribute('data-uid')); }; });
+  }
+  async function openMember(uid){
+    var d=document.getElementById('mdetail'); d.innerHTML='<div class="card muted">Memuat member…</div>';
+    var m=null,score=0; try{ m=await O.getMemberByUid(uid); score=await O.getMemberScore(uid); }catch(e){}
+    if(!m){ d.innerHTML='<div class="card"><div class="res bad">Member tidak ditemukan.</div></div>'; return; }
+    sel=m;
+    d.innerHTML='<div class="card"><div class="nm" style="font-size:1.05rem">'+esc(m.name||'Member')+'</div>'
+      +'<div class="sub" style="margin:3px 0 10px">'+esc(m.phone||'-')+'</div>'
+      +'<div class="row" style="border:none;padding:0"><div class="grow">Poin saat ini</div><div class="pts" style="font-size:1.1rem">'+m.points+'</div></div>'
+      +'<div class="row"><div class="grow">Skor game terbaik</div><div class="pts" style="font-size:1.1rem">'+score+'</div></div>'
+
+      +'<label>Tambah / kurangi poin (boleh minus)</label><input id="adl" inputmode="numeric" placeholder="cth: 10 atau -5">'
+      +'<label>Alasan (opsional, tampil di rekap)</label><input id="adr" placeholder="cth: kasir lupa input UMS">'
+      +'<button class="btn" id="adBtn">Terapkan penyesuaian poin</button>'
+
+      +'<label style="margin-top:16px">Set poin jadi (angka pasti)</label><input id="spv" inputmode="numeric" placeholder="cth: 100">'
+      +'<button class="btn sec" id="spBtn">Set poin</button>'
+
+      +'<label style="margin-top:16px">Set skor game jadi</label><input id="ssv" inputmode="numeric" placeholder="cth: 250">'
+      +'<button class="btn sec" id="ssBtn">Set skor</button>'
+
+      +'<div id="mmsg"></div></div>';
+    document.getElementById('adBtn').onclick=function(){ run(function(){ return O.adminAdjustPoints(uid, parseInt(document.getElementById('adl').value||'0',10)||0, document.getElementById('adr').value); }, 'Poin disesuaikan.'); };
+    document.getElementById('spBtn').onclick=function(){ run(function(){ return O.adminSetPoints(uid, parseInt(document.getElementById('spv').value||'0',10)||0, document.getElementById('adr').value||'Set poin admin'); }, 'Poin di-set.'); };
+    document.getElementById('ssBtn').onclick=function(){ run(function(){ return O.adminSetScore(uid, parseInt(document.getElementById('ssv').value||'0',10)||0); }, 'Skor di-set.'); };
+    function run(fn, okmsg){
+      if(busy) return; busy=true; var msg=document.getElementById('mmsg'); msg.innerHTML='<div class="muted" style="margin-top:10px">Memproses…</div>';
+      Promise.resolve().then(fn).then(function(r){ busy=false; msg.innerHTML='<div class="res ok">✓ '+okmsg+'</div>'; openMember(uid); })
+        .catch(function(e){ busy=false; msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'coba lagi')+'</div>'; });
+    }
+  }
+
+  /* ---------- OUTLET ---------- */
+  async function renderOutlet(){
+    tabEl.innerHTML='<div class="card"><div class="nm">Tambah outlet baru</div>'
+      +'<label>Nama outlet</label><input id="oNm" placeholder="cth: Oma Opa Cakery Gajah Raya Semarang">'
+      +'<label>Area</label><input id="oAr" placeholder="cth: Semarang">'
+      +'<label>Link Google Maps (opsional)</label><input id="oMp" placeholder="https://maps.app.goo.gl/...">'
+      +'<button class="btn" id="oAdd">＋ Tambah outlet</button><div id="oMsg"></div></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar outlet</div><button class="btn sm sec" id="oReload">↻</button></div><div id="oList"><div class="muted">Memuat…</div></div></div>';
+    document.getElementById('oAdd').onclick=async function(){
+      if(busy) return; busy=true; var msg=document.getElementById('oMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+      try{ await O.addOutlet({ name:document.getElementById('oNm').value, area:document.getElementById('oAr').value, maps:document.getElementById('oMp').value });
+        msg.innerHTML='<div class="res ok">✓ Outlet ditambahkan.</div>'; document.getElementById('oNm').value=''; document.getElementById('oMp').value=''; loadOutlets();
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      busy=false;
+    };
+    document.getElementById('oReload').onclick=loadOutlets;
+    loadOutlets();
+  }
+  async function loadOutlets(){
+    var box=document.getElementById('oList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listOutlets(); }catch(e){}
+    if(!arr.length){
+      box.innerHTML='<div class="res warn">Belum ada outlet di database.</div>'
+        +'<button class="btn green" id="oSeed">Impor '+((window.OMA_OUTLETS||[]).length)+' outlet dari file</button>'
+        +'<div class="hint">Sekali klik untuk memindahkan daftar outlet bawaan ke database, supaya bisa dikelola di sini.</div>';
+      var sb=document.getElementById('oSeed'); if(sb) sb.onclick=async function(){ if(busy) return; busy=true; sb.disabled=true; sb.textContent='Mengimpor…';
+        try{ var r=await O.seedOutlets(window.OMA_OUTLETS||[]); box.innerHTML='<div class="res ok">✓ '+r.count+' outlet diimpor.</div>'; loadOutlets(); }
+        catch(e){ box.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+      return;
+    }
+    var areas=[]; arr.forEach(function(o){ if(areas.indexOf(o.area)<0) areas.push(o.area); });
+    var PRIO=['Yogya','Solo Raya','Semarang']; areas.sort(function(a,b){ var ia=PRIO.indexOf(a),ib=PRIO.indexOf(b); if(ia<0)ia=99; if(ib<0)ib=99; return ia!==ib?ia-ib:a.localeCompare(b); });
+    var html='';
+    areas.forEach(function(a){
+      html+='<div class="area-h">'+esc(a)+'</div>';
+      arr.filter(function(o){ return o.area===a; }).forEach(function(o){
+        var label=o.name.replace(/^Oma Opa Cakery\s*/i,'');
+        html+='<div class="row"><div class="grow"><div class="nm">'+esc(label)+'</div>'
+          +'<div class="sub">'+(o.maps?'<a class="link" href="'+esc(o.maps)+'" target="_blank">Lihat Maps</a>':'(tanpa maps)')+'</div></div>'
+          +'<span class="tag '+(o.active?'on':'off')+'">'+(o.active?'AKTIF':'OFF')+'</span>'
+          +'<button class="btn sm sec" data-tog="'+esc(o.id)+'" data-act="'+(o.active?'1':'0')+'">'+(o.active?'Nonaktifkan':'Aktifkan')+'</button>'
+          +'<button class="btn sm red" data-del="'+esc(o.id)+'" data-nm="'+esc(label)+'">Hapus</button></div>';
+      });
+    });
+    box.innerHTML=html;
+    box.querySelectorAll('[data-tog]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true;
+      try{ await O.updateOutlet(b.getAttribute('data-tog'), { active: b.getAttribute('data-act')!=='1' }); loadOutlets(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=async function(){ if(busy) return;
+      if(!confirm('Hapus outlet "'+b.getAttribute('data-nm')+'"? Tindakan ini permanen.')) return;
+      busy=true; b.disabled=true; try{ await O.deleteOutlet(b.getAttribute('data-del')); loadOutlets(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+  }
+
+  window.addEventListener('omaopa:ready', boot);
+  window.addEventListener('omaopa:change', function(){ if(app.style.display==='none') boot(); });
+  setTimeout(boot, 800);
+})();
+</script>
+</body>
+</html>

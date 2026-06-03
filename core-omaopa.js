@@ -11,7 +11,7 @@ import {
   signOut as fbSignOut, updateProfile
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, onSnapshot, increment, serverTimestamp,
+  getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, increment, serverTimestamp,
   runTransaction, collection, getDocs, query, orderBy, where, limit
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
@@ -719,6 +719,94 @@ async function openHistory(){
 }
 
 // ============================================================
+//  ADMIN / AKUN MASTER — kelola member, poin, skor, outlet
+// ============================================================
+async function isAdmin(){ const s=await getStaffInfo(); return !!(s&&s.admin); }
+async function getMemberByPhone(phone){
+  const p=normPhone(phone); if(!p) return null;
+  try{ const snap=await getDocs(query(collection(db,'users'), where('phone','==',p), limit(1)));
+    let r=null; snap.forEach(d=>{ if(!r){ const x=d.data(); r={uid:d.id,name:x.name||'',phone:x.phone||'',points:(typeof x.points==='number')?x.points:0}; } }); return r;
+  }catch(e){ return null; }
+}
+async function listMembers(qstr, n){
+  n=n||500; qstr=(qstr||'').trim().toLowerCase();
+  try{ const snap=await getDocs(query(collection(db,'users'), limit(n))); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); const nm=(x.name||''), ph=(x.phone||'');
+      if(qstr && nm.toLowerCase().indexOf(qstr)<0 && ph.indexOf(qstr)<0) return;
+      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0}); });
+    arr.sort((a,b)=>b.points-a.points); return arr;
+  }catch(e){ return []; }
+}
+async function getMemberScore(uid){ try{ const s=await getDoc(doc(db,'scores',(uid||'').trim())); return s.exists()?(s.data().score||0):0; }catch(e){ return 0; } }
+async function adminAdjustPoints(uid, delta, reason){
+  uid=(uid||'').trim(); delta=Math.floor(Number(delta)||0);
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!uid) throw {message:'Member belum dipilih.'};
+  if(!delta) throw {message:'Jumlah poin tidak boleh 0.'};
+  const uref=doc(db,'users',uid); let newTotal=0, mname='', applied=0;
+  await runTransaction(db, async(tx)=>{
+    const us=await tx.get(uref); if(!us.exists()) throw {message:'Member tidak ditemukan.'};
+    const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||'';
+    newTotal=Math.max(0, cur+delta); applied=newTotal-cur;
+    tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
+    tx.set(doc(db,'leaderboard',uid), { name:mname, points:newTotal, updatedAt:serverTimestamp() },{merge:true});
+    const tref=doc(collection(db,'transactions'));
+    tx.set(tref,{ uid:uid, name:mname, nominal:0, points:applied, outlet:(reason||'Penyesuaian admin'), kind:'adjust', staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
+  });
+  return { newTotal:newTotal, applied:applied, name:mname };
+}
+async function adminSetPoints(uid, value, reason){
+  value=Math.max(0, Math.floor(Number(value)||0));
+  const m=await getMemberByUid(uid); if(!m) throw {message:'Member tidak ditemukan.'};
+  return adminAdjustPoints(uid, value-m.points, reason||'Set poin admin');
+}
+async function adminSetScore(uid, value){
+  uid=(uid||'').trim(); value=Math.max(0, Math.floor(Number(value)||0));
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!uid) throw {message:'Member belum dipilih.'};
+  const m=await getMemberByUid(uid);
+  await setDoc(doc(db,'scores',uid), { name:(m&&m.name)||'Pemain', score:value, updatedAt:serverTimestamp() },{merge:true});
+  return { score:value };
+}
+function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || ('o'+Date.now()); }
+async function listOutlets(){
+  try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', active:x.active!==false }); });
+    arr.sort((a,b)=>(a.area||'').localeCompare(b.area||'')||(a.name||'').localeCompare(b.name||'')); return arr;
+  }catch(e){ return []; }
+}
+async function listPublicOutlets(){
+  try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); if(x.active===false) return; arr.push({ name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'' }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function addOutlet(o){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  o=o||{}; if(!o.name||!o.name.trim()) throw {message:'Nama outlet wajib diisi.'};
+  const id=slug(o.name);
+  await setDoc(doc(db,'outlets',id), { name:o.name.trim(), area:(o.area||'Lainnya').trim(), maps:(o.maps||'').trim(), active:true, updatedAt:serverTimestamp() },{merge:true});
+  return { id:id };
+}
+async function updateOutlet(id, patch){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!id) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'outlets',id), Object.assign({updatedAt:serverTimestamp()}, patch||{}), {merge:true});
+}
+async function deleteOutlet(id){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!id) throw {message:'ID kosong.'};
+  await deleteDoc(doc(db,'outlets',id));
+}
+async function seedOutlets(arr){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  arr=arr||[]; let n=0;
+  for(const o of arr){ if(!o||!o.name) continue;
+    await setDoc(doc(db,'outlets',slug(o.name)), { name:o.name, area:o.area||'Lainnya', maps:o.maps||'', active:true, updatedAt:serverTimestamp() },{merge:true}); n++; }
+  return { count:n };
+}
+
+// ============================================================
 //  API publik
 // ============================================================
 window.OmaOpa = {
@@ -731,6 +819,9 @@ window.OmaOpa = {
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers,
+  isAdmin, getMemberByPhone, listMembers, getMemberScore,
+  adminAdjustPoints, adminSetPoints, adminSetScore,
+  listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'', phone:(profile&&profile.phone)||'' } : null,
   getPoints: ()=> points,
