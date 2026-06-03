@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rekap — Oma Opa Cakery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --kuning:#FACC1A; --kuning-d:#E0B100; --coklat:#613925; --cream:#FFF8EC; }
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
+    background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream);
+    min-height:100vh; padding:18px 14px 50px; }
+  .wrap{ max-width:780px; margin:0 auto; }
+  .head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .head h1{ font-family:'Fredoka'; font-size:1.2rem; margin:0; color:var(--coklat); }
+  .badge{ font-size:.66rem; font-weight:900; background:var(--kuning); color:#5A3A05; padding:2px 9px; border-radius:999px; }
+  .badge.adm{ background:#2E7D32; color:#fff; }
+  .card{ background:#fff; border:2px solid #EFE2C4; border-radius:18px; padding:16px; margin-bottom:14px; }
+  .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  label{ font-size:.72rem; font-weight:800; color:#8a6a3a; display:block; margin:0 0 4px; }
+  input,select{ width:100%; border:2px solid #E7D8BE; border-radius:11px; padding:9px 10px; font-size:.92rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
+  input:focus,select:focus{ outline:none; border-color:var(--kuning); }
+  .filters{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .filters .full{ grid-column:1 / -1; }
+  .btn{ border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:.92rem; border-radius:12px; padding:11px 14px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--kuning-d); }
+  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #E7D8BE; box-shadow:none; }
+  .tabs{ display:flex; gap:8px; margin-bottom:12px; }
+  .tab{ flex:1; text-align:center; padding:9px; border-radius:11px; font-weight:800; font-size:.85rem; background:#F3EBD9; color:#9a7a5e; cursor:pointer; }
+  .tab.on{ background:var(--coklat); color:#fff; }
+  .stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+  .stat{ background:#FFF7E0; border:2px solid #F1E4CC; border-radius:13px; padding:9px; text-align:center; }
+  .stat .v{ font-weight:900; font-size:1.05rem; color:var(--coklat); }
+  .stat .k{ font-size:.62rem; font-weight:800; color:#b08e3a; margin-top:1px; }
+  .tbl{ width:100%; border-collapse:collapse; font-size:.78rem; }
+  .tbl th{ text-align:left; background:#F7EFDD; color:#7A5A12; font-weight:900; padding:7px 8px; position:sticky; top:0; }
+  .tbl td{ padding:7px 8px; border-top:1px solid #F1E8D6; }
+  .tbl tr:nth-child(even) td{ background:#FCF8EF; }
+  .scroll{ max-height:54vh; overflow:auto; border:2px solid #F1E4CC; border-radius:13px; }
+  .empty{ text-align:center; color:#b59a7e; font-weight:700; padding:24px 6px; }
+  .right{ text-align:right; }
+  a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>📊 Rekap Oma Opa</h1><span class="badge" id="roleBadge">…</span>
+    <span style="margin-left:auto"><a class="link" href="staff.html">‹ Kasir</a></span>
+  </div>
+  <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
+</div>
+
+<script type="module" src="core-omaopa.js?v=44"></script>
+<script>
+(function(){
+  var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
+  var info=null, tab='txn', allTxn=[], allVou=[];
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+  function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
+  function fmt(ts){ try{ return ts?new Date(ts).toLocaleString('id-ID',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'-'; }catch(e){ return '-'; } }
+  function ymd(d){ var z=function(n){return (n<10?'0':'')+n;}; return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
+
+  async function boot(){
+    if(!window.OmaOpa){ panel.innerHTML='<div class="muted">Menyiapkan…</div>'; return; }
+    var u=window.OmaOpa.getUser();
+    if(!u){ roleBadge.textContent='—'; panel.innerHTML='<div class="muted">Khusus staff. Silakan masuk.</div><button class="btn" id="lg" style="margin-top:10px">Masuk</button>'; document.getElementById('lg').onclick=function(){ window.OmaOpa.openLogin(); }; return; }
+    panel.innerHTML='<div class="muted">Memeriksa akses…</div>';
+    try{ info=await window.OmaOpa.getStaffInfo(); }catch(e){ info=null; }
+    if(!info){ roleBadge.textContent='—'; panel.innerHTML='<div class="muted" style="color:#C0392B;font-weight:900">Akun ini bukan staff.</div><div class="uid"></div><button class="btn sec" id="o" style="margin-top:10px">Keluar</button>'; document.getElementById('o').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} }; return; }
+    roleBadge.textContent = info.admin ? 'ADMIN' : 'STAFF';
+    roleBadge.className = 'badge'+(info.admin?' adm':'');
+    renderShell();
+    await loadData();
+    render();
+  }
+
+  function renderShell(){
+    var to=new Date(); var from=new Date(); from.setDate(from.getDate()-29);
+    panel.innerHTML=
+      '<div class="muted" style="margin-bottom:10px">Outlet: <b style="color:#613925">'+(info.admin?'Semua (admin)':esc(info.outlet||'-'))+'</b></div>'
+      + '<div class="filters">'
+      +   '<div><label>Dari tanggal</label><input type="date" id="from" value="'+ymd(from)+'"></div>'
+      +   '<div><label>Sampai tanggal</label><input type="date" id="to" value="'+ymd(to)+'"></div>'
+      +   (info.admin?'<div class="full"><label>Outlet</label><select id="outSel"><option value="">Semua outlet</option></select></div>':'')
+      + '</div>'
+      + '<div class="tabs" style="margin-top:12px"><div class="tab on" data-t="txn">Transaksi Poin</div><div class="tab" data-t="vou">Voucher Terpakai</div></div>'
+      + '<div id="body"></div>'
+      + '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="reload">↻ Muat ulang</button><button class="btn sec" id="csv">⬇ Export CSV</button></div>';
+    document.getElementById('from').addEventListener('change',render);
+    document.getElementById('to').addEventListener('change',render);
+    var os=document.getElementById('outSel'); if(os) os.addEventListener('change',render);
+    panel.querySelectorAll('.tab').forEach(function(t){ t.onclick=function(){ tab=t.dataset.t; panel.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x.dataset.t===tab);}); render(); }; });
+    document.getElementById('reload').onclick=async function(){ var b=this; b.disabled=true; b.textContent='Memuat…'; await loadData(); render(); b.disabled=false; b.textContent='↻ Muat ulang'; };
+    document.getElementById('csv').onclick=exportCSV;
+  }
+
+  async function loadData(){
+    var body=document.getElementById('body'); if(body) body.innerHTML='<div class="empty">Memuat data…</div>';
+    var oArg = info.admin ? null : (info.outlet||'');
+    try{ allTxn = await window.OmaOpa.listTransactions(oArg); }catch(e){ allTxn=[]; }
+    try{ allVou = await window.OmaOpa.listUsedVouchers(oArg); }catch(e){ allVou=[]; }
+    if(info.admin){
+      var os=document.getElementById('outSel'); if(os){
+        var set={}; allTxn.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allVou.forEach(function(r){ if(r.outlet) set[r.outlet]=1; });
+        var keys=Object.keys(set).sort(); var cur=os.value;
+        os.innerHTML='<option value="">Semua outlet</option>'+keys.map(function(k){return '<option value="'+esc(k)+'">'+esc(k)+'</option>';}).join('');
+        os.value=cur;
+      }
+    }
+  }
+
+  function curRange(){
+    var f=document.getElementById('from').value, t=document.getElementById('to').value;
+    var from = f ? new Date(f+'T00:00:00').getTime() : 0;
+    var to = t ? new Date(t+'T23:59:59').getTime() : Date.now()+864e5;
+    var outlet = info.admin ? (document.getElementById('outSel')?document.getElementById('outSel').value:'') : (info.outlet||'');
+    return {from:from,to:to,outlet:outlet};
+  }
+  function filterRows(rows){
+    var r=curRange();
+    return rows.filter(function(x){ return x.ts>=r.from && x.ts<=r.to && (!r.outlet || x.outlet===r.outlet); });
+  }
+
+  function render(){
+    var body=document.getElementById('body'); if(!body) return;
+    if(tab==='txn'){
+      var rows=filterRows(allTxn);
+      var omzet=0, poin=0; rows.forEach(function(x){ omzet+=(x.nominal||0); poin+=(x.points||0); });
+      var head='<div class="stats">'
+        +'<div class="stat"><div class="v">'+rows.length+'</div><div class="k">TRANSAKSI</div></div>'
+        +'<div class="stat"><div class="v">'+rp(omzet)+'</div><div class="k">OMZET</div></div>'
+        +'<div class="stat"><div class="v">'+poin+'</div><div class="k">POIN DIBERI</div></div></div>';
+      if(!rows.length){ body.innerHTML=head+'<div class="empty">Belum ada transaksi pada rentang ini.</div>'; return; }
+      var t='<div class="scroll"><table class="tbl"><thead><tr><th>Waktu</th><th>Outlet</th><th>Member</th><th class="right">Nominal</th><th class="right">Poin</th></tr></thead><tbody>'
+        + rows.map(function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.name||x.uid.slice(0,6))+'</td><td class="right">'+rp(x.nominal)+'</td><td class="right">+'+x.points+'</td></tr>'; }).join('')
+        + '</tbody></table></div>';
+      body.innerHTML=head+t;
+    } else {
+      var rows2=filterRows(allVou);
+      var head2='<div class="stats"><div class="stat"><div class="v">'+rows2.length+'</div><div class="k">VOUCHER TERPAKAI</div></div></div>';
+      if(!rows2.length){ body.innerHTML=head2+'<div class="empty">Belum ada voucher terpakai pada rentang ini.</div>'; return; }
+      var t2='<div class="scroll"><table class="tbl"><thead><tr><th>Waktu</th><th>Outlet</th><th>Kode</th><th>Voucher</th><th>Member</th></tr></thead><tbody>'
+        + rows2.map(function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.title||'-')+'</td><td>'+esc(x.name||'-')+'</td></tr>'; }).join('')
+        + '</tbody></table></div>';
+      body.innerHTML=head2+t2;
+    }
+  }
+
+  function csvCell(s){ s=String(s==null?'':s); return '"'+s.replace(/"/g,'""')+'"'; }
+  function exportCSV(){
+    var lines=[], fname;
+    if(tab==='txn'){
+      var rows=filterRows(allTxn);
+      lines.push(['Waktu','Outlet','Member','UID','Nominal','Poin'].map(csvCell).join(','));
+      rows.forEach(function(x){ lines.push([fmt(x.ts),x.outlet,x.name,x.uid,x.nominal,x.points].map(csvCell).join(',')); });
+      fname='rekap-transaksi.csv';
+    } else {
+      var rows2=filterRows(allVou);
+      lines.push(['Waktu','Outlet','Kode','Voucher','Member','UID'].map(csvCell).join(','));
+      rows2.forEach(function(x){ lines.push([fmt(x.ts),x.outlet,x.code,x.title,x.name,x.uid].map(csvCell).join(',')); });
+      fname='rekap-voucher.csv';
+    }
+    var blob=new Blob(["\ufeff"+lines.join("\r\n")], {type:'text/csv;charset=utf-8;'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+  }
+
+  window.addEventListener('omaopa:ready', boot);
+  window.addEventListener('omaopa:change', function(){ /* re-evaluate auth only if not loaded */ if(!info) boot(); });
+  setTimeout(boot, 800);
+})();
+</script>
+</body>
+</html>

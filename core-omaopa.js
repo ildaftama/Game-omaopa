@@ -171,6 +171,7 @@ async function registerPhonePin(data){
   try{ await updateProfile(user,{displayName:name.trim()}); }catch(e){}
   await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, occupation, consent:true, provider:'phone', profileComplete:true });
   pushToSheet({
+    type: 'member',
     waktu: new Date().toISOString(),
     uid: user.uid,
     nama: name.trim(),
@@ -319,13 +320,25 @@ bk.addEventListener('click', e=>{ if(e.target===bk) closeLogin(); });
 //  REWARD / VOUCHER
 // ============================================================
 const REWARDS = [
-  { id:'d5',  cost:100, title:'Diskon 5%' },
-  { id:'d10', cost:150, title:'Diskon 10%' },
-  { id:'ft',  cost:200, title:'Gratis topping 1 malmil', note:'tiap pembelian 3 malmil' },
-  { id:'d15', cost:250, title:'Diskon 15%' },
-  { id:'fm',  cost:350, title:'Gratis malmil polos', note:'tiap transaksi Rp50.000' },
-  { id:'tb',  cost:500, title:'Gratis totebag', note:'tiap pembelian ogura topping' }
+  { id:'d5',      cost:100,  limit:500, title:'Diskon 5%' },
+  { id:'d10',     cost:150,  limit:500, title:'Diskon 10%' },
+  { id:'ft',      cost:200,  limit:500, title:'Gratis topping 1 malmil', note:'tiap pembelian 3 malmil' },
+  { id:'d15',     cost:250,  limit:500, title:'Diskon 15%' },
+  { id:'fm',      cost:350,  limit:500, title:'Gratis malmil polos', note:'tiap transaksi Rp50.000' },
+  { id:'d30',     cost:400,  limit:100, title:'Diskon 30%', note:'maksimal Rp50.000' },
+  { id:'tb',      cost:500,  limit:500, title:'Gratis totebag', note:'tiap pembelian ogura topping' },
+  { id:'fmt',     cost:500,  limit:100, title:'Free Malmil Topping' },
+  { id:'totebag', cost:750,  limit:200, title:'Tote Bag Oma Opa' },
+  { id:'payung',  cost:1000, limit:200, title:'Payung Oma Opa' }
 ];
+let rewardStock = {};   // id -> jumlah yang sudah diklaim (claimed)
+async function listRewardStock(){
+  try{
+    const snap = await getDocs(collection(db,'rewards'));
+    const m={}; snap.forEach(d=>{ const x=d.data(); m[d.id]=(typeof x.claimed==='number')?x.claimed:0; });
+    return m;
+  }catch(e){ return {}; }
+}
 function genCode(){
   const t = Date.now().toString(36).toUpperCase().slice(-4);
   const r = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4).padEnd(4,'X');
@@ -333,18 +346,24 @@ function genCode(){
 }
 async function redeem(rewardId){
   if(!user) throw {message:'Masuk dulu untuk menukar poin.'};
-  const rw = REWARDS.find(x=>x.id===rewardId); if(!rw) throw {message:'Voucher tidak ditemukan.'};
+  const rw = REWARDS.find(x=>x.id===rewardId); if(!rw) throw {message:'Hadiah tidak ditemukan.'};
   const uref = doc(db,'users',user.uid);
+  const rref = doc(db,'rewards',rw.id);
   const code = genCode();
   const vref = doc(db,'vouchers',code);
   const nm = (profile&&profile.name)||user.displayName||'';
   await runTransaction(db, async (tx)=>{
     const us = await tx.get(uref);
+    const rs = await tx.get(rref);
     const cur = (us.exists() && typeof us.data().points==='number') ? us.data().points : 0;
+    const claimed = (rs.exists() && typeof rs.data().claimed==='number') ? rs.data().claimed : 0;
+    if(typeof rw.limit==='number' && claimed >= rw.limit) throw {message:'Yah, stok hadiah ini sudah habis 😢'};
     if(cur < rw.cost) throw {message:'Poin belum cukup.'};
     tx.set(uref, { points: cur - rw.cost, updatedAt: serverTimestamp() }, {merge:true});
+    tx.set(rref, { claimed: claimed + 1, limit: (rw.limit||null), title: rw.title, updatedAt: serverTimestamp() }, {merge:true});
     tx.set(vref, { code:code, uid:user.uid, name:nm, rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, status:'aktif', createdAt: serverTimestamp() });
   });
+  rewardStock[rw.id] = (rewardStock[rw.id]||0) + 1;
   return code;
 }
 async function listVouchers(){
@@ -373,7 +392,10 @@ async function getStaffOutlet(){
 async function markVoucherUsed(code){
   code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
   const outlet=await getStaffOutlet();
+  let data={};
+  try{ const s=await getDoc(doc(db,'vouchers',code)); if(s.exists()) data=s.data(); }catch(e){}
   await setDoc(doc(db,'vouchers',code), { status:'terpakai', usedAt: serverTimestamp(), usedOutlet:outlet, usedBy:(user?user.uid:'') }, {merge:true});
+  pushToSheet({ type:'voucher', waktu:new Date().toISOString(), outlet:outlet, kode:code, title:data.title||'', nama:data.name||'', uid:data.uid||'' });
 }
 async function getMemberByUid(uid){
   uid=(uid||'').trim(); if(!uid) return null;
@@ -389,17 +411,38 @@ async function awardPoints(uid, nominal){
   const pts=Math.floor(nominal/EARN_PER_POINT);
   if(pts<=0) throw {message:'Belanja minimal Rp'+EARN_PER_POINT.toLocaleString('id-ID')+' untuk dapat 1 poin.'};
   const outlet=await getStaffOutlet();
-  const uref=doc(db,'users',uid); let newTotal=0;
+  const uref=doc(db,'users',uid); let newTotal=0, mname='';
   await runTransaction(db, async (tx)=>{
     const us=await tx.get(uref);
     if(!us.exists()) throw {message:'Member tidak ditemukan.'};
-    const cur=(typeof us.data().points==='number')?us.data().points:0;
+    const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||'';
     newTotal=cur+pts;
     tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
     const tref=doc(collection(db,'transactions'));
-    tx.set(tref,{ uid:uid, nominal:nominal, points:pts, outlet:outlet, staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
+    tx.set(tref,{ uid:uid, name:mname, nominal:nominal, points:pts, outlet:outlet, staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
   });
+  pushToSheet({ type:'txn', waktu:new Date().toISOString(), outlet:outlet, nama:mname, uid:uid, nominal:nominal, poin:pts });
   return { points:pts, newTotal:newTotal, outlet:outlet };
+}
+async function getStaffInfo(){
+  if(!user) return null;
+  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true }; }catch(e){ return null; }
+}
+async function listTransactions(outlet){
+  try{
+    const q = outlet ? query(collection(db,'transactions'), where('outlet','==',outlet)) : collection(db,'transactions');
+    const snap = await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, uid:x.uid||'', name:x.name||'', nominal:x.nominal||0, points:x.points||0, outlet:x.outlet||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    arr.sort((a,b)=>b.ts-a.ts); return arr;
+  }catch(e){ return []; }
+}
+async function listUsedVouchers(outlet){
+  try{
+    const q = query(collection(db,'vouchers'), where('status','==','terpakai'));
+    const snap = await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); const o=x.usedOutlet||''; if(outlet && o!==outlet) return; arr.push({ code:d.id, title:x.title||'', name:x.name||'', uid:x.uid||'', outlet:o, ts:(x.usedAt&&x.usedAt.seconds)?x.usedAt.seconds*1000:0 }); });
+    arr.sort((a,b)=>b.ts-a.ts); return arr;
+  }catch(e){ return []; }
 }
 function ensureQRLib(){
   return new Promise((res,rej)=>{
@@ -430,6 +473,14 @@ styleR.textContent = `
 .rw-vs.terpakai{background:#F1EDE6;color:#9a8b78}
 .rw-empty{text-align:center;color:#b59a7e;font-weight:700;font-size:.85rem;padding:18px 6px}
 .rw-banner{background:#E7F6E7;color:#2E7D32;border-radius:11px;padding:9px 11px;font-size:.82rem;font-weight:800;text-align:center;margin-bottom:10px}
+.rw-item{align-items:stretch}
+.rw-act{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:5px;min-width:86px}
+.rw-act .rw-c{margin-bottom:0}
+.rw-stock{font-size:.66rem;font-weight:800;color:#9a7a5e;margin-top:6px}
+.rw-bar{height:6px;background:#EFE6D2;border-radius:999px;overflow:hidden;margin-top:3px}
+.rw-bar>span{display:block;height:100%;background:linear-gradient(90deg,#FACC1A,#E0915B);border-radius:999px;transition:width .4s}
+.rw-badge{display:inline-block;font-size:.6rem;font-weight:900;background:#FFE2E2;color:#C0392B;border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:middle}
+.rw-item.rw-out{opacity:.6}
 `;
 document.head.appendChild(styleR);
 
@@ -449,11 +500,12 @@ rwBk.innerHTML = `<div class="oo-card" style="position:relative">
 function mountRw(){ if(!document.body.contains(rwBk)) document.body.appendChild(rwBk); }
 if(document.body) mountRw(); else document.addEventListener('DOMContentLoaded', mountRw);
 let rwTab='katalog', rwBanner='';
-function openRewards(){ mountRw(); rwTab='katalog'; rwBanner=''; renderRewards(); rwBk.classList.add('show'); }
+function openRewards(){ mountRw(); rwTab='katalog'; rwBanner=''; renderRewards(); rwBk.classList.add('show'); refreshStock(); }
 function closeRewards(){ rwBk.classList.remove('show'); rwBanner=''; }
+function refreshStock(){ listRewardStock().then(s=>{ rewardStock=s; if(rwBk.classList.contains('show') && rwTab==='katalog') renderRewards(); }); }
 rwBk.querySelector('#rwX').onclick = closeRewards;
 rwBk.addEventListener('click', e=>{ if(e.target===rwBk) closeRewards(); });
-rwBk.querySelectorAll('.oo-tab').forEach(t=> t.onclick = ()=>{ rwTab=t.dataset.rt; rwBanner=''; renderRewards(); });
+rwBk.querySelectorAll('.oo-tab').forEach(t=> t.onclick = ()=>{ rwTab=t.dataset.rt; rwBanner=''; renderRewards(); if(rwTab==='katalog') refreshStock(); });
 
 function renderRewards(){
   const rp=rwBk.querySelector('#rwPts'); if(rp) rp.innerHTML='🪙 '+points+' poin';
@@ -462,12 +514,23 @@ function renderRewards(){
   const body=rwBk.querySelector('#rwBody'); if(!body) return;
   if(rwTab==='katalog'){
     body.innerHTML = REWARDS.map(rw=>{
-      const can = !!user && points>=rw.cost;
-      const label = !user ? 'Masuk' : (points>=rw.cost ? 'Tukar' : 'Kurang');
-      const dis = (!user) ? '' : (points>=rw.cost ? '' : 'disabled');
-      return `<div class="rw-item"><div class="rw-info"><div class="rw-t">${rw.title}</div>${rw.note?`<div class="rw-n">${rw.note}</div>`:''}</div>`
-        +`<div><div class="rw-c">${rw.cost} poin</div><button class="rw-btn" data-rid="${rw.id}" ${dis}>${label}</button></div></div>`;
-    }).join('') + `<div class="oo-mini">Tukarkan kode voucher ke kasir Oma Opa saat membeli.</div>`;
+      const claimed = rewardStock[rw.id]||0;
+      const lim = rw.limit||0;
+      const remain = lim ? Math.max(0, lim-claimed) : null;
+      const habis = remain!==null && remain<=0;
+      const low = remain!==null && remain>0 && remain<=Math.max(10, Math.round(lim*0.1));
+      const enough = !!user && points>=rw.cost;
+      const label = !user ? 'Masuk' : (habis ? 'Habis' : (enough ? 'Tukar' : 'Kurang'));
+      const dis = (!user) ? '' : ((habis||!enough) ? 'disabled' : '');
+      const pct = lim ? Math.min(100, Math.round(claimed/lim*100)) : 0;
+      const stockTxt = remain===null ? '' : (habis ? '🚫 Stok habis' : ('Sisa '+remain+' / '+lim+' pcs'));
+      return `<div class="rw-item${habis?' rw-out':''}">`
+        +`<div class="rw-info"><div class="rw-t">${rw.title}${low?' <span class="rw-badge">Hampir habis!</span>':''}</div>`
+        +`${rw.note?`<div class="rw-n">${rw.note}</div>`:''}`
+        +`${remain!==null?`<div class="rw-stock">${stockTxt}</div><div class="rw-bar"><span style="width:${pct}%"></span></div>`:''}</div>`
+        +`<div class="rw-act"><div class="rw-c">${rw.cost} poin</div>`
+        +`<button class="rw-btn" data-rid="${rw.id}" ${dis}>${label}</button></div></div>`;
+    }).join('') + `<div class="oo-mini">Stok terbatas — siapa cepat dia dapat! Tunjukkan kode/QR voucher ke kasir Oma Opa.</div>`;
   } else {
     body.innerHTML = `<div class="rw-empty">Memuat voucher…</div>`;
     listVouchers().then(list=>{
@@ -496,7 +559,7 @@ rwBk.querySelector('#rwBody').addEventListener('click', async (e)=>{
   b.disabled=true; b.textContent='…';
   try{
     const code = await redeem(rid);
-    rwTab='voucher'; rwBanner='Berhasil! Kode voucher: '+code+' — tunjukkan ke kasir.'; renderRewards();
+    rwTab='voucher'; rwBanner='Berhasil! Kode voucher: '+code+' — tunjukkan ke kasir.'; renderRewards(); refreshStock();
   }catch(err){ rwBanner=(err&&err.message)||'Gagal menukar.'; renderRewards(); }
 });
 
@@ -510,10 +573,12 @@ mcBk.innerHTML = `<div class="oo-card" style="position:relative;text-align:cente
   <div class="rw-pts" id="mcPts">🪙 0 poin</div>
   <div id="mcQR" style="width:200px;height:200px;margin:6px auto 8px;background:#fff;border:2px solid #F1E4CC;border-radius:14px;display:flex;align-items:center;justify-content:center"></div>
   <div class="oo-mini">Tunjukkan QR ini ke kasir buat dapat poin tiap belanja.</div>
+  <button class="oo-out" id="mcOut" style="margin-top:12px">Keluar akun</button>
 </div>`;
 function mountMc(){ if(!document.body.contains(mcBk)) document.body.appendChild(mcBk); }
 if(document.body) mountMc(); else document.addEventListener('DOMContentLoaded', mountMc);
 mcBk.querySelector('#mcX').onclick = ()=> mcBk.classList.remove('show');
+mcBk.querySelector('#mcOut').onclick = async ()=>{ try{ await doSignOut(); }catch(e){} mcBk.classList.remove('show'); };
 mcBk.addEventListener('click', e=>{ if(e.target===mcBk) mcBk.classList.remove('show'); });
 async function openMemberCard(){
   if(!user){ openLogin(); return; }
@@ -536,6 +601,7 @@ window.OmaOpa = {
   redeem, listVouchers,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
+  getStaffInfo, listTransactions, listUsedVouchers,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'' } : null,
   getPoints: ()=> points,
