@@ -53,7 +53,7 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=48"></script>
+<script type="module" src="core-omaopa.js?v=49"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
 (function(){
@@ -98,13 +98,13 @@
       + '<input id="code" placeholder="OO-XXXXXXXX" autocomplete="off" autocapitalize="characters">'
       + '<button class="btn sec" id="checkBtn">Cek voucher</button>'
       + '<div id="out"></div>'
-      + '<div style="text-align:right;margin-top:14px"><a class="link" href="rekap.html?v=48">📊 Rekap</a> &nbsp;·&nbsp; <a class="link" id="logoutStaff" href="#">Keluar staff</a></div>';
+      + '<div style="text-align:right;margin-top:14px"><a class="link" href="rekap.html?v=49">📊 Rekap</a> &nbsp;·&nbsp; <a class="link" id="logoutStaff" href="#">Keluar staff</a></div>';
     document.getElementById('scanBtn').onclick = toggleScan;
     var input = document.getElementById('code');
     document.getElementById('checkBtn').onclick = function(){ doCheck(input.value); };
     input.addEventListener('keydown', function(e){ if(e.key==='Enter') doCheck(input.value); });
     document.getElementById('logoutStaff').onclick = async function(e){ e.preventDefault(); await stopScan(); try{ await window.OmaOpa.signOut(); }catch(e){} };
-    try{ if(window.OmaOpa.isAdmin && await window.OmaOpa.isAdmin()){ var rl=panel.querySelector('a.link[href^="rekap"]'); if(rl) rl.insertAdjacentHTML('afterend', ' &nbsp;·&nbsp; <a class="link" href="admin.html?v=48">🛠️ Admin</a>'); } }catch(e){}
+    try{ if(window.OmaOpa.isAdmin && await window.OmaOpa.isAdmin()){ var rl=panel.querySelector('a.link[href^="rekap"]'); if(rl) rl.insertAdjacentHTML('afterend', ' &nbsp;·&nbsp; <a class="link" href="admin.html?v=49">🛠️ Admin</a>'); } }catch(e){}
   }
 
   async function toggleScan(){

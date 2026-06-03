@@ -11,7 +11,7 @@ import {
   signOut as fbSignOut, updateProfile
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, increment, serverTimestamp,
+  getFirestore, doc, getDoc, setDoc, deleteDoc, addDoc, onSnapshot, increment, serverTimestamp,
   runTransaction, collection, getDocs, query, orderBy, where, limit
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
@@ -332,14 +332,17 @@ const REWARDS = [
   { id:'payung',  cost:1000, limit:200, title:'Payung Oma Opa' }
 ];
 function rewardIcon(rw){
-  const id=rw.id; let bg, svg;
-  if(id==='payung'){
+  const id=rw.id||''; const ic=rw.icon||''; const t=(rw.title||'').toLowerCase(); let bg, svg;
+  const umbrella = ic==='umbrella'||id==='payung'||t.indexOf('payung')>=0;
+  const tote = ic==='tote'||id==='totebag'||t.indexOf('tote')>=0;
+  const bolu = ic==='bolu'||id==='ft'||id==='fm'||id==='fmt'||t.indexOf('malmil')>=0||t.indexOf('topping')>=0;
+  if(umbrella){
     bg='#FFF3CC';
     svg='<svg viewBox="0 0 24 24" width="30" height="30" fill="none"><path d="M3 11 Q3 3.2 12 3 Q21 3.2 21 11 Q19 9.3 17 11 Q15 9.3 13 11 Q11 9.3 9 11 Q7 9.3 5 11 Q4 9.5 3 11 Z" fill="#FACC1A" stroke="#E0B100" stroke-width="1" stroke-linejoin="round"/><path d="M12 3 V2.1" stroke="#7A5A12" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="1.8" r=".9" fill="#7A5A12"/><path d="M12 11 V18.2" stroke="#7A5A12" stroke-width="1.6" stroke-linecap="round"/><path d="M12 18.2 Q12 20.4 9.6 20.4 Q8.2 20.4 8.2 19.2" fill="none" stroke="#7A5A12" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  } else if(id==='totebag'){
+  } else if(tote){
     bg='#F3E6D2';
     svg='<svg viewBox="0 0 24 24" width="30" height="30" fill="none"><path d="M6 8.3h12l1 11.2a1 1 0 0 1-1 1.1H6a1 1 0 0 1-1-1.1Z" fill="#E0B17A" stroke="#A9743C" stroke-width="1.1" stroke-linejoin="round"/><path d="M9 8.5V6.7a3 3 0 0 1 6 0v1.8" stroke="#A9743C" stroke-width="1.6" stroke-linecap="round"/><path d="M9.4 12.5h5.2" stroke="#A9743C" stroke-width="1.3" stroke-linecap="round" opacity=".6"/></svg>';
-  } else if(id==='ft'||id==='fm'||id==='fmt'){
+  } else if(bolu){
     bg='#FDEFD3';
     svg='<svg viewBox="0 0 24 24" width="32" height="32" fill="none"><path d="M4 12h16v4a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1" stroke-linejoin="round"/><path d="M3.4 12.3C3 8 6.6 5 12 5s9 3 8.6 7.3Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1" stroke-linejoin="round"/><ellipse cx="9" cy="8.2" rx="3.6" ry="1.3" fill="#fff" opacity=".35"/><ellipse cx="9.5" cy="15.4" rx="1" ry="1.3" fill="#5a3b2e"/><ellipse cx="14.5" cy="15.4" rx="1" ry="1.3" fill="#5a3b2e"/><path d="M11 16.7q1 .8 2 0" stroke="#5a3b2e" stroke-width=".9" fill="none" stroke-linecap="round"/><circle cx="7.3" cy="16.1" r=".9" fill="#F4A6B0" opacity=".6"/><circle cx="16.7" cy="16.1" r=".9" fill="#F4A6B0" opacity=".6"/></svg>';
   } else {
@@ -348,14 +351,27 @@ function rewardIcon(rw){
   }
   return '<div class="rw-ic" style="background:'+bg+'">'+svg+'</div>';
 }
-let rewardStock = {};   // id -> jumlah yang sudah diklaim (claimed)
-async function listRewardStock(){
-  try{
-    const snap = await getDocs(collection(db,'rewards'));
-    const m={}; snap.forEach(d=>{ const x=d.data(); m[d.id]=(typeof x.claimed==='number')?x.claimed:0; });
-    return m;
-  }catch(e){ return {}; }
+let rewardStock = {};      // id -> jumlah klaim
+let rewardCatalog = null;  // daftar efektif: default kode + override Firestore + reward custom
+function defaultRewards(){ return REWARDS.map(rw=>Object.assign({ note:'', active:true, icon:'' }, rw, { claimed:0 })); }
+async function loadRewardCatalog(){
+  let docs={};
+  try{ const snap=await getDocs(collection(db,'rewards')); snap.forEach(d=>{ docs[d.id]=d.data()||{}; }); }catch(e){}
+  const num=(v)=> (typeof v==='number')?v:null;
+  const list=[];
+  REWARDS.forEach(rw=>{ const o=docs[rw.id]||{};
+    list.push({ id:rw.id,
+      title:(o.title!=null?o.title:rw.title), note:(o.note!=null?o.note:(rw.note||'')),
+      cost:(num(o.cost)!=null?o.cost:rw.cost), limit:(num(o.limit)!=null?o.limit:(rw.limit!=null?rw.limit:null)),
+      claimed:(num(o.claimed)!=null?o.claimed:0), active:(o.active!==false), icon:(o.icon||''), custom:false });
+    delete docs[rw.id]; });
+  Object.keys(docs).forEach(id=>{ const x=docs[id]; if(num(x.cost)==null) return;
+    list.push({ id, title:x.title||id, note:x.note||'', cost:x.cost, limit:(num(x.limit)!=null?x.limit:null), claimed:(num(x.claimed)!=null?x.claimed:0), active:(x.active!==false), icon:x.icon||'', custom:true }); });
+  list.sort((a,b)=>a.cost-b.cost);
+  rewardCatalog=list; rewardStock={}; list.forEach(r=>rewardStock[r.id]=r.claimed);
+  return list;
 }
+async function listRewardStock(){ await loadRewardCatalog(); return rewardStock; }
 function genCode(){
   const t = Date.now().toString(36).toUpperCase().slice(-4);
   const r = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4).padEnd(4,'X');
@@ -363,7 +379,8 @@ function genCode(){
 }
 async function redeem(rewardId){
   if(!user) throw {message:'Masuk dulu untuk menukar poin.'};
-  const rw = REWARDS.find(x=>x.id===rewardId); if(!rw) throw {message:'Hadiah tidak ditemukan.'};
+  const rw = (rewardCatalog||defaultRewards()).find(x=>x.id===rewardId); if(!rw) throw {message:'Hadiah tidak ditemukan.'};
+  if(rw.active===false) throw {message:'Hadiah sedang tidak tersedia.'};
   const uref = doc(db,'users',user.uid);
   const rref = doc(db,'rewards',rw.id);
   const code = genCode();
@@ -581,7 +598,7 @@ if(document.body) mountRw(); else document.addEventListener('DOMContentLoaded', 
 let rwTab='katalog', rwBanner='';
 function openRewards(){ mountRw(); rwTab='katalog'; rwBanner=''; renderRewards(); rwBk.classList.add('show'); refreshStock(); }
 function closeRewards(){ rwBk.classList.remove('show'); rwBanner=''; }
-function refreshStock(){ listRewardStock().then(s=>{ rewardStock=s; if(rwBk.classList.contains('show') && rwTab==='katalog') renderRewards(); }); }
+function refreshStock(){ loadRewardCatalog().then(()=>{ if(rwBk.classList.contains('show') && rwTab==='katalog') renderRewards(); }); }
 rwBk.querySelector('#rwX').onclick = closeRewards;
 rwBk.addEventListener('click', e=>{ if(e.target===rwBk) closeRewards(); });
 rwBk.querySelectorAll('.oo-tab').forEach(t=> t.onclick = ()=>{ rwTab=t.dataset.rt; rwBanner=''; renderRewards(); if(rwTab==='katalog') refreshStock(); });
@@ -592,7 +609,7 @@ function renderRewards(){
   const ban=rwBk.querySelector('#rwBanner'); if(ban) ban.innerHTML = rwBanner? `<div class="rw-banner">${rwBanner}</div>`:'';
   const body=rwBk.querySelector('#rwBody'); if(!body) return;
   if(rwTab==='katalog'){
-    body.innerHTML = REWARDS.map(rw=>{
+    body.innerHTML = (rewardCatalog||defaultRewards()).filter(rw=>rw.active!==false).map(rw=>{
       const claimed = rewardStock[rw.id]||0;
       const lim = rw.limit||0;
       const remain = lim ? Math.max(0, lim-claimed) : null;
@@ -633,7 +650,7 @@ function renderRewards(){
 rwBk.querySelector('#rwBody').addEventListener('click', async (e)=>{
   const b=e.target.closest('[data-rid]'); if(!b) return;
   if(!user){ closeRewards(); openLogin(); return; }
-  const rid=b.dataset.rid; const rw=REWARDS.find(x=>x.id===rid); if(!rw) return;
+  const rid=b.dataset.rid; const rw=(rewardCatalog||defaultRewards()).find(x=>x.id===rid); if(!rw) return;
   if(points<rw.cost){ rwBanner='Poin belum cukup.'; renderRewards(); return; }
   if(!window.confirm('Tukar '+rw.cost+' poin untuk "'+rw.title+'"?')) return;
   b.disabled=true; b.textContent='…';
@@ -650,6 +667,7 @@ mcBk.innerHTML = `<div class="oo-card" style="position:relative;text-align:cente
   <button class="oo-x" id="mcX">×</button>
   <div class="oo-h">Kartu Member 🎫</div>
   <div id="mcName" style="font-weight:900;color:${CO};font-size:1.05rem;margin-bottom:2px"></div>
+  <div id="mcTier" style="margin-bottom:6px"></div>
   <div class="rw-pts" id="mcPts">🪙 0 poin</div>
   <div id="mcQR" style="width:200px;height:200px;margin:6px auto 8px;background:#fff;border:2px solid #F1E4CC;border-radius:14px;display:flex;align-items:center;justify-content:center"></div>
   <div class="oo-mini">Tunjukkan QR ini ke kasir buat dapat poin tiap belanja.</div>
@@ -665,6 +683,7 @@ async function openMemberCard(){
   mountMc();
   mcBk.querySelector('#mcName').textContent=(profile&&profile.name)||'Member';
   mcBk.querySelector('#mcPts').innerHTML='🪙 '+points+' poin';
+  (async()=>{ try{ const txs=await listMyTransactions(); const spend=txs.reduce((s,t)=>s+(t.nominal||0),0); const tr=tierOf(spend); const el=mcBk.querySelector('#mcTier'); if(el) el.innerHTML='<span style="display:inline-block;background:'+tr.color+';color:#fff;font-weight:900;font-size:.72rem;border-radius:999px;padding:3px 12px">★ Member '+tr.name+'</span>'; }catch(e){} })();
   const box=mcBk.querySelector('#mcQR'); box.innerHTML='<span style="color:#b59a7e;font-weight:700;font-size:.8rem">Memuat QR…</span>';
   mcBk.classList.add('show');
   try{ await ensureQRLib(); box.innerHTML=''; new QRCode(box,{text:'OMAOPA:MEMBER:'+user.uid, width:188, height:188, correctLevel:QRCode.CorrectLevel.M}); }
@@ -733,7 +752,7 @@ async function listMembers(qstr, n){
   try{ const snap=await getDocs(query(collection(db,'users'), limit(n))); const arr=[];
     snap.forEach(d=>{ const x=d.data(); const nm=(x.name||''), ph=(x.phone||'');
       if(qstr && nm.toLowerCase().indexOf(qstr)<0 && ph.indexOf(qstr)<0) return;
-      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0}); });
+      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||''}); });
     arr.sort((a,b)=>b.points-a.points); return arr;
   }catch(e){ return []; }
 }
@@ -806,6 +825,73 @@ async function seedOutlets(arr){
   return { count:n };
 }
 
+// ---- staff / kasir ----
+async function listStaff(){
+  if(!(await isAdmin())) return [];
+  try{ const snap=await getDocs(collection(db,'staff')); const base=[];
+    snap.forEach(d=>{ const x=d.data()||{}; base.push({ uid:d.id, outlet:x.outlet||x.name||'', admin:x.admin===true }); });
+    for(const s of base){ try{ const u=await getDoc(doc(db,'users',s.uid)); if(u.exists()){ const d=u.data(); s.name=d.name||''; s.phone=d.phone||''; } }catch(e){} }
+    base.sort((a,b)=>(a.outlet||'').localeCompare(b.outlet||'')); return base;
+  }catch(e){ return []; }
+}
+async function addStaff(uid, outlet, admin){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; uid=(uid||'').trim(); if(!uid) throw {message:'UID wajib diisi.'};
+  await setDoc(doc(db,'staff',uid), { outlet:(outlet||'').trim(), admin:!!admin, updatedAt:serverTimestamp() },{merge:true}); }
+async function updateStaff(uid, patch){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await setDoc(doc(db,'staff',(uid||'').trim()), Object.assign({updatedAt:serverTimestamp()}, patch||{}),{merge:true}); }
+async function removeStaff(uid){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await deleteDoc(doc(db,'staff',(uid||'').trim())); }
+
+// ---- kelola reward ----
+async function listRewardsAdmin(){ return await loadRewardCatalog(); }
+async function saveReward(id, patch){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'}; patch=patch||{};
+  if(!id){ const t=(patch.title||'').trim(); if(!t) throw {message:'Judul reward wajib.'}; id=slug(t); }
+  const data={}; ['title','note','icon'].forEach(k=>{ if(patch[k]!=null) data[k]=String(patch[k]); });
+  if(patch.cost!=null && patch.cost!=='') data.cost=Math.max(0,Math.floor(Number(patch.cost)||0));
+  if(patch.limit!=null && patch.limit!=='') data.limit=Math.max(0,Math.floor(Number(patch.limit)||0));
+  if(patch.active!=null) data.active=!!patch.active;
+  data.updatedAt=serverTimestamp();
+  await setDoc(doc(db,'rewards',id), data, {merge:true}); return { id:id };
+}
+async function setRewardActive(id, active){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await setDoc(doc(db,'rewards',(id||'').trim()), { active:!!active, updatedAt:serverTimestamp() },{merge:true}); }
+async function resetRewardClaimed(id){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await setDoc(doc(db,'rewards',(id||'').trim()), { claimed:0, updatedAt:serverTimestamp() },{merge:true}); }
+async function deleteReward(id){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await deleteDoc(doc(db,'rewards',(id||'').trim())); }
+
+// ---- voucher (admin) ----
+async function adminSetVoucherStatus(code, active){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'}; code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
+  if(active){ await setDoc(doc(db,'vouchers',code), { status:'aktif', usedAt:null, usedOutlet:null, usedBy:null, updatedAt:serverTimestamp() },{merge:true}); }
+  else { await setDoc(doc(db,'vouchers',code), { status:'terpakai', usedAt:serverTimestamp(), updatedAt:serverTimestamp() },{merge:true}); }
+}
+async function listVouchersByUid(uid){ uid=(uid||'').trim(); if(!uid) return [];
+  try{ const snap=await getDocs(query(collection(db,'vouchers'), where('uid','==',uid))); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ code:d.id, title:x.title||'', status:x.status||'aktif', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    arr.sort((a,b)=>b.ts-a.ts); return arr; }catch(e){ return []; }
+}
+
+// ---- pengumuman / banner ----
+async function getAnnouncement(){
+  try{ const s=await getDoc(doc(db,'settings','announcement')); if(!s.exists()) return {text:'',active:false}; const x=s.data(); return {text:x.text||'', active:x.active===true}; }catch(e){ return {text:'',active:false}; }
+}
+async function setAnnouncement(text, active){ if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  await setDoc(doc(db,'settings','announcement'), { text:String(text||''), active:!!active, updatedAt:serverTimestamp() },{merge:true}); }
+
+// ---- order (pesanan web) ----
+async function logOrder(o){
+  o=o||{}; const items=(o.items||[]).map(it=>({ id:it.id||'', cat:it.cat||'', name:it.name||'', price:it.price||0, qty:it.qty||0 }));
+  try{ await addDoc(collection(db,'orders'), { items:items, total:o.total||0, count:items.reduce((s,i)=>s+(i.qty||0),0),
+    outlet:o.outlet||'', nama:o.nama||'', telp:o.telp||'', tgl:o.tgl||'', jam:o.jam||'', note:o.note||'',
+    uid:(user?user.uid:''), status:'baru', createdAt:serverTimestamp() }); }catch(e){}
+}
+async function listOrders(n){ n=n||1000;
+  try{ const snap=await getDocs(query(collection(db,'orders'), orderBy('createdAt','desc'), limit(n))); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, items:x.items||[], total:x.total||0, count:x.count||0, outlet:x.outlet||'', nama:x.nama||'', jam:x.jam||'', tgl:x.tgl||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    return arr;
+  }catch(e){ try{ const snap=await getDocs(collection(db,'orders')); const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, items:x.items||[], total:x.total||0, count:x.count||0, outlet:x.outlet||'', nama:x.nama||'', jam:x.jam||'', tgl:x.tgl||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); }); arr.sort((a,b)=>b.ts-a.ts); return arr; }catch(e2){ return []; } }
+}
+
+// ---- tier member (berdasarkan total belanja) ----
+const TIERS=[{name:'Gold',min:2000000,color:'#E0B100'},{name:'Silver',min:500000,color:'#9AA0A6'},{name:'Bronze',min:0,color:'#C98A4B'}];
+function tierOf(spend){ spend=Number(spend)||0; for(let i=0;i<TIERS.length;i++){ if(spend>=TIERS[i].min) return TIERS[i]; } return TIERS[TIERS.length-1]; }
+
 // ============================================================
 //  API publik
 // ============================================================
@@ -822,6 +908,11 @@ window.OmaOpa = {
   isAdmin, getMemberByPhone, listMembers, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
+  listStaff, addStaff, updateStaff, removeStaff,
+  listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
+  adminSetVoucherStatus, listVouchersByUid,
+  getAnnouncement, setAnnouncement, logOrder, listOrders,
+  tierOf, TIERS,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'', phone:(profile&&profile.phone)||'' } : null,
   getPoints: ()=> points,
