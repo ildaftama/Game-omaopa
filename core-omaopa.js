@@ -110,11 +110,13 @@ async function ensureDoc(extra){
   mergedOnce = true;
 }
 
-function addPoints(n){
+function addPoints(n, source){
   n = Math.round(n)||0; if(!n) return;
   if(user){
     const ref = doc(db,'users',user.uid);
-    setDoc(ref,{ points: increment(n), updatedAt: serverTimestamp() },{merge:true}).catch(()=>{});
+    const patch = { points: increment(n), updatedAt: serverTimestamp() };
+    if(n>0 && (source==='game'||source==='checkin')) patch['earn_'+source] = increment(n);
+    setDoc(ref, patch, {merge:true}).catch(()=>{});
     // tampilan diupdate oleh onSnapshot
   } else {
     points += n;
@@ -461,13 +463,13 @@ async function awardPoints(uid, nominal){
 }
 async function getStaffInfo(){
   if(!user) return null;
-  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true }; }catch(e){ return null; }
+  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true, super: d.super===true }; }catch(e){ return null; }
 }
 async function listTransactions(outlet){
   try{
     const q = outlet ? query(collection(db,'transactions'), where('outlet','==',outlet)) : collection(db,'transactions');
     const snap = await getDocs(q); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, uid:x.uid||'', name:x.name||'', nominal:x.nominal||0, points:x.points||0, outlet:x.outlet||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, uid:x.uid||'', name:x.name||'', nominal:x.nominal||0, points:x.points||0, kind:x.kind||'', outlet:x.outlet||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
     arr.sort((a,b)=>b.ts-a.ts); return arr;
   }catch(e){ return []; }
 }
@@ -690,6 +692,108 @@ async function openMemberCard(){
   catch(e){ box.innerHTML='<span style="color:#C0392B;font-weight:700;font-size:.8rem">QR gagal dimuat</span>'; }
 }
 
+// ====== Profil (rincian member, read-only) ======
+const pfBk = document.createElement('div');
+pfBk.className='oo-bk';
+pfBk.innerHTML = `<div class="oo-card" style="position:relative">
+  <button class="oo-x" id="pfX">×</button>
+  <div class="oo-h">Profil Saya 👤</div>
+  <div id="pfName" style="font-weight:900;color:${CO};font-size:1.1rem;text-align:center"></div>
+  <div id="pfTier" style="text-align:center;margin:4px 0 12px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:10px 12px"><div id="pfPts" style="font-family:Fredoka,sans-serif;font-size:1.3rem;font-weight:700;color:#C98A1B">0</div><div style="font-size:.7rem;font-weight:800;color:#9a7a5e">Poin kamu</div></div>
+    <div style="background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:10px 12px"><div id="pfSpent" style="font-family:Fredoka,sans-serif;font-size:1.15rem;font-weight:700;color:${CO}">Rp0</div><div style="font-size:.7rem;font-weight:800;color:#9a7a5e">Total belanja</div></div>
+    <div style="background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:10px 12px"><div id="pfTx" style="font-family:Fredoka,sans-serif;font-size:1.3rem;font-weight:700;color:${CO}">0</div><div style="font-size:.7rem;font-weight:800;color:#9a7a5e">Transaksi</div></div>
+    <div style="background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:10px 12px"><div id="pfScore" style="font-family:Fredoka,sans-serif;font-size:1.3rem;font-weight:700;color:${CO}">0</div><div style="font-size:.7rem;font-weight:800;color:#9a7a5e">Skor game</div></div>
+  </div>
+  <div style="font-weight:900;color:${CO};font-size:.9rem;margin:14px 2px 6px">Data diri</div>
+  <div id="pfData" style="background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:2px 12px"></div>
+  <div class="oo-mini" style="margin-top:8px">Data tidak bisa diubah sendiri. Untuk koreksi data, hubungi kasir Oma Opa ya 🙏</div>
+  <button class="oo-out" id="pfCard" style="margin-top:12px;background:${K};color:#5A3A05;border-color:${K}">Lihat Kartu Member (QR) →</button>
+  <button class="oo-out" id="pfOut" style="margin-top:8px">Keluar akun</button>
+</div>`;
+function mountPf(){ if(!document.body.contains(pfBk)) document.body.appendChild(pfBk); }
+if(document.body) mountPf(); else document.addEventListener('DOMContentLoaded', mountPf);
+pfBk.querySelector('#pfX').onclick = ()=> pfBk.classList.remove('show');
+pfBk.querySelector('#pfOut').onclick = async ()=>{ try{ await doSignOut(); }catch(e){} pfBk.classList.remove('show'); };
+pfBk.querySelector('#pfCard').onclick = ()=>{ pfBk.classList.remove('show'); openMemberCard(); };
+pfBk.addEventListener('click', e=>{ if(e.target===pfBk) pfBk.classList.remove('show'); });
+async function openProfile(){
+  if(!user){ openLogin(); return; }
+  mountPf();
+  const esc=(s)=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  pfBk.querySelector('#pfName').textContent=(profile&&profile.name)||'Member';
+  pfBk.querySelector('#pfPts').textContent=points;
+  const ph=(((profile&&profile.phone)||'')+'').replace(/^62/,'0');
+  const rows=[['No. HP',ph],['Jenis kelamin',(profile&&profile.gender)||''],['Usia',(profile&&profile.age)||''],['Pekerjaan',(profile&&profile.occupation)||'']];
+  pfBk.querySelector('#pfData').innerHTML=rows.map((r,i)=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;'+(i?'border-top:1px solid #F2E8D5;':'')+'font-size:.86rem"><span style="color:#9a7a5e;font-weight:700">'+r[0]+'</span><span style="font-weight:800;color:'+CO+';text-align:right">'+esc(r[1]||'-')+'</span></div>').join('');
+  pfBk.querySelector('#pfTier').innerHTML='';
+  pfBk.classList.add('show');
+  (async()=>{ try{ const txs=await listMyTransactions(); const spend=txs.reduce((s,t)=>s+(t.nominal||0),0); const tr=tierOf(spend);
+    pfBk.querySelector('#pfSpent').textContent='Rp'+spend.toLocaleString('id-ID');
+    pfBk.querySelector('#pfTx').textContent=txs.length;
+    const te=pfBk.querySelector('#pfTier'); if(te) te.innerHTML='<span style="display:inline-block;background:'+tr.color+';color:#fff;font-weight:900;font-size:.72rem;border-radius:999px;padding:3px 14px">★ Member '+tr.name+'</span>';
+  }catch(e){} })();
+  (async()=>{ try{ const sc=await getMemberScore(user.uid); const se=pfBk.querySelector('#pfScore'); if(se) se.textContent=sc; }catch(e){} })();
+}
+
+// ====== Check-in harian ======
+const CHECKIN_REWARDS=[1,1,5,2,3,4,10]; // hari ke-1..7 (hari ke-7 bonus)
+function _ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _todayStr(){ return _ymd(new Date()); }
+function _offsetStr(n){ const d=new Date(); d.setDate(d.getDate()+n); return _ymd(d); }
+function getCheckinStatus(){
+  const last=(profile&&profile.lastCheckin)||''; const cur=(profile&&profile.streak)||0; const today=_todayStr();
+  const claimedToday=(last===today);
+  let nextDay; if(claimedToday) nextDay=cur; else if(last===_offsetStr(-1)) nextDay=(cur>=7?1:cur+1); else nextDay=1;
+  return { claimedToday:claimedToday, streak:cur, nextDay:nextDay, nextReward:CHECKIN_REWARDS[(nextDay||1)-1], rewards:CHECKIN_REWARDS.slice() };
+}
+async function dailyCheckin(){
+  if(!user){ openLogin(); throw {message:'Masuk dulu ya.'}; }
+  const today=_todayStr(); const last=(profile&&profile.lastCheckin)||''; const cur=(profile&&profile.streak)||0;
+  if(last===today) return { already:true, streak:cur, reward:0 };
+  let ns; if(last===_offsetStr(-1)) ns=(cur>=7?1:cur+1); else ns=1;
+  const reward=CHECKIN_REWARDS[ns-1]||0;
+  await addPoints(reward, 'checkin');
+  try{ await setDoc(doc(db,'users',user.uid), { lastCheckin:today, streak:ns }, {merge:true}); }catch(e){}
+  if(profile){ profile.lastCheckin=today; profile.streak=ns; }
+  return { claimed:true, streak:ns, reward:reward, bonus:(ns===7) };
+}
+const ciBk=document.createElement('div'); ciBk.className='oo-bk';
+ciBk.innerHTML=`<div class="oo-card" style="position:relative;text-align:center">
+  <button class="oo-x" id="ciX">×</button>
+  <div class="oo-h">Check-in Harian 🔥</div>
+  <div id="ciMsg" class="oo-mini" style="margin-bottom:10px"></div>
+  <div id="ciGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px"></div>
+  <button class="oo-out" id="ciBtn" style="margin-top:14px;background:${K};color:#5A3A05;border-color:${K}">Klaim</button>
+  <div class="oo-mini" style="margin-top:8px">Login & klaim tiap hari. Lewat sehari, streak mulai dari awal ya 😊</div>
+</div>`;
+function mountCi(){ if(!document.body.contains(ciBk)) document.body.appendChild(ciBk); }
+if(document.body) mountCi(); else document.addEventListener('DOMContentLoaded', mountCi);
+ciBk.querySelector('#ciX').onclick=()=>ciBk.classList.remove('show');
+ciBk.addEventListener('click',e=>{ if(e.target===ciBk) ciBk.classList.remove('show'); });
+function renderCheckin(){
+  const st=getCheckinStatus(); const grid=ciBk.querySelector('#ciGrid');
+  grid.innerHTML=st.rewards.map((rw,i)=>{ const day=i+1; const big=(day===7);
+    const done = st.claimedToday ? (day<=st.streak) : (day<st.nextDay);
+    const isNext = !st.claimedToday && day===st.nextDay;
+    const bd = done?'#2E9E5B':(isNext?K:'#EFE2C4'); const bg = done?'#E7F6E7':(isNext?'#FFF7E0':'#fff');
+    return '<div style="border:2px solid '+bd+';background:'+bg+';border-radius:12px;padding:8px 2px">'
+      +'<div style="font-size:.58rem;font-weight:800;color:#9a7a5e">Hari '+day+'</div>'
+      +'<div style="font-size:'+(big?'1.05rem':'.95rem')+';font-weight:900;color:'+(big?'#C98A1B':CO)+'">'+(done?'✓':('+'+rw))+'</div>'
+      +(big?'<div style="font-size:.52rem;font-weight:900;color:#C98A1B">BONUS</div>':'')+'</div>';
+  }).join('');
+  const btn=ciBk.querySelector('#ciBtn'), msg=ciBk.querySelector('#ciMsg');
+  if(st.claimedToday){ btn.disabled=true; btn.style.opacity='.55'; btn.textContent='Sudah check-in hari ini 🎉'; msg.textContent='Streak kamu '+st.streak+' hari. Balik lagi besok biar makin panjang!'; }
+  else { btn.disabled=false; btn.style.opacity='1'; btn.textContent='Klaim +'+st.nextReward+' poin'; msg.textContent=(st.nextDay===1?'Mulai streak check-in kamu hari ini!':('Lanjutkan streak — hari ke-'+st.nextDay+'!')); }
+}
+ciBk.querySelector('#ciBtn').onclick=async function(){
+  if(!user){ openLogin(); return; } const b=this; if(b.disabled) return; b.disabled=true; b.textContent='Memproses…';
+  try{ const r=await dailyCheckin(); renderCheckin(); if(r.claimed){ ciBk.querySelector('#ciMsg').innerHTML=(r.bonus?'🎉 BONUS! ':'🎉 ')+'+'+r.reward+' poin masuk! Streak '+r.streak+' hari.'; } }
+  catch(e){ renderCheckin(); }
+};
+async function openCheckin(){ if(!user){ openLogin(); return; } mountCi(); renderCheckin(); ciBk.classList.add('show'); }
+
 // ====== Leaderboard / Riwayat ======
 function makeListOverlay(){
   const bk=document.createElement('div'); bk.className='oo-bk';
@@ -740,7 +844,8 @@ async function openHistory(){
 // ============================================================
 //  ADMIN / AKUN MASTER — kelola member, poin, skor, outlet
 // ============================================================
-async function isAdmin(){ const s=await getStaffInfo(); return !!(s&&s.admin); }
+async function isAdmin(){ const s=await getStaffInfo(); return !!(s&&(s.admin||s.super)); }
+async function isSuper(){ const s=await getStaffInfo(); return !!(s&&s.super); }
 async function getMemberByPhone(phone){
   const p=normPhone(phone); if(!p) return null;
   try{ const snap=await getDocs(query(collection(db,'users'), where('phone','==',p), limit(1)));
@@ -752,14 +857,14 @@ async function listMembers(qstr, n){
   try{ const snap=await getDocs(query(collection(db,'users'), limit(n))); const arr=[];
     snap.forEach(d=>{ const x=d.data(); const nm=(x.name||''), ph=(x.phone||'');
       if(qstr && nm.toLowerCase().indexOf(qstr)<0 && ph.indexOf(qstr)<0) return;
-      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||''}); });
+      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||'', earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
     arr.sort((a,b)=>b.points-a.points); return arr;
   }catch(e){ return []; }
 }
 async function getMemberScore(uid){ try{ const s=await getDoc(doc(db,'scores',(uid||'').trim())); return s.exists()?(s.data().score||0):0; }catch(e){ return 0; } }
 async function adminAdjustPoints(uid, delta, reason){
   uid=(uid||'').trim(); delta=Math.floor(Number(delta)||0);
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   if(!uid) throw {message:'Member belum dipilih.'};
   if(!delta) throw {message:'Jumlah poin tidak boleh 0.'};
   const uref=doc(db,'users',uid); let newTotal=0, mname='', applied=0;
@@ -781,11 +886,23 @@ async function adminSetPoints(uid, value, reason){
 }
 async function adminSetScore(uid, value){
   uid=(uid||'').trim(); value=Math.max(0, Math.floor(Number(value)||0));
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   if(!uid) throw {message:'Member belum dipilih.'};
   const m=await getMemberByUid(uid);
   await setDoc(doc(db,'scores',uid), { name:(m&&m.name)||'Pemain', score:value, updatedAt:serverTimestamp() },{merge:true});
   return { score:value };
+}
+async function adminResetPoints(opts){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  opts=opts||{};
+  const usnap=await getDocs(collection(db,'users')); let n=0;
+  for(const ds of usnap.docs){ const uid=ds.id;
+    try{ await setDoc(doc(db,'users',uid), { points:0, earn_game:0, earn_checkin:0, lastCheckin:'', streak:0, updatedAt:serverTimestamp() }, {merge:true}); }catch(e){}
+    try{ await setDoc(doc(db,'leaderboard',uid), { points:0, updatedAt:serverTimestamp() }, {merge:true}); }catch(e){}
+    if(opts.scores){ try{ await deleteDoc(doc(db,'scores',uid)); }catch(e){} }
+    n++;
+  }
+  return { count:n };
 }
 function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || ('o'+Date.now()); }
 async function listOutlets(){
@@ -801,24 +918,24 @@ async function listPublicOutlets(){
   }catch(e){ return []; }
 }
 async function addOutlet(o){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   o=o||{}; if(!o.name||!o.name.trim()) throw {message:'Nama outlet wajib diisi.'};
   const id=slug(o.name);
   await setDoc(doc(db,'outlets',id), { name:o.name.trim(), area:(o.area||'Lainnya').trim(), maps:(o.maps||'').trim(), active:true, updatedAt:serverTimestamp() },{merge:true});
   return { id:id };
 }
 async function updateOutlet(id, patch){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   if(!id) throw {message:'ID kosong.'};
   await setDoc(doc(db,'outlets',id), Object.assign({updatedAt:serverTimestamp()}, patch||{}), {merge:true});
 }
 async function deleteOutlet(id){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   if(!id) throw {message:'ID kosong.'};
   await deleteDoc(doc(db,'outlets',id));
 }
 async function seedOutlets(arr){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   arr=arr||[]; let n=0;
   for(const o of arr){ if(!o||!o.name) continue;
     await setDoc(doc(db,'outlets',slug(o.name)), { name:o.name, area:o.area||'Lainnya', maps:o.maps||'', active:true, updatedAt:serverTimestamp() },{merge:true}); n++; }
@@ -829,20 +946,20 @@ async function seedOutlets(arr){
 async function listStaff(){
   if(!(await isAdmin())) return [];
   try{ const snap=await getDocs(collection(db,'staff')); const base=[];
-    snap.forEach(d=>{ const x=d.data()||{}; base.push({ uid:d.id, outlet:x.outlet||x.name||'', admin:x.admin===true }); });
+    snap.forEach(d=>{ const x=d.data()||{}; base.push({ uid:d.id, outlet:x.outlet||x.name||'', admin:x.admin===true, super:x.super===true }); });
     for(const s of base){ try{ const u=await getDoc(doc(db,'users',s.uid)); if(u.exists()){ const d=u.data(); s.name=d.name||''; s.phone=d.phone||''; } }catch(e){} }
     base.sort((a,b)=>(a.outlet||'').localeCompare(b.outlet||'')); return base;
   }catch(e){ return []; }
 }
-async function addStaff(uid, outlet, admin){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; uid=(uid||'').trim(); if(!uid) throw {message:'UID wajib diisi.'};
+async function addStaff(uid, outlet, admin){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; uid=(uid||'').trim(); if(!uid) throw {message:'UID wajib diisi.'};
   await setDoc(doc(db,'staff',uid), { outlet:(outlet||'').trim(), admin:!!admin, updatedAt:serverTimestamp() },{merge:true}); }
-async function updateStaff(uid, patch){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await setDoc(doc(db,'staff',(uid||'').trim()), Object.assign({updatedAt:serverTimestamp()}, patch||{}),{merge:true}); }
-async function removeStaff(uid){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await deleteDoc(doc(db,'staff',(uid||'').trim())); }
+async function updateStaff(uid, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'staff',(uid||'').trim()), Object.assign({updatedAt:serverTimestamp()}, patch||{}),{merge:true}); }
+async function removeStaff(uid){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'staff',(uid||'').trim())); }
 
 // ---- kelola reward ----
 async function listRewardsAdmin(){ return await loadRewardCatalog(); }
 async function saveReward(id, patch){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'}; patch=patch||{};
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'}; patch=patch||{};
   if(!id){ const t=(patch.title||'').trim(); if(!t) throw {message:'Judul reward wajib.'}; id=slug(t); }
   const data={}; ['title','note','icon'].forEach(k=>{ if(patch[k]!=null) data[k]=String(patch[k]); });
   if(patch.cost!=null && patch.cost!=='') data.cost=Math.max(0,Math.floor(Number(patch.cost)||0));
@@ -851,13 +968,13 @@ async function saveReward(id, patch){
   data.updatedAt=serverTimestamp();
   await setDoc(doc(db,'rewards',id), data, {merge:true}); return { id:id };
 }
-async function setRewardActive(id, active){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await setDoc(doc(db,'rewards',(id||'').trim()), { active:!!active, updatedAt:serverTimestamp() },{merge:true}); }
-async function resetRewardClaimed(id){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await setDoc(doc(db,'rewards',(id||'').trim()), { claimed:0, updatedAt:serverTimestamp() },{merge:true}); }
-async function deleteReward(id){ if(!(await isAdmin())) throw {message:'Khusus admin.'}; await deleteDoc(doc(db,'rewards',(id||'').trim())); }
+async function setRewardActive(id, active){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'rewards',(id||'').trim()), { active:!!active, updatedAt:serverTimestamp() },{merge:true}); }
+async function resetRewardClaimed(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'rewards',(id||'').trim()), { claimed:0, updatedAt:serverTimestamp() },{merge:true}); }
+async function deleteReward(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'rewards',(id||'').trim())); }
 
 // ---- voucher (admin) ----
 async function adminSetVoucherStatus(code, active){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'}; code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'}; code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
   if(active){ await setDoc(doc(db,'vouchers',code), { status:'aktif', usedAt:null, usedOutlet:null, usedBy:null, updatedAt:serverTimestamp() },{merge:true}); }
   else { await setDoc(doc(db,'vouchers',code), { status:'terpakai', usedAt:serverTimestamp(), updatedAt:serverTimestamp() },{merge:true}); }
 }
@@ -871,7 +988,7 @@ async function listVouchersByUid(uid){ uid=(uid||'').trim(); if(!uid) return [];
 async function getAnnouncement(){
   try{ const s=await getDoc(doc(db,'settings','announcement')); if(!s.exists()) return {text:'',active:false}; const x=s.data(); return {text:x.text||'', active:x.active===true}; }catch(e){ return {text:'',active:false}; }
 }
-async function setAnnouncement(text, active){ if(!(await isAdmin())) throw {message:'Khusus admin.'};
+async function setAnnouncement(text, active){ if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   await setDoc(doc(db,'settings','announcement'), { text:String(text||''), active:!!active, updatedAt:serverTimestamp() },{merge:true}); }
 
 // ---- order (pesanan web) ----
@@ -882,11 +999,13 @@ async function logOrder(o){
     uid:(user?user.uid:''), status:'baru', createdAt:serverTimestamp() }); }catch(e){}
 }
 async function listOrders(n){ n=n||1000;
-  try{ const snap=await getDocs(query(collection(db,'orders'), orderBy('createdAt','desc'), limit(n))); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, items:x.items||[], total:x.total||0, count:x.count||0, outlet:x.outlet||'', nama:x.nama||'', jam:x.jam||'', tgl:x.tgl||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
-    return arr;
-  }catch(e){ try{ const snap=await getDocs(collection(db,'orders')); const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, items:x.items||[], total:x.total||0, count:x.count||0, outlet:x.outlet||'', nama:x.nama||'', jam:x.jam||'', tgl:x.tgl||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); }); arr.sort((a,b)=>b.ts-a.ts); return arr; }catch(e2){ return []; } }
+  function row(d){ const x=d.data(); return { id:d.id, items:x.items||[], total:x.total||0, count:x.count||0, outlet:x.outlet||'', nama:x.nama||'', telp:x.telp||'', jam:x.jam||'', tgl:x.tgl||'', note:x.note||'', status:x.status||'baru', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }; }
+  try{ const snap=await getDocs(query(collection(db,'orders'), orderBy('createdAt','desc'), limit(n))); const arr=[]; snap.forEach(d=>arr.push(row(d))); return arr;
+  }catch(e){ try{ const snap=await getDocs(collection(db,'orders')); const arr=[]; snap.forEach(d=>arr.push(row(d))); arr.sort((a,b)=>b.ts-a.ts); return arr; }catch(e2){ return []; } }
 }
+async function setOrderStatus(id, status){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'orders',(id||'').trim()), { status:String(status||'baru'), updatedAt:serverTimestamp() },{merge:true}); }
+async function updateOrder(id, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; const data=Object.assign({updatedAt:serverTimestamp()}, patch||{}); if(data.total!=null) data.total=Math.round(Number(data.total)||0); await setDoc(doc(db,'orders',(id||'').trim()), data, {merge:true}); }
+async function deleteOrder(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'orders',(id||'').trim())); }
 
 // ---- tier member (berdasarkan total belanja) ----
 const TIERS=[{name:'Gold',min:2000000,color:'#E0B100'},{name:'Silver',min:500000,color:'#9AA0A6'},{name:'Bronze',min:0,color:'#C98A4B'}];
@@ -898,20 +1017,21 @@ function tierOf(spend){ spend=Number(spend)||0; for(let i=0;i<TIERS.length;i++){
 window.OmaOpa = {
   openLogin, closeLogin,
   openRewards, closeRewards,
-  openMemberCard,
+  openMemberCard, openProfile, getCheckinStatus, dailyCheckin, openCheckin,
   openLeaderboard, openScoreboard, openHistory,
   submitScore, listPointLeaderboard, listScoreLeaderboard, listMyTransactions,
   redeem, listVouchers,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers,
-  isAdmin, getMemberByPhone, listMembers, getMemberScore,
-  adminAdjustPoints, adminSetPoints, adminSetScore,
+  isAdmin, isSuper, getMemberByPhone, listMembers, getMemberScore,
+  adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, listVouchersByUid,
   getAnnouncement, setAnnouncement, logOrder, listOrders,
+  setOrderStatus, updateOrder, deleteOrder,
   tierOf, TIERS,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'', phone:(profile&&profile.phone)||'' } : null,

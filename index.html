@@ -72,10 +72,12 @@
 
   <div class="login-hint" id="loginHint" style="cursor:pointer">🔒 Masuk untuk menyimpan poin &amp; tukar voucher <span style="margin-left:auto;font-weight:800;color:#C98A1B">Masuk ›</span></div>
 
+  <div id="checkinCard" style="display:none;margin:7px 0 0"></div>
+
   <h2 class="sec">Pilih permainan</h2>
   <div class="games">
 
-    <a class="gcard" href="topping.html?v=49">
+    <a class="gcard" href="topping.html?v=51">
       <div class="gicon" style="background:#FCEFC2"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M6 18h24v6a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 18.5C4.4 12 9.8 7.5 18 7.5S31.6 12 31 18.5Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="13.5" cy="12" rx="5.5" ry="2" fill="#fff" opacity=".35"/><ellipse cx="14.2" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><ellipse cx="21.8" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><path d="M16.5 25.2q1.5 1.2 3 0" stroke="#5a3b2e" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="11" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/><circle cx="25" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/></svg></div>
       <div class="gname">Menopping Asik!</div>
       <div class="gdesc">Selesaikan pesanan customer dan dapatkan pointnya.</div>
@@ -124,9 +126,9 @@
   <div id="navProfil" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.8" r="3.4"/><path d="M5.5 19.3a6.5 6.5 0 0 1 13 0"/></svg></span>Profil</div>
 </div>
 
-<script src="menu-data.js?v=49"></script>
-<script src="outlets-data.js?v=49"></script>
-<script type="module" src="core-omaopa.js?v=49"></script>
+<script src="menu-data.js?v=51"></script>
+<script src="outlets-data.js?v=51"></script>
+<script type="module" src="core-omaopa.js?v=51"></script>
 <script>
   try{ document.getElementById('coin').textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){ document.getElementById('coin').textContent='0'; }
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -298,14 +300,32 @@
   })();
   function openLogin(){ if(window.OmaOpa){ window.OmaOpa.openLogin(); } else { alert('Sedang menyiapkan login, coba lagi sebentar…'); } }
   function openMemberCard(){ if(window.OmaOpa){ window.OmaOpa.openMemberCard(); } else { soon(); } }
+  function openProfile(){ if(window.OmaOpa && window.OmaOpa.openProfile){ window.OmaOpa.openProfile(); } else { soon(); } }
+  function loggedIn(){ return !!(window.OmaOpa && window.OmaOpa.getUser && window.OmaOpa.getUser()); }
+  function refreshCheckinCard(){
+    var c=document.getElementById('checkinCard'); if(!c) return;
+    if(!loggedIn() || !(window.OmaOpa&&window.OmaOpa.getCheckinStatus)){ c.style.display='none'; return; }
+    var st; try{ st=window.OmaOpa.getCheckinStatus(); }catch(e){ c.style.display='none'; return; }
+    c.style.display='';
+    var done=st.claimedToday;
+    var label= done ? ('🔥 Check-in: streak '+st.streak+' hari') : ('🎁 Check-in harian — ada +'+st.nextReward+' poin!');
+    var right= done ? '✓ Selesai' : 'Klaim ›';
+    c.innerHTML='<div id="ciCardInner" style="display:flex;align-items:center;gap:8px;background:'+(done?'#EAF6EA':'#FFF3D6')+';border:2px solid '+(done?'#BFE0BF':'#F2D98A')+';border-radius:13px;padding:11px 13px;cursor:pointer;font-weight:800;color:#7A5A12"><span style="flex:1">'+label+'</span><span style="color:#C98A1B;font-weight:900">'+right+'</span></div>';
+    var inner=document.getElementById('ciCardInner'); if(inner) inner.onclick=function(){ if(window.OmaOpa&&window.OmaOpa.openCheckin) window.OmaOpa.openCheckin(); };
+  }
   var mcb=document.getElementById('memberCardBtn'); if(mcb) mcb.addEventListener('click',function(e){e.preventDefault();openMemberCard();});
-  var lh=document.getElementById('loginHint'); if(lh) lh.addEventListener('click',openLogin);
-  var np=document.getElementById('navProfil'); if(np) np.addEventListener('click',function(){ if(window.OmaOpa && window.OmaOpa.getUser && window.OmaOpa.getUser()){ openMemberCard(); } else { openLogin(); } });
+  var lh=document.getElementById('loginHint'); if(lh) lh.addEventListener('click',function(){ if(loggedIn()) openProfile(); else openLogin(); });
+  var np=document.getElementById('navProfil'); if(np) np.addEventListener('click',function(){ if(loggedIn()) openProfile(); else openLogin(); });
   window.addEventListener('omaopa:change',function(e){
-    var s=e.detail||{}; var el=document.getElementById('loginHint'); if(!el) return;
-    if(s.user){ el.innerHTML='👋 Hai, '+(s.user.name||'Sahabat')+' <span style="margin-left:auto;font-weight:800;color:#C98A1B">'+(s.points||0)+' poin ›</span>'; }
+    var s=e.detail||{};
+    var c=document.getElementById('coin'); if(c){ try{ c.textContent = s.user ? (s.points||0) : (parseInt(localStorage.getItem('omaopa_points')||'0',10)||0); }catch(err){} }
+    var el=document.getElementById('loginHint'); if(!el) return;
+    if(s.user){ el.innerHTML='👋 Hai, '+(s.user.name||'Sahabat')+' <span style="margin-left:auto;font-weight:800;color:#C98A1B">Lihat profil ›</span>'; }
     else { el.innerHTML='🔒 Masuk untuk menyimpan poin &amp; tukar voucher <span style="margin-left:auto;font-weight:800;color:#C98A1B">Masuk ›</span>'; }
+    refreshCheckinCard();
   });
+  window.addEventListener('omaopa:ready', refreshCheckinCard);
+  setTimeout(refreshCheckinCard, 1200);
 </script>
 <script>
 /* Banner promo dari admin (settings/announcement) */

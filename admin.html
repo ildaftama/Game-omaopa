@@ -66,7 +66,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="head"><h1>Admin Oma Opa</h1><span class="badge">MASTER</span></div>
+  <div class="head"><h1>Admin Oma Opa</h1><span class="badge" id="roleBadge">ADMIN</span></div>
   <div id="gate" class="card"><div class="muted">Menyiapkan…</div></div>
   <div id="app" style="display:none">
     <div class="tabs">
@@ -76,19 +76,21 @@
       <button data-tab="staff">🧑‍🍳 Staff</button>
       <button data-tab="reward">🎁 Reward</button>
       <button data-tab="analitik">📈 Analitik</button>
+      <button data-tab="pesanan">🧾 Pesanan</button>
     </div>
     <div id="tab"></div>
   </div>
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script src="outlets-data.js?v=49"></script>
-<script type="module" src="core-omaopa.js?v=49"></script>
+<script src="outlets-data.js?v=51"></script>
+<script type="module" src="core-omaopa.js?v=51"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
-  var tab='home', busy=false, segFilter=null;
+  var tab='home', busy=false, segFilter=null, canEdit=false;
   var MEMBERS=null, TXN=null; // cache
+  var curOf='baru';
   var PAL=['#FACC1A','#E0915B','#7CC9B5','#C98A4B','#88B0E0','#F4A6B0','#9a8b78','#B7D77A','#caa6e0'];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
@@ -105,12 +107,14 @@
         +'<div class="muted" style="margin-top:8px">Minta admin menandai akun (UID) ini dengan <b>admin: true</b> di koleksi <b>staff</b>:</div>'
         +'<div class="uid">'+esc(u.uid)+'</div><button class="btn sec" id="out">Keluar / ganti akun</button>';
       document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} }; app.style.display='none'; return; }
+    try{ canEdit=await O.isSuper(); }catch(e){ canEdit=false; }
+    var rbg=document.getElementById('roleBadge'); if(rbg){ rbg.textContent=canEdit?'ADMIN UTAMA':'LIHAT-SAJA'; rbg.style.background=canEdit?'#613925':'#9a8b78'; }
     gate.style.display='none'; app.style.display=''; render();
   }
   document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
     tab=b.getAttribute('data-tab'); document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on'); render();
   }; });
-  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, analitik:renderAnalitik}[tab]||renderHome)(); }
+  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, analitik:renderAnalitik, pesanan:renderPesanan}[tab]||renderHome)(); }
   function setActiveTab(name){ tab=name; document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-tab')===name); }); }
   function applySegment(field,val){ segFilter={field:field, value:val}; setActiveTab('member'); render(); }
 
@@ -164,11 +168,11 @@
       +'<div class="kpi"><div class="v">'+num(txn.length)+'</div><div class="l">Total transaksi</div></div>'
       +'</div>';
     html+='<div class="card"><div class="muted" style="margin-bottom:2px;font-size:.74rem">Ketuk legenda untuk lihat membernya 👇</div>'+donut('Umur member', tally(mem,'age'),'age')+donut('Jenis kelamin', tally(mem,'gender'),'gender')+donut('Pekerjaan', tally(mem,'occupation'),'occupation')+donut('Tier member', tierCnt,'')+'</div>';
-    html+='<div class="card"><div class="nm">📣 Banner promo di app</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
-    html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=49">Buka Halaman Rekap →</a></div>';
+    if(canEdit) html+='<div class="card"><div class="nm">📣 Banner promo di app</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
+    html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=51">Buka Halaman Rekap →</a></div>';
     tabEl.innerHTML=html;
     tabEl.querySelectorAll('.lg[data-segf]').forEach(function(el){ el.onclick=function(){ var f=el.getAttribute('data-segf'); if(f) applySegment(f, el.getAttribute('data-segv')); }; });
-    loadBanner();
+    if(canEdit) loadBanner();
   }
   async function loadBanner(){
     var w=document.getElementById('bnWrap'); if(!w) return; var b={text:'',active:false}; try{ b=await O.getAnnouncement(); }catch(e){}
@@ -194,8 +198,26 @@
       +'<button class="btn sec" id="vfind">Cek voucher</button><div id="vout"></div></div>'
       +'<div class="card"><div class="nm">😴 Member tidak aktif (win-back)</div>'
       +'<div style="display:flex;gap:6px;margin:9px 0"><button class="btn sm sec" data-inact="30">30 hari</button><button class="btn sm sec" data-inact="60">60 hari</button><button class="btn sm sec" data-inact="90">90 hari</button></div>'
-      +'<div id="inact" class="muted">Pilih rentang di atas untuk lihat member yang sudah lama tidak belanja, lalu sapa via WhatsApp.</div></div>';
+      +'<div id="inact" class="muted">Pilih rentang di atas untuk lihat member yang sudah lama tidak belanja, lalu sapa via WhatsApp.</div></div>'
+      +'<div class="card"><div class="nm">🛡️ Audit poin (deteksi tidak wajar)</div>'
+      +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Membandingkan poin dengan total belanja. Poin dari game & check-in itu wajar, jadi pakai ini untuk <b>menyaring kandidat yang perlu dicek</b> sebelum kasih hadiah besar — bukan vonis.</div>'
+      +'<button class="btn sec" id="auditBtn">Tampilkan audit poin</button><div id="auditOut" style="margin-top:8px"></div></div>'
+      +(canEdit ? ('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya</div>'
+        +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Reset <b>SEMUA</b> poin member ke 0 (termasuk poin game & check-in). Berguna untuk mulai dari bersih setelah masa uji coba. <b>Tidak bisa dibatalkan.</b></div>'
+        +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in</label>'
+        +'<button class="btn red" id="rsBtn">Reset semua poin ke 0</button><div id="rsMsg"></div></div>') : '');
     tabEl.querySelectorAll('[data-inact]').forEach(function(b){ b.onclick=function(){ loadInactive(parseInt(b.getAttribute('data-inact'),10)); }; });
+    var ab=document.getElementById('auditBtn'); if(ab) ab.onclick=loadAudit;
+    var rb=document.getElementById('rsBtn'); if(rb) rb.onclick=async function(){
+      if(busy) return;
+      if(!confirm('Yakin reset SEMUA poin member jadi 0? Tindakan ini TIDAK bisa dibatalkan.')) return;
+      if(!confirm('Sekali lagi — poin SEMUA member akan jadi 0. Lanjutkan?')) return;
+      busy=true; var msg=document.getElementById('rsMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Mereset… (jangan tutup halaman)</div>';
+      try{ var r=await O.adminResetPoints({ scores: document.getElementById('rsScores').checked }); MEMBERS=null; TXN=null;
+        msg.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' member di-reset ke 0 poin.</div>'; }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      busy=false;
+    };
     document.getElementById('mfind').onclick=function(){ segFilter=null; doFind(document.getElementById('mq').value.trim()); };
     document.getElementById('mq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ segFilter=null; doFind(e.target.value.trim()); } });
     document.getElementById('vfind').onclick=function(){ doVoucher(document.getElementById('vq').value.trim()); };
@@ -228,25 +250,29 @@
     var tr=O.tierOf(spend);
     var vhtml = vs.length ? vs.map(function(v){ var on=(v.status!=='terpakai');
       return '<div class="row"><div class="grow"><div class="nm" style="font-size:.85rem">'+esc(v.title||'Voucher')+'</div><div class="sub">'+esc(v.code)+' · <span class="'+(on?'':'')+'">'+(on?'Aktif':'Sudah dipakai')+'</span></div></div>'
-        +'<button class="btn sm '+(on?'sec':'green')+'" data-vtog="'+esc(v.code)+'" data-on="'+(on?'1':'0')+'">'+(on?'Tandai dipakai':'Aktifkan lagi')+'</button></div>'; }).join('') : '<div class="muted">Belum ada voucher.</div>';
+        +(canEdit?('<button class="btn sm '+(on?'sec':'green')+'" data-vtog="'+esc(v.code)+'" data-on="'+(on?'1':'0')+'">'+(on?'Tandai dipakai':'Aktifkan lagi')+'</button>'):'')+'</div>'; }).join('') : '<div class="muted">Belum ada voucher.</div>';
     d.innerHTML='<div class="card"><div class="nm" style="font-size:1.05rem">'+esc(m.name||'Member')+'</div><div class="sub" style="margin:2px 0 5px">'+esc(m.phone||'-')+'</div>'
       +'<div style="margin:0 0 10px"><span style="display:inline-block;background:'+tr.color+';color:#fff;font-weight:900;font-size:.7rem;border-radius:999px;padding:3px 11px">★ '+tr.name+'</span> <span class="sub">total belanja '+rp(spend)+'</span></div>'
       +'<div class="row" style="border:none;padding:0"><div class="grow">Poin saat ini</div><div class="pts" style="font-size:1.1rem">'+m.points+'</div></div>'
       +'<div class="row"><div class="grow">Skor game terbaik</div><div class="pts" style="font-size:1.1rem">'+score+'</div></div>'
-      +'<label>Tambah / kurangi poin (boleh minus)</label><input id="adl" inputmode="numeric" placeholder="cth: 10 atau -5">'
-      +'<label>Alasan (tampil di rekap)</label><input id="adr" placeholder="cth: kasir lupa input UMS">'
-      +'<button class="btn" id="adBtn">Terapkan penyesuaian poin</button>'
-      +'<label style="margin-top:14px">Set poin jadi</label><input id="spv" inputmode="numeric" placeholder="angka pasti"><button class="btn sec" id="spBtn">Set poin</button>'
-      +'<label style="margin-top:14px">Set skor game jadi</label><input id="ssv" inputmode="numeric" placeholder="angka"><button class="btn sec" id="ssBtn">Set skor</button>'
+      +(canEdit ? (
+         '<label>Tambah / kurangi poin (boleh minus)</label><input id="adl" inputmode="numeric" placeholder="cth: 10 atau -5">'
+        +'<label>Alasan (tampil di rekap)</label><input id="adr" placeholder="cth: kasir lupa input UMS">'
+        +'<button class="btn" id="adBtn">Terapkan penyesuaian poin</button>'
+        +'<label style="margin-top:14px">Set poin jadi</label><input id="spv" inputmode="numeric" placeholder="angka pasti"><button class="btn sec" id="spBtn">Set poin</button>'
+        +'<label style="margin-top:14px">Set skor game jadi</label><input id="ssv" inputmode="numeric" placeholder="angka"><button class="btn sec" id="ssBtn">Set skor</button>'
+        ) : '<div class="res warn" style="margin-top:10px">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengubah poin & skor.</div>')
       +'<div style="margin-top:16px" class="nm">Voucher member ini</div>'+vhtml
       +'<div id="mmsg"></div></div>';
     function run(fn,ok){ if(busy) return; busy=true; var msg=document.getElementById('mmsg'); msg.innerHTML='<div class="muted" style="margin-top:10px">Memproses…</div>';
       Promise.resolve().then(fn).then(function(){ busy=false; msg.innerHTML='<div class="res ok">✓ '+ok+'</div>'; MEMBERS=null; openMember(uid); })
       .catch(function(e){ busy=false; msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }); }
-    document.getElementById('adBtn').onclick=function(){ run(function(){ return O.adminAdjustPoints(uid, parseInt(document.getElementById('adl').value||'0',10)||0, document.getElementById('adr').value); },'Poin disesuaikan.'); };
-    document.getElementById('spBtn').onclick=function(){ run(function(){ return O.adminSetPoints(uid, parseInt(document.getElementById('spv').value||'0',10)||0, document.getElementById('adr').value||'Set poin admin'); },'Poin di-set.'); };
-    document.getElementById('ssBtn').onclick=function(){ run(function(){ return O.adminSetScore(uid, parseInt(document.getElementById('ssv').value||'0',10)||0); },'Skor di-set.'); };
-    d.querySelectorAll('[data-vtog]').forEach(function(b){ b.onclick=function(){ run(function(){ return O.adminSetVoucherStatus(b.getAttribute('data-vtog'), b.getAttribute('data-on')!=='1'); },'Status voucher diubah.'); }; });
+    if(canEdit){
+      document.getElementById('adBtn').onclick=function(){ run(function(){ return O.adminAdjustPoints(uid, parseInt(document.getElementById('adl').value||'0',10)||0, document.getElementById('adr').value); },'Poin disesuaikan.'); };
+      document.getElementById('spBtn').onclick=function(){ run(function(){ return O.adminSetPoints(uid, parseInt(document.getElementById('spv').value||'0',10)||0, document.getElementById('adr').value||'Set poin admin'); },'Poin di-set.'); };
+      document.getElementById('ssBtn').onclick=function(){ run(function(){ return O.adminSetScore(uid, parseInt(document.getElementById('ssv').value||'0',10)||0); },'Skor di-set.'); };
+      d.querySelectorAll('[data-vtog]').forEach(function(b){ b.onclick=function(){ run(function(){ return O.adminSetVoucherStatus(b.getAttribute('data-vtog'), b.getAttribute('data-on')!=='1'); },'Status voucher diubah.'); }; });
+    }
   }
   async function doVoucher(code){
     var out=document.getElementById('vout'); if(!out) return; code=(code||'').trim().toUpperCase();
@@ -257,8 +283,8 @@
     var on=(v.status!=='terpakai');
     out.innerHTML='<div class="res '+(on?'ok':'warn')+'"><div class="nm">'+esc(v.title||'Voucher')+'</div>'
       +'<div class="sub">Pemilik: '+esc(v.name||'-')+'</div><div class="sub">Status: '+(on?'AKTIF':'SUDAH DIPAKAI')+'</div></div>'
-      +'<button class="btn '+(on?'red':'green')+'" id="vtg">'+(on?'Tandai SUDAH DIPAKAI':'Batalkan — aktifkan lagi')+'</button>';
-    document.getElementById('vtg').onclick=async function(){ if(busy)return; busy=true; this.disabled=true;
+      +(canEdit ? ('<button class="btn '+(on?'red':'green')+'" id="vtg">'+(on?'Tandai SUDAH DIPAKAI':'Batalkan — aktifkan lagi')+'</button>') : '');
+    var vtg=document.getElementById('vtg'); if(vtg) vtg.onclick=async function(){ if(busy)return; busy=true; this.disabled=true;
       try{ await O.adminSetVoucherStatus(code, !on); }catch(e){ alert((e&&e.message)||'Gagal'); }
       busy=false; doVoucher(code); };
   }
@@ -280,45 +306,109 @@
       + (arr.length>60?'<div class="hint">Tampil 60 dari '+arr.length+'.</div>':'');
   }
 
+  /* ---------- AUDIT POIN ---------- */
+  async function loadAudit(){
+    var box=document.getElementById('auditOut'); if(!box) return; box.innerHTML='<div class="muted">Menghitung…</div>';
+    var mem=await getMembers(), txn=await getTxn();
+    var belRp={}, belPt={}, admPt={};
+    txn.forEach(function(t){ if(!t.uid) return; if((t.kind||'')==='adjust'){ admPt[t.uid]=(admPt[t.uid]||0)+(t.points||0); } else { belRp[t.uid]=(belRp[t.uid]||0)+(t.nominal||0); belPt[t.uid]=(belPt[t.uid]||0)+(t.points||0); } });
+    var rows=mem.map(function(m){ var bp=belPt[m.uid]||0, br=belRp[m.uid]||0, ap=admPt[m.uid]||0, g=m.earnGame||0, c=m.earnCheckin||0;
+      var lain=(m.points||0)-(bp+g+c+ap); if(lain<0) lain=0;
+      var free=g+c; var flag=(br===0 && (m.points||0)>=50) || (lain>=300) || (free>=500);
+      return { uid:m.uid, name:m.name, phone:m.phone, points:(m.points||0), belRp:br, belPt:bp, game:g, checkin:c, admin:ap, lain:lain, susp:lain+free, flag:flag }; });
+    rows.sort(function(a,b){ return b.susp-a.susp; });
+    var flagged=rows.filter(function(r){return r.flag;}).length;
+    box.innerHTML='<div class="muted" style="margin-bottom:6px">'+(flagged?('<b style="color:#C0392B">'+flagged+' member</b> perlu dicek. '):'Tidak ada yang menonjol. ')+'Rincian poin per sumber:</div>'
+      + rows.slice(0,40).map(function(r){
+        var parts='🛒 belanja '+r.belPt+'p ('+rp(r.belRp)+') · 🎮 game '+r.game+'p · 🔥 check-in '+r.checkin+'p'+(r.admin?(' · ⚙️ admin '+r.admin+'p'):'')+(r.lain?(' · ❓ lainnya '+r.lain+'p'):'');
+        return '<div class="row" style="flex-wrap:wrap" data-uid="'+esc(r.uid)+'"'+(r.flag?' style="background:#FDECEC"':'')+'>'
+          +'<div class="grow"><div class="nm" style="font-size:.88rem">'+(r.flag?'🚩 ':'')+esc(r.name||'(tanpa nama)')+' <span class="pts">'+r.points+' poin</span></div>'
+          +'<div class="sub">'+esc(r.phone||'-')+'</div>'
+          +'<div class="sub" style="margin-top:3px;line-height:1.5">'+parts+'</div></div></div>'; }).join('')
+      + '<div class="hint">🛒 belanja & ⚙️ admin dari data transaksi; 🎮 game & 🔥 check-in dari pencatatan baru. <b>❓ lainnya</b> = poin yang tak terlacak (poin lama sebelum fitur ini, atau perlu dicek). Klik baris untuk detail.</div>';
+    box.querySelectorAll('tr[data-uid], .row[data-uid]').forEach(function(el){ el.onclick=function(){ openMember(el.getAttribute('data-uid')); window.scrollTo({top:0,behavior:'smooth'}); }; });
+  }
+
   /* ---------- ANALITIK ---------- */
   async function renderAnalitik(){
     tabEl.innerHTML='<div class="card"><div class="muted">Memuat analitik…</div></div>';
     var orders=[],txn=[]; try{ orders=await O.listOrders(1500); }catch(e){} txn=await getTxn();
-    var totOrder=orders.length, nilai=orders.reduce(function(s,o){return s+(o.total||0);},0);
-    var im={}; orders.forEach(function(o){ (o.items||[]).forEach(function(it){ var key=(it.cat?it.cat+' - ':'')+(it.name||it.id||'?'); im[key]=(im[key]||0)+(it.qty||0); }); });
+    var appr=orders.filter(function(o){return (o.status||'baru')==='approved';});
+    var pend=orders.filter(function(o){return (o.status||'baru')==='baru';}).length;
+    var totOrder=appr.length, nilai=appr.reduce(function(s,o){return s+(o.total||0);},0);
+    var im={}; appr.forEach(function(o){ (o.items||[]).forEach(function(it){ var key=(it.cat?it.cat+' - ':'')+(it.name||it.id||'?'); im[key]=(im[key]||0)+(it.qty||0); }); });
     var best=Object.keys(im).map(function(k){return {label:k,value:im[k],sub:im[k]+' pcs'};}).sort(function(a,b){return b.value-a.value;}).slice(0,8);
     var om={}; txn.forEach(function(t){ var o=t.outlet||'(lainnya)'; om[o]=(om[o]||0)+(t.nominal||0); });
     var outRows=Object.keys(om).map(function(k){return {label:k.replace(/^Oma Opa Cakery\s*/i,''),value:om[k],sub:rp(om[k])};}).sort(function(a,b){return b.value-a.value;}).slice(0,12);
     var days=14, today=new Date(); today.setHours(0,0,0,0); var buckets=[],labels=[];
     for(var i=days-1;i>=0;i--){ var dd=new Date(today); dd.setDate(dd.getDate()-i); buckets.push(0); labels.push(dd.getDate()+'/'+(dd.getMonth()+1)); }
     txn.forEach(function(t){ var dd=new Date(t.ts); dd.setHours(0,0,0,0); var diff=Math.round((today-dd)/86400000); var idx=days-1-diff; if(idx>=0&&idx<days) buckets[idx]++; });
-    var html='<div class="kpis"><div class="kpi"><div class="v">'+num(totOrder)+'</div><div class="l">Order via web</div></div>'
-      +'<div class="kpi"><div class="v" style="font-size:1.12rem">'+rp(nilai)+'</div><div class="l">Nilai order web</div></div></div>';
+    var html='';
+    if(pend>0) html+='<div class="res warn" style="margin-top:0;cursor:pointer" id="pendNote"><b>'+pend+' pesanan</b> menunggu dicek — buka tab Pesanan untuk approve. 👉</div>';
+    html+='<div class="kpis"><div class="kpi"><div class="v">'+num(totOrder)+'</div><div class="l">Order deal (web)</div></div>'
+      +'<div class="kpi"><div class="v" style="font-size:1.12rem">'+rp(nilai)+'</div><div class="l">Nilai order deal</div></div></div>';
     html+='<div class="card">'+lineChart('Tren transaksi 14 hari', buckets, labels)+'</div>';
-    html+='<div class="card">'+barH('Menu terlaris (dari order web)', best)+'</div>';
+    html+='<div class="card">'+barH('Menu terlaris (order disetujui)', best)+'</div>';
     html+='<div class="card">'+barH('Omzet per outlet (transaksi kasir)', outRows)+'</div>';
-    if(!orders.length){ html+='<div class="muted" style="margin-top:8px">Analitik menu terisi otomatis begitu pelanggan mulai memesan lewat keranjang web.</div>'; }
+    if(!appr.length){ html+='<div class="muted" style="margin-top:8px">Menu terlaris terisi setelah ada pesanan web yang kamu <b>approve</b> di tab Pesanan.</div>'; }
     tabEl.innerHTML=html;
+    var pn=document.getElementById('pendNote'); if(pn) pn.onclick=function(){ setActiveTab('pesanan'); render(); };
+  }
+
+  /* ---------- PESANAN (approval) ---------- */
+  async function renderPesanan(){
+    tabEl.innerHTML='<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Pesanan via web</div><button class="btn sm sec" id="oRl">↻</button></div>'
+      +'<div class="muted" style="font-size:.76rem;margin-bottom:8px">Pesanan dari keranjang web masuk sebagai <b>BARU</b>. Cek & sesuaikan kalau perlu, lalu <b>Approve</b> supaya masuk hitungan analitik.</div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm sec" data-of="baru">Perlu dicek</button><button class="btn sm sec" data-of="approved">Disetujui</button><button class="btn sm sec" data-of="all">Semua</button></div>'
+      +'<div id="oList"><div class="muted">Memuat…</div></div></div>';
+    document.getElementById('oRl').onclick=function(){ loadOrders(curOf); };
+    tabEl.querySelectorAll('[data-of]').forEach(function(b){ b.onclick=function(){ curOf=b.getAttribute('data-of'); loadOrders(curOf); }; });
+    loadOrders(curOf);
+  }
+  function orderAct(fn){ if(busy) return; busy=true; Promise.resolve().then(fn).then(function(){ busy=false; loadOrders(curOf); }).catch(function(e){ busy=false; alert((e&&e.message)||'Gagal'); }); }
+  async function loadOrders(f){
+    var box=document.getElementById('oList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listOrders(1000); }catch(e){}
+    if(f && f!=='all') arr=arr.filter(function(o){ return (o.status||'baru')===f; });
+    if(!arr.length){ box.innerHTML='<div class="res ok">Tidak ada pesanan'+(f==='baru'?' yang perlu dicek 👍':'')+'.</div>'; return; }
+    box.innerHTML=arr.slice(0,80).map(function(o){
+      var st=o.status||'baru'; var badge= st==='approved'?'<span class="tag on">DEAL</span>': st==='rejected'?'<span class="tag off">DITOLAK</span>':'<span class="tag adm">BARU</span>';
+      var items=(o.items||[]).map(function(it){ return it.qty+'x '+(it.cat?it.cat+' - ':'')+it.name; }).join(', ');
+      var when=o.ts?new Date(o.ts).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow"><div class="nm" style="font-size:.9rem">'+esc(o.nama||'(tanpa nama)')+' '+badge+'</div>'
+        +'<div class="sub">'+esc(o.outlet||'-')+' · '+rp(o.total)+' · '+esc(when)+'</div>'
+        +'<div class="sub" style="margin-top:3px">'+esc(items||'(tanpa item)')+(o.note?(' · 📝 '+esc(o.note)):'')+'</div>'
+        +(o.telp?'<div class="sub">'+esc(o.telp)+'</div>':'')+'</div>'
+        +(canEdit ? ('<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;width:100%">'
+        +(st!=='approved'?'<button class="btn sm green" data-oapp="'+esc(o.id)+'">✓ Approve</button>':'')
+        +'<button class="btn sm sec" data-oedit="'+esc(o.id)+'" data-tot="'+o.total+'" data-out="'+esc(o.outlet||'')+'">Edit</button>'
+        +(st!=='rejected'?'<button class="btn sm sec" data-orej="'+esc(o.id)+'">Tolak</button>':'')
+        +'<button class="btn sm red" data-odel="'+esc(o.id)+'">Hapus</button></div>') : '')+'</div>'; }).join('');
+    if(!canEdit) return;
+    box.querySelectorAll('[data-oapp]').forEach(function(b){ b.onclick=function(){ orderAct(function(){ return O.setOrderStatus(b.getAttribute('data-oapp'),'approved'); }); }; });
+    box.querySelectorAll('[data-orej]').forEach(function(b){ b.onclick=function(){ orderAct(function(){ return O.setOrderStatus(b.getAttribute('data-orej'),'rejected'); }); }; });
+    box.querySelectorAll('[data-odel]').forEach(function(b){ b.onclick=function(){ if(!confirm('Hapus pesanan ini?')) return; orderAct(function(){ return O.deleteOrder(b.getAttribute('data-odel')); }); }; });
+    box.querySelectorAll('[data-oedit]').forEach(function(b){ b.onclick=function(){ var t=prompt('Total (Rp):', b.getAttribute('data-tot')); if(t==null) return; var ou=prompt('Outlet:', b.getAttribute('data-out')); if(ou==null) return; orderAct(function(){ return O.updateOrder(b.getAttribute('data-oedit'),{ total:parseInt(t,10)||0, outlet:ou }); }); }; });
   }
 
   /* ---------- OUTLET ---------- */
   async function renderOutlet(){
-    tabEl.innerHTML='<div class="card"><div class="nm">Tambah outlet baru</div>'
+    tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah outlet baru</div>'
       +'<label>Nama outlet</label><input id="oNm" placeholder="cth: Oma Opa Cakery Gajah Raya Semarang">'
       +'<label>Area</label><input id="oAr" placeholder="cth: Semarang">'
       +'<label>Link Google Maps (opsional)</label><input id="oMp" placeholder="https://maps.app.goo.gl/...">'
-      +'<button class="btn" id="oAdd">＋ Tambah outlet</button><div id="oMsg"></div></div>'
+      +'<button class="btn" id="oAdd">＋ Tambah outlet</button><div id="oMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola outlet.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar outlet</div><button class="btn sm sec" id="oReload">↻</button></div><div id="oList"><div class="muted">Memuat…</div></div></div>';
-    document.getElementById('oAdd').onclick=async function(){ if(busy) return; busy=true; var msg=document.getElementById('oMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+    if(canEdit){ document.getElementById('oAdd').onclick=async function(){ if(busy) return; busy=true; var msg=document.getElementById('oMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       try{ await O.addOutlet({ name:document.getElementById('oNm').value, area:document.getElementById('oAr').value, maps:document.getElementById('oMp').value });
         msg.innerHTML='<div class="res ok">✓ Outlet ditambahkan.</div>'; document.getElementById('oNm').value=''; document.getElementById('oMp').value=''; loadOutlets();
-      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     document.getElementById('oReload').onclick=loadOutlets; loadOutlets();
   }
   async function loadOutlets(){
     var box=document.getElementById('oList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     var arr=[]; try{ arr=await O.listOutlets(); }catch(e){}
-    if(!arr.length){ box.innerHTML='<div class="res warn">Belum ada outlet di database.</div><button class="btn green" id="oSeed">Impor '+((window.OMA_OUTLETS||[]).length)+' outlet dari file</button><div class="hint">Sekali klik untuk memindahkan daftar bawaan ke database.</div>';
+    if(!arr.length){ box.innerHTML=(canEdit?('<div class="res warn">Belum ada outlet di database.</div><button class="btn green" id="oSeed">Impor '+((window.OMA_OUTLETS||[]).length)+' outlet dari file</button><div class="hint">Sekali klik untuk memindahkan daftar bawaan ke database.</div>'):'<div class="muted">Belum ada outlet.</div>');
       var sb=document.getElementById('oSeed'); if(sb) sb.onclick=async function(){ if(busy)return; busy=true; sb.disabled=true; sb.textContent='Mengimpor…';
         try{ var r=await O.seedOutlets(window.OMA_OUTLETS||[]); box.innerHTML='<div class="res ok">✓ '+r.count+' outlet diimpor.</div>'; loadOutlets(); }catch(e){ box.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; return; }
     var areas=[]; arr.forEach(function(o){ if(areas.indexOf(o.area)<0) areas.push(o.area); });
@@ -327,53 +417,59 @@
       arr.filter(function(o){return o.area===a;}).forEach(function(o){ var label=o.name.replace(/^Oma Opa Cakery\s*/i,'');
         html+='<div class="row"><div class="grow"><div class="nm">'+esc(label)+'</div><div class="sub">'+(o.maps?'<a class="link" href="'+esc(o.maps)+'" target="_blank">Maps</a>':'(tanpa maps)')+'</div></div>'
           +'<span class="tag '+(o.active?'on':'off')+'">'+(o.active?'AKTIF':'OFF')+'</span>'
-          +'<button class="btn sm sec" data-tog="'+esc(o.id)+'" data-act="'+(o.active?'1':'0')+'">'+(o.active?'Off':'On')+'</button>'
-          +'<button class="btn sm red" data-del="'+esc(o.id)+'" data-nm="'+esc(label)+'">Hapus</button></div>'; }); });
+          +(canEdit ? ('<button class="btn sm sec" data-tog="'+esc(o.id)+'" data-act="'+(o.active?'1':'0')+'">'+(o.active?'Off':'On')+'</button>'
+            +'<button class="btn sm red" data-del="'+esc(o.id)+'" data-nm="'+esc(label)+'">Hapus</button>') : '')+'</div>'; }); });
     box.innerHTML=html;
+    if(!canEdit) return;
     box.querySelectorAll('[data-tog]').forEach(function(b){ b.onclick=async function(){ if(busy)return; busy=true; b.disabled=true; try{ await O.updateOutlet(b.getAttribute('data-tog'),{active:b.getAttribute('data-act')!=='1'}); loadOutlets(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=async function(){ if(busy)return; if(!confirm('Hapus outlet "'+b.getAttribute('data-nm')+'"?')) return; busy=true; b.disabled=true; try{ await O.deleteOutlet(b.getAttribute('data-del')); loadOutlets(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
 
   /* ---------- STAFF ---------- */
   async function renderStaff(){
-    tabEl.innerHTML='<div class="card"><div class="nm">Tambah staff / kasir</div>'
+    tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah staff / kasir</div>'
       +'<label>UID akun (dari halaman kasir saat "belum terdaftar")</label><input id="sUid" placeholder="tempel UID di sini">'
       +'<label>Outlet</label><input id="sOut" placeholder="cth: Oma Opa Cakery UMS">'
-      +'<label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="sAdm" style="width:auto"> Jadikan admin (akses penuh)</label>'
-      +'<button class="btn" id="sAdd">＋ Tambah staff</button><div id="sMsg"></div></div>'
+      +'<label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="sAdm" style="width:auto"> Bisa buka dashboard (admin)</label>'
+      +'<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="sSup" style="width:auto"> Admin Utama (bisa mengubah poin & semua data)</label>'
+      +'<button class="btn" id="sAdd">＋ Tambah staff</button><div id="sMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola staff.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar staff</div><button class="btn sm sec" id="sReload">↻</button></div><div id="sList"><div class="muted">Memuat…</div></div></div>';
-    document.getElementById('sAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('sMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+    if(canEdit){ document.getElementById('sAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('sMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       try{ await O.addStaff(document.getElementById('sUid').value, document.getElementById('sOut').value, document.getElementById('sAdm').checked);
-        msg.innerHTML='<div class="res ok">✓ Staff ditambahkan.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sAdm').checked=false; loadStaff();
-      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+        if(document.getElementById('sSup').checked){ await O.updateStaff(document.getElementById('sUid').value.trim(), {super:true, admin:true}); }
+        msg.innerHTML='<div class="res ok">✓ Staff ditambahkan.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sAdm').checked=false; document.getElementById('sSup').checked=false; loadStaff();
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     document.getElementById('sReload').onclick=loadStaff; loadStaff();
   }
   async function loadStaff(){
     var box=document.getElementById('sList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     var arr=[]; try{ arr=await O.listStaff(); }catch(e){}
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada staff.</div>'; return; }
-    box.innerHTML=arr.map(function(s){ return '<div class="row"><div class="grow"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.admin?' <span class="tag adm">ADMIN</span>':'')+'</div>'
+    box.innerHTML=arr.map(function(s){ return '<div class="row"><div class="grow"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':' <span class="tag off">KASIR</span>'))+'</div>'
       +'<div class="sub">'+esc(s.outlet||'(outlet kosong)')+' · '+esc(s.phone||'')+'</div></div>'
-      +'<button class="btn sm sec" data-edit="'+esc(s.uid)+'" data-out="'+esc(s.outlet||'')+'">Outlet</button>'
-      +'<button class="btn sm sec" data-adm="'+esc(s.uid)+'" data-on="'+(s.admin?'1':'0')+'">'+(s.admin?'Cabut admin':'Jadikan admin')+'</button>'
-      +'<button class="btn sm red" data-rem="'+esc(s.uid)+'">Hapus</button></div>'; }).join('');
+      +(canEdit ? ('<button class="btn sm sec" data-edit="'+esc(s.uid)+'" data-out="'+esc(s.outlet||'')+'">Outlet</button>'
+        +'<button class="btn sm sec" data-adm="'+esc(s.uid)+'" data-on="'+(s.admin?'1':'0')+'">'+(s.admin?'Cabut admin':'Jadikan admin')+'</button>'
+        +'<button class="btn sm sec" data-sup="'+esc(s.uid)+'" data-on="'+(s.super?'1':'0')+'">'+(s.super?'Cabut utama':'Jadikan utama')+'</button>'
+        +'<button class="btn sm red" data-rem="'+esc(s.uid)+'">Hapus</button>') : '')+'</div>'; }).join('');
+    if(!canEdit) return;
     box.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=async function(){ var v=prompt('Outlet untuk staff ini:', b.getAttribute('data-out')); if(v==null) return; busy=true; try{ await O.updateStaff(b.getAttribute('data-edit'),{outlet:v.trim()}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-adm]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-adm'),{admin:b.getAttribute('data-on')!=='1'}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-sup]').forEach(function(b){ b.onclick=async function(){ var mk=b.getAttribute('data-on')!=='1'; busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-sup'), mk?{super:true,admin:true}:{super:false}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-rem]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus akses staff ini?')) return; busy=true; b.disabled=true; try{ await O.removeStaff(b.getAttribute('data-rem')); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
 
   /* ---------- REWARD ---------- */
   async function renderReward(){
-    tabEl.innerHTML='<div class="card"><div class="nm">Tambah reward baru</div>'
+    tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah reward baru</div>'
       +'<label>Judul</label><input id="rT" placeholder="cth: Gratis Kopi">'
       +'<label>Catatan (opsional)</label><input id="rN" placeholder="cth: min. belanja 50rb">'
       +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Harga poin</label><input id="rC" inputmode="numeric" placeholder="cth: 150"></div><div style="flex:1"><label>Stok (limit)</label><input id="rL" inputmode="numeric" placeholder="cth: 100"></div></div>'
-      +'<button class="btn" id="rAdd">＋ Tambah reward</button><div id="rMsg"></div></div>'
+      +'<button class="btn" id="rAdd">＋ Tambah reward</button><div id="rMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola reward.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar reward</div><button class="btn sm sec" id="rReload">↻</button></div><div id="rList"><div class="muted">Memuat…</div></div></div>';
-    document.getElementById('rAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('rMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+    if(canEdit){ document.getElementById('rAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('rMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       try{ await O.saveReward(null,{ title:document.getElementById('rT').value, note:document.getElementById('rN').value, cost:document.getElementById('rC').value, limit:document.getElementById('rL').value, active:true });
         msg.innerHTML='<div class="res ok">✓ Reward ditambahkan.</div>'; ['rT','rN','rC','rL'].forEach(function(i){document.getElementById(i).value='';}); loadRewards();
-      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     document.getElementById('rReload').onclick=loadRewards; loadRewards();
   }
   async function loadRewards(){
@@ -383,9 +479,10 @@
     box.innerHTML=arr.map(function(r){ var rem=(r.limit!=null)?('sisa '+Math.max(0,r.limit-r.claimed)+'/'+r.limit):'tanpa limit';
       return '<div class="row"><div class="grow"><div class="nm">'+esc(r.title)+(r.active?'':' <span class="tag off">OFF</span>')+(r.custom?' <span class="tag adm">custom</span>':'')+'</div>'
         +'<div class="sub"><span class="pts">'+r.cost+' poin</span> · '+rem+(r.note?(' · '+esc(r.note)):'')+'</div></div>'
-        +'<button class="btn sm sec" data-redit=\''+esc(JSON.stringify({id:r.id,title:r.title,note:r.note,cost:r.cost,limit:r.limit}))+'\'>Edit</button>'
-        +'<button class="btn sm sec" data-ract="'+esc(r.id)+'" data-on="'+(r.active?'1':'0')+'">'+(r.active?'Off':'On')+'</button>'
-        +(r.custom?'<button class="btn sm red" data-rdel="'+esc(r.id)+'">Hapus</button>':'')+'</div>'; }).join('');
+        +(canEdit ? ('<button class="btn sm sec" data-redit=\''+esc(JSON.stringify({id:r.id,title:r.title,note:r.note,cost:r.cost,limit:r.limit}))+'\'>Edit</button>'
+          +'<button class="btn sm sec" data-ract="'+esc(r.id)+'" data-on="'+(r.active?'1':'0')+'">'+(r.active?'Off':'On')+'</button>'
+          +(r.custom?'<button class="btn sm red" data-rdel="'+esc(r.id)+'">Hapus</button>':'')) : '')+'</div>'; }).join('');
+    if(!canEdit) return;
     box.querySelectorAll('[data-ract]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.setRewardActive(b.getAttribute('data-ract'), b.getAttribute('data-on')!=='1'); loadRewards(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-rdel]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus reward ini?')) return; busy=true; b.disabled=true; try{ await O.deleteReward(b.getAttribute('data-rdel')); loadRewards(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-redit]').forEach(function(b){ b.onclick=function(){ var r=JSON.parse(b.getAttribute('data-redit')); editReward(r); }; });

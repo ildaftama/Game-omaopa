@@ -887,12 +887,12 @@ const DECOR=[
 /* ---- DEKORASI OUTLET (fondasi shop) ---- */
 /* ---- TOOLS / ITEM OUTLET (bisa dibeli di Toko) ---- */
 const TOOLS=[
-  {id:'balon',   emoji:'🎈', name:'Balon Ceria',            cost:120, desc:'Customer betah, waktu tunggu +25%.'},
-  {id:'autofill',emoji:'⚙️', name:'Pengisi Topping Otomatis', cost:220, desc:'Topping yang habis terisi sendiri.'},
-  {id:'promo',   emoji:'📢', name:'Banner Promo',            cost:160, desc:'Customer datang lebih ramai.'},
-  {id:'kulkas',  emoji:'🧊', name:'Kulkas Premium',          cost:140, desc:'Stok topping 2x lebih besar.'},
-  {id:'tip',     emoji:'💰', name:'Toples Tip',              cost:180, desc:'Tiap pesanan benar dapat +1 poin.'},
-  {id:'menu',    emoji:'🪧', name:'Papan Menu Lucu',         cost:150, desc:'Customer +10% sabar & lebih jarang rewel.'}
+  {id:'balon',   emoji:'🎈', name:'Balon Ceria',            cost:90,  desc:'Customer makin betah & sabar nunggu.'},
+  {id:'autofill',emoji:'⚙️', name:'Pengisi Topping Otomatis', cost:180, desc:'Topping yang habis terisi sendiri.'},
+  {id:'promo',   emoji:'📢', name:'Banner Promo',            cost:125, desc:'Customer datang lebih ramai.'},
+  {id:'kulkas',  emoji:'⏰', name:'Jam Toko Ajaib',          cost:110, desc:'Toko buka lebih lama, waktu main nambah.'},
+  {id:'tip',     emoji:'💰', name:'Toples Tip',              cost:145, desc:'Sesekali customer kasih tip poin tambahan.'},
+  {id:'menu',    emoji:'🪧', name:'Papan Menu Lucu',         cost:115, desc:'Customer lebih sabar & jarang ngambek.'}
 ];
 const LS_TOOLS='omaopa_tools', LS_DECOR='omaopa_decor';
 function ownedTools(){ try{ const a=JSON.parse(localStorage.getItem(LS_TOOLS)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
@@ -915,7 +915,7 @@ function decorPromo(){ return '<path d="M120 10 H280" stroke="#C9A86A" stroke-wi
 function decorMenu(){ return '<rect x="301" y="20" width="33" height="26" rx="3" fill="#fff" stroke="#C9A86A"/><line x1="306" y1="27" x2="329" y2="27" stroke="#C9A86A"/><line x1="306" y1="33" x2="329" y2="33" stroke="#C9A86A"/><line x1="306" y1="39" x2="322" y2="39" stroke="#C9A86A"/><rect x="315" y="46" width="4" height="7" fill="#C9A86A"/>'; }
 function decorAutofill(){ return '<rect x="58" y="100" width="26" height="22" rx="4" fill="#8FB4D6"/><rect x="62" y="104" width="18" height="8" rx="2" fill="#CDE6FF"/><circle cx="71" cy="116" r="2.4" fill="#F2C14E"/><rect x="69" y="120" width="4" height="5" fill="#6E94B6"/>'; }
 function decorTip(){ return '<rect x="112" y="106" width="20" height="18" rx="3" fill="#CDE6FF" opacity=".85" stroke="#9DBCD0"/><circle cx="122" cy="103" r="3" fill="#F2C14E" stroke="#d9a93a"/><text x="122" y="120" text-anchor="middle" font-family="Fredoka,sans-serif" font-size="9" font-weight="800" fill="#3E6E9E">Rp</text>'; }
-function decorKulkas(){ return '<rect x="320" y="96" width="26" height="40" rx="4" fill="#DCE8F0" stroke="#B7CBDA"/><line x1="320" y1="114" x2="346" y2="114" stroke="#B7CBDA"/><rect x="341" y="100" width="3" height="8" rx="1.5" fill="#9DB4C6"/><rect x="341" y="118" width="3" height="8" rx="1.5" fill="#9DB4C6"/>'; }
+function decorKulkas(){ return '<circle cx="333" cy="115" r="12" fill="#FFF3D6" stroke="#E0B100" stroke-width="2"/><line x1="333" y1="115" x2="333" y2="108" stroke="#7A5A12" stroke-width="1.5" stroke-linecap="round"/><line x1="333" y1="115" x2="338" y2="115" stroke="#7A5A12" stroke-width="1.5" stroke-linecap="round"/><circle cx="333" cy="115" r="1.4" fill="#7A5A12"/>'; }
 const DECOR_SLOTS=[
   {id:'balon',   px:95,  py:30,  draw:decorBalon},
   {id:'promo',   px:200, py:13,  draw:decorPromo},
@@ -1039,7 +1039,7 @@ function openLvlSelect(){
   document.getElementById('overlay').classList.remove('show');
   document.getElementById('lvlSelect').classList.add('show');
 }
-function addPoints(p){ if(window.OmaOpa){ window.OmaOpa.addPoints(p); } else { try{const c=parseInt(localStorage.getItem(LS_PTS)||'0',10)||0; localStorage.setItem(LS_PTS,c+p);}catch(e){} } }
+function addPoints(p,src){ if(window.OmaOpa){ window.OmaOpa.addPoints(p,src); } else { try{const c=parseInt(localStorage.getItem(LS_PTS)||'0',10)||0; localStorage.setItem(LS_PTS,c+p);}catch(e){} } }
 function totalPoints(){ if(window.OmaOpa) return window.OmaOpa.getPoints(); return parseInt(localStorage.getItem(LS_PTS)||'0',10)||0; }
 
 function updateHUD(){
@@ -1160,7 +1160,7 @@ function serve(){
     gained = -Math.max(3, Math.round(pen));
     state.combo=0;
   }
-  if((o.special||fullOk) && state.tip) gained+=state.tip;   // Toples Tip
+  if((o.special||fullOk) && state.tip && Math.random()<0.10) gained+=1;   // Toples Tip: sesekali dapat tip
   if(state.combo>=6) bonus=2; else if(state.combo>=3) bonus=1;
   const total=gained+bonus; state.score=(state.score||0)+total;
   const _el=document.querySelector('.cust[data-cid="'+o.id+'"]');
@@ -1189,8 +1189,8 @@ function serve(){
 function levelDone(){
   state.over=true; if(raf) cancelAnimationFrame(raf); SND.end();
   const dv=document.getElementById('dangerVig'); if(dv) dv.classList.remove('on');
-  const n=state.level, sc=state.score||0, pts=Math.floor(sc/10);
-  setBest(n,sc); if(pts>0) addPoints(pts);
+  const n=state.level, sc=state.score||0, pts=Math.floor(sc/25);
+  setBest(n,sc); if(pts>0) addPoints(pts,'game');
   try{ if(window.OmaOpa && window.OmaOpa.submitScore) window.OmaOpa.submitScore(sc); }catch(e){}
   const nx=n+1; if(nx<=MAX_LEVEL && sc>=(UNLOCK[nx]||0)) setUnlocked(nx);
   showScore(n, sc, pts);
@@ -1249,7 +1249,7 @@ function startLevel(n){
   document.getElementById('pauseMenu').classList.remove('show');
   if(raf) cancelAnimationFrame(raf);
   const T=ownedTools();
-  const capTop=(T.indexOf('kulkas')>=0)?CAP*2:CAP;
+  const capTop=CAP;
   const stock={}; TOP_KEYS.forEach(k=>stock[k]=capTop);
   const now=performance.now();
   state={level:n, tier:levelTier(n), maxConc:levelConcurrent(n), otime:levelOrderTime(n), spawnGap:spawnGap(n),
@@ -1264,6 +1264,7 @@ function startLevel(n){
   state.fillMs=1500;
   state.autoFill=T.indexOf('autofill')>=0;
   state.tip=(T.indexOf('tip')>=0)?1:0;
+  if(T.indexOf('kulkas')>=0){ const ex=12; state.levelEnd=now+(GAME_TIME+ex)*1000; state.timeLeft=GAME_TIME+ex; }
   state.queue.push(makeTicket());                 // 1 customer dulu
   state.nextSpawnAt=now+state.spawnGap*1000;       // sisanya datang bergiliran
   const _th=applyTheme(n); state.ev=_th.ev; state.evEmoji=_th.emoji; renderOutletBar(); renderDecorLayer();
@@ -1290,7 +1291,7 @@ function dPromo(){ return '<div class="promoDeco"><svg width="58" height="50" vi
 function dMenu(){ return '<svg width="44" height="50" viewBox="0 0 44 50"><rect x="11" y="30" width="3" height="15" rx="1" fill="#5A3A24" transform="rotate(9 12 37)"/><rect x="30" y="30" width="3" height="15" rx="1" fill="#5A3A24" transform="rotate(-9 31 37)"/><rect x="5" y="5" width="34" height="29" rx="5" fill="#7A5230"/><rect x="6.5" y="6.5" width="31" height="26" rx="4" fill="#5A3A24"/><rect x="9" y="9" width="26" height="21" rx="3" fill="#3E6B57"/><rect x="13" y="2" width="18" height="9" rx="4.5" fill="#E0728A"/><text x="22" y="8.6" text-anchor="middle" font-family="Fredoka,sans-serif" font-size="5.6" font-weight="800" fill="#fff">MENU</text><path d="M15 25 h7 l-1 -5 h-5 z" fill="none" stroke="#fff" stroke-width="1" opacity=".9"/><path d="M15 20 q3.5 -4 7 0" fill="none" stroke="#FBD4E0" stroke-width="1.3"/><circle cx="18.5" cy="17.3" r="1.2" fill="#F2C14E"/><line x1="26" y1="16" x2="32" y2="16" stroke="rgba(255,255,255,.75)" stroke-width="1"/><line x1="26" y1="20" x2="32" y2="20" stroke="rgba(255,255,255,.75)" stroke-width="1"/><line x1="26" y1="24" x2="31" y2="24" stroke="rgba(255,255,255,.75)" stroke-width="1"/><path class="twinkle" d="M35 7 l.8 1.8 1.8 .8 -1.8 .8 -.8 1.8 -.8 -1.8 -1.8 -.8 1.8 -.8 z" fill="#FFF1A8"/></svg>'; }
 function dFiller(){ return '<svg width="36" height="40" viewBox="0 0 36 40"><rect x="4" y="4" width="28" height="18" rx="5" fill="#8FB4D6"/><rect x="4" y="4" width="28" height="18" rx="5" fill="none" stroke="#6E94B6" stroke-width="1"/><rect x="8" y="8" width="20" height="8" rx="2.5" fill="#EAF4FF"/><circle cx="13" cy="12" r="1.8" fill="#E0728A"/><circle cx="18" cy="12" r="1.8" fill="#7CC9B5"/><circle cx="23" cy="12" r="1.8" fill="#F2C14E"/><circle class="led" cx="28.5" cy="7.5" r="1.5" fill="#7CC9B5"/><rect x="14" y="22" width="8" height="6" rx="1.5" fill="#5E7E9E"/><path class="drip" d="M18 28 q-2.2 3 0 5 q2.2 -2 0 -5" fill="#E0728A"/><rect x="8" y="33" width="20" height="4.5" rx="2.2" fill="#B7CBDA"/></svg>'; }
 function dTip(){ return '<svg width="28" height="36" viewBox="0 0 28 36"><circle class="coin" cx="14" cy="6" r="3.2" fill="#FBD24E" stroke="#d9a93a"/><path d="M5 13 q0 -2 2 -2 h14 q2 0 2 2 v15 q0 3 -3 3 h-12 q-3 0 -3 -3 z" fill="#CDE6FF" stroke="#9DBCD0" opacity=".92"/><rect x="7.5" y="14" width="2.6" height="15" rx="1.3" fill="rgba(255,255,255,.65)"/><circle cx="11" cy="27" r="2.5" fill="#FBD24E" stroke="#d9a93a"/><circle cx="17" cy="28" r="2.5" fill="#FBD24E" stroke="#d9a93a"/><circle cx="14" cy="24" r="2.5" fill="#F6CE63" stroke="#d9a93a"/><text x="14" y="22" text-anchor="middle" font-family="Fredoka,sans-serif" font-size="4.6" font-weight="800" fill="#b8902f">Rp</text><rect x="4" y="10" width="20" height="3.4" rx="1.7" fill="#9DBCD0"/></svg>'; }
-function dFridge(){ return '<svg width="32" height="46" viewBox="0 0 32 46"><rect x="3" y="2" width="26" height="42" rx="6" fill="#EAF1F6" stroke="#B7CBDA" stroke-width="1.5"/><rect x="6" y="5" width="20" height="15" rx="3" fill="#BFE0EE"/><rect x="6" y="5" width="20" height="15" rx="3" fill="none" stroke="#A6CEDD" stroke-width="1"/><rect x="9" y="8" width="3.6" height="9" rx="1.2" fill="#E0728A"/><rect x="14.2" y="8" width="3.6" height="9" rx="1.2" fill="#7CC9B5"/><rect x="19.4" y="8" width="3.6" height="9" rx="1.2" fill="#F2C14E"/><line x1="3" y1="24" x2="29" y2="24" stroke="#B7CBDA" stroke-width="1.5"/><rect x="23.5" y="9" width="3" height="9" rx="1.5" fill="#9DB4C6"/><rect x="23.5" y="28" width="3" height="9" rx="1.5" fill="#9DB4C6"/><rect x="7" y="28" width="13" height="11" rx="2" fill="#DCEAF2"/><path class="twinkle" d="M9 31 l.7 1.6 1.6 .7 -1.6 .7 -.7 1.6 -.7 -1.6 -1.6 -.7 1.6 -.7 z" fill="#fff"/></svg>'; }
+function dFridge(){ return '<svg width="34" height="40" viewBox="0 0 34 40"><circle cx="17" cy="21" r="14" fill="#FFF3D6" stroke="#E0B100" stroke-width="2"/><circle cx="17" cy="21" r="11" fill="#fff" stroke="#F2D98A" stroke-width="1"/><line x1="17" y1="21" x2="17" y2="12" stroke="#7A5A12" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="21" x2="23" y2="21" stroke="#7A5A12" stroke-width="2" stroke-linecap="round"/><circle cx="17" cy="21" r="1.8" fill="#7A5A12"/><rect x="10" y="2" width="4" height="4" rx="1" fill="#E0B100"/><rect x="20" y="2" width="4" height="4" rx="1" fill="#E0B100"/></svg>'; }
 function renderDecorLayer(){
   const dd=document.getElementById('decorDisplay');
   if(dd){
@@ -1408,7 +1409,7 @@ document.getElementById('serveBtn').addEventListener('click',serve);
 document.getElementById('lvlGrid').addEventListener('click',e=>{const b=e.target.closest('[data-lvl]');if(!b)return;ensureAudio();SND.blip();startLevel(parseInt(b.dataset.lvl,10));});
 showStart();
 </script>
-<script type="module" src="core-omaopa.js?v=48"></script>
+<script type="module" src="core-omaopa.js?v=51"></script>
 <script>
   (function(){
     function paintAcct(s){
