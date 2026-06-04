@@ -83,8 +83,8 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script src="outlets-data.js?v=51"></script>
-<script type="module" src="core-omaopa.js?v=51"></script>
+<script src="outlets-data.js?v=52"></script>
+<script type="module" src="core-omaopa.js?v=52"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -169,7 +169,7 @@
       +'</div>';
     html+='<div class="card"><div class="muted" style="margin-bottom:2px;font-size:.74rem">Ketuk legenda untuk lihat membernya 👇</div>'+donut('Umur member', tally(mem,'age'),'age')+donut('Jenis kelamin', tally(mem,'gender'),'gender')+donut('Pekerjaan', tally(mem,'occupation'),'occupation')+donut('Tier member', tierCnt,'')+'</div>';
     if(canEdit) html+='<div class="card"><div class="nm">📣 Banner promo di app</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
-    html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=51">Buka Halaman Rekap →</a></div>';
+    html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=52">Buka Halaman Rekap →</a></div>';
     tabEl.innerHTML=html;
     tabEl.querySelectorAll('.lg[data-segf]').forEach(function(el){ el.onclick=function(){ var f=el.getAttribute('data-segf'); if(f) applySegment(f, el.getAttribute('data-segv')); }; });
     if(canEdit) loadBanner();
@@ -205,7 +205,10 @@
       +(canEdit ? ('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya</div>'
         +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Reset <b>SEMUA</b> poin member ke 0 (termasuk poin game & check-in). Berguna untuk mulai dari bersih setelah masa uji coba. <b>Tidak bisa dibatalkan.</b></div>'
         +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in</label>'
-        +'<button class="btn red" id="rsBtn">Reset semua poin ke 0</button><div id="rsMsg"></div></div>') : '');
+        +'<button class="btn red" id="rsBtn">Reset semua poin ke 0</button><div id="rsMsg"></div>'
+        +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
+        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>SEMUA transaksi kasir</b> (termasuk penyesuaian poin admin). Membersihkan grafik omzet & tren dari data uji coba. <b>Tidak bisa dibatalkan.</b></div>'
+        +'<button class="btn red" id="txBtn">Hapus semua transaksi kasir</button><div id="txMsg"></div></div>') : '');
     tabEl.querySelectorAll('[data-inact]').forEach(function(b){ b.onclick=function(){ loadInactive(parseInt(b.getAttribute('data-inact'),10)); }; });
     var ab=document.getElementById('auditBtn'); if(ab) ab.onclick=loadAudit;
     var rb=document.getElementById('rsBtn'); if(rb) rb.onclick=async function(){
@@ -215,6 +218,16 @@
       busy=true; var msg=document.getElementById('rsMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Mereset… (jangan tutup halaman)</div>';
       try{ var r=await O.adminResetPoints({ scores: document.getElementById('rsScores').checked }); MEMBERS=null; TXN=null;
         msg.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' member di-reset ke 0 poin.</div>'; }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      busy=false;
+    };
+    var tb=document.getElementById('txBtn'); if(tb) tb.onclick=async function(){
+      if(busy) return;
+      if(!confirm('Hapus SEMUA transaksi kasir? Grafik omzet & tren akan kosong. Tidak bisa dibatalkan.')) return;
+      if(!confirm('Sekali lagi — semua catatan transaksi kasir akan hilang. Lanjutkan?')) return;
+      busy=true; var msg=document.getElementById('txMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus… (jangan tutup halaman)</div>';
+      try{ var r=await O.adminClearTransactions(); TXN=null;
+        msg.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' transaksi dihapus.</div>'; }
       catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
       busy=false;
     };
@@ -445,12 +458,13 @@
     var box=document.getElementById('sList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     var arr=[]; try{ arr=await O.listStaff(); }catch(e){}
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada staff.</div>'; return; }
-    box.innerHTML=arr.map(function(s){ return '<div class="row"><div class="grow"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':' <span class="tag off">KASIR</span>'))+'</div>'
+    box.innerHTML=arr.map(function(s){ return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':' <span class="tag off">KASIR</span>'))+'</div>'
       +'<div class="sub">'+esc(s.outlet||'(outlet kosong)')+' · '+esc(s.phone||'')+'</div></div>'
-      +(canEdit ? ('<button class="btn sm sec" data-edit="'+esc(s.uid)+'" data-out="'+esc(s.outlet||'')+'">Outlet</button>'
+      +(canEdit ? ('<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
+        +'<button class="btn sm sec" data-edit="'+esc(s.uid)+'" data-out="'+esc(s.outlet||'')+'">Outlet</button>'
         +'<button class="btn sm sec" data-adm="'+esc(s.uid)+'" data-on="'+(s.admin?'1':'0')+'">'+(s.admin?'Cabut admin':'Jadikan admin')+'</button>'
         +'<button class="btn sm sec" data-sup="'+esc(s.uid)+'" data-on="'+(s.super?'1':'0')+'">'+(s.super?'Cabut utama':'Jadikan utama')+'</button>'
-        +'<button class="btn sm red" data-rem="'+esc(s.uid)+'">Hapus</button>') : '')+'</div>'; }).join('');
+        +'<button class="btn sm red" data-rem="'+esc(s.uid)+'">Hapus</button></div>') : '')+'</div>'; }).join('');
     if(!canEdit) return;
     box.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=async function(){ var v=prompt('Outlet untuk staff ini:', b.getAttribute('data-out')); if(v==null) return; busy=true; try{ await O.updateStaff(b.getAttribute('data-edit'),{outlet:v.trim()}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-adm]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-adm'),{admin:b.getAttribute('data-on')!=='1'}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });

@@ -904,6 +904,12 @@ async function adminResetPoints(opts){
   }
   return { count:n };
 }
+async function adminClearTransactions(){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  const snap=await getDocs(collection(db,'transactions')); let n=0;
+  for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'transactions',ds.id)); n++; }catch(e){} }
+  return { count:n };
+}
 function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || ('o'+Date.now()); }
 async function listOutlets(){
   try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
@@ -1025,7 +1031,7 @@ window.OmaOpa = {
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers,
   isAdmin, isSuper, getMemberByPhone, listMembers, getMemberScore,
-  adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints,
+  adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,

@@ -77,7 +77,7 @@
   <h2 class="sec">Pilih permainan</h2>
   <div class="games">
 
-    <a class="gcard" href="topping.html?v=51">
+    <a class="gcard" href="topping.html?v=52">
       <div class="gicon" style="background:#FCEFC2"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M6 18h24v6a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 18.5C4.4 12 9.8 7.5 18 7.5S31.6 12 31 18.5Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="13.5" cy="12" rx="5.5" ry="2" fill="#fff" opacity=".35"/><ellipse cx="14.2" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><ellipse cx="21.8" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><path d="M16.5 25.2q1.5 1.2 3 0" stroke="#5a3b2e" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="11" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/><circle cx="25" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/></svg></div>
       <div class="gname">Menopping Asik!</div>
       <div class="gdesc">Selesaikan pesanan customer dan dapatkan pointnya.</div>
@@ -126,9 +126,9 @@
   <div id="navProfil" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.8" r="3.4"/><path d="M5.5 19.3a6.5 6.5 0 0 1 13 0"/></svg></span>Profil</div>
 </div>
 
-<script src="menu-data.js?v=51"></script>
-<script src="outlets-data.js?v=51"></script>
-<script type="module" src="core-omaopa.js?v=51"></script>
+<script src="menu-data.js?v=52"></script>
+<script src="outlets-data.js?v=52"></script>
+<script type="module" src="core-omaopa.js?v=52"></script>
 <script>
   try{ document.getElementById('coin').textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){ document.getElementById('coin').textContent='0'; }
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -332,13 +332,24 @@
 (function(){
   function show(a){
     if(!a||!a.active||!a.text){ var ex=document.getElementById('omaPromo'); if(ex) ex.style.display='none'; return; }
+    if(!document.getElementById('omaPromoCss')){
+      var st=document.createElement('style'); st.id='omaPromoCss';
+      st.textContent='@keyframes omaPromoIn{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}'
+        +'@keyframes omaPromoShine{0%{transform:translateX(-130%) skewX(-18deg)}55%,100%{transform:translateX(360%) skewX(-18deg)}}'
+        +'@keyframes omaPromoMega{0%,100%{transform:rotate(0)}25%{transform:rotate(-13deg)}75%{transform:rotate(13deg)}}'
+        +'#omaPromo{position:sticky;top:0;z-index:600;overflow:hidden;background:linear-gradient(90deg,#FFDD55,#FACC1A 45%,#FFD23E);color:#5A3A05;font-weight:800;font-size:.9rem;letter-spacing:.2px;padding:11px 40px 11px 16px;text-align:center;box-shadow:0 3px 12px rgba(224,177,0,.45);border-bottom:2px solid #E0B100;animation:omaPromoIn .55s cubic-bezier(.2,.85,.25,1)}'
+        +'#omaPromo .shine{position:absolute;top:0;left:0;height:100%;width:32%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);animation:omaPromoShine 3.4s ease-in-out infinite;pointer-events:none}'
+        +'#omaPromo .mega{display:inline-block;animation:omaPromoMega 1.7s ease-in-out infinite;transform-origin:65% 65%;margin-right:3px}'
+        +'#omaPromo .ptxt{position:relative;z-index:1}'
+        +'#omaPromo .pclose{position:absolute;right:9px;top:50%;transform:translateY(-50%);background:rgba(90,58,5,.16);border:none;color:#5A3A05;width:24px;height:24px;border-radius:50%;font-weight:900;cursor:pointer;line-height:1;z-index:2}'
+        +'@media(prefers-reduced-motion:reduce){#omaPromo,#omaPromo .shine,#omaPromo .mega{animation:none}}';
+      document.head.appendChild(st);
+    }
     var d=document.getElementById('omaPromo');
     if(!d){ d=document.createElement('div'); d.id='omaPromo'; document.body.insertBefore(d, document.body.firstChild); }
-    d.style.cssText='position:sticky;top:0;z-index:600;background:linear-gradient(90deg,#613925,#7a4a30);color:#fff;font-weight:800;font-size:.86rem;padding:10px 36px 10px 14px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.15)';
-    d.textContent='📣 '+a.text; d.style.display='block';
-    var x=document.createElement('button'); x.textContent='×';
-    x.style.cssText='position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.22);border:none;color:#fff;width:22px;height:22px;border-radius:50%;font-weight:900;cursor:pointer;line-height:1';
-    x.onclick=function(){ d.style.display='none'; }; d.appendChild(x);
+    d.style.display='block';
+    d.innerHTML='<span class="shine"></span><span class="mega">📣</span><span class="ptxt">'+String(a.text).replace(/</g,'&lt;')+'</span><button class="pclose" aria-label="tutup">×</button>';
+    d.querySelector('.pclose').onclick=function(){ d.style.display='none'; };
   }
   function load(){ try{ if(window.OmaOpa&&window.OmaOpa.getAnnouncement){ window.OmaOpa.getAnnouncement().then(show).catch(function(){}); } }catch(e){} }
   window.addEventListener('omaopa:ready', load); setTimeout(load, 1000);
