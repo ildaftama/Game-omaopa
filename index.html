@@ -331,25 +331,40 @@
 /* Banner promo dari admin (settings/announcement) */
 (function(){
   function show(a){
-    if(!a||!a.active||!a.text){ var ex=document.getElementById('omaPromo'); if(ex) ex.style.display='none'; return; }
+    var app=document.querySelector('.app')||document.body;
+    if(!a||!a.active||(!a.image&&!a.text)){ var ex=document.getElementById('omaPromo'); if(ex) ex.style.display='none'; return; }
     if(!document.getElementById('omaPromoCss')){
       var st=document.createElement('style'); st.id='omaPromoCss';
       st.textContent='@keyframes omaPromoIn{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}'
         +'@keyframes omaPromoShine{0%{transform:translateX(-130%) skewX(-18deg)}55%,100%{transform:translateX(360%) skewX(-18deg)}}'
         +'@keyframes omaPromoMega{0%,100%{transform:rotate(0)}25%{transform:rotate(-13deg)}75%{transform:rotate(13deg)}}'
-        +'#omaPromo{position:sticky;top:0;z-index:600;overflow:hidden;background:linear-gradient(90deg,#FFDD55,#FACC1A 45%,#FFD23E);color:#5A3A05;font-weight:800;font-size:.9rem;letter-spacing:.2px;padding:11px 40px 11px 16px;text-align:center;box-shadow:0 3px 12px rgba(224,177,0,.45);border-bottom:2px solid #E0B100;animation:omaPromoIn .55s cubic-bezier(.2,.85,.25,1)}'
-        +'#omaPromo .shine{position:absolute;top:0;left:0;height:100%;width:32%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);animation:omaPromoShine 3.4s ease-in-out infinite;pointer-events:none}'
+        +'#omaPromo{position:sticky;top:0;z-index:600;overflow:hidden;animation:omaPromoIn .55s cubic-bezier(.2,.85,.25,1)}'
+        +'#omaPromo.txt{background:linear-gradient(90deg,#FFDD55,#FACC1A 45%,#FFD23E);color:#5A3A05;font-weight:800;font-size:.9rem;letter-spacing:.2px;padding:11px 40px 11px 16px;text-align:center;box-shadow:0 3px 12px rgba(224,177,0,.45);border-bottom:2px solid #E0B100}'
+        +'#omaPromo.img{line-height:0;box-shadow:0 3px 12px rgba(224,177,0,.4)}'
+        +'#omaPromo.img img{display:block;width:100%;height:auto}'
+        +'#omaPromo .shine{position:absolute;top:0;left:0;height:100%;width:32%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.65),transparent);animation:omaPromoShine 3.6s ease-in-out infinite;pointer-events:none;z-index:2}'
         +'#omaPromo .mega{display:inline-block;animation:omaPromoMega 1.7s ease-in-out infinite;transform-origin:65% 65%;margin-right:3px}'
         +'#omaPromo .ptxt{position:relative;z-index:1}'
-        +'#omaPromo .pclose{position:absolute;right:9px;top:50%;transform:translateY(-50%);background:rgba(90,58,5,.16);border:none;color:#5A3A05;width:24px;height:24px;border-radius:50%;font-weight:900;cursor:pointer;line-height:1;z-index:2}'
+        +'#omaPromo .pclose{position:absolute;right:8px;border:none;width:24px;height:24px;border-radius:50%;font-weight:900;cursor:pointer;line-height:1;z-index:3}'
+        +'#omaPromo.txt .pclose{top:50%;transform:translateY(-50%);background:rgba(90,58,5,.16);color:#5A3A05}'
+        +'#omaPromo.img .pclose{top:8px;background:rgba(40,25,10,.45);color:#fff}'
         +'@media(prefers-reduced-motion:reduce){#omaPromo,#omaPromo .shine,#omaPromo .mega{animation:none}}';
       document.head.appendChild(st);
     }
     var d=document.getElementById('omaPromo');
-    if(!d){ d=document.createElement('div'); d.id='omaPromo'; document.body.insertBefore(d, document.body.firstChild); }
+    if(!d){ d=document.createElement('div'); d.id='omaPromo'; app.insertBefore(d, app.firstChild); }
+    else if(d.parentNode!==app){ app.insertBefore(d, app.firstChild); }
     d.style.display='block';
-    d.innerHTML='<span class="shine"></span><span class="mega">📣</span><span class="ptxt">'+String(a.text).replace(/</g,'&lt;')+'</span><button class="pclose" aria-label="tutup">×</button>';
-    d.querySelector('.pclose').onclick=function(){ d.style.display='none'; };
+    if(a.image){
+      d.className='img';
+      var L=a.link?('<a href="'+String(a.link).replace(/"/g,'&quot;')+'" target="_blank" rel="noopener">'):'';
+      var LE=a.link?'</a>':'';
+      d.innerHTML='<span class="shine"></span>'+L+'<img src="'+a.image+'" alt="Promo">'+LE+'<button class="pclose" aria-label="tutup">×</button>';
+    } else {
+      d.className='txt';
+      d.innerHTML='<span class="shine"></span><span class="mega">📣</span><span class="ptxt">'+String(a.text).replace(/</g,'&lt;')+'</span><button class="pclose" aria-label="tutup">×</button>';
+    }
+    d.querySelector('.pclose').onclick=function(e){ if(e&&e.preventDefault) e.preventDefault(); d.style.display='none'; };
   }
   function load(){ try{ if(window.OmaOpa&&window.OmaOpa.getAnnouncement){ window.OmaOpa.getAnnouncement().then(show).catch(function(){}); } }catch(e){} }
   window.addEventListener('omaopa:ready', load); setTimeout(load, 1000);

@@ -175,13 +175,36 @@
     if(canEdit) loadBanner();
   }
   async function loadBanner(){
-    var w=document.getElementById('bnWrap'); if(!w) return; var b={text:'',active:false}; try{ b=await O.getAnnouncement(); }catch(e){}
+    var w=document.getElementById('bnWrap'); if(!w) return; var b={text:'',active:false,image:'',link:''}; try{ b=await O.getAnnouncement(); }catch(e){}
     w.classList.remove('muted');
-    w.innerHTML='<label>Teks banner</label><input id="bnTxt" value="'+esc(b.text||'')+'" placeholder="cth: Promo akhir pekan! Diskon 10% semua Ogura">'
-      +'<label style="display:flex;align-items:center;gap:8px;margin-top:9px"><input type="checkbox" id="bnAct" style="width:auto" '+(b.active?'checked':'')+'> Tampilkan banner di app</label>'
-      +'<button class="btn" id="bnSave">Simpan banner</button><div id="bnMsg"></div>';
+    var pending=null;
+    w.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:8px">Upload <b>gambar banner</b> (persegi panjang). Disarankan <b>1080 × 360 px</b> (rasio 3:1), JPG/PNG. Gambar otomatis dikecilkan & dikompres.</div>'
+      +'<div id="bnPrev" style="margin-bottom:8px"></div>'
+      +'<label>Pilih gambar banner</label><input type="file" id="bnFile" accept="image/*">'
+      +'<label style="margin-top:10px">Link saat banner diklik (opsional)</label><input id="bnLink" value="'+esc(b.link||'')+'" placeholder="https://... (mis. WA / IG / promo)">'
+      +'<label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="bnAct" style="width:auto" '+(b.active?'checked':'')+'> Tampilkan banner di app</label>'
+      +'<div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="bnSave">Simpan banner</button><button class="btn sec" id="bnDel">Hapus gambar</button></div><div id="bnMsg"></div>';
+    function renderPrev(src){ var p=document.getElementById('bnPrev'); if(!p) return; if(!src){ p.innerHTML='<div class="muted" style="font-size:.78rem">Belum ada gambar.</div>'; return; } p.innerHTML='<img src="'+src+'" style="width:100%;border-radius:12px;border:2px solid #EFE2C4;display:block">'; }
+    renderPrev(b.image||'');
+    document.getElementById('bnFile').onchange=function(){
+      var f=this.files&&this.files[0]; if(!f) return; var m=document.getElementById('bnMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Memproses gambar…</div>';
+      var rd=new FileReader();
+      rd.onload=function(){ var img=new Image(); img.onload=function(){
+        var maxW=1080; var sc=Math.min(1, maxW/img.width); var cw=Math.round(img.width*sc), ch=Math.round(img.height*sc);
+        var cv=document.createElement('canvas'); cv.width=cw; cv.height=ch; cv.getContext('2d').drawImage(img,0,0,cw,ch);
+        var q=0.82; pending=cv.toDataURL('image/jpeg',q);
+        while(pending.length>900000 && q>0.4){ q-=0.12; pending=cv.toDataURL('image/jpeg',q); }
+        renderPrev(pending); var kb=Math.round(pending.length*0.75/1024);
+        m.innerHTML='<div class="res ok">✓ Gambar siap ('+cw+'×'+ch+', ~'+kb+'KB). Klik "Simpan banner".</div>';
+      }; img.onerror=function(){ m.innerHTML='<div class="res bad">Gambar tidak terbaca.</div>'; }; img.src=rd.result; };
+      rd.readAsDataURL(f);
+    };
     document.getElementById('bnSave').onclick=async function(){ if(busy)return; busy=true; var m=document.getElementById('bnMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
-      try{ await O.setAnnouncement(document.getElementById('bnTxt').value, document.getElementById('bnAct').checked); m.innerHTML='<div class="res ok">✓ Banner disimpan.</div>'; }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+      try{ var opts={ link:document.getElementById('bnLink').value, active:document.getElementById('bnAct').checked }; if(pending) opts.image=pending;
+        await O.saveBanner(opts); m.innerHTML='<div class="res ok">✓ Banner disimpan.</div>'; pending=null;
+      }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+    document.getElementById('bnDel').onclick=async function(){ if(busy)return; if(!confirm('Hapus gambar banner?')) return; busy=true; var m=document.getElementById('bnMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Menghapus…</div>';
+      try{ await O.saveBanner({ image:'', active:false }); pending=null; renderPrev(''); var ac=document.getElementById('bnAct'); if(ac) ac.checked=false; m.innerHTML='<div class="res ok">✓ Gambar dihapus.</div>'; }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
   }
 
   /* ---------- MEMBER ---------- */

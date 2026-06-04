@@ -127,12 +127,17 @@ function addPoints(n, source){
 }
 
 // ---------- auth flow ----------
+let staffFlag=false;
 onAuthStateChanged(auth, async (u)=>{
   if(unsubDoc){ unsubDoc(); unsubDoc=null; }
   mergedOnce = false;
   user = u || null;
+  staffFlag = false;
   if(user){
     try{ await ensureDoc(); }catch(e){}
+    try{ const si=await getStaffInfo(); staffFlag=!!si;
+      if(staffFlag){ try{ setDoc(doc(db,'leaderboard',user.uid),{staff:true},{merge:true}); }catch(e){} try{ setDoc(doc(db,'scores',user.uid),{staff:true},{merge:true}); }catch(e){} }
+    }catch(e){ staffFlag=false; }
     const ref = doc(db,'users',user.uid);
     unsubDoc = onSnapshot(ref,(d)=>{
       const data = d.exists()? d.data() : {};
@@ -484,15 +489,15 @@ async function listUsedVouchers(outlet){
 // ---- leaderboard / skor / riwayat (cermin publik: hanya nama + angka) ----
 function mirrorLeaderboard(name, pts){
   if(!user) return;
-  try{ setDoc(doc(db,'leaderboard',user.uid), { name:name||'', points:(typeof pts==='number'?pts:0), updatedAt:serverTimestamp() }, {merge:true}); }catch(e){}
+  try{ setDoc(doc(db,'leaderboard',user.uid), { name:name||'', points:(typeof pts==='number'?pts:0), staff:staffFlag, updatedAt:serverTimestamp() }, {merge:true}); }catch(e){}
 }
 async function listPointLeaderboard(n){
   n=n||50;
   try{
-    const q=query(collection(db,'leaderboard'), orderBy('points','desc'), limit(n));
+    const q=query(collection(db,'leaderboard'), orderBy('points','desc'), limit(n+15));
     const snap=await getDocs(q); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ uid:d.id, name:x.name||'Sahabat', points:(typeof x.points==='number')?x.points:0 }); });
-    return arr;
+    snap.forEach(d=>{ const x=d.data(); if(x.staff===true) return; arr.push({ uid:d.id, name:x.name||'Sahabat', points:(typeof x.points==='number')?x.points:0 }); });
+    return arr.slice(0,n);
   }catch(e){ return []; }
 }
 async function submitScore(score){
@@ -502,17 +507,17 @@ async function submitScore(score){
   const ref=doc(db,'scores',user.uid);
   try{
     const s=await getDoc(ref); const prev=(s.exists()&&typeof s.data().score==='number')?s.data().score:0;
-    if(score>prev){ await setDoc(ref,{ name:nm, score:score, updatedAt:serverTimestamp() },{merge:true}); return {best:score, prev:prev, improved:true}; }
+    if(score>prev){ await setDoc(ref,{ name:nm, score:score, staff:staffFlag, updatedAt:serverTimestamp() },{merge:true}); return {best:score, prev:prev, improved:true}; }
     return {best:prev, prev:prev, improved:false};
   }catch(e){ return null; }
 }
 async function listScoreLeaderboard(n){
   n=n||50;
   try{
-    const q=query(collection(db,'scores'), orderBy('score','desc'), limit(n));
+    const q=query(collection(db,'scores'), orderBy('score','desc'), limit(n+15));
     const snap=await getDocs(q); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ uid:d.id, name:x.name||'Pemain', score:(typeof x.score==='number')?x.score:0 }); });
-    return arr;
+    snap.forEach(d=>{ const x=d.data(); if(x.staff===true) return; arr.push({ uid:d.id, name:x.name||'Pemain', score:(typeof x.score==='number')?x.score:0 }); });
+    return arr.slice(0,n);
   }catch(e){ return []; }
 }
 async function listMyTransactions(){
@@ -992,10 +997,17 @@ async function listVouchersByUid(uid){ uid=(uid||'').trim(); if(!uid) return [];
 
 // ---- pengumuman / banner ----
 async function getAnnouncement(){
-  try{ const s=await getDoc(doc(db,'settings','announcement')); if(!s.exists()) return {text:'',active:false}; const x=s.data(); return {text:x.text||'', active:x.active===true}; }catch(e){ return {text:'',active:false}; }
+  try{ const s=await getDoc(doc(db,'settings','announcement')); if(!s.exists()) return {text:'',active:false,image:'',link:''}; const x=s.data(); return {text:x.text||'', active:x.active===true, image:x.image||'', link:x.link||''}; }catch(e){ return {text:'',active:false,image:'',link:''}; }
 }
 async function setAnnouncement(text, active){ if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   await setDoc(doc(db,'settings','announcement'), { text:String(text||''), active:!!active, updatedAt:serverTimestamp() },{merge:true}); }
+async function saveBanner(opts){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; opts=opts||{};
+  const patch={ updatedAt:serverTimestamp() };
+  if(opts.image!==undefined) patch.image=String(opts.image||'');
+  if(opts.link!==undefined) patch.link=String(opts.link||'');
+  if(opts.text!==undefined) patch.text=String(opts.text||'');
+  if(opts.active!==undefined) patch.active=!!opts.active;
+  await setDoc(doc(db,'settings','announcement'), patch, {merge:true}); }
 
 // ---- order (pesanan web) ----
 async function logOrder(o){
@@ -1036,7 +1048,7 @@ window.OmaOpa = {
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, listVouchersByUid,
-  getAnnouncement, setAnnouncement, logOrder, listOrders,
+  getAnnouncement, setAnnouncement, saveBanner, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder,
   tierOf, TIERS,
   signOut: doSignOut,
