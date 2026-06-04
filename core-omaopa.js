@@ -984,6 +984,13 @@ async function resetRewardClaimed(id){ if(!(await isSuper())) throw {message:'Kh
 async function deleteReward(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'rewards',(id||'').trim())); }
 
 // ---- voucher (admin) ----
+async function adminClearUsedVouchers(){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  const q=query(collection(db,'vouchers'), where('status','==','terpakai'));
+  const snap=await getDocs(q); let n=0;
+  for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'vouchers',ds.id)); n++; }catch(e){} }
+  return { count:n };
+}
 async function adminSetVoucherStatus(code, active){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'}; code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
   if(active){ await setDoc(doc(db,'vouchers',code), { status:'aktif', usedAt:null, usedOutlet:null, usedBy:null, updatedAt:serverTimestamp() },{merge:true}); }
@@ -1047,7 +1054,7 @@ window.OmaOpa = {
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
-  adminSetVoucherStatus, listVouchersByUid,
+  adminSetVoucherStatus, adminClearUsedVouchers, listVouchersByUid,
   getAnnouncement, setAnnouncement, saveBanner, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder,
   tierOf, TIERS,
