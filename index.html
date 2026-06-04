@@ -77,7 +77,7 @@
   <h2 class="sec">Pilih permainan</h2>
   <div class="games">
 
-    <a class="gcard" href="topping.html?v=59">
+    <a class="gcard" href="topping.html?v=60">
       <div class="gicon" style="background:#FCEFC2"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M6 18h24v6a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 18.5C4.4 12 9.8 7.5 18 7.5S31.6 12 31 18.5Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="13.5" cy="12" rx="5.5" ry="2" fill="#fff" opacity=".35"/><ellipse cx="14.2" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><ellipse cx="21.8" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><path d="M16.5 25.2q1.5 1.2 3 0" stroke="#5a3b2e" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="11" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/><circle cx="25" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/></svg></div>
       <div class="gname">Menopping Asik!</div>
       <div class="gdesc">Selesaikan pesanan customer dan dapatkan pointnya.</div>
@@ -126,9 +126,9 @@
   <div id="navProfil" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.8" r="3.4"/><path d="M5.5 19.3a6.5 6.5 0 0 1 13 0"/></svg></span>Profil</div>
 </div>
 
-<script src="menu-data.js?v=59"></script>
-<script src="outlets-data.js?v=59"></script>
-<script type="module" src="core-omaopa.js?v=59"></script>
+<script src="menu-data.js?v=60"></script>
+<script src="outlets-data.js?v=60"></script>
+<script type="module" src="core-omaopa.js?v=60"></script>
 <script>
   try{ document.getElementById('coin').textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){ document.getElementById('coin').textContent='0'; }
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -302,7 +302,8 @@
         +'Catatan tambahan : '+((form.note&&form.note.trim())||'-');
       try{ if(window.OmaOpa&&window.OmaOpa.logOrder){ window.OmaOpa.logOrder({ items: ol.map(function(x){ return {id:x.m.id,cat:x.m.cat,name:x.m.name,price:x.m.price,qty:x.q}; }), total: total(), outlet: form.outlet, nama: form.nama, telp: form.telp, tgl: form.tgl, jam: form.jam, note: form.note }); } }catch(e){}
       var waUrl='https://wa.me/'+waFor()+'?text='+encodeURIComponent(msg);
-      window.location.href=waUrl;
+      if(err){ err.innerHTML='<a href="'+waUrl.replace(/"/g,'&quot;')+'" target="_blank" rel="noopener" style="display:block;background:#25D366;color:#fff;font-weight:900;text-align:center;text-decoration:none;border-radius:13px;padding:13px;margin-top:8px;box-shadow:0 3px 0 #1da851">Buka WhatsApp →</a><div class="cf-hint" style="text-align:center">Kalau tidak otomatis terbuka, ketuk tombol hijau ini.</div>'; try{ err.scrollIntoView({block:'center'}); }catch(e){} }
+      try{ window.location.href=waUrl; }catch(e){}
     }
     function refreshOutlets(){ try{ if(window.OmaOpa&&window.OmaOpa.listPublicOutlets){ window.OmaOpa.listPublicOutlets().then(function(a){ if(a&&a.length){ OUTLETS=a; if(view==='form') renderForm(); } }).catch(function(){}); } }catch(e){} }
     function open(){ if(!bk) build(); view='list'; render(); bk.classList.add('show'); refreshOutlets(); }
