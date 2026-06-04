@@ -77,7 +77,7 @@
   <h2 class="sec">Pilih permainan</h2>
   <div class="games">
 
-    <a class="gcard" href="topping.html?v=53">
+    <a class="gcard" href="topping.html?v=54">
       <div class="gicon" style="background:#FCEFC2"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M6 18h24v6a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 18.5C4.4 12 9.8 7.5 18 7.5S31.6 12 31 18.5Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="13.5" cy="12" rx="5.5" ry="2" fill="#fff" opacity=".35"/><ellipse cx="14.2" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><ellipse cx="21.8" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><path d="M16.5 25.2q1.5 1.2 3 0" stroke="#5a3b2e" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="11" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/><circle cx="25" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/></svg></div>
       <div class="gname">Menopping Asik!</div>
       <div class="gdesc">Selesaikan pesanan customer dan dapatkan pointnya.</div>
@@ -126,9 +126,9 @@
   <div id="navProfil" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.8" r="3.4"/><path d="M5.5 19.3a6.5 6.5 0 0 1 13 0"/></svg></span>Profil</div>
 </div>
 
-<script src="menu-data.js?v=53"></script>
-<script src="outlets-data.js?v=53"></script>
-<script type="module" src="core-omaopa.js?v=53"></script>
+<script src="menu-data.js?v=54"></script>
+<script src="outlets-data.js?v=54"></script>
+<script type="module" src="core-omaopa.js?v=54"></script>
 <script>
   try{ document.getElementById('coin').textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){ document.getElementById('coin').textContent='0'; }
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -141,9 +141,9 @@
   var WA_CS='6285315004300';   // nomor lama (default semua area)
   var WA_ALT='6281223860200';  // Yogya, KECUALI 5 outlet di bawah
   var WA_G1=['umy','jakal','nusa indah','godean','tajem']; // 5 outlet Yogya tetap pakai nomor lama
-  function waFor(outletName){
-    var nm=(outletName||'').toLowerCase(); var area='';
-    for(var i=0;i<OUTLETS.length;i++){ if(OUTLETS[i].name===outletName){ area=String(OUTLETS[i].area||''); break; } }
+  function waFor(){
+    var nm=(form.outlet||'').toLowerCase(); var area=String(form.outletArea||'');
+    if(!area){ for(var i=0;i<OUTLETS.length;i++){ if(OUTLETS[i].name===form.outlet){ area=String(OUTLETS[i].area||''); break; } } }
     var isYogya=/yogya|jogja/i.test(area);
     var isException=false; for(var j=0;j<WA_G1.length;j++){ if(nm.indexOf(WA_G1[j])>=0){ isException=true; break; } }
     return (isYogya && !isException) ? WA_ALT : WA_CS;
@@ -224,7 +224,7 @@
         rows+='<div class="cf-area" data-area="'+esc(a)+'">'+esc(a)+'</div>';
         OUTLETS.filter(function(o){return o.area===a;}).forEach(function(o){
           var label=o.name.replace(/^Oma Opa Cakery\s*/i,'');
-          rows+='<div class="cf-out'+(form.outlet===o.name?' sel':'')+'" data-out="'+esc(o.name)+'" data-find="'+esc((o.name+' '+a).toLowerCase())+'"><span class="dot"></span>'+esc(label)+'</div>';
+          rows+='<div class="cf-out'+(form.outlet===o.name?' sel':'')+'" data-out="'+esc(o.name)+'" data-area="'+esc(a)+'" data-find="'+esc((o.name+' '+a).toLowerCase())+'"><span class="dot"></span>'+esc(label)+'</div>';
         });
       });
       var ol=orderLines();
@@ -253,6 +253,7 @@
       // pilih outlet (ketuk)
       bk.querySelectorAll('#fOut .cf-out').forEach(function(r){ r.onclick=function(){
         form.outlet=r.getAttribute('data-out');
+        form.outletArea=r.getAttribute('data-area')||'';
         bk.querySelectorAll('#fOut .cf-out').forEach(function(x){ x.classList.remove('sel'); });
         r.classList.add('sel'); clearErr();
       }; });
@@ -300,7 +301,7 @@
         +'Total : '+rpid(total())+'\n'
         +'Catatan tambahan : '+((form.note&&form.note.trim())||'-');
       try{ if(window.OmaOpa&&window.OmaOpa.logOrder){ window.OmaOpa.logOrder({ items: ol.map(function(x){ return {id:x.m.id,cat:x.m.cat,name:x.m.name,price:x.m.price,qty:x.q}; }), total: total(), outlet: form.outlet, nama: form.nama, telp: form.telp, tgl: form.tgl, jam: form.jam, note: form.note }); } }catch(e){}
-      window.open('https://wa.me/'+waFor(form.outlet)+'?text='+encodeURIComponent(msg),'_blank');
+      window.open('https://wa.me/'+waFor()+'?text='+encodeURIComponent(msg),'_blank');
     }
     function refreshOutlets(){ try{ if(window.OmaOpa&&window.OmaOpa.listPublicOutlets){ window.OmaOpa.listPublicOutlets().then(function(a){ if(a&&a.length){ OUTLETS=a; if(view==='form') renderForm(); } }).catch(function(){}); } }catch(e){} }
     function open(){ if(!bk) build(); view='list'; render(); bk.classList.add('show'); refreshOutlets(); }
