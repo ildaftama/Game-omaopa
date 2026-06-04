@@ -1031,6 +1031,12 @@ async function listOrders(n){ n=n||1000;
 async function setOrderStatus(id, status){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'orders',(id||'').trim()), { status:String(status||'baru'), updatedAt:serverTimestamp() },{merge:true}); }
 async function updateOrder(id, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; const data=Object.assign({updatedAt:serverTimestamp()}, patch||{}); if(data.total!=null) data.total=Math.round(Number(data.total)||0); await setDoc(doc(db,'orders',(id||'').trim()), data, {merge:true}); }
 async function deleteOrder(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'orders',(id||'').trim())); }
+async function adminClearOrders(){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  const snap=await getDocs(collection(db,'orders')); let n=0;
+  for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'orders',ds.id)); n++; }catch(e){} }
+  return { count:n };
+}
 
 // ---- tier member (berdasarkan total belanja) ----
 const TIERS=[{name:'Gold',min:2000000,color:'#E0B100'},{name:'Silver',min:500000,color:'#9AA0A6'},{name:'Bronze',min:0,color:'#C98A4B'}];
@@ -1056,7 +1062,7 @@ window.OmaOpa = {
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, listVouchersByUid,
   getAnnouncement, setAnnouncement, saveBanner, logOrder, listOrders,
-  setOrderStatus, updateOrder, deleteOrder,
+  setOrderStatus, updateOrder, deleteOrder, adminClearOrders,
   tierOf, TIERS,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'', phone:(profile&&profile.phone)||'' } : null,

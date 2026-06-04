@@ -83,14 +83,14 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script src="outlets-data.js?v=53"></script>
-<script type="module" src="core-omaopa.js?v=53"></script>
+<script src="outlets-data.js?v=62"></script>
+<script type="module" src="core-omaopa.js?v=62"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
   var tab='home', busy=false, segFilter=null, canEdit=false;
   var MEMBERS=null, TXN=null; // cache
-  var curOf='baru';
+  var curOf='baru', curOrders=[];
   var PAL=['#FACC1A','#E0915B','#7CC9B5','#C98A4B','#88B0E0','#F4A6B0','#9a8b78','#B7D77A','#caa6e0'];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
@@ -169,7 +169,7 @@
       +'</div>';
     html+='<div class="card"><div class="muted" style="margin-bottom:2px;font-size:.74rem">Ketuk legenda untuk lihat membernya 👇</div>'+donut('Umur member', tally(mem,'age'),'age')+donut('Jenis kelamin', tally(mem,'gender'),'gender')+donut('Pekerjaan', tally(mem,'occupation'),'occupation')+donut('Tier member', tierCnt,'')+'</div>';
     if(canEdit) html+='<div class="card"><div class="nm">📣 Banner promo di app</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
-    html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=53">Buka Halaman Rekap →</a></div>';
+    html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=62">Buka Halaman Rekap →</a></div>';
     tabEl.innerHTML=html;
     tabEl.querySelectorAll('.lg[data-segf]').forEach(function(el){ el.onclick=function(){ var f=el.getAttribute('data-segf'); if(f) applySegment(f, el.getAttribute('data-segv')); }; });
     if(canEdit) loadBanner();
@@ -409,8 +409,20 @@
     tabEl.innerHTML='<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Pesanan via web</div><button class="btn sm sec" id="oRl">↻</button></div>'
       +'<div class="muted" style="font-size:.76rem;margin-bottom:8px">Pesanan dari keranjang web masuk sebagai <b>BARU</b>. Cek & sesuaikan kalau perlu, lalu <b>Approve</b> supaya masuk hitungan analitik.</div>'
       +'<div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm sec" data-of="baru">Perlu dicek</button><button class="btn sm sec" data-of="approved">Disetujui</button><button class="btn sm sec" data-of="all">Semua</button></div>'
-      +'<div id="oList"><div class="muted">Memuat…</div></div></div>';
+      +'<div id="oList"><div class="muted">Memuat…</div></div></div>'
+      +(canEdit ? ('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Bersihkan riwayat</div>'
+        +'<div class="muted" style="font-size:.76rem;margin:4px 0 8px">Hapus <b>SEMUA</b> pesanan web (BARU, DEAL, DITOLAK) — berguna setelah uji coba. Tidak bisa dibatalkan.</div>'
+        +'<button class="btn red" id="oClearAll">🗑️ Hapus semua riwayat pesanan</button></div>') : '');
     document.getElementById('oRl').onclick=function(){ loadOrders(curOf); };
+    var oca=document.getElementById('oClearAll');
+    if(oca) oca.onclick=function(){
+      if(!confirm('Hapus SEMUA riwayat pesanan web? Tindakan ini tidak bisa dibatalkan.')) return;
+      if(prompt('Ketik HAPUS untuk konfirmasi:')!=='HAPUS') return;
+      oca.disabled=true; oca.textContent='Menghapus…';
+      Promise.resolve().then(function(){ return O.adminClearOrders(); }).then(function(r){
+        alert((r&&r.count||0)+' pesanan dihapus.'); loadOrders(curOf);
+      }).catch(function(e){ alert((e&&e.message)||'Gagal'); }).then(function(){ oca.disabled=false; oca.textContent='🗑️ Hapus semua riwayat pesanan'; });
+    };
     tabEl.querySelectorAll('[data-of]').forEach(function(b){ b.onclick=function(){ curOf=b.getAttribute('data-of'); loadOrders(curOf); }; });
     loadOrders(curOf);
   }
@@ -418,6 +430,7 @@
   async function loadOrders(f){
     var box=document.getElementById('oList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     var arr=[]; try{ arr=await O.listOrders(1000); }catch(e){}
+    curOrders=arr;
     if(f && f!=='all') arr=arr.filter(function(o){ return (o.status||'baru')===f; });
     if(!arr.length){ box.innerHTML='<div class="res ok">Tidak ada pesanan'+(f==='baru'?' yang perlu dicek 👍':'')+'.</div>'; return; }
     box.innerHTML=arr.slice(0,80).map(function(o){
@@ -437,7 +450,67 @@
     box.querySelectorAll('[data-oapp]').forEach(function(b){ b.onclick=function(){ orderAct(function(){ return O.setOrderStatus(b.getAttribute('data-oapp'),'approved'); }); }; });
     box.querySelectorAll('[data-orej]').forEach(function(b){ b.onclick=function(){ orderAct(function(){ return O.setOrderStatus(b.getAttribute('data-orej'),'rejected'); }); }; });
     box.querySelectorAll('[data-odel]').forEach(function(b){ b.onclick=function(){ if(!confirm('Hapus pesanan ini?')) return; orderAct(function(){ return O.deleteOrder(b.getAttribute('data-odel')); }); }; });
-    box.querySelectorAll('[data-oedit]').forEach(function(b){ b.onclick=function(){ var t=prompt('Total (Rp):', b.getAttribute('data-tot')); if(t==null) return; var ou=prompt('Outlet:', b.getAttribute('data-out')); if(ou==null) return; orderAct(function(){ return O.updateOrder(b.getAttribute('data-oedit'),{ total:parseInt(t,10)||0, outlet:ou }); }); }; });
+    box.querySelectorAll('[data-oedit]').forEach(function(b){ b.onclick=function(){ openOrderEdit(b.getAttribute('data-oedit')); }; });
+  }
+  function openOrderEdit(id){
+    var o=null; for(var i=0;i<curOrders.length;i++){ if(curOrders[i].id===id){ o=curOrders[i]; break; } }
+    if(!o){ alert('Pesanan tidak ditemukan, muat ulang dulu.'); return; }
+    var items=(o.items||[]).map(function(it){ return { id:it.id||'', cat:it.cat||'', name:it.name||'', price:Number(it.price)||0, qty:Number(it.qty)||0 }; });
+    var ov=document.getElementById('oEditOv');
+    if(!ov){ ov=document.createElement('div'); ov.id='oEditOv';
+      ov.style.cssText='position:fixed;inset:0;background:rgba(60,40,20,.55);display:flex;align-items:flex-end;justify-content:center;z-index:99999';
+      document.body.appendChild(ov);
+    }
+    var itemRows=items.map(function(it,ix){
+      return '<div class="row" style="gap:7px;align-items:center;padding:7px 0">'
+        +'<div class="grow"><div style="font-weight:800;font-size:.85rem;color:var(--coklat)">'+esc(it.name||'(item)')+'</div>'
+        +'<div class="muted" style="font-size:.7rem">'+esc(it.cat||'')+'</div></div>'
+        +'<div style="width:62px"><div class="muted" style="font-size:.62rem">Qty</div><input type="number" inputmode="numeric" min="0" data-iq="'+ix+'" value="'+it.qty+'" style="padding:7px"></div>'
+        +'<div style="width:96px"><div class="muted" style="font-size:.62rem">Harga</div><input type="number" inputmode="numeric" min="0" data-ip="'+ix+'" value="'+it.price+'" style="padding:7px"></div>'
+        +'</div>';
+    }).join('') || '<div class="muted" style="font-size:.78rem">Pesanan ini tanpa rincian item.</div>';
+    ov.innerHTML='<div style="background:var(--cream);width:100%;max-width:480px;max-height:92vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+      +'<div style="display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:2px solid #F0E2C4;background:#fff"><div class="nm" style="flex:1">📝 Edit pesanan</div><button class="btn sm sec" id="oeX" style="width:34px;margin:0">✕</button></div>'
+      +'<div style="overflow:auto;padding:13px 15px">'
+      +'<label class="muted" style="font-size:.72rem;font-weight:800">Nama</label><input id="oeNama" value="'+esc(o.nama||'')+'">'
+      +'<label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-top:9px">No telepon</label><input id="oeTelp" value="'+esc(o.telp||'')+'">'
+      +'<div style="display:flex;gap:8px"><div style="flex:1"><label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-top:9px">Tanggal</label><input id="oeTgl" type="date" value="'+esc(o.tgl||'')+'"></div>'
+      +'<div style="width:120px"><label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-top:9px">Jam</label><input id="oeJam" value="'+esc(o.jam||'')+'" placeholder="mis. 14:00"></div></div>'
+      +'<label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-top:9px">Outlet</label><input id="oeOut" value="'+esc(o.outlet||'')+'">'
+      +'<label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-top:9px">Catatan</label><input id="oeNote" value="'+esc(o.note||'')+'">'
+      +'<div class="nm" style="font-size:.82rem;margin:14px 0 2px">Item & harga</div>'+itemRows
+      +'<div class="row" style="border-top:2px solid #EFE2C4;margin-top:8px;padding-top:10px"><div class="grow nm">Total</div><div class="pts" id="oeTot" style="font-size:1.05rem">'+rp(o.total)+'</div></div>'
+      +'<label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-top:4px">Total dihitung dari item. Centang di bawah kalau mau isi manual (mis. ada diskon).</label>'
+      +'<div class="row" style="border:none;padding:6px 0"><input type="checkbox" id="oeMan" style="width:auto"><div class="grow">Isi total manual</div><input id="oeTotIn" type="number" inputmode="numeric" value="'+(Number(o.total)||0)+'" disabled style="width:120px"></div>'
+      +'</div>'
+      +'<div style="padding:11px 15px;border-top:2px solid #F0E2C4;background:#fff;display:flex;gap:8px"><button class="btn sec" id="oeCancel" style="margin:0">Batal</button><button class="btn green" id="oeSave" style="margin:0">💾 Simpan</button></div>'
+      +'</div>';
+    function calc(){
+      var t=0; ov.querySelectorAll('[data-iq]').forEach(function(q){ var ix=+q.getAttribute('data-iq'); var qty=Math.max(0,parseInt(q.value,10)||0); var pr=Math.max(0,parseInt(ov.querySelector('[data-ip="'+ix+'"]').value,10)||0); t+=qty*pr; });
+      ov.querySelector('#oeTot').textContent=rp(t);
+      var man=ov.querySelector('#oeMan').checked; if(!man) ov.querySelector('#oeTotIn').value=t;
+      return t;
+    }
+    ov.querySelectorAll('[data-iq],[data-ip]').forEach(function(el){ el.addEventListener('input',calc); });
+    var man=ov.querySelector('#oeMan'); man.onchange=function(){ ov.querySelector('#oeTotIn').disabled=!man.checked; if(!man.checked) calc(); };
+    function shut(){ ov.remove(); }
+    ov.querySelector('#oeX').onclick=shut; ov.querySelector('#oeCancel').onclick=shut;
+    ov.onclick=function(e){ if(e.target===ov) shut(); };
+    calc();
+    ov.querySelector('#oeSave').onclick=function(){
+      var newItems=items.map(function(it,ix){ var qty=Math.max(0,parseInt(ov.querySelector('[data-iq="'+ix+'"]').value,10)||0); var pr=Math.max(0,parseInt(ov.querySelector('[data-ip="'+ix+'"]').value,10)||0); return { id:it.id, cat:it.cat, name:it.name, price:pr, qty:qty }; });
+      var calcTot=newItems.reduce(function(s,it){ return s+it.price*it.qty; },0);
+      var useMan=ov.querySelector('#oeMan').checked;
+      var total=useMan ? (parseInt(ov.querySelector('#oeTotIn').value,10)||0) : calcTot;
+      var count=newItems.reduce(function(s,it){ return s+it.qty; },0);
+      var patch={ nama:ov.querySelector('#oeNama').value.trim(), telp:ov.querySelector('#oeTelp').value.trim(),
+        tgl:ov.querySelector('#oeTgl').value, jam:ov.querySelector('#oeJam').value.trim(),
+        outlet:ov.querySelector('#oeOut').value.trim(), note:ov.querySelector('#oeNote').value.trim(),
+        items:newItems, total:total, count:count };
+      var sv=ov.querySelector('#oeSave'); sv.disabled=true; sv.textContent='Menyimpan…';
+      Promise.resolve().then(function(){ return O.updateOrder(id, patch); }).then(function(){ shut(); loadOrders(curOf); })
+        .catch(function(e){ alert((e&&e.message)||'Gagal'); sv.disabled=false; sv.textContent='💾 Simpan'; });
+    };
   }
 
   /* ---------- OUTLET ---------- */
