@@ -926,6 +926,7 @@ async function adminClearTransactions(){
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'transactions',ds.id)); n++; }catch(e){} }
   return { count:n };
 }
+async function deleteTransaction(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); if(!id) throw {message:'ID kosong.'}; await deleteDoc(doc(db,'transactions',id)); }
 function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || ('o'+Date.now()); }
 async function listOutlets(){
   try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
@@ -1002,6 +1003,7 @@ async function adminClearUsedVouchers(){
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'vouchers',ds.id)); n++; }catch(e){} }
   return { count:n };
 }
+async function deleteVoucherRec(code){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; code=(code||'').trim(); if(!code) throw {message:'Kode kosong.'}; await deleteDoc(doc(db,'vouchers',code)); }
 async function adminSetVoucherStatus(code, active){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'}; code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
   if(active){ await setDoc(doc(db,'vouchers',code), { status:'aktif', usedAt:null, usedOutlet:null, usedBy:null, updatedAt:serverTimestamp() },{merge:true}); }
@@ -1082,11 +1084,11 @@ window.OmaOpa = {
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers,
   isAdmin, isSuper, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
-  adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions,
+  adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
-  adminSetVoucherStatus, adminClearUsedVouchers, listVouchersByUid,
+  adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
   getAnnouncement, setAnnouncement, saveBanner, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder, adminClearOrders,
   tierOf, TIERS,

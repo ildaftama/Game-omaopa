@@ -49,14 +49,18 @@
 </head>
 <body>
 <div class="wrap">
+  <div style="display:flex;gap:7px;margin-bottom:12px">
+    <a href="admin.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">🛠️ Admin</a>
+    <span style="flex:1;text-align:center;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FACC1A;color:#613925">📊 Rekap</span>
+    <a href="staff.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">🧾 Kasir</a>
+  </div>
   <div class="head">
     <h1>📊 Rekap Oma Opa</h1><span class="badge" id="roleBadge">…</span>
-    <span style="margin-left:auto"><a class="link" href="staff.html">‹ Kasir</a></span>
   </div>
   <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=71"></script>
+<script type="module" src="core-omaopa.js?v=72"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
@@ -207,9 +211,9 @@
     var opt={ rows:rows, msOf:function(x){return x.ts;}, mode:st.mode, period:st.period, perLabel:'transaksi',
       metaOf:function(g){ var o=0; g.list.forEach(function(x){o+=(x.nominal||0);}); return rp(o); },
       stats:[{v:rows.length,k:'TRANSAKSI'},{v:rp(omzet),k:'OMZET'},{v:poin,k:'POIN'}],
-      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Member'},{t:'Nominal',r:1},{t:'Poin',r:1}],
-      detailRow:function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.name||(x.uid?x.uid.slice(0,6):'-'))+'</td><td class="right">'+rp(x.nominal)+'</td><td class="right">+'+(x.points||0)+'</td></tr>'; },
-      detailFoot:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.nominal||0);p+=(x.points||0);}); return '<tr style="font-weight:900"><td colspan="3">SUBTOTAL</td><td class="right">'+rp(o)+'</td><td class="right">+'+p+'</td></tr>'; },
+      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Member'},{t:'Nominal',r:1},{t:'Poin',r:1}].concat(info.super?[{t:''}]:[]),
+      detailRow:function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.name||(x.uid?x.uid.slice(0,6):'-'))+'</td><td class="right">'+rp(x.nominal)+'</td><td class="right">+'+(x.points||0)+'</td>'+delCell('txn',x.id)+'</tr>'; },
+      detailFoot:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.nominal||0);p+=(x.points||0);}); return '<tr style="font-weight:900"><td colspan="3">SUBTOTAL</td><td class="right">'+rp(o)+'</td><td class="right">+'+p+'</td>'+(info.super?'<td></td>':'')+'</tr>'; },
       summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Trx',r:1},{t:'Omzet',r:1},{t:'Poin',r:1}],
       summaryRow:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.nominal||0);p+=(x.points||0);}); return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td><td class="right">'+rp(o)+'</td><td class="right">+'+p+'</td></tr>'; },
       summaryFoot:function(){ return '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+rp(omzet)+'</td><td class="right">+'+poin+'</td></tr>'; }
@@ -221,8 +225,8 @@
     if(!rows.length){ body.innerHTML=emptyBox('',st)+'<div class="empty">Belum ada voucher terpakai pada rentang & outlet ini.</div>'; wireG(body); return; }
     var opt={ rows:rows, msOf:function(x){return x.ts;}, mode:st.mode, period:st.period, perLabel:'voucher',
       stats:[{v:rows.length,k:'VOUCHER TERPAKAI'}],
-      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Kode'},{t:'Voucher'},{t:'Member'}],
-      detailRow:function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.code||'-')+'</td><td>'+esc(x.title||'-')+'</td><td>'+esc(x.name||'-')+'</td></tr>'; },
+      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Kode'},{t:'Voucher'},{t:'Member'}].concat(info.super?[{t:''}]:[]),
+      detailRow:function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.code||'-')+'</td><td>'+esc(x.title||'-')+'</td><td>'+esc(x.name||'-')+'</td>'+delCell('vou',x.code)+'</tr>'; },
       summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Voucher',r:1}],
       summaryRow:function(g){ return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td></tr>'; },
       summaryFoot:function(){ return '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td></tr>'; }
@@ -248,16 +252,28 @@
     var opt={ rows:rows, msOf:ordMs, mode:st.mode, period:st.period, perLabel:'order', extraFilter:basis,
       metaOf:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return rp(o); },
       stats:[{v:rows.length,k:'ORDER DEAL'},{v:rp(omzet),k:'OMZET'},{v:pcs,k:'TOTAL PCS'}],
-      detailHead:[{t:'Tgl pesan'},{t:'Tgl ambil'},{t:'Outlet'},{t:'Nama'},{t:'Item'},{t:'Total',r:1}],
-      detailRow:function(o){ var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', '); var jam=o.jam?(' '+o.jam):''; return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(dShort(o.tgl)+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td></tr>'; },
-      detailFoot:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return '<tr style="font-weight:900"><td colspan="5">SUBTOTAL</td><td class="right">'+rp(o)+'</td></tr>'; },
+      detailHead:[{t:'Tgl pesan'},{t:'Tgl ambil'},{t:'Outlet'},{t:'Nama'},{t:'Item'},{t:'Total',r:1}].concat(info.super?[{t:''}]:[]),
+      detailRow:function(o){ var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', '); var jam=o.jam?(' '+o.jam):''; return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(dShort(o.tgl)+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td>'+delCell('ord',o.id)+'</tr>'; },
+      detailFoot:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return '<tr style="font-weight:900"><td colspan="5">SUBTOTAL</td><td class="right">'+rp(o)+'</td>'+(info.super?'<td></td>':'')+'</tr>'; },
       summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Order',r:1},{t:'Pcs',r:1},{t:'Omzet',r:1}],
       summaryRow:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.total||0);p+=ordPcs(x);}); return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td><td class="right">'+p+'</td><td class="right">'+rp(o)+'</td></tr>'; },
       summaryFoot:function(){ return '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+pcs+'</td><td class="right">'+rp(omzet)+'</td></tr>'; }
     };
     body.innerHTML=buildGrouped(opt)+note+delBtn; st.period=opt.period; wireG(body);
   }
+  function delCell(type, id){ if(!info.super) return ''; return '<td style="text-align:center"><button data-del="'+type+'" data-id="'+esc(String(id||''))+'" title="Hapus baris ini" style="background:#fff;border:1.5px solid #E8B4B4;color:#C0392B;border-radius:8px;padding:3px 8px;font-weight:800;cursor:pointer">🗑</button></td>'; }
+  function delOne(type, id){
+    var label = type==='ord' ? 'pesanan' : (type==='txn' ? 'transaksi' : 'voucher terpakai');
+    var extra = type==='txn' ? '\n\n(Catatan: poin yang sudah diberikan ke member TIDAK otomatis ditarik kembali.)' : '';
+    if(!confirm('Hapus 1 '+label+' ini? Permanen & tidak bisa dibatalkan.'+extra)) return;
+    var fn = type==='ord' ? window.OmaOpa.deleteOrder : (type==='txn' ? window.OmaOpa.deleteTransaction : window.OmaOpa.deleteVoucherRec);
+    Promise.resolve().then(function(){ return fn(id); })
+      .then(function(){ return loadData(); })
+      .then(function(){ render(); })
+      .catch(function(e){ alert((e&&e.message)||'Gagal menghapus.'); });
+  }
   function wireG(body){
+    body.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(ev){ ev.stopPropagation(); delOne(b.getAttribute('data-del'), b.getAttribute('data-id')); }; });
     var st=view[tab];
     body.querySelectorAll('[data-mode]').forEach(function(t){ t.onclick=function(){ st.mode=t.getAttribute('data-mode'); st.period=''; render(); }; });
     var ps=body.querySelector('#periodSel'); if(ps) ps.onchange=function(){ st.period=ps.value; render(); };

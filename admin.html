@@ -66,6 +66,11 @@
 </head>
 <body>
 <div class="wrap">
+  <div style="display:flex;gap:7px;margin-bottom:12px">
+    <span style="flex:1;text-align:center;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FACC1A;color:#613925">🛠️ Admin</span>
+    <a href="rekap.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">📊 Rekap</a>
+    <a href="staff.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">🧾 Kasir</a>
+  </div>
   <div class="head"><h1>Admin Oma Opa</h1><span class="badge" id="roleBadge">ADMIN</span></div>
   <div id="gate" class="card"><div class="muted">Menyiapkan…</div></div>
   <div id="app" style="display:none">
@@ -85,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=71"></script>
+<script type="module" src="core-omaopa.js?v=72"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
