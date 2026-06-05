@@ -60,11 +60,45 @@
 <script>
 (function(){
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
-  var info=null, tab='txn', allTxn=[], allVou=[], allOrd=[], ordMode='harian', ordPeriod='', ordBasis='ambil';
+  var info=null, tab='txn', allTxn=[], allVou=[], allOrd=[];
+  var view={ txn:{mode:'harian',period:''}, vou:{mode:'harian',period:''}, ord:{mode:'harian',period:'',basis:'ambil'} };
   var BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   function dateMs(s){ var t=new Date(s+'T00:00:00').getTime(); return isNaN(t)?0:t; }
-  function ordMs(o){ if(ordBasis==='pesan'){ return o.ts || (o.tgl?dateMs(o.tgl):0); } return o.tgl?dateMs(o.tgl):(o.ts||0); }
+  function ordMs(o){ if(view.ord.basis==='pesan'){ return o.ts || (o.tgl?dateMs(o.tgl):0); } return o.tgl?dateMs(o.tgl):(o.ts||0); }
   function ordPcs(o){ return o.count || (o.items||[]).reduce(function(a,it){return a+(it.qty||0);},0); }
+  function HARIfull(d){ return ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()]; }
+  function pkl(ms,mode){ var d=new Date(ms); if(mode==='bulanan') return {k:d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1), label:BLN[d.getMonth()]+' '+d.getFullYear()}; return {k:ymd(d), label:HARIfull(d)+', '+d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear()}; }
+  // bangun blok filter (mode + dropdown periode) + ringkasan + tabel detail/ringkas, semua dengan filter MENYATU di atas
+  function buildGrouped(opt){
+    // opt: rows, msOf, mode, period, stats[], onPeriodMissing handled by caller, detailHead[], detailRow(o), summaryHead, summaryRow(g), extraFilter (html string di atas, mis. basis toggle), perLabel
+    var groups={};
+    opt.rows.forEach(function(o){ var p=pkl(opt.msOf(o),opt.mode); if(!groups[p.k]) groups[p.k]={k:p.k,label:p.label,list:[]}; groups[p.k].list.push(o); });
+    var keys=Object.keys(groups).sort(function(a,b){return a<b?1:-1;});
+    var period = (opt.period && keys.indexOf(opt.period)>=0) ? opt.period : '';
+    opt.period=period;
+    var selStyle='width:100%;padding:10px;border:2px solid #E7D8BE;border-radius:11px;font-weight:700;color:var(--coklat);background:#fff;font-family:inherit;font-size:.9rem';
+    var modeBtn='<div style="display:flex;gap:7px;align-items:center"><span class="muted" style="font-size:.72rem;font-weight:800">Tampilan:</span>'
+      +'<button class="btn sm'+(opt.mode==='harian'?'':' sec')+'" data-mode="harian" style="width:auto;margin:0">Per hari</button>'
+      +'<button class="btn sm'+(opt.mode==='bulanan'?'':' sec')+'" data-mode="bulanan" style="width:auto;margin:0">Per bulan</button></div>';
+    var sel='<div style="margin-top:8px"><label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px">Pilih '+(opt.mode==='bulanan'?'bulan':'tanggal')+':</label>'
+      +'<select id="periodSel" style="'+selStyle+'"><option value="">— Semua (ringkasan) —</option>'
+      + keys.map(function(k){ var g=groups[k]; return '<option value="'+esc(k)+'"'+(period===k?' selected':'')+'>'+esc(g.label)+'  ·  '+g.list.length+' '+opt.perLabel+(opt.metaOf?(' · '+opt.metaOf(g)):'')+'</option>'; }).join('') + '</select></div>';
+    var filterBox='<div style="background:#FFF6E2;border:2px solid #F0E2C4;border-radius:13px;padding:11px 12px;margin-bottom:12px">'+(opt.extraFilter||'')+modeBtn+sel+'</div>';
+    var statsHtml='<div class="stats">'+opt.stats.map(function(s){return '<div class="stat"><div class="v">'+s.v+'</div><div class="k">'+s.k+'</div></div>';}).join('')+'</div>';
+    var tbl='';
+    if(period){
+      var g=groups[period];
+      var det=g.list.slice().sort(function(a,b){ return opt.msOf(a)-opt.msOf(b); });
+      tbl='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;background:var(--coklat);color:#fff;border-radius:10px;padding:9px 12px;font-weight:900;font-size:.84rem;margin-bottom:6px"><span>'+esc(g.label)+'</span><span style="white-space:nowrap">'+g.list.length+' '+opt.perLabel+(opt.metaOf?(' · '+opt.metaOf(g)):'')+'</span></div>'
+        +'<div class="scroll"><table class="tbl"><thead><tr>'+opt.detailHead.map(function(h){return '<th'+(h.r?' class="right"':'')+'>'+h.t+'</th>';}).join('')+'</tr></thead><tbody>'
+        + det.map(opt.detailRow).join('') + (opt.detailFoot?opt.detailFoot(g):'') + '</tbody></table></div>';
+    } else {
+      tbl='<div class="muted" style="font-size:.7rem;margin-bottom:6px">Ketuk salah satu baris (atau pilih di dropdown) untuk lihat rinciannya.</div>'
+        +'<div class="scroll"><table class="tbl"><thead><tr>'+opt.summaryHead.map(function(h){return '<th'+(h.r?' class="right"':'')+'>'+h.t+'</th>';}).join('')+'</tr></thead><tbody>'
+        + keys.map(function(k){ return opt.summaryRow(groups[k]); }).join('') + (opt.summaryFoot?opt.summaryFoot():'') + '</tbody></table></div>';
+    }
+    return filterBox+statsHtml+tbl;
+  }
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
@@ -135,136 +169,112 @@
     return rows.filter(function(x){ return x.ts>=r.from && x.ts<=r.to && (!r.outlet || x.outlet===r.outlet); });
   }
 
+  function emptyBox(extra,st){
+    var modeBtn='<div style="display:flex;gap:7px;align-items:center"><span class="muted" style="font-size:.72rem;font-weight:800">Tampilan:</span>'
+      +'<button class="btn sm'+(st.mode==='harian'?'':' sec')+'" data-mode="harian" style="width:auto;margin:0">Per hari</button>'
+      +'<button class="btn sm'+(st.mode==='bulanan'?'':' sec')+'" data-mode="bulanan" style="width:auto;margin:0">Per bulan</button></div>';
+    return '<div style="background:#FFF6E2;border:2px solid #F0E2C4;border-radius:13px;padding:11px 12px;margin-bottom:12px">'+(extra||'')+modeBtn+'</div>';
+  }
   function render(){
     var body=document.getElementById('body'); if(!body) return;
-    if(tab==='txn'){
-      var rows=filterRows(allTxn);
-      var omzet=0, poin=0; rows.forEach(function(x){ omzet+=(x.nominal||0); poin+=(x.points||0); });
-      var head='<div class="stats">'
-        +'<div class="stat"><div class="v">'+rows.length+'</div><div class="k">TRANSAKSI</div></div>'
-        +'<div class="stat"><div class="v">'+rp(omzet)+'</div><div class="k">OMZET</div></div>'
-        +'<div class="stat"><div class="v">'+poin+'</div><div class="k">POIN DIBERI</div></div></div>';
-      if(!rows.length){ body.innerHTML=head+'<div class="empty">Belum ada transaksi pada rentang ini.</div>'; return; }
-      var t='<div class="scroll"><table class="tbl"><thead><tr><th>Waktu</th><th>Outlet</th><th>Member</th><th class="right">Nominal</th><th class="right">Poin</th></tr></thead><tbody>'
-        + rows.map(function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.name||x.uid.slice(0,6))+'</td><td class="right">'+rp(x.nominal)+'</td><td class="right">+'+x.points+'</td></tr>'; }).join('')
-        + '</tbody></table></div>';
-      body.innerHTML=head+t;
-    } else if(tab==='vou'){
-      var rows2=filterRows(allVou);
-      var head2='<div class="stats"><div class="stat"><div class="v">'+rows2.length+'</div><div class="k">VOUCHER TERPAKAI</div></div></div>';
-      if(!rows2.length){ body.innerHTML=head2+'<div class="empty">Belum ada voucher terpakai pada rentang ini.</div>'; return; }
-      var t2='<div class="scroll"><table class="tbl"><thead><tr><th>Waktu</th><th>Outlet</th><th>Kode</th><th>Voucher</th><th>Member</th></tr></thead><tbody>'
-        + rows2.map(function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.title||'-')+'</td><td>'+esc(x.name||'-')+'</td></tr>'; }).join('')
-        + '</tbody></table></div>';
-      body.innerHTML=head2+t2;
-    } else {
-      renderOrd(body);
-    }
+    if(tab==='txn') renderTxn(body);
+    else if(tab==='vou') renderVou(body);
+    else renderOrd(body);
   }
-
+  function renderTxn(body){
+    var rows=filterRows(allTxn); var st=view.txn;
+    var omzet=0, poin=0; rows.forEach(function(x){ omzet+=(x.nominal||0); poin+=(x.points||0); });
+    if(!rows.length){ body.innerHTML=emptyBox('',st)+'<div class="empty">Belum ada transaksi pada rentang & outlet ini.</div>'; wireG(body); return; }
+    var opt={ rows:rows, msOf:function(x){return x.ts;}, mode:st.mode, period:st.period, perLabel:'transaksi',
+      metaOf:function(g){ var o=0; g.list.forEach(function(x){o+=(x.nominal||0);}); return rp(o); },
+      stats:[{v:rows.length,k:'TRANSAKSI'},{v:rp(omzet),k:'OMZET'},{v:poin,k:'POIN'}],
+      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Member'},{t:'Nominal',r:1},{t:'Poin',r:1}],
+      detailRow:function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.name||(x.uid?x.uid.slice(0,6):'-'))+'</td><td class="right">'+rp(x.nominal)+'</td><td class="right">+'+(x.points||0)+'</td></tr>'; },
+      detailFoot:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.nominal||0);p+=(x.points||0);}); return '<tr style="font-weight:900"><td colspan="3">SUBTOTAL</td><td class="right">'+rp(o)+'</td><td class="right">+'+p+'</td></tr>'; },
+      summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Trx',r:1},{t:'Omzet',r:1},{t:'Poin',r:1}],
+      summaryRow:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.nominal||0);p+=(x.points||0);}); return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td><td class="right">'+rp(o)+'</td><td class="right">+'+p+'</td></tr>'; },
+      summaryFoot:function(){ return '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+rp(omzet)+'</td><td class="right">+'+poin+'</td></tr>'; }
+    };
+    body.innerHTML=buildGrouped(opt); st.period=opt.period; wireG(body);
+  }
+  function renderVou(body){
+    var rows=filterRows(allVou); var st=view.vou;
+    if(!rows.length){ body.innerHTML=emptyBox('',st)+'<div class="empty">Belum ada voucher terpakai pada rentang & outlet ini.</div>'; wireG(body); return; }
+    var opt={ rows:rows, msOf:function(x){return x.ts;}, mode:st.mode, period:st.period, perLabel:'voucher',
+      stats:[{v:rows.length,k:'VOUCHER TERPAKAI'}],
+      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Kode'},{t:'Voucher'},{t:'Member'}],
+      detailRow:function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.code||'-')+'</td><td>'+esc(x.title||'-')+'</td><td>'+esc(x.name||'-')+'</td></tr>'; },
+      summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Voucher',r:1}],
+      summaryRow:function(g){ return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td></tr>'; },
+      summaryFoot:function(){ return '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td></tr>'; }
+    };
+    body.innerHTML=buildGrouped(opt); st.period=opt.period; wireG(body);
+  }
   function filterOrders(){
     var r=curRange();
     return allOrd.filter(function(o){ var ms=ordMs(o); return ms>=r.from && ms<=r.to && (!r.outlet || o.outlet===r.outlet); });
   }
   function renderOrd(body){
-    var rows=filterOrders();
+    var rows=filterOrders(); var st=view.ord;
     var omzet=rows.reduce(function(s,o){return s+(o.total||0);},0);
     var pcs=rows.reduce(function(s,o){return s+ordPcs(o);},0);
-    var head='<div class="stats">'
-      +'<div class="stat"><div class="v">'+rows.length+'</div><div class="k">ORDER DEAL</div></div>'
-      +'<div class="stat"><div class="v">'+rp(omzet)+'</div><div class="k">OMZET</div></div>'
-      +'<div class="stat"><div class="v">'+pcs+'</div><div class="k">TOTAL PCS</div></div></div>';
-    var basis='<div style="display:flex;gap:7px;align-items:center;margin-bottom:9px;flex-wrap:wrap"><span class="muted" style="font-size:.72rem;font-weight:800">Hitung per:</span>'
-      +'<button class="btn sm'+(ordBasis==='ambil'?'':' sec')+'" data-basis="ambil" style="width:auto;margin:0">📅 Tanggal ambil</button>'
-      +'<button class="btn sm'+(ordBasis==='pesan'?'':' sec')+'" data-basis="pesan" style="width:auto;margin:0">🧾 Tanggal pesan</button></div>';
-    var modeBtn='<div style="display:flex;gap:7px;margin-bottom:9px"><span class="muted" style="font-size:.72rem;font-weight:800;align-self:center">Tampilan:</span>'
-      +'<button class="btn sm'+(ordMode==='harian'?'':' sec')+'" data-mode="harian" style="width:auto;margin:0">Per hari</button>'
-      +'<button class="btn sm'+(ordMode==='bulanan'?'':' sec')+'" data-mode="bulanan" style="width:auto;margin:0">Per bulan</button></div>';
-    var outletNow = info.admin ? (document.getElementById('outSel')?document.getElementById('outSel').value:'') : (info.outlet||'');
-    var ctx='<div class="muted" style="font-size:.74rem;margin-bottom:6px">Outlet: <b>'+esc(outletNow||'Semua outlet')+'</b>'+(info.admin?' <span style="opacity:.7">(ganti di dropdown atas)</span>':'')+'</div>';
-    // kelompokkan per periode (hari/bulan) sesuai basis
-    var groups={}; 
-    rows.forEach(function(o){ var d=new Date(ordMs(o)); var k,label;
-      if(ordMode==='bulanan'){ k=d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1); label=BLN[d.getMonth()]+' '+d.getFullYear(); }
-      else { k=ymd(d); label=HARIfull(d)+', '+d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear(); }
-      if(!groups[k]) groups[k]={k:k,label:label,list:[],count:0,pcs:0,omzet:0};
-      groups[k].list.push(o); groups[k].count++; groups[k].pcs+=ordPcs(o); groups[k].omzet+=(o.total||0);
-    });
-    var keys=Object.keys(groups).sort(function(a,b){return a<b?1:-1;});
-    if(ordPeriod && keys.indexOf(ordPeriod)<0) ordPeriod='';
-    var selStyle='width:100%;padding:10px;border:2px solid #E7D8BE;border-radius:11px;font-weight:700;color:var(--coklat);background:#fff;margin-bottom:10px;font-family:inherit;font-size:.9rem';
-    var sel='<label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px">Pilih '+(ordMode==='bulanan'?'bulan':'tanggal')+':</label>'
-      +'<select id="ordPeriod" style="'+selStyle+'"><option value="">— Semua (ringkasan) —</option>'
-      + keys.map(function(k){ var g=groups[k]; return '<option value="'+esc(k)+'"'+(ordPeriod===k?' selected':'')+'>'+esc(g.label)+'  ·  '+g.count+' order · '+rp(g.omzet)+'</option>'; }).join('')
-      + '</select>';
-    var basisLabel = ordBasis==='ambil' ? 'tanggal pengambilan' : 'tanggal order masuk';
-    var note='<div class="muted" style="font-size:.7rem;margin-bottom:8px">Dihitung per <b>'+basisLabel+'</b> · hanya pesanan ter-<b>approve</b>.</div>';
+    var basis='<div style="display:flex;gap:7px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><span class="muted" style="font-size:.72rem;font-weight:800">Hitung per:</span>'
+      +'<button class="btn sm'+(st.basis==='ambil'?'':' sec')+'" data-basis="ambil" style="width:auto;margin:0">📅 Tanggal ambil</button>'
+      +'<button class="btn sm'+(st.basis==='pesan'?'':' sec')+'" data-basis="pesan" style="width:auto;margin:0">🧾 Tanggal pesan</button></div>';
     var delBtn = info.super ? '<button class="btn" id="ordClear" style="background:#C0392B;color:#fff;box-shadow:0 3px 0 #97271b;margin-top:16px">🗑️ Hapus semua rekap pesanan (bersihkan uji coba)</button>' : '';
-    if(!rows.length){ body.innerHTML=head+basis+modeBtn+ctx+note+'<div class="empty">Belum ada pesanan deal pada rentang & outlet ini.</div>'+delBtn; wireG(body); return; }
-    var tbl='';
-    if(ordPeriod){
-      var g=groups[ordPeriod];
-      var det=g.list.slice().sort(function(a,b){ var dm=ordMs(a)-ordMs(b); return dm||((a.jam||'').localeCompare(b.jam||'')); });
-      function dShort(s){ if(!s) return '-'; var d=new Date(s+'T00:00:00'); return isNaN(d.getTime())?s:(d.getDate()+' '+BLN[d.getMonth()]); }
-      tbl='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;background:var(--coklat);color:#fff;border-radius:10px;padding:9px 12px;font-weight:900;font-size:.84rem;margin-bottom:6px"><span>'+esc(g.label)+'</span><span style="white-space:nowrap">'+g.count+' order · '+rp(g.omzet)+'</span></div>'
-        +'<div class="scroll"><table class="tbl"><thead><tr><th>Tgl pesan</th><th>Tgl ambil</th><th>Outlet</th><th>Nama</th><th>Item</th><th class="right">Total</th></tr></thead><tbody>'
-        + det.map(function(o){
-            var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', ');
-            var jam=o.jam?(' '+o.jam):'';
-            return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(dShort(o.tgl)+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td></tr>';
-          }).join('')
-        + '<tr style="font-weight:900"><td colspan="5">SUBTOTAL '+esc(g.label)+'</td><td class="right">'+rp(g.omzet)+'</td></tr>'
-        + '</tbody></table></div>';
-    } else {
-      var colH=ordMode==='bulanan'?'Bulan':'Tanggal';
-      tbl='<div class="muted" style="font-size:.7rem;margin-bottom:6px">Ketuk salah satu baris (atau pilih di dropdown) untuk lihat rincian pesanannya.</div>'
-        +'<div class="scroll"><table class="tbl"><thead><tr><th>'+colH+'</th><th class="right">Order</th><th class="right">Pcs</th><th class="right">Omzet</th></tr></thead><tbody>'
-        + keys.map(function(k){ var g=groups[k]; return '<tr data-period="'+esc(k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.count+'</td><td class="right">'+g.pcs+'</td><td class="right">'+rp(g.omzet)+'</td></tr>'; }).join('')
-        + '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+pcs+'</td><td class="right">'+rp(omzet)+'</td></tr>'
-        + '</tbody></table></div>';
-    }
-    body.innerHTML=head+basis+modeBtn+ctx+sel+note+tbl+delBtn;
-    wireG(body);
+    var basisLabel = st.basis==='ambil' ? 'tanggal pengambilan' : 'tanggal order masuk';
+    var note='<div class="muted" style="font-size:.7rem;margin:6px 0 0">Dihitung per <b>'+basisLabel+'</b> · hanya pesanan ter-<b>approve</b>.</div>';
+    if(!rows.length){ body.innerHTML=emptyBox(basis,st)+'<div class="empty">Belum ada pesanan deal pada rentang & outlet ini.</div>'+delBtn; wireG(body); return; }
+    function dShort(s){ if(!s) return '-'; var d=new Date(s+'T00:00:00'); return isNaN(d.getTime())?s:(d.getDate()+' '+BLN[d.getMonth()]); }
+    var opt={ rows:rows, msOf:ordMs, mode:st.mode, period:st.period, perLabel:'order', extraFilter:basis,
+      metaOf:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return rp(o); },
+      stats:[{v:rows.length,k:'ORDER DEAL'},{v:rp(omzet),k:'OMZET'},{v:pcs,k:'TOTAL PCS'}],
+      detailHead:[{t:'Tgl pesan'},{t:'Tgl ambil'},{t:'Outlet'},{t:'Nama'},{t:'Item'},{t:'Total',r:1}],
+      detailRow:function(o){ var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', '); var jam=o.jam?(' '+o.jam):''; return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(dShort(o.tgl)+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td></tr>'; },
+      detailFoot:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return '<tr style="font-weight:900"><td colspan="5">SUBTOTAL</td><td class="right">'+rp(o)+'</td></tr>'; },
+      summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Order',r:1},{t:'Pcs',r:1},{t:'Omzet',r:1}],
+      summaryRow:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.total||0);p+=ordPcs(x);}); return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td><td class="right">'+p+'</td><td class="right">'+rp(o)+'</td></tr>'; },
+      summaryFoot:function(){ return '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+pcs+'</td><td class="right">'+rp(omzet)+'</td></tr>'; }
+    };
+    body.innerHTML=buildGrouped(opt)+note+delBtn; st.period=opt.period; wireG(body);
   }
-  function HARIfull(d){ return ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()]; }
   function wireG(body){
-    body.querySelectorAll('[data-basis]').forEach(function(t){ t.onclick=function(){ ordBasis=t.getAttribute('data-basis'); ordPeriod=''; render(); }; });
-    body.querySelectorAll('[data-mode]').forEach(function(t){ t.onclick=function(){ ordMode=t.getAttribute('data-mode'); ordPeriod=''; render(); }; });
-    var ps=body.querySelector('#ordPeriod'); if(ps) ps.onchange=function(){ ordPeriod=ps.value; render(); };
-    body.querySelectorAll('[data-period]').forEach(function(r){ r.onclick=function(){ ordPeriod=r.getAttribute('data-period'); render(); }; });
+    var st=view[tab];
+    body.querySelectorAll('[data-mode]').forEach(function(t){ t.onclick=function(){ st.mode=t.getAttribute('data-mode'); st.period=''; render(); }; });
+    var ps=body.querySelector('#periodSel'); if(ps) ps.onchange=function(){ st.period=ps.value; render(); };
+    body.querySelectorAll('[data-period]').forEach(function(r){ r.onclick=function(){ st.period=r.getAttribute('data-period'); render(); }; });
+    body.querySelectorAll('[data-basis]').forEach(function(t){ t.onclick=function(){ view.ord.basis=t.getAttribute('data-basis'); view.ord.period=''; render(); }; });
     var oc=body.querySelector('#ordClear');
     if(oc) oc.onclick=function(){
       if(!confirm('Hapus SEMUA rekap pesanan web? Tindakan ini permanen dan tidak bisa dibatalkan.')) return;
       if(prompt('Ketik HAPUS untuk konfirmasi:')!=='HAPUS') return;
       oc.disabled=true; oc.textContent='Menghapus…';
       Promise.resolve().then(function(){ return window.OmaOpa.adminClearOrders(); })
-        .then(function(r){ alert((r&&r.count||0)+' pesanan dihapus.'); ordPeriod=''; return loadData(); })
+        .then(function(r){ alert((r&&r.count||0)+' pesanan dihapus.'); view.ord.period=''; return loadData(); })
         .then(function(){ render(); })
         .catch(function(e){ alert((e&&e.message)||'Gagal'); oc.disabled=false; oc.textContent='🗑️ Hapus semua rekap pesanan (bersihkan uji coba)'; });
     };
   }
   function csvCell(s){ s=String(s==null?'':s); return '"'+s.replace(/"/g,'""')+'"'; }
+  function inPeriod(ms, st){ if(!st.period) return true; var p=pkl(ms,st.mode); return p.k===st.period; }
   function exportCSV(){
     var lines=[], fname;
     if(tab==='txn'){
-      var rows=filterRows(allTxn);
+      var st=view.txn; var rows=filterRows(allTxn).filter(function(x){return inPeriod(x.ts,st);});
       lines.push(['Waktu','Outlet','Member','UID','Nominal','Poin'].map(csvCell).join(','));
       rows.forEach(function(x){ lines.push([fmt(x.ts),x.outlet,x.name,x.uid,x.nominal,x.points].map(csvCell).join(',')); });
-      fname='rekap-transaksi.csv';
+      fname='rekap-transaksi'+(st.period?('-'+st.period):'')+'.csv';
     } else if(tab==='vou'){
-      var rows2=filterRows(allVou);
+      var sv=view.vou; var rows2=filterRows(allVou).filter(function(x){return inPeriod(x.ts,sv);});
       lines.push(['Waktu','Outlet','Kode','Voucher','Member','UID'].map(csvCell).join(','));
       rows2.forEach(function(x){ lines.push([fmt(x.ts),x.outlet,x.code,x.title,x.name,x.uid].map(csvCell).join(',')); });
-      fname='rekap-voucher.csv';
+      fname='rekap-voucher'+(sv.period?('-'+sv.period):'')+'.csv';
     } else {
-      var rows3=filterOrders();
-      if(ordPeriod){
-        rows3=rows3.filter(function(o){ var d=new Date(ordMs(o)); var k=ordMode==='bulanan'?(d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1)):ymd(d); return k===ordPeriod; });
-      }
+      var so=view.ord; var rows3=filterOrders().filter(function(o){return inPeriod(ordMs(o),so);});
       var sorted=rows3.slice().sort(function(a,b){ return ordMs(a)-ordMs(b); });
       lines.push(['Tgl pesan','Tgl ambil','Jam','Outlet','Nama','Telp','Item','Pcs','Total'].map(csvCell).join(','));
       sorted.forEach(function(o){ var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join('; '); lines.push([fmt(o.ts),o.tgl||'',o.jam||'',o.outlet||'',o.nama||'',o.telp||'',itlbl,ordPcs(o),o.total||0].map(csvCell).join(',')); });
-      fname='rekap-pesanan'+(ordPeriod?('-'+ordPeriod):'')+'.csv';
+      fname='rekap-pesanan'+(so.period?('-'+so.period):'')+'.csv';
     }
     var blob=new Blob(["\ufeff"+lines.join("\r\n")], {type:'text/csv;charset=utf-8;'});
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
