@@ -60,7 +60,7 @@
 <script>
 (function(){
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
-  var info=null, tab='txn', allTxn=[], allVou=[], allOrd=[], ordGroup='harian', ordBasis='ambil';
+  var info=null, tab='txn', allTxn=[], allVou=[], allOrd=[], ordMode='harian', ordPeriod='', ordBasis='ambil';
   var BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   function dateMs(s){ var t=new Date(s+'T00:00:00').getTime(); return isNaN(t)?0:t; }
   function ordMs(o){ if(ordBasis==='pesan'){ return o.ts || (o.tgl?dateMs(o.tgl):0); } return o.tgl?dateMs(o.tgl):(o.ts||0); }
@@ -177,67 +177,68 @@
     var basis='<div style="display:flex;gap:7px;align-items:center;margin-bottom:9px;flex-wrap:wrap"><span class="muted" style="font-size:.72rem;font-weight:800">Hitung per:</span>'
       +'<button class="btn sm'+(ordBasis==='ambil'?'':' sec')+'" data-basis="ambil" style="width:auto;margin:0">📅 Tanggal ambil</button>'
       +'<button class="btn sm'+(ordBasis==='pesan'?'':' sec')+'" data-basis="pesan" style="width:auto;margin:0">🧾 Tanggal pesan</button></div>';
-    var G=[['harian','Per hari'],['bulanan','Per bulan'],['outlet','Per outlet'],['rincian','Rincian']];
-    var gbtn='<div class="tabs" style="margin-bottom:10px">'+G.map(function(g){ return '<div class="tab'+(ordGroup===g[0]?' on':'')+'" data-g="'+g[0]+'">'+g[1]+'</div>'; }).join('')+'</div>';
+    var modeBtn='<div style="display:flex;gap:7px;margin-bottom:9px"><span class="muted" style="font-size:.72rem;font-weight:800;align-self:center">Tampilan:</span>'
+      +'<button class="btn sm'+(ordMode==='harian'?'':' sec')+'" data-mode="harian" style="width:auto;margin:0">Per hari</button>'
+      +'<button class="btn sm'+(ordMode==='bulanan'?'':' sec')+'" data-mode="bulanan" style="width:auto;margin:0">Per bulan</button></div>';
+    var outletNow = info.admin ? (document.getElementById('outSel')?document.getElementById('outSel').value:'') : (info.outlet||'');
+    var ctx='<div class="muted" style="font-size:.74rem;margin-bottom:6px">Outlet: <b>'+esc(outletNow||'Semua outlet')+'</b>'+(info.admin?' <span style="opacity:.7">(ganti di dropdown atas)</span>':'')+'</div>';
+    // kelompokkan per periode (hari/bulan) sesuai basis
+    var groups={}; 
+    rows.forEach(function(o){ var d=new Date(ordMs(o)); var k,label;
+      if(ordMode==='bulanan'){ k=d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1); label=BLN[d.getMonth()]+' '+d.getFullYear(); }
+      else { k=ymd(d); label=HARIfull(d)+', '+d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear(); }
+      if(!groups[k]) groups[k]={k:k,label:label,list:[],count:0,pcs:0,omzet:0};
+      groups[k].list.push(o); groups[k].count++; groups[k].pcs+=ordPcs(o); groups[k].omzet+=(o.total||0);
+    });
+    var keys=Object.keys(groups).sort(function(a,b){return a<b?1:-1;});
+    if(ordPeriod && keys.indexOf(ordPeriod)<0) ordPeriod='';
+    var selStyle='width:100%;padding:10px;border:2px solid #E7D8BE;border-radius:11px;font-weight:700;color:var(--coklat);background:#fff;margin-bottom:10px;font-family:inherit;font-size:.9rem';
+    var sel='<label class="muted" style="font-size:.72rem;font-weight:800;display:block;margin-bottom:3px">Pilih '+(ordMode==='bulanan'?'bulan':'tanggal')+':</label>'
+      +'<select id="ordPeriod" style="'+selStyle+'"><option value="">— Semua (ringkasan) —</option>'
+      + keys.map(function(k){ var g=groups[k]; return '<option value="'+esc(k)+'"'+(ordPeriod===k?' selected':'')+'>'+esc(g.label)+'  ·  '+g.count+' order · '+rp(g.omzet)+'</option>'; }).join('')
+      + '</select>';
     var basisLabel = ordBasis==='ambil' ? 'tanggal pengambilan' : 'tanggal order masuk';
-    var note='<div class="muted" style="font-size:.72rem;margin-bottom:8px">Laporan dihitung per <b>'+basisLabel+'</b>. Hanya pesanan yang sudah di-<b>approve</b>.'+(info.admin?' Filter per outlet di atas.':'')+'</div>';
+    var note='<div class="muted" style="font-size:.7rem;margin-bottom:8px">Dihitung per <b>'+basisLabel+'</b> · hanya pesanan ter-<b>approve</b>.</div>';
     var delBtn = info.super ? '<button class="btn" id="ordClear" style="background:#C0392B;color:#fff;box-shadow:0 3px 0 #97271b;margin-top:16px">🗑️ Hapus semua rekap pesanan (bersihkan uji coba)</button>' : '';
-    if(!rows.length){ body.innerHTML=head+basis+gbtn+note+'<div class="empty">Belum ada pesanan deal pada rentang ini.</div>'+delBtn; wireG(body); return; }
+    if(!rows.length){ body.innerHTML=head+basis+modeBtn+ctx+note+'<div class="empty">Belum ada pesanan deal pada rentang & outlet ini.</div>'+delBtn; wireG(body); return; }
     var tbl='';
-    if(ordGroup==='rincian'){
-      var sorted=rows.slice().sort(function(a,b){ return ordMs(b)-ordMs(a); });
-      tbl='<div class="scroll"><table class="tbl"><thead><tr><th>Tgl ambil</th><th>Tgl pesan</th><th>Outlet</th><th>Nama</th><th>Item</th><th class="right">Total</th></tr></thead><tbody>'
-        + sorted.map(function(o){
-          var ab=o.tgl?(function(){ var d=new Date(o.tgl+'T00:00:00'); return isNaN(d.getTime())?o.tgl:(d.getDate()+' '+BLN[d.getMonth()]); })():'-';
-          var jam=o.jam?(' '+o.jam):'';
-          var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', ');
-          return '<tr><td>'+esc(ab+jam)+'</td><td>'+esc(fmt(o.ts))+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td></tr>';
-        }).join('')
+    if(ordPeriod){
+      var g=groups[ordPeriod];
+      var det=g.list.slice().sort(function(a,b){ var dm=ordMs(a)-ordMs(b); return dm||((a.jam||'').localeCompare(b.jam||'')); });
+      function dShort(s){ if(!s) return '-'; var d=new Date(s+'T00:00:00'); return isNaN(d.getTime())?s:(d.getDate()+' '+BLN[d.getMonth()]); }
+      tbl='<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;background:var(--coklat);color:#fff;border-radius:10px;padding:9px 12px;font-weight:900;font-size:.84rem;margin-bottom:6px"><span>'+esc(g.label)+'</span><span style="white-space:nowrap">'+g.count+' order · '+rp(g.omzet)+'</span></div>'
+        +'<div class="scroll"><table class="tbl"><thead><tr><th>Tgl pesan</th><th>Tgl ambil</th><th>Outlet</th><th>Nama</th><th>Item</th><th class="right">Total</th></tr></thead><tbody>'
+        + det.map(function(o){
+            var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', ');
+            var jam=o.jam?(' '+o.jam):'';
+            return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(dShort(o.tgl)+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td></tr>';
+          }).join('')
+        + '<tr style="font-weight:900"><td colspan="5">SUBTOTAL '+esc(g.label)+'</td><td class="right">'+rp(g.omzet)+'</td></tr>'
         + '</tbody></table></div>';
-    } else if(ordGroup==='harian'){
-      var gmap={};
-      rows.forEach(function(o){ var d=new Date(ordMs(o)); var k=ymd(d); if(!gmap[k]) gmap[k]={k:k,label:HARIfull(d)+', '+d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear(),list:[],count:0,pcs:0,omzet:0}; gmap[k].list.push(o); gmap[k].count++; gmap[k].pcs+=ordPcs(o); gmap[k].omzet+=(o.total||0); });
-      var keys=Object.keys(gmap).sort(function(a,b){return a<b?1:-1;});
-      tbl=keys.map(function(k){ var g=gmap[k];
-        var rowsH=g.list.sort(function(a,b){return (a.jam||'').localeCompare(b.jam||'');}).map(function(o){
-          var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', ');
-          return '<tr><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+(o.jam?(' · '+esc(o.jam)):'')+'<div class="muted" style="font-size:.66rem;font-weight:600">'+esc(itlbl||'-')+'</div></td><td class="right">'+rp(o.total)+'</td></tr>';
-        }).join('');
-        return '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;background:var(--coklat);color:#fff;border-radius:10px;padding:8px 11px;font-weight:900;font-size:.8rem"><span>'+esc(g.label)+'</span><span style="white-space:nowrap">'+g.count+' order · '+rp(g.omzet)+'</span></div>'
-          +'<table class="tbl" style="margin-top:4px"><thead><tr><th>Outlet</th><th>Pemesan &amp; item</th><th class="right">Total</th></tr></thead><tbody>'+rowsH+'</tbody></table></div>';
-      }).join('');
-      tbl='<div class="scroll" style="max-height:60vh;padding:4px">'+tbl+'</div>';
     } else {
-      var map={};
-      rows.forEach(function(o){
-        var k,label;
-        if(ordGroup==='bulanan'){ var d=new Date(ordMs(o)); k=d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1); label=BLN[d.getMonth()]+' '+d.getFullYear(); }
-        else { k=o.outlet||'(lainnya)'; label=k.replace(/^Oma Opa Cakery\s*/i,''); }
-        if(!map[k]) map[k]={k:k,label:label,count:0,pcs:0,omzet:0};
-        map[k].count++; map[k].pcs+=ordPcs(o); map[k].omzet+=(o.total||0);
-      });
-      var arr=Object.keys(map).map(function(k){return map[k];});
-      if(ordGroup==='outlet') arr.sort(function(a,b){return b.omzet-a.omzet;}); else arr.sort(function(a,b){return a.k<b.k?1:-1;});
-      var colH=ordGroup==='outlet'?'Outlet':'Bulan';
-      tbl='<div class="scroll"><table class="tbl"><thead><tr><th>'+colH+'</th><th class="right">Order</th><th class="right">Pcs</th><th class="right">Omzet</th></tr></thead><tbody>'
-        + arr.map(function(g){ return '<tr><td>'+esc(g.label)+'</td><td class="right">'+g.count+'</td><td class="right">'+g.pcs+'</td><td class="right">'+rp(g.omzet)+'</td></tr>'; }).join('')
+      var colH=ordMode==='bulanan'?'Bulan':'Tanggal';
+      tbl='<div class="muted" style="font-size:.7rem;margin-bottom:6px">Ketuk salah satu baris (atau pilih di dropdown) untuk lihat rincian pesanannya.</div>'
+        +'<div class="scroll"><table class="tbl"><thead><tr><th>'+colH+'</th><th class="right">Order</th><th class="right">Pcs</th><th class="right">Omzet</th></tr></thead><tbody>'
+        + keys.map(function(k){ var g=groups[k]; return '<tr data-period="'+esc(k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.count+'</td><td class="right">'+g.pcs+'</td><td class="right">'+rp(g.omzet)+'</td></tr>'; }).join('')
         + '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+pcs+'</td><td class="right">'+rp(omzet)+'</td></tr>'
         + '</tbody></table></div>';
     }
-    body.innerHTML=head+basis+gbtn+note+tbl+delBtn;
+    body.innerHTML=head+basis+modeBtn+ctx+sel+note+tbl+delBtn;
     wireG(body);
   }
   function HARIfull(d){ return ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()]; }
   function wireG(body){
-    body.querySelectorAll('[data-g]').forEach(function(t){ t.onclick=function(){ ordGroup=t.getAttribute('data-g'); render(); }; });
-    body.querySelectorAll('[data-basis]').forEach(function(t){ t.onclick=function(){ ordBasis=t.getAttribute('data-basis'); render(); }; });
+    body.querySelectorAll('[data-basis]').forEach(function(t){ t.onclick=function(){ ordBasis=t.getAttribute('data-basis'); ordPeriod=''; render(); }; });
+    body.querySelectorAll('[data-mode]').forEach(function(t){ t.onclick=function(){ ordMode=t.getAttribute('data-mode'); ordPeriod=''; render(); }; });
+    var ps=body.querySelector('#ordPeriod'); if(ps) ps.onchange=function(){ ordPeriod=ps.value; render(); };
+    body.querySelectorAll('[data-period]').forEach(function(r){ r.onclick=function(){ ordPeriod=r.getAttribute('data-period'); render(); }; });
     var oc=body.querySelector('#ordClear');
     if(oc) oc.onclick=function(){
       if(!confirm('Hapus SEMUA rekap pesanan web? Tindakan ini permanen dan tidak bisa dibatalkan.')) return;
       if(prompt('Ketik HAPUS untuk konfirmasi:')!=='HAPUS') return;
       oc.disabled=true; oc.textContent='Menghapus…';
       Promise.resolve().then(function(){ return window.OmaOpa.adminClearOrders(); })
-        .then(function(r){ alert((r&&r.count||0)+' pesanan dihapus.'); return loadData(); })
+        .then(function(r){ alert((r&&r.count||0)+' pesanan dihapus.'); ordPeriod=''; return loadData(); })
         .then(function(){ render(); })
         .catch(function(e){ alert((e&&e.message)||'Gagal'); oc.disabled=false; oc.textContent='🗑️ Hapus semua rekap pesanan (bersihkan uji coba)'; });
     };
@@ -257,24 +258,13 @@
       fname='rekap-voucher.csv';
     } else {
       var rows3=filterOrders();
-      if(ordGroup==='rincian'){
-        var sorted=rows3.slice().sort(function(a,b){ return ordMs(b)-ordMs(a); });
-        lines.push(['Tgl order','Tgl ambil','Jam','Outlet','Nama','Telp','Item','Pcs','Total'].map(csvCell).join(','));
-        sorted.forEach(function(o){ var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join('; '); lines.push([fmt(o.ts),o.tgl||'',o.jam||'',o.outlet||'',o.nama||'',o.telp||'',itlbl,ordPcs(o),o.total||0].map(csvCell).join(',')); });
-        fname='rekap-pesanan-rincian.csv';
-      } else {
-        var map={};
-        rows3.forEach(function(o){ var k,label;
-          if(ordGroup==='bulanan'){ var d=new Date(ordMs(o)); k=d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1); label=k; }
-          else if(ordGroup==='outlet'){ k=o.outlet||'(lainnya)'; label=k; }
-          else { k=ymd(new Date(ordMs(o))); label=k; }
-          if(!map[k]) map[k]={label:label,count:0,pcs:0,omzet:0}; map[k].count++; map[k].pcs+=ordPcs(o); map[k].omzet+=(o.total||0);
-        });
-        var hdr=ordGroup==='outlet'?'Outlet':(ordGroup==='bulanan'?'Bulan':'Tanggal');
-        lines.push([hdr,'Jml order','Pcs','Omzet'].map(csvCell).join(','));
-        Object.keys(map).sort().forEach(function(k){ var g=map[k]; lines.push([g.label,g.count,g.pcs,g.omzet].map(csvCell).join(',')); });
-        fname='rekap-pesanan-'+ordGroup+'.csv';
+      if(ordPeriod){
+        rows3=rows3.filter(function(o){ var d=new Date(ordMs(o)); var k=ordMode==='bulanan'?(d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1)):ymd(d); return k===ordPeriod; });
       }
+      var sorted=rows3.slice().sort(function(a,b){ return ordMs(a)-ordMs(b); });
+      lines.push(['Tgl pesan','Tgl ambil','Jam','Outlet','Nama','Telp','Item','Pcs','Total'].map(csvCell).join(','));
+      sorted.forEach(function(o){ var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join('; '); lines.push([fmt(o.ts),o.tgl||'',o.jam||'',o.outlet||'',o.nama||'',o.telp||'',itlbl,ordPcs(o),o.total||0].map(csvCell).join(',')); });
+      fname='rekap-pesanan'+(ordPeriod?('-'+ordPeriod):'')+'.csv';
     }
     var blob=new Blob(["\ufeff"+lines.join("\r\n")], {type:'text/csv;charset=utf-8;'});
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
