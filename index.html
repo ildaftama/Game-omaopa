@@ -99,7 +99,7 @@
   <h2 class="sec">Pilih permainan</h2>
   <div class="games">
 
-    <a class="gcard" href="topping.html?v=68">
+    <a class="gcard" href="topping.html?v=69">
       <div class="gicon" style="background:#FCEFC2"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M6 18h24v6a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 18.5C4.4 12 9.8 7.5 18 7.5S31.6 12 31 18.5Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="13.5" cy="12" rx="5.5" ry="2" fill="#fff" opacity=".35"/><ellipse cx="14.2" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><ellipse cx="21.8" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><path d="M16.5 25.2q1.5 1.2 3 0" stroke="#5a3b2e" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="11" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/><circle cx="25" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/></svg></div>
       <div class="gname">Menopping Asik!</div>
       <div class="gdesc">Selesaikan pesanan customer dan dapatkan pointnya.</div>
@@ -155,9 +155,9 @@
   <div id="navMember" style="cursor:pointer"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2.2"/><rect x="6" y="8" width="5" height="5" rx="1"/><path d="M13.5 8.5h4.5M13.5 11.5h4.5M6.5 16h11"/></svg></span>Kartu Member</div>
 </div>
 
-<script src="menu-data.js?v=68"></script>
-<script src="outlets-data.js?v=68"></script>
-<script type="module" src="core-omaopa.js?v=68"></script>
+<script src="menu-data.js?v=69"></script>
+<script src="outlets-data.js?v=69"></script>
+<script type="module" src="core-omaopa.js?v=69"></script>
 <script>
   try{ document.getElementById('coin').textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){ document.getElementById('coin').textContent='0'; }
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -243,18 +243,6 @@
       // slot jam (08:00–20:00, tiap 30 menit)
       var slots=[]; for(var h=8;h<=20;h++){ slots.push(z(h)+':00'); if(h<20) slots.push(z(h)+':30'); }
       var chips=slots.map(function(s){ return '<button type="button" class="cf-chip'+(form.jam===s?' sel':'')+'" data-jam="'+s+'">'+s+'</button>'; }).join('');
-      // daftar outlet ketuk, dikelompokkan area
-      var areas=[]; OUTLETS.forEach(function(o){ if(areas.indexOf(o.area)<0) areas.push(o.area); });
-      var PRIO=['Yogya','Solo Raya','Semarang'];
-      areas.sort(function(a,b){ var ia=PRIO.indexOf(a),ib=PRIO.indexOf(b); if(ia<0)ia=99; if(ib<0)ib=99; return ia!==ib?ia-ib:a.localeCompare(b); });
-      var rows='';
-      areas.forEach(function(a){
-        rows+='<div class="cf-area" data-area="'+esc(a)+'">'+esc(a)+'</div>';
-        OUTLETS.filter(function(o){return o.area===a;}).forEach(function(o){
-          var label=o.name.replace(/^Oma Opa Cakery\s*/i,'');
-          rows+='<div class="cf-out'+(form.outlet===o.name?' sel':'')+'" data-out="'+esc(o.name)+'" data-area="'+esc(a)+'" data-find="'+esc((o.name+' '+a).toLowerCase())+'"><span class="dot"></span>'+esc(label)+'</div>';
-        });
-      });
       var ol=orderLines();
       var sum='<div class="cf-sum"><div class="cf-hd" style="margin-bottom:5px">Pesananmu</div>'
         + ol.map(function(x){ return '<div class="r"><span>'+x.q+'x '+esc(x.m.cat)+' — '+esc(x.m.name)+'</span><span>'+rpid(x.sub)+'</span></div>'; }).join('')
@@ -267,7 +255,7 @@
         +(tel?'<div class="cf-hint">Otomatis dari akunmu — boleh diubah kalau perlu.</div>':'')
         +'<label>Outlet pengambilan</label>'
         +'<input id="fOcari" class="cf-osearch" placeholder="🔎 Cari outlet / kota...">'
-        +'<div class="cf-owrap" id="fOut">'+rows+'<div class="cf-none" id="fOutNone" style="display:none">Outlet tidak ditemukan</div></div>'
+        +'<div class="cf-owrap" id="fOut"></div>'
         +'<label>Catatan tambahan (opsional)</label><textarea id="fNote" rows="2" placeholder="mis. potong jadi 6, tanpa greentea, dll">'+esc(form.note||'')+'</textarea>'
         +'<div id="fErr"></div>'+sum+'</div>';
       // simpan field input teks saat berubah
@@ -278,21 +266,39 @@
         bk.querySelectorAll('#fJamChips .cf-chip').forEach(function(x){ x.classList.remove('sel'); });
         c.classList.add('sel'); clearErr();
       }; });
-      // pilih outlet (ketuk)
-      bk.querySelectorAll('#fOut .cf-out').forEach(function(r){ r.onclick=function(){
-        form.outlet=r.getAttribute('data-out');
-        form.outletArea=r.getAttribute('data-area')||'';
-        bk.querySelectorAll('#fOut .cf-out').forEach(function(x){ x.classList.remove('sel'); });
-        r.classList.add('sel'); clearErr();
-      }; });
-      // cari outlet
+      // ===== pemilih outlet: pilih KOTA dulu, lalu outlet =====
+      function drawPicker(){
+        var wrap=bk.querySelector('#fOut'); if(!wrap) return;
+        var cari=bk.querySelector('#fOcari'); var q=cari?cari.value.trim().toLowerCase():'';
+        var areas=[]; OUTLETS.forEach(function(o){ if(areas.indexOf(o.area)<0) areas.push(o.area); });
+        var PRIO=['Yogya','Solo Raya','Semarang'];
+        areas.sort(function(a,b){ var ia=PRIO.indexOf(a),ib=PRIO.indexOf(b); if(ia<0)ia=99; if(ib<0)ib=99; return ia!==ib?ia-ib:String(a).localeCompare(String(b)); });
+        function outRow(o){ var label=String(o.name).replace(/^Oma Opa Cakery\s*/i,''); return '<div class="cf-out'+(form.outlet===o.name?' sel':'')+'" data-out="'+esc(o.name)+'" data-area="'+esc(o.area||'')+'"><span class="dot"></span>'+esc(label)+'</div>'; }
+        var html='';
+        if(q){
+          var matched=OUTLETS.filter(function(o){ return (o.name+' '+(o.area||'')).toLowerCase().indexOf(q)>=0; });
+          html = matched.length ? matched.map(outRow).join('') : '<div class="cf-none">Outlet tidak ditemukan</div>';
+        } else if(form._pickArea){
+          html='<div class="cf-area" data-back="1" style="display:flex;align-items:center;gap:6px;cursor:pointer"><span style="font-weight:900">‹</span>'+esc(form._pickArea)+'<span style="margin-left:auto;font-weight:700;font-size:.62rem;opacity:.85">ganti kota</span></div>';
+          var inArea=OUTLETS.filter(function(o){return o.area===form._pickArea;});
+          html += inArea.length ? inArea.map(outRow).join('') : '<div class="cf-none">Belum ada outlet di kota ini</div>';
+        } else {
+          html='<div class="cf-area">Pilih kota dulu ya 👇</div>';
+          html += areas.map(function(a){ var n=OUTLETS.filter(function(o){return o.area===a;}).length; return '<div class="cf-out" data-city="'+esc(a)+'" style="font-weight:800;color:var(--coklat)"><span style="margin-right:3px">🏙️</span>'+esc(a)+'<span style="margin-left:auto;font-size:.72rem;color:#a98e6e;font-weight:700">'+n+' outlet ›</span></div>'; }).join('') || '<div class="cf-none">Belum ada outlet.</div>';
+        }
+        wrap.innerHTML=html;
+        wrap.querySelectorAll('[data-city]').forEach(function(r){ r.onclick=function(){ form._pickArea=r.getAttribute('data-city'); drawPicker(); }; });
+        var bb=wrap.querySelector('[data-back]'); if(bb) bb.onclick=function(){ form._pickArea=null; drawPicker(); };
+        wrap.querySelectorAll('.cf-out[data-out]').forEach(function(r){ r.onclick=function(){
+          form.outlet=r.getAttribute('data-out'); form.outletArea=r.getAttribute('data-area')||'';
+          wrap.querySelectorAll('.cf-out[data-out]').forEach(function(x){ x.classList.remove('sel'); });
+          r.classList.add('sel'); clearErr();
+        }; });
+      }
+      if(form._pickArea===undefined) form._pickArea = form.outlet ? (form.outletArea||null) : null;
+      drawPicker();
       var cari=bk.querySelector('#fOcari');
-      if(cari) cari.addEventListener('input',function(){
-        var q=cari.value.trim().toLowerCase(); var shown=0;
-        bk.querySelectorAll('#fOut .cf-out').forEach(function(r){ var ok=!q||r.getAttribute('data-find').indexOf(q)>=0; r.style.display=ok?'':'none'; if(ok) shown++; });
-        bk.querySelectorAll('#fOut .cf-area').forEach(function(h){ var a=h.getAttribute('data-area'); var any=false; var n=h.nextSibling; while(n&&n.classList&&n.classList.contains('cf-out')){ if(n.style.display!=='none') any=true; n=n.nextSibling; } h.style.display=any?'':'none'; });
-        var none=bk.querySelector('#fOutNone'); if(none) none.style.display=shown?'none':'';
-      });
+      if(cari) cari.addEventListener('input',drawPicker);
       updateTotal();
     }
     function clearErr(){ var e=bk.querySelector('#fErr'); if(e) e.innerHTML=''; }

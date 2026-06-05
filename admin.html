@@ -91,7 +91,7 @@
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
   var tab='home', busy=false, segFilter=null, canEdit=false;
   var MEMBERS=null, TXN=null; // cache
-  var curOf='baru', curOrders=[];
+  var curOf='baru', curOrders=[], OUTLETS_CACHE=[];
   var PAL=['#FACC1A','#E0915B','#7CC9B5','#C98A4B','#88B0E0','#F4A6B0','#9a8b78','#B7D77A','#caa6e0'];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
@@ -416,6 +416,7 @@
         +'<div class="muted" style="font-size:.76rem;margin:4px 0 8px">Hapus <b>SEMUA</b> pesanan web (BARU, DEAL, DITOLAK) — berguna setelah uji coba. Tidak bisa dibatalkan.</div>'
         +'<button class="btn red" id="oClearAll">🗑️ Hapus semua riwayat pesanan</button></div>') : '');
     document.getElementById('oRl').onclick=function(){ loadOrders(curOf); };
+    try{ O.listOutlets().then(function(a){ OUTLETS_CACHE=a||[]; }).catch(function(){}); }catch(e){}
     var oca=document.getElementById('oClearAll');
     if(oca) oca.onclick=function(){
       if(!confirm('Hapus SEMUA riwayat pesanan web? Tindakan ini tidak bisa dibatalkan.')) return;
@@ -467,6 +468,13 @@
     var menuOpts='<option value="">+ pilih menu untuk ditambah…</option>'; var mcats=[];
     MENU.forEach(function(m){ if(m.avail!==false){ var c=m.cat||'Menu'; if(mcats.indexOf(c)<0) mcats.push(c); } });
     mcats.forEach(function(c){ menuOpts+='<optgroup label="'+esc(c)+'">'; MENU.filter(function(m){return (m.cat||'Menu')===c&&m.avail!==false;}).forEach(function(m){ menuOpts+='<option value="'+esc(m.id)+'">'+esc(m.name)+' — '+rp(m.price)+'</option>'; }); menuOpts+='</optgroup>'; });
+    var oList = OUTLETS_CACHE.length ? OUTLETS_CACHE : (window.OMA_OUTLETS||[]);
+    var curOut=o.outlet||''; var inList=false;
+    var oareas=[]; oList.forEach(function(x){ var a=x.area||'Lainnya'; if(oareas.indexOf(a)<0) oareas.push(a); if(x.name===curOut) inList=true; });
+    var outSel='<select id="oeOut"><option value="">— pilih outlet —</option>';
+    if(curOut && !inList) outSel+='<option value="'+esc(curOut)+'" selected>'+esc(curOut)+' (saat ini)</option>';
+    oareas.forEach(function(a){ outSel+='<optgroup label="'+esc(a)+'">'; oList.filter(function(x){return (x.area||'Lainnya')===a;}).forEach(function(x){ outSel+='<option value="'+esc(x.name)+'"'+(x.name===curOut?' selected':'')+'>'+esc(x.name)+'</option>'; }); outSel+='</optgroup>'; });
+    outSel+='</select>';
     var lbl='font-size:.72rem;font-weight:800;display:block;margin-top:9px';
     ov.innerHTML='<div style="background:var(--cream);width:100%;max-width:480px;max-height:92vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden">'
       +'<div style="display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:2px solid #F0E2C4;background:#fff"><div class="nm" style="flex:1">📝 Edit pesanan</div><button class="btn sm sec" id="oeX" style="width:34px;margin:0">✕</button></div>'
@@ -475,7 +483,7 @@
       +'<label class="muted" style="'+lbl+'">No telepon</label><input id="oeTelp" value="'+esc(o.telp||'')+'">'
       +'<div style="display:flex;gap:8px"><div style="flex:1"><label class="muted" style="'+lbl+'">Tanggal</label><input id="oeTgl" type="date" value="'+esc(o.tgl||'')+'"></div>'
       +'<div style="width:120px"><label class="muted" style="'+lbl+'">Jam</label><input id="oeJam" value="'+esc(o.jam||'')+'" placeholder="mis. 14:00"></div></div>'
-      +'<label class="muted" style="'+lbl+'">Outlet</label><input id="oeOut" value="'+esc(o.outlet||'')+'">'
+      +'<label class="muted" style="'+lbl+'">Outlet</label>'+outSel
       +'<label class="muted" style="'+lbl+'">Catatan</label><input id="oeNote" value="'+esc(o.note||'')+'">'
       +'<div class="nm" style="font-size:.82rem;margin:14px 0 4px">Item pesanan</div>'
       +'<div id="oeItems"></div>'
