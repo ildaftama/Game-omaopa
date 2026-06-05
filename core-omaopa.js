@@ -1041,28 +1041,35 @@ async function listOrders(n){ n=n||1000;
   try{ const snap=await getDocs(query(collection(db,'orders'), orderBy('createdAt','desc'), limit(n))); const arr=[]; snap.forEach(d=>arr.push(row(d))); return arr;
   }catch(e){ try{ const snap=await getDocs(collection(db,'orders')); const arr=[]; snap.forEach(d=>arr.push(row(d))); arr.sort((a,b)=>b.ts-a.ts); return arr; }catch(e2){ return []; } }
 }
+function itemLabel(it){ it=it||{}; var base=String(it.cat||'').trim(); var nm=String(it.name||it.id||'').trim(); if(base && nm && base.toLowerCase()!==nm.toLowerCase()) return base+' – '+nm; return nm||base; }
 function pushOrderRow(id, x, action){
-  const items=(x.items||[]).map(it=>((it.qty||0)+'x '+(it.name||it.id||''))).join('; ');
+  const items=(x.items||[]).map(it=>((it.qty||0)+'x '+itemLabel(it))).join('; ');
   pushToSheet({ type:'pesanan', action:action||'upsert', id:id, waktu:new Date().toISOString(),
     tgl_ambil:x.tgl||'', jam:x.jam||'', outlet:x.outlet||'', nama:x.nama||'', telp:("'"+(x.telp||'')),
     items:items, pcs:x.count||0, total:x.total||0, status:x.status||'' });
 }
+function pushOrderItems(id, x, action){
+  if(action==='delete'||action==='clear'){ pushToSheet({ type:'item', action:action, id:id }); return; }
+  const rows=(x.items||[]).map(function(it){ var q=Number(it.qty)||0, h=Number(it.price)||0; return { kue:it.cat||'', topping:it.name||it.id||'', qty:q, harga:h, subtotal:h*q }; });
+  pushToSheet({ type:'item', action:'replace', id:id, waktu:new Date().toISOString(),
+    tgl_ambil:x.tgl||'', jam:x.jam||'', outlet:x.outlet||'', nama:x.nama||'', status:x.status||'', rows:rows });
+}
 async function setOrderStatus(id, status){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim();
   await setDoc(doc(db,'orders',id), { status:String(status||'baru'), updatedAt:serverTimestamp() },{merge:true});
-  try{ if(String(status)==='approved'){ const s=await getDoc(doc(db,'orders',id)); if(s.exists()) pushOrderRow(id, s.data(), 'upsert'); }
-       else { pushToSheet({ type:'pesanan', action:'delete', id:id }); } }catch(e){}
+  try{ if(String(status)==='approved'){ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ pushOrderRow(id, s.data(), 'upsert'); pushOrderItems(id, s.data(), 'replace'); } }
+       else { pushToSheet({ type:'pesanan', action:'delete', id:id }); pushOrderItems(id, null, 'delete'); } }catch(e){}
 }
 async function updateOrder(id, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); const data=Object.assign({updatedAt:serverTimestamp()}, patch||{}); if(data.total!=null) data.total=Math.round(Number(data.total)||0); await setDoc(doc(db,'orders',id), data, {merge:true});
-  try{ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const d=s.data(); if((d.status||'baru')==='approved') pushOrderRow(id, d, 'upsert'); } }catch(e){}
+  try{ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const d=s.data(); if((d.status||'baru')==='approved'){ pushOrderRow(id, d, 'upsert'); pushOrderItems(id, d, 'replace'); } } }catch(e){}
 }
 async function deleteOrder(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); await deleteDoc(doc(db,'orders',id));
-  try{ pushToSheet({ type:'pesanan', action:'delete', id:id }); }catch(e){}
+  try{ pushToSheet({ type:'pesanan', action:'delete', id:id }); pushOrderItems(id, null, 'delete'); }catch(e){}
 }
 async function adminClearOrders(){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   const snap=await getDocs(collection(db,'orders')); let n=0;
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'orders',ds.id)); n++; }catch(e){} }
-  try{ pushToSheet({ type:'pesanan', action:'clear' }); }catch(e){}
+  try{ pushToSheet({ type:'pesanan', action:'clear' }); pushOrderItems(null, null, 'clear'); }catch(e){}
   return { count:n };
 }
 
@@ -1090,7 +1097,7 @@ window.OmaOpa = {
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
   getAnnouncement, setAnnouncement, saveBanner, logOrder, listOrders,
-  setOrderStatus, updateOrder, deleteOrder, adminClearOrders,
+  setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel,
   tierOf, TIERS,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'', phone:(profile&&profile.phone)||'' } : null,

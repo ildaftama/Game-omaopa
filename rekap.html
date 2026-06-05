@@ -60,7 +60,7 @@
   <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=72"></script>
+<script type="module" src="core-omaopa.js?v=73"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
@@ -253,7 +253,7 @@
       metaOf:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return rp(o); },
       stats:[{v:rows.length,k:'ORDER DEAL'},{v:rp(omzet),k:'OMZET'},{v:pcs,k:'TOTAL PCS'}],
       detailHead:[{t:'Tgl pesan'},{t:'Tgl ambil'},{t:'Outlet'},{t:'Nama'},{t:'Item'},{t:'Total',r:1}].concat(info.super?[{t:''}]:[]),
-      detailRow:function(o){ var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', '); var jam=o.jam?(' '+o.jam):''; return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(dShort(o.tgl)+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td>'+delCell('ord',o.id)+'</tr>'; },
+      detailRow:function(o){ var IL=(window.OmaOpa&&window.OmaOpa.itemLabel)||function(it){return (it.cat?it.cat+' – ':'')+(it.name||it.id||'');}; var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+IL(it);}).join(', '); var jam=o.jam?(' '+o.jam):''; return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(dShort(o.tgl)+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td>'+delCell('ord',o.id)+'</tr>'; },
       detailFoot:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return '<tr style="font-weight:900"><td colspan="5">SUBTOTAL</td><td class="right">'+rp(o)+'</td>'+(info.super?'<td></td>':'')+'</tr>'; },
       summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Order',r:1},{t:'Pcs',r:1},{t:'Omzet',r:1}],
       summaryRow:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.total||0);p+=ordPcs(x);}); return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td><td class="right">'+p+'</td><td class="right">'+rp(o)+'</td></tr>'; },
