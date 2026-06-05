@@ -62,6 +62,7 @@
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
   var info=null, tab='txn', allTxn=[], allVou=[], allOrd=[];
   var view={ txn:{mode:'harian',period:''}, vou:{mode:'harian',period:''}, ord:{mode:'harian',period:'',basis:'ambil'} };
+  var OUTLET_AREA={};
   var BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   function dateMs(s){ var t=new Date(s+'T00:00:00').getTime(); return isNaN(t)?0:t; }
   function ordMs(o){ if(view.ord.basis==='pesan'){ return o.ts || (o.tgl?dateMs(o.tgl):0); } return o.tgl?dateMs(o.tgl):(o.ts||0); }
@@ -147,11 +148,12 @@
     try{ allVou = await window.OmaOpa.listUsedVouchers(oArg); }catch(e){ allVou=[]; }
     try{ var ords = await window.OmaOpa.listOrders(2000); allOrd=(ords||[]).filter(function(o){ return (o.status||'baru')==='approved'; }); }catch(e){ allOrd=[]; }
     if(!info.admin){ allOrd=allOrd.filter(function(o){ return (o.outlet||'')===(info.outlet||''); }); }
+    if(!Object.keys(OUTLET_AREA).length){ try{ var outs=await window.OmaOpa.listOutlets(); (outs||[]).forEach(function(o){ if(o&&o.name) OUTLET_AREA[o.name]=o.area||''; }); }catch(e){} }
     if(info.admin){
       var os=document.getElementById('outSel'); if(os){
         var set={}; allTxn.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allVou.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allOrd.forEach(function(r){ if(r.outlet) set[r.outlet]=1; });
         var keys=Object.keys(set).sort(); var cur=os.value;
-        var meta=keys.filter(isMetavest), kron=keys.filter(function(k){return !isMetavest(k);});
+        var kron=keys.filter(isKronggahan), meta=keys.filter(function(k){return !isKronggahan(k);});
         function opt(k){ return '<option value="'+esc(k)+'">'+esc(k)+'</option>'; }
         os.innerHTML='<option value="">🟡 Semua outlet (All)</option>'
           +'<option value="__metavest">🏢 All Metavest</option>'
@@ -170,12 +172,15 @@
     var outlet = info.admin ? (document.getElementById('outSel')?document.getElementById('outSel').value:'') : (info.outlet||'');
     return {from:from,to:to,outlet:outlet};
   }
-  var METAVEST_KEYS=['umy','jakal','uii','nusa indah','godean','tajem'];
-  function isMetavest(name){ name=(name||'').toLowerCase(); return METAVEST_KEYS.some(function(k){return name.indexOf(k)>=0;}); }
+  var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal','uii']; // 5 outlet Yogya yang TETAP Metavest
+  function isYogya(name){ return String(OUTLET_AREA[name]||'').toLowerCase().indexOf('yogya')>=0; }
+  function is5(name){ name=(name||'').toLowerCase(); return KRON_EXCEPT.some(function(k){return name.indexOf(k)>=0;}); }
+  function isKronggahan(name){ return isYogya(name) && !is5(name); } // outlet Yogya selain 5
+  function isMetavest(name){ return !isKronggahan(name); }            // semua selain Kronggahan
   function outletOk(rowOutlet, sel){
     if(!sel) return true;
     if(sel==='__metavest') return isMetavest(rowOutlet);
-    if(sel==='__kronggahan') return !isMetavest(rowOutlet);
+    if(sel==='__kronggahan') return isKronggahan(rowOutlet);
     return rowOutlet===sel;
   }
   function filterRows(rows){
