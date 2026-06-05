@@ -151,7 +151,13 @@
       var os=document.getElementById('outSel'); if(os){
         var set={}; allTxn.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allVou.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allOrd.forEach(function(r){ if(r.outlet) set[r.outlet]=1; });
         var keys=Object.keys(set).sort(); var cur=os.value;
-        os.innerHTML='<option value="">Semua outlet</option>'+keys.map(function(k){return '<option value="'+esc(k)+'">'+esc(k)+'</option>';}).join('');
+        var meta=keys.filter(isMetavest), kron=keys.filter(function(k){return !isMetavest(k);});
+        function opt(k){ return '<option value="'+esc(k)+'">'+esc(k)+'</option>'; }
+        os.innerHTML='<option value="">🟡 Semua outlet (All)</option>'
+          +'<option value="__metavest">🏢 All Metavest</option>'
+          +'<option value="__kronggahan">🏢 All Kronggahan</option>'
+          +(meta.length?('<optgroup label="— Metavest —">'+meta.map(opt).join('')+'</optgroup>'):'')
+          +(kron.length?('<optgroup label="— Kronggahan —">'+kron.map(opt).join('')+'</optgroup>'):'');
         os.value=cur;
       }
     }
@@ -164,9 +170,17 @@
     var outlet = info.admin ? (document.getElementById('outSel')?document.getElementById('outSel').value:'') : (info.outlet||'');
     return {from:from,to:to,outlet:outlet};
   }
+  var METAVEST_KEYS=['umy','jakal','uii','nusa indah','godean','tajem'];
+  function isMetavest(name){ name=(name||'').toLowerCase(); return METAVEST_KEYS.some(function(k){return name.indexOf(k)>=0;}); }
+  function outletOk(rowOutlet, sel){
+    if(!sel) return true;
+    if(sel==='__metavest') return isMetavest(rowOutlet);
+    if(sel==='__kronggahan') return !isMetavest(rowOutlet);
+    return rowOutlet===sel;
+  }
   function filterRows(rows){
     var r=curRange();
-    return rows.filter(function(x){ return x.ts>=r.from && x.ts<=r.to && (!r.outlet || x.outlet===r.outlet); });
+    return rows.filter(function(x){ return x.ts>=r.from && x.ts<=r.to && outletOk(x.outlet, r.outlet); });
   }
 
   function emptyBox(extra,st){
@@ -212,7 +226,7 @@
   }
   function filterOrders(){
     var r=curRange();
-    return allOrd.filter(function(o){ var ms=ordMs(o); return ms>=r.from && ms<=r.to && (!r.outlet || o.outlet===r.outlet); });
+    return allOrd.filter(function(o){ var ms=ordMs(o); return ms>=r.from && ms<=r.to && outletOk(o.outlet, r.outlet); });
   }
   function renderOrd(body){
     var rows=filterOrders(); var st=view.ord;
