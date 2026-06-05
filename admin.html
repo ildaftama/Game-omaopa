@@ -85,12 +85,13 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=62"></script>
+<script type="module" src="core-omaopa.js?v=71"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
   var tab='home', busy=false, segFilter=null, canEdit=false;
   var MEMBERS=null, TXN=null; // cache
+  var memStack=[null], memPage=0; // paginasi member (cursor)
   var curOf='baru', curOrders=[], OUTLETS_CACHE=[];
   var PAL=['#FACC1A','#E0915B','#7CC9B5','#C98A4B','#88B0E0','#F4A6B0','#9a8b78','#B7D77A','#caa6e0'];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
@@ -268,11 +269,36 @@
       catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
       busy=false;
     };
-    document.getElementById('mfind').onclick=function(){ segFilter=null; doFind(document.getElementById('mq').value.trim()); };
-    document.getElementById('mq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ segFilter=null; doFind(e.target.value.trim()); } });
+    document.getElementById('mfind').onclick=function(){ memSearch(document.getElementById('mq').value); };
+    document.getElementById('mq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ memSearch(e.target.value); } });
     document.getElementById('vfind').onclick=function(){ doVoucher(document.getElementById('vq').value.trim()); };
     if(seg){ var clr=document.getElementById('segClr'); if(clr) clr.onclick=function(){ segFilter=null; render(); }; showSegment(seg); }
-    else doFind('');
+    else { memReset(); loadMemberPage(); }
+  }
+  function memReset(){ memStack=[null]; memPage=0; }
+  function memSearch(q){ segFilter=null; q=(q||'').trim(); if(q){ doFind(q); } else { memReset(); loadMemberPage(); } }
+  async function loadMemberPage(){
+    var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
+    var after=memStack[memPage]||null;
+    var r; try{ r=await O.listMembersPage(100, after); }catch(e){ r={rows:[],lastDoc:null,hasMore:false}; }
+    if(r.hasMore && r.lastDoc && !memStack[memPage+1]) memStack[memPage+1]=r.lastDoc;
+    renderMemberPage(box, r);
+  }
+  function renderMemberPage(box, r){
+    var arr=(r.rows||[]).slice().sort(function(a,b){return b.points-a.points;});
+    if(!arr.length){ box.innerHTML='<div class="res warn">'+(memPage>0?'Tidak ada member lagi.':'Belum ada member.')+'</div>'
+      +(memPage>0?'<div style="margin-top:8px"><button class="btn sm sec" id="mPrev" style="width:auto;margin:0">‹ Sebelumnya</button></div>':'');
+      var pv0=box.querySelector('#mPrev'); if(pv0) pv0.onclick=function(){ if(memPage>0){ memPage--; loadMemberPage(); } }; return; }
+    var rows=arr.map(function(m){ return '<tr data-uid="'+esc(m.uid)+'"><td>'+esc(m.name||'(tanpa nama)')+'<div class="sub">'+esc(m.phone||'-')+'</div></td><td>'+esc(m.age||'-')+'</td><td>'+esc((m.gender||'-').slice(0,1))+'</td><td class="pts">'+m.points+'</td></tr>'; }).join('');
+    var pager='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px">'
+      +'<button class="btn sm sec" id="mPrev" style="width:auto;margin:0"'+(memPage<=0?' disabled':'')+'>‹ Sebelumnya</button>'
+      +'<span class="muted" style="font-size:.78rem;font-weight:800">Halaman '+(memPage+1)+'</span>'
+      +'<button class="btn sm sec" id="mNext" style="width:auto;margin:0"'+(r.hasMore?'':' disabled')+'>Berikutnya ›</button></div>';
+    box.innerHTML='<div class="muted" style="margin-bottom:6px">Menampilkan '+arr.length+' member (100/halaman). Ketik nama/HP di atas untuk mencari satu member.</div>'
+      +'<table class="mt"><tr><th>Nama / HP</th><th>Umur</th><th>JK</th><th>Poin</th></tr>'+rows+'</table>'+pager;
+    box.querySelectorAll('tr[data-uid]').forEach(function(tr){ tr.onclick=function(){ openMember(tr.getAttribute('data-uid')); window.scrollTo({top:0,behavior:'smooth'}); }; });
+    var pv=box.querySelector('#mPrev'); if(pv) pv.onclick=function(){ if(memPage>0){ memPage--; loadMemberPage(); } };
+    var nx=box.querySelector('#mNext'); if(nx) nx.onclick=function(){ if(r.hasMore){ memPage++; loadMemberPage(); } };
   }
   function renderTable(box, arr, note){
     if(!arr.length){ box.innerHTML='<div class="res warn">Tidak ada member.</div>'; return; }

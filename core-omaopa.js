@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, addDoc, onSnapshot, increment, serverTimestamp,
-  runTransaction, collection, getDocs, query, orderBy, where, limit
+  runTransaction, collection, getDocs, query, orderBy, where, limit, startAfter, documentId
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -825,13 +825,13 @@ function renderRankList(list, key, emoji){
 async function openLeaderboard(){
   lbO.mount(); lbO.head.textContent='🏆 Peringkat Poin';
   lbO.body.innerHTML='<div class="lb-loading">Memuat peringkat…</div>'; lbO.bk.classList.add('show');
-  const list=await listPointLeaderboard(50);
+  const list=await listPointLeaderboard(10);
   lbO.body.innerHTML='<div class="oo-mini" style="margin:0 0 10px">Siapa raja poin Oma Opa? Kumpulkan poin biar naik peringkat!</div>'+renderRankList(list,'points','🪙');
 }
 async function openScoreboard(){
   sbO.mount(); sbO.head.textContent='🏆 Raja Skor Menopping';
   sbO.body.innerHTML='<div class="lb-loading">Memuat peringkat…</div>'; sbO.bk.classList.add('show');
-  const list=await listScoreLeaderboard(50);
+  const list=await listScoreLeaderboard(10);
   sbO.body.innerHTML='<div class="oo-mini" style="margin:0 0 10px">Skor tertinggi para pemain. Pecahkan rekornya!</div>'+renderRankList(list,'score','⭐');
 }
 async function openHistory(){
@@ -867,6 +867,17 @@ async function listMembers(qstr, n){
   }catch(e){ return []; }
 }
 async function getMemberScore(uid){ try{ const s=await getDoc(doc(db,'scores',(uid||'').trim())); return s.exists()?(s.data().score||0):0; }catch(e){ return 0; } }
+async function listMembersPage(n, after){
+  n=n||100;
+  try{
+    const base=collection(db,'users');
+    const q = after ? query(base, orderBy(documentId()), startAfter(after), limit(n))
+                    : query(base, orderBy(documentId()), limit(n));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({uid:d.id,name:x.name||'',phone:x.phone||'',points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||''}); });
+    return { rows:arr, lastDoc: snap.docs.length? snap.docs[snap.docs.length-1] : null, hasMore: snap.docs.length===n };
+  }catch(e){ return { rows:[], lastDoc:null, hasMore:false }; }
+}
 async function adminAdjustPoints(uid, delta, reason){
   uid=(uid||'').trim(); delta=Math.floor(Number(delta)||0);
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
@@ -1028,13 +1039,28 @@ async function listOrders(n){ n=n||1000;
   try{ const snap=await getDocs(query(collection(db,'orders'), orderBy('createdAt','desc'), limit(n))); const arr=[]; snap.forEach(d=>arr.push(row(d))); return arr;
   }catch(e){ try{ const snap=await getDocs(collection(db,'orders')); const arr=[]; snap.forEach(d=>arr.push(row(d))); arr.sort((a,b)=>b.ts-a.ts); return arr; }catch(e2){ return []; } }
 }
-async function setOrderStatus(id, status){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'orders',(id||'').trim()), { status:String(status||'baru'), updatedAt:serverTimestamp() },{merge:true}); }
-async function updateOrder(id, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; const data=Object.assign({updatedAt:serverTimestamp()}, patch||{}); if(data.total!=null) data.total=Math.round(Number(data.total)||0); await setDoc(doc(db,'orders',(id||'').trim()), data, {merge:true}); }
-async function deleteOrder(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'orders',(id||'').trim())); }
+function pushOrderRow(id, x, action){
+  const items=(x.items||[]).map(it=>((it.qty||0)+'x '+(it.name||it.id||''))).join('; ');
+  pushToSheet({ type:'pesanan', action:action||'upsert', id:id, waktu:new Date().toISOString(),
+    tgl_ambil:x.tgl||'', jam:x.jam||'', outlet:x.outlet||'', nama:x.nama||'', telp:("'"+(x.telp||'')),
+    items:items, pcs:x.count||0, total:x.total||0, status:x.status||'' });
+}
+async function setOrderStatus(id, status){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim();
+  await setDoc(doc(db,'orders',id), { status:String(status||'baru'), updatedAt:serverTimestamp() },{merge:true});
+  try{ if(String(status)==='approved'){ const s=await getDoc(doc(db,'orders',id)); if(s.exists()) pushOrderRow(id, s.data(), 'upsert'); }
+       else { pushToSheet({ type:'pesanan', action:'delete', id:id }); } }catch(e){}
+}
+async function updateOrder(id, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); const data=Object.assign({updatedAt:serverTimestamp()}, patch||{}); if(data.total!=null) data.total=Math.round(Number(data.total)||0); await setDoc(doc(db,'orders',id), data, {merge:true});
+  try{ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const d=s.data(); if((d.status||'baru')==='approved') pushOrderRow(id, d, 'upsert'); } }catch(e){}
+}
+async function deleteOrder(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); await deleteDoc(doc(db,'orders',id));
+  try{ pushToSheet({ type:'pesanan', action:'delete', id:id }); }catch(e){}
+}
 async function adminClearOrders(){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   const snap=await getDocs(collection(db,'orders')); let n=0;
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'orders',ds.id)); n++; }catch(e){} }
+  try{ pushToSheet({ type:'pesanan', action:'clear' }); }catch(e){}
   return { count:n };
 }
 
@@ -1055,7 +1081,7 @@ window.OmaOpa = {
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers,
-  isAdmin, isSuper, getMemberByPhone, listMembers, getMemberScore,
+  isAdmin, isSuper, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
   listStaff, addStaff, updateStaff, removeStaff,
