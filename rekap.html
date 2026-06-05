@@ -56,11 +56,14 @@
   <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=48"></script>
+<script type="module" src="core-omaopa.js?v=62"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
-  var info=null, tab='txn', allTxn=[], allVou=[];
+  var info=null, tab='txn', allTxn=[], allVou=[], allOrd=[], ordGroup='harian';
+  var BLN=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  function ordMs(o){ return o.ts || (o.tgl ? (function(){ var t=new Date(o.tgl+'T00:00:00').getTime(); return isNaN(t)?0:t; })() : 0); }
+  function ordPcs(o){ return o.count || (o.items||[]).reduce(function(a,it){return a+(it.qty||0);},0); }
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
@@ -74,6 +77,7 @@
     panel.innerHTML='<div class="muted">Memeriksa akses…</div>';
     try{ info=await window.OmaOpa.getStaffInfo(); }catch(e){ info=null; }
     if(!info){ roleBadge.textContent='—'; panel.innerHTML='<div class="muted" style="color:#C0392B;font-weight:900">Akun ini bukan staff.</div><div class="uid"></div><button class="btn sec" id="o" style="margin-top:10px">Keluar</button>'; document.getElementById('o').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} }; return; }
+    info.admin = !!(info.admin || info.super);
     roleBadge.textContent = info.admin ? 'ADMIN' : 'STAFF';
     roleBadge.className = 'badge'+(info.admin?' adm':'');
     renderShell();
@@ -90,7 +94,7 @@
       +   '<div><label>Sampai tanggal</label><input type="date" id="to" value="'+ymd(to)+'"></div>'
       +   (info.admin?'<div class="full"><label>Outlet</label><select id="outSel"><option value="">Semua outlet</option></select></div>':'')
       + '</div>'
-      + '<div class="tabs" style="margin-top:12px"><div class="tab on" data-t="txn">Transaksi Poin</div><div class="tab" data-t="vou">Voucher Terpakai</div></div>'
+      + '<div class="tabs" style="margin-top:12px;flex-wrap:wrap"><div class="tab on" data-t="txn">Transaksi Poin</div><div class="tab" data-t="vou">Voucher Terpakai</div><div class="tab" data-t="ord">Pesanan Web</div></div>'
       + '<div id="body"></div>'
       + '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="reload">↻ Muat ulang</button><button class="btn sec" id="csv">⬇ Export CSV</button></div>';
     document.getElementById('from').addEventListener('change',render);
@@ -106,9 +110,11 @@
     var oArg = info.admin ? null : (info.outlet||'');
     try{ allTxn = await window.OmaOpa.listTransactions(oArg); }catch(e){ allTxn=[]; }
     try{ allVou = await window.OmaOpa.listUsedVouchers(oArg); }catch(e){ allVou=[]; }
+    try{ var ords = await window.OmaOpa.listOrders(2000); allOrd=(ords||[]).filter(function(o){ return (o.status||'baru')==='approved'; }); }catch(e){ allOrd=[]; }
+    if(!info.admin){ allOrd=allOrd.filter(function(o){ return (o.outlet||'')===(info.outlet||''); }); }
     if(info.admin){
       var os=document.getElementById('outSel'); if(os){
-        var set={}; allTxn.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allVou.forEach(function(r){ if(r.outlet) set[r.outlet]=1; });
+        var set={}; allTxn.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allVou.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allOrd.forEach(function(r){ if(r.outlet) set[r.outlet]=1; });
         var keys=Object.keys(set).sort(); var cur=os.value;
         os.innerHTML='<option value="">Semua outlet</option>'+keys.map(function(k){return '<option value="'+esc(k)+'">'+esc(k)+'</option>';}).join('');
         os.value=cur;
@@ -142,7 +148,7 @@
         + rows.map(function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.name||x.uid.slice(0,6))+'</td><td class="right">'+rp(x.nominal)+'</td><td class="right">+'+x.points+'</td></tr>'; }).join('')
         + '</tbody></table></div>';
       body.innerHTML=head+t;
-    } else {
+    } else if(tab==='vou'){
       var rows2=filterRows(allVou);
       var head2='<div class="stats"><div class="stat"><div class="v">'+rows2.length+'</div><div class="k">VOUCHER TERPAKAI</div></div></div>';
       if(!rows2.length){ body.innerHTML=head2+'<div class="empty">Belum ada voucher terpakai pada rentang ini.</div>'; return; }
@@ -150,9 +156,62 @@
         + rows2.map(function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.code)+'</td><td>'+esc(x.title||'-')+'</td><td>'+esc(x.name||'-')+'</td></tr>'; }).join('')
         + '</tbody></table></div>';
       body.innerHTML=head2+t2;
+    } else {
+      renderOrd(body);
     }
   }
 
+  function filterOrders(){
+    var r=curRange();
+    return allOrd.filter(function(o){ var ms=ordMs(o); return ms>=r.from && ms<=r.to && (!r.outlet || o.outlet===r.outlet); });
+  }
+  function renderOrd(body){
+    var rows=filterOrders();
+    var omzet=rows.reduce(function(s,o){return s+(o.total||0);},0);
+    var pcs=rows.reduce(function(s,o){return s+ordPcs(o);},0);
+    var head='<div class="stats">'
+      +'<div class="stat"><div class="v">'+rows.length+'</div><div class="k">ORDER DEAL</div></div>'
+      +'<div class="stat"><div class="v">'+rp(omzet)+'</div><div class="k">OMZET</div></div>'
+      +'<div class="stat"><div class="v">'+pcs+'</div><div class="k">TOTAL PCS</div></div></div>';
+    var G=[['harian','Per hari'],['bulanan','Per bulan'],['outlet','Per outlet'],['rincian','Rincian']];
+    var gbtn='<div class="tabs" style="margin-bottom:10px">'+G.map(function(g){ return '<div class="tab'+(ordGroup===g[0]?' on':'')+'" data-g="'+g[0]+'">'+g[1]+'</div>'; }).join('')+'</div>';
+    var note='<div class="muted" style="font-size:.72rem;margin-bottom:8px">Tanggal = <b>tanggal order masuk</b> (yang sudah di-<b>approve</b>). Kolom "Ambil" menunjukkan tanggal pengambilan.</div>';
+    if(!rows.length){ body.innerHTML=head+gbtn+note+'<div class="empty">Belum ada pesanan deal pada rentang ini.</div>'; wireG(body); return; }
+    var tbl='';
+    if(ordGroup==='rincian'){
+      var sorted=rows.slice().sort(function(a,b){ return ordMs(b)-ordMs(a); });
+      tbl='<div class="scroll"><table class="tbl"><thead><tr><th>Tgl order</th><th>Ambil</th><th>Outlet</th><th>Nama</th><th>Item</th><th class="right">Total</th></tr></thead><tbody>'
+        + sorted.map(function(o){
+          var ab=o.tgl?(function(){ var d=new Date(o.tgl+'T00:00:00'); return isNaN(d.getTime())?o.tgl:(d.getDate()+' '+BLN[d.getMonth()]); })():'-';
+          var jam=o.jam?(' '+o.jam):'';
+          var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join(', ');
+          return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(ab+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td></tr>';
+        }).join('')
+        + '</tbody></table></div>';
+    } else {
+      var map={};
+      rows.forEach(function(o){
+        var k,label;
+        if(ordGroup==='bulanan'){ var d=new Date(ordMs(o)); k=d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1); label=BLN[d.getMonth()]+' '+d.getFullYear(); }
+        else if(ordGroup==='outlet'){ k=o.outlet||'(lainnya)'; label=k.replace(/^Oma Opa Cakery\s*/i,''); }
+        else { var dd=new Date(ordMs(o)); k=ymd(dd); label=dd.getDate()+' '+BLN[dd.getMonth()]+' '+dd.getFullYear(); }
+        if(!map[k]) map[k]={k:k,label:label,count:0,pcs:0,omzet:0};
+        map[k].count++; map[k].pcs+=ordPcs(o); map[k].omzet+=(o.total||0);
+      });
+      var arr=Object.keys(map).map(function(k){return map[k];});
+      if(ordGroup==='outlet') arr.sort(function(a,b){return b.omzet-a.omzet;}); else arr.sort(function(a,b){return a.k<b.k?1:-1;});
+      var colH=ordGroup==='outlet'?'Outlet':(ordGroup==='bulanan'?'Bulan':'Tanggal');
+      tbl='<div class="scroll"><table class="tbl"><thead><tr><th>'+colH+'</th><th class="right">Order</th><th class="right">Pcs</th><th class="right">Omzet</th></tr></thead><tbody>'
+        + arr.map(function(g){ return '<tr><td>'+esc(g.label)+'</td><td class="right">'+g.count+'</td><td class="right">'+g.pcs+'</td><td class="right">'+rp(g.omzet)+'</td></tr>'; }).join('')
+        + '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+pcs+'</td><td class="right">'+rp(omzet)+'</td></tr>'
+        + '</tbody></table></div>';
+    }
+    body.innerHTML=head+gbtn+note+tbl;
+    wireG(body);
+  }
+  function wireG(body){
+    body.querySelectorAll('[data-g]').forEach(function(t){ t.onclick=function(){ ordGroup=t.getAttribute('data-g'); render(); }; });
+  }
   function csvCell(s){ s=String(s==null?'':s); return '"'+s.replace(/"/g,'""')+'"'; }
   function exportCSV(){
     var lines=[], fname;
@@ -161,11 +220,31 @@
       lines.push(['Waktu','Outlet','Member','UID','Nominal','Poin'].map(csvCell).join(','));
       rows.forEach(function(x){ lines.push([fmt(x.ts),x.outlet,x.name,x.uid,x.nominal,x.points].map(csvCell).join(',')); });
       fname='rekap-transaksi.csv';
-    } else {
+    } else if(tab==='vou'){
       var rows2=filterRows(allVou);
       lines.push(['Waktu','Outlet','Kode','Voucher','Member','UID'].map(csvCell).join(','));
       rows2.forEach(function(x){ lines.push([fmt(x.ts),x.outlet,x.code,x.title,x.name,x.uid].map(csvCell).join(',')); });
       fname='rekap-voucher.csv';
+    } else {
+      var rows3=filterOrders();
+      if(ordGroup==='rincian'){
+        var sorted=rows3.slice().sort(function(a,b){ return ordMs(b)-ordMs(a); });
+        lines.push(['Tgl order','Tgl ambil','Jam','Outlet','Nama','Telp','Item','Pcs','Total'].map(csvCell).join(','));
+        sorted.forEach(function(o){ var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+(it.name||it.id);}).join('; '); lines.push([fmt(o.ts),o.tgl||'',o.jam||'',o.outlet||'',o.nama||'',o.telp||'',itlbl,ordPcs(o),o.total||0].map(csvCell).join(',')); });
+        fname='rekap-pesanan-rincian.csv';
+      } else {
+        var map={};
+        rows3.forEach(function(o){ var k,label;
+          if(ordGroup==='bulanan'){ var d=new Date(ordMs(o)); k=d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1); label=k; }
+          else if(ordGroup==='outlet'){ k=o.outlet||'(lainnya)'; label=k; }
+          else { k=ymd(new Date(ordMs(o))); label=k; }
+          if(!map[k]) map[k]={label:label,count:0,pcs:0,omzet:0}; map[k].count++; map[k].pcs+=ordPcs(o); map[k].omzet+=(o.total||0);
+        });
+        var hdr=ordGroup==='outlet'?'Outlet':(ordGroup==='bulanan'?'Bulan':'Tanggal');
+        lines.push([hdr,'Jml order','Pcs','Omzet'].map(csvCell).join(','));
+        Object.keys(map).sort().forEach(function(k){ var g=map[k]; lines.push([g.label,g.count,g.pcs,g.omzet].map(csvCell).join(',')); });
+        fname='rekap-pesanan-'+ordGroup+'.csv';
+      }
     }
     var blob=new Blob(["\ufeff"+lines.join("\r\n")], {type:'text/csv;charset=utf-8;'});
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
