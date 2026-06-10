@@ -127,10 +127,10 @@ function addPoints(n, source){
 }
 
 // ---------- auth flow ----------
-let staffFlag=false;
+let staffFlag=false, refCodeChecked=false;
 onAuthStateChanged(auth, async (u)=>{
   if(unsubDoc){ unsubDoc(); unsubDoc=null; }
-  mergedOnce = false;
+  mergedOnce = false; refCodeChecked = false;
   user = u || null;
   staffFlag = false;
   if(user){
@@ -145,6 +145,7 @@ onAuthStateChanged(auth, async (u)=>{
       points = (typeof data.points==='number') ? data.points : 0;
       emit();
       if(d.exists()) mirrorLeaderboard(data.name, points);
+      if(d.exists() && !staffFlag && !data.refCode && !refCodeChecked){ refCodeChecked=true; ensureRefCode().catch(()=>{}); }
     }, ()=>{});
   } else {
     profile = null;
@@ -166,7 +167,7 @@ async function loginPhonePin(phone, pin){
   await ensureDoc();
 }
 async function registerPhonePin(data){
-  const { phone, pin, name, gender, age, occupation, consent } = data;
+  const { phone, pin, name, gender, age, occupation, consent, ref } = data;
   if(!name || name.trim().length<2) throw {message:'Isi nama dulu ya.'};
   if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
   if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
@@ -177,7 +178,14 @@ async function registerPhonePin(data){
   const res = await createUserWithEmailAndPassword(auth, phoneEmail(phone), pin);
   user = res.user;
   try{ await updateProfile(user,{displayName:name.trim()}); }catch(e){}
-  await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, occupation, consent:true, provider:'phone', profileComplete:true });
+  // cek kode referral (opsional) -> uid pemberi
+  let referredBy='';
+  const rc=(ref||'').trim().toUpperCase();
+  if(rc){ try{ const rm=await getDoc(doc(db,'refcodes',rc)); if(rm.exists()){ const ru=(rm.data().uid||''); if(ru && ru!==user.uid) referredBy=ru; } }catch(e){} }
+  // buat kode referral unik untuk akun ini
+  const myCode=await ensureUniqueRefCode();
+  await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, occupation, consent:true, provider:'phone', profileComplete:true, refCode:myCode, referredBy:referredBy, refRewarded:false });
+  try{ await setDoc(doc(db,'refcodes',myCode), { uid:user.uid, name:name.trim(), createdAt:serverTimestamp() }); }catch(e){}
   pushToSheet({
     type: 'member',
     waktu: new Date().toISOString(),
@@ -227,6 +235,11 @@ style.textContent = `
 .oo-av{width:64px;height:64px;border-radius:50%;background:${K};color:${CO};font-weight:900;font-size:1.6rem;display:flex;align-items:center;justify-content:center;margin:4px auto 8px}
 .oo-pts{display:inline-flex;gap:6px;align-items:center;background:#fff;border:2px solid #F1E4CC;border-radius:999px;padding:6px 14px;font-weight:900;color:#7A5A12;margin:6px 0 14px}
 .oo-out{width:100%;border:2px solid #E7D8BE;background:#fff;color:#C0392B;font-weight:800;border-radius:13px;padding:11px;cursor:pointer;font-family:inherit}
+.oo-ref{background:#fff;border:2px dashed ${KD};border-radius:14px;padding:10px 12px;margin:2px 0 9px;font-size:.72rem;font-weight:800;color:#8a6a3a}
+.oo-ref b{display:block;font-size:1.4rem;letter-spacing:3px;color:${CO};margin:3px 0 5px;font-family:'Fredoka','Nunito',sans-serif}
+.oo-share{width:100%;border:2px solid ${KD};background:${K};color:${CO};font-weight:900;border-radius:13px;padding:11px;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.oo-share:active{transform:translateY(1px)}
+.oo-tc{font-size:.64rem;color:#b59a7e;line-height:1.45;margin-top:8px;text-align:left}
 `;
 document.head.appendChild(style);
 
@@ -242,19 +255,31 @@ if(document.body) mount(); else document.addEventListener('DOMContentLoaded', mo
 let tab='masuk';
 function openLogin(){ mount(); renderOverlay(); bk.classList.add('show'); }
 function closeLogin(){ bk.classList.remove('show'); }
+function shareRef(code){
+  code=(code||'').trim();
+  if(!code){ try{ alert('Kode referral lagi disiapkan, coba sebentar lagi ya.'); }catch(e){} return; }
+  const txt='Yuk daftar member Oma Opa Cakery & pakai kode referralku: '+code+' — kita berdua dapat '+REF_WELCOME+' poin pas belanja pertama! Daftar di https://omaopa.fun';
+  try{ if(navigator.share){ navigator.share({ title:'Oma Opa Cakery', text:txt }); return; } }catch(e){}
+  try{ window.open('https://wa.me/?text='+encodeURIComponent(txt), '_blank'); }catch(e){}
+}
 
 function renderOverlay(){
   const body = bk.querySelector('#ooBody'); if(!body) return;
   if(user){
     const nm = (profile&&profile.name)||user.displayName||'Sahabat Oma Opa';
+    const myCode = (profile&&profile.refCode)||'';
     body.innerHTML = `<div class="oo-prof">
       <div class="oo-av">${(nm[0]||'O').toUpperCase()}</div>
       <div class="oo-h" style="margin-bottom:0">Hai, ${nm}!</div>
       <div class="oo-pts">🪙 ${points} poin</div>
+      <div class="oo-ref">Kode referral kamu<b id="ooRefCode">${myCode||'…'}</b>Ajak teman daftar pakai kodemu — kalian <b style="display:inline;font-size:.72rem;letter-spacing:0;color:#8a6a3a">berdua dapat ${REF_REWARD} poin</b> pas belanja pertamanya 🎉</div>
+      <button class="oo-share" id="ooRefShare">📲 Bagikan kode referral</button>
       <button class="oo-out" id="ooOut">Keluar</button>
-      <div class="oo-mini">Poinmu tersimpan di akun & bisa dipakai di semua game.</div>
+      <div class="oo-tc">Jumlah poin & ketentuan reward sepenuhnya kebijakan Oma Opa Cakery dan dapat berubah sewaktu-waktu. Poin dari kecurangan atau pemanfaatan celah dapat dibatalkan & akun ditangguhkan.</div>
     </div>`;
     body.querySelector('#ooOut').onclick = async ()=>{ try{ await doSignOut(); }catch(e){} closeLogin(); };
+    const sb=body.querySelector('#ooRefShare'); if(sb) sb.onclick=()=>shareRef((profile&&profile.refCode)||'');
+    if(!myCode){ ensureRefCode().then(function(c){ var el=body.querySelector('#ooRefCode'); if(el && c) el.textContent=c; }).catch(()=>{}); }
     return;
   }
   body.innerHTML = `
@@ -303,7 +328,9 @@ function renderForm(){
       <label class="oo-l">Pekerjaan</label>
       <select class="oo-se" id="rJob"><option value="">—</option><option>PNS</option><option>Pelajar</option><option>Mahasiswa</option><option>Karyawan swasta</option><option>Pengusaha</option><option>Ibu Rumah Tangga</option><option>Lainnya</option></select>
       <input class="oo-in" id="rJobOther" placeholder="Tulis pekerjaanmu" style="display:none">
-      <label class="oo-ck"><input type="checkbox" id="rConsent"> Saya setuju data saya digunakan sebagai member dan riset customer.</label>
+      <label class="oo-l">Kode referral (opsional)</label>
+      <input class="oo-in" id="rRef" placeholder="Punya kode teman? isi di sini" style="text-transform:uppercase">
+      <label class="oo-ck"><input type="checkbox" id="rConsent"> Saya setuju data saya digunakan sebagai member & riset customer, serta menyetujui <b>Ketentuan Poin &amp; Reward</b> Oma Opa.</label>
       <button class="oo-btn" id="rGo">Daftar</button>
     </div>`;
     (function(){ var js=f.querySelector('#rJob'), jo=f.querySelector('#rJobOther'); if(js&&jo) js.onchange=function(){ jo.style.display=(js.value==='Lainnya')?'block':'none'; }; })();
@@ -314,7 +341,7 @@ function renderForm(){
         await registerPhonePin({
           name:f.querySelector('#rName').value, phone:f.querySelector('#rPhone').value, pin:f.querySelector('#rPin').value,
           gender:f.querySelector('#rGender').value, age:f.querySelector('#rAge').value, occupation:occ,
-          consent:f.querySelector('#rConsent').checked
+          consent:f.querySelector('#rConsent').checked, ref:f.querySelector('#rRef').value
         });
         closeLogin();
       }catch(e){ setErr(errMsg(e)); b.disabled=false; b.textContent='Daftar'; }
@@ -464,7 +491,79 @@ async function awardPoints(uid, nominal){
     tx.set(tref,{ uid:uid, name:mname, nominal:nominal, points:pts, outlet:outlet, staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
   });
   pushToSheet({ type:'txn', waktu:new Date().toISOString(), outlet:outlet, nama:mname, uid:uid, nominal:nominal, poin:pts });
+  try{ await maybePayReferral(uid); }catch(e){}
   return { points:pts, newTotal:newTotal, outlet:outlet };
+}
+
+// ---------- referral & poin pesanan ----------
+const REF_REWARD = 25;    // poin untuk pemberi kode tiap referral berhasil
+const REF_WELCOME = 25;   // poin welcome untuk pendaftar baru
+const REF_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // tanpa O/0 & I/1
+function genRefCode(){ var s=''; for(var i=0;i<6;i++) s+=REF_ABC.charAt(Math.floor(Math.random()*REF_ABC.length)); return s; }
+async function ensureUniqueRefCode(){
+  for(var i=0;i<6;i++){ var c=genRefCode(); try{ const s=await getDoc(doc(db,'refcodes',c)); if(!s.exists()) return c; }catch(e){ return c; } }
+  return genRefCode();
+}
+async function ensureRefCode(){
+  if(!user) return '';
+  try{
+    const uref=doc(db,'users',user.uid); const s=await getDoc(uref);
+    if(s.exists() && s.data().refCode) return s.data().refCode;
+    const code=await ensureUniqueRefCode();
+    await setDoc(uref,{ refCode:code, updatedAt:serverTimestamp() },{merge:true});
+    try{ await setDoc(doc(db,'refcodes',code),{ uid:user.uid, name:(s.exists()?(s.data().name||''):''), createdAt:serverTimestamp() }); }catch(e){}
+    return code;
+  }catch(e){ return ''; }
+}
+// kredit poin ke member (dipakai approve pesanan & referral). Dipanggil dari konteks staff/admin.
+async function creditMember(uid, delta, info){
+  uid=(uid||'').trim(); delta=Math.floor(Number(delta)||0); info=info||{};
+  if(!uid || !delta) return null;
+  const nom=Math.floor(Number(info.nominal)||0), out=info.outlet||'', kind=info.kind||'adjust';
+  const uref=doc(db,'users',uid); let newTotal=0, mname='';
+  try{
+    await runTransaction(db, async(tx)=>{
+      const us=await tx.get(uref); if(!us.exists()) return;
+      const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||'';
+      newTotal=Math.max(0, cur+delta);
+      tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
+      tx.set(doc(db,'leaderboard',uid), { name:mname, points:newTotal, updatedAt:serverTimestamp() },{merge:true});
+      const tref=doc(collection(db,'transactions'));
+      tx.set(tref,{ uid:uid, name:mname, nominal:nom, points:delta, outlet:out, kind:kind, staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
+    });
+    pushToSheet({ type:'txn', waktu:new Date().toISOString(), outlet:out, nama:mname, uid:uid, nominal:nom, poin:delta });
+  }catch(e){}
+  return { newTotal:newTotal, name:mname };
+}
+// bayar bonus referral (1x per akun) saat belanja pertama si pendaftar
+async function maybePayReferral(uid){
+  uid=(uid||'').trim(); if(!uid) return;
+  let refBy='';
+  try{
+    const uref=doc(db,'users',uid);
+    await runTransaction(db, async(tx)=>{                 // klaim atomik biar gak dobel
+      const us=await tx.get(uref); if(!us.exists()){ refBy=''; return; }
+      const d=us.data(); const rb=(d.referredBy||'').trim();
+      if(!rb || d.refRewarded===true || rb===uid){ refBy=''; return; }
+      refBy=rb; tx.set(uref,{ refRewarded:true, updatedAt:serverTimestamp() },{merge:true});
+    });
+    if(!refBy) return;
+    await creditMember(uid, REF_WELCOME, { kind:'referral', nominal:0, outlet:'Referral (welcome)' });
+    await creditMember(refBy, REF_REWARD, { kind:'referral', nominal:0, outlet:'Referral' });
+  }catch(e){}
+}
+// kasih poin saat pesanan di-approve (sekali saja), lalu cek referral
+async function awardOrderPoints(id, d){
+  try{
+    if(!d || d.pointsAwarded===true) return;
+    const total=Math.floor(Number(d.total)||0);
+    const pts=Math.floor(total/EARN_PER_POINT);
+    let uid=(d.uid||'').trim();
+    if(!uid){ try{ const m=await getMemberByPhone(d.telp||''); if(m) uid=m.uid; }catch(e){} }
+    await setDoc(doc(db,'orders',id), { pointsAwarded:true, awardedUid:uid||'', awardedPts:(uid?pts:0), updatedAt:serverTimestamp() }, {merge:true});
+    if(uid && pts>0) await creditMember(uid, pts, { kind:'order', nominal:total, outlet:d.outlet||'Pesanan web' });
+    if(uid) await maybePayReferral(uid);
+  }catch(e){}
 }
 async function getStaffInfo(){
   if(!user) return null;
@@ -634,7 +733,7 @@ function renderRewards(){
         +`${remain!==null?`<div class="rw-stock">${stockTxt}</div><div class="rw-bar"><span style="width:${pct}%"></span></div>`:''}</div>`
         +`<div class="rw-act"><div class="rw-c">${rw.cost} poin</div>`
         +`<button class="rw-btn" data-rid="${rw.id}" ${dis}>${label}</button></div></div>`;
-    }).join('') + `<div class="oo-mini">Stok terbatas — siapa cepat dia dapat! Tunjukkan kode/QR voucher ke kasir Oma Opa.</div>`;
+    }).join('') + `<div class="oo-mini">Stok terbatas — siapa cepat dia dapat! Tunjukkan kode/QR voucher ke kasir Oma Opa.</div><div class="oo-tc">Jumlah poin & ketentuan reward sepenuhnya kebijakan Oma Opa Cakery dan dapat berubah sewaktu-waktu. Poin dari kecurangan atau pemanfaatan celah dapat dibatalkan & akun ditangguhkan.</div>`;
   } else {
     body.innerHTML = `<div class="rw-empty">Memuat voucher…</div>`;
     listVouchers().then(list=>{
@@ -1056,7 +1155,7 @@ function pushOrderItems(id, x, action){
 }
 async function setOrderStatus(id, status){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim();
   await setDoc(doc(db,'orders',id), { status:String(status||'baru'), updatedAt:serverTimestamp() },{merge:true});
-  try{ if(String(status)==='approved'){ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ pushOrderRow(id, s.data(), 'upsert'); pushOrderItems(id, s.data(), 'replace'); } }
+  try{ if(String(status)==='approved'){ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const d=s.data(); pushOrderRow(id, d, 'upsert'); pushOrderItems(id, d, 'replace'); await awardOrderPoints(id, d); } }
        else { pushToSheet({ type:'pesanan', action:'delete', id:id }); pushOrderItems(id, null, 'delete'); } }catch(e){}
 }
 async function updateOrder(id, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); const data=Object.assign({updatedAt:serverTimestamp()}, patch||{}); if(data.total!=null) data.total=Math.round(Number(data.total)||0); await setDoc(doc(db,'orders',id), data, {merge:true});
