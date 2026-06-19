@@ -86,6 +86,9 @@
   .hero{position:relative;margin:14px 0 0;border-radius:22px;padding:18px 18px 16px;overflow:hidden;cursor:pointer;background:linear-gradient(145deg,var(--kuning-hi),var(--kuning) 58%,#FFB200);box-shadow:0 6px 0 var(--kuning-d),0 16px 26px -16px rgba(229,161,0,.9);color:var(--coklat);}
   .hero:active{transform:translateY(2px);}
   .hero .spr{position:absolute;width:13px;height:5px;border-radius:9px;opacity:.85;}
+  @keyframes ooDrift{0%{left:-8%;opacity:0}12%{opacity:var(--op0)}88%{opacity:var(--op0)}100%{left:108%;opacity:0}}
+  @keyframes ooBob{0%,100%{transform:translateY(0) rotate(var(--rot))}50%{transform:translateY(calc(var(--fy) * -1)) rotate(var(--rot))}}
+  @media(prefers-reduced-motion:reduce){.hero .spr{animation:none !important}}
   .hero .lbl{font-weight:900;font-size:.72rem;letter-spacing:1.4px;text-transform:uppercase;opacity:.72;position:relative;z-index:1;}
   .hero .big{font-family:'Fredoka';font-weight:700;font-size:3rem;line-height:.95;margin:1px 0 2px;position:relative;z-index:1;}
   .hero .big small{font-size:1rem;font-weight:600;opacity:.7;margin-left:5px;}
@@ -93,7 +96,7 @@
   .hero .hbar i{display:block;height:100%;width:0;border-radius:99px;background:var(--pop);transition:width .6s ease;}
   .hero .hhint{font-weight:800;font-size:.74rem;color:#6B3C1E;position:relative;z-index:1;flex:1;min-width:0;}
   .hero .hfoot{display:flex;align-items:center;gap:10px;margin-top:8px;position:relative;z-index:1;}
-  .hero .hcta{flex:0 0 auto;background:var(--coklat);color:#fff;font-family:'Fredoka';font-weight:600;font-size:.74rem;padding:7px 13px;border-radius:999px;white-space:nowrap;box-shadow:0 3px 0 rgba(0,0,0,.18);}
+  .hero .hcta{flex:0 0 auto;background:#f60909;color:#fff;font-family:'Fredoka';font-weight:600;font-size:.74rem;padding:7px 13px;border-radius:999px;white-space:nowrap;box-shadow:0 3px 0 #C40606;}
   .rw{display:flex;align-items:center;gap:12px;background:var(--merah);border-radius:16px;padding:12px 13px;margin-bottom:10px;border-left:5px solid var(--pop);box-shadow:0 4px 0 #C32F47;cursor:pointer;transition:transform .12s;}
   .rw:active{transform:translateY(2px);}
   .rw .rwic{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
@@ -103,10 +106,18 @@
   .rw .rwt span{font-size:.72rem;font-weight:700;color:#FFE0E6;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .rw .rwc{flex:0 0 auto;background:linear-gradient(150deg,var(--kuning-hi),var(--kuning));color:#7A2B14;font-family:'Fredoka';font-weight:600;font-size:.8rem;padding:7px 12px;border-radius:999px;box-shadow:0 2px 0 rgba(0,0,0,.12);}
   h2.sec.tight{margin-top:20px;}
-  .cc-foot{display:flex;align-items:center;justify-content:center;gap:9px;margin:20px 2px 8px;padding:13px;border-radius:15px;background:#fff;border:1.5px solid #F2E2C2;color:var(--coklat);text-decoration:none;font-weight:700;font-size:.82rem;text-align:center;}
+  .cc-foot{display:flex;align-items:center;justify-content:center;gap:9px;margin:20px 2px 8px;padding:14px;border-radius:15px;background:linear-gradient(150deg,var(--kuning-hi),var(--kuning));border:none;color:var(--coklat);text-decoration:none;font-weight:800;font-size:.82rem;text-align:center;box-shadow:0 4px 0 var(--kuning-d);}
   .cc-foot svg{width:19px;height:19px;flex:0 0 auto;color:var(--pop);}
   .cc-foot b{font-family:'Fredoka';font-weight:600;}
   .cc-foot:active{transform:scale(.98);}
+  .gicon.liveicon{position:relative;overflow:visible;}
+  .gicon .cakeface{width:50px;height:50px;animation:cakeBob 2.6s ease-in-out infinite;transform-origin:50% 72%;}
+  @keyframes cakeBob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-2px) scale(1.05)}}
+  .gicon .lovebub{position:absolute;top:-10px;right:-9px;width:24px;height:24px;background:#fff;border-radius:50% 50% 50% 5px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 7px rgba(0,0,0,.2);transform:scale(0);opacity:0;animation:lovePop 4.6s ease-in-out infinite;z-index:3;}
+  .gicon .lovebub svg{width:14px;height:14px;animation:heartBeat .9s ease-in-out infinite;}
+  @keyframes lovePop{0%,56%{transform:scale(0) translateY(6px) rotate(-12deg);opacity:0}64%{transform:scale(1.28) translateY(0) rotate(7deg);opacity:1}70%{transform:scale(.9) rotate(-5deg)}76%{transform:scale(1.06) rotate(2deg)}82%{transform:scale(1) rotate(0)}90%{transform:scale(1) translateY(-2px);opacity:1}100%{transform:scale(.7) translateY(-12px);opacity:0}}
+  @keyframes heartBeat{0%,100%{transform:scale(1)}30%{transform:scale(1.22)}45%{transform:scale(.95)}60%{transform:scale(1.12)}}
+  @media(prefers-reduced-motion:reduce){.gicon .cakeface,.gicon .lovebub,.gicon .lovebub svg{animation:none}.gicon .lovebub{opacity:1;transform:scale(1)}}
   /* banner carousel */
   .bnr{position:relative;border-radius:20px;overflow:hidden;height:150px;margin-top:2px;box-shadow:0 10px 22px -12px rgba(90,48,23,.5);}
   .bnr .bwrap{display:flex;height:100%;transition:transform .5s cubic-bezier(.5,.05,.2,1);}
@@ -133,14 +144,7 @@
     </div>
   </div>
 
-    <div class="bnr" id="bnr">
-    <div class="bwrap" id="bnrWrap">
-      <div class="bsl" style="background:linear-gradient(135deg,var(--kuning),#FF9E2C)"><div class="btag" style="color:#B5530E">Poin</div><b>Tiap Rp4.000 = 1 poin</b><span>Kumpulin, tukar jadi reward seru</span></div>
-      <a class="bsl" id="bnrRef" href="#" style="background:linear-gradient(135deg,#FF8A4D,#FF5A86)"><div class="btag" style="color:#C3324F">Referral</div><b>Ajak teman, berdua +25 poin</b><span>Bagikan kodemu di profil ›</span></a>
-      <a class="bsl" id="bnrRwd" href="#" style="background:linear-gradient(135deg,#5A3017,#9A6B45)"><div class="btag" style="color:#5A3017">Reward</div><b>Tukar poin jadi reward</b><span>Voucher &amp; hadiah nunggu kamu ›</span></a>
-    </div>
-    <div class="bdots" id="bnrDots"><i class="on"></i><i></i><i></i></div>
-  </div>
+  <div id="bannerCar" style="display:none;margin:0 0 12px"></div>
 
   <div class="hero" id="heroCard">
     <div class="lbl">Poin kamu</div>
@@ -156,14 +160,11 @@
 
 
 
-  <h2 class="sec" id="rwPopHd" style="display:none">Reward populer</h2>
-  <div id="rewardPopuler"></div>
-
   <h2 class="sec tight">Main &amp; kumpulin poin</h2>
   <div class="games">
 
     <a class="gcard" href="topping.html?v=69">
-      <div class="gicon" style="background:#FCEFC2"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M6 18h24v6a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 18.5C4.4 12 9.8 7.5 18 7.5S31.6 12 31 18.5Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="13.5" cy="12" rx="5.5" ry="2" fill="#fff" opacity=".35"/><ellipse cx="14.2" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><ellipse cx="21.8" cy="23" rx="1.5" ry="2" fill="#5a3b2e"/><path d="M16.5 25.2q1.5 1.2 3 0" stroke="#5a3b2e" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="11" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/><circle cx="25" cy="24" r="1.4" fill="#F4A6B0" opacity=".6"/></svg></div>
+      <div class="gicon liveicon" style="background:#FCEFC2"><span class="lovebub" aria-hidden="true"><svg viewBox="0 0 24 24" width="13" height="13"><path d="M12 21s-7-4.5-9.2-8.6C1 9.3 2.7 6 6 6c2 0 3.2 1.2 4 2.3C10.8 7.2 12 6 14 6c3.3 0 5 3.3 3.2 6.4C19 16.5 12 21 12 21Z" fill="#FF4D7D"/></svg></span><svg class="cakeface" viewBox="0 0 36 36" aria-hidden="true"><path d="M6 18h24v6a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4Z" fill="#F4D79B" stroke="#D9A94E" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 18.5C4.4 12 9.8 7.5 18 7.5S31.6 12 31 18.5Z" fill="#C98A4B" stroke="#A96A2E" stroke-width="1.5" stroke-linejoin="round"/><ellipse cx="13.5" cy="12" rx="5.5" ry="2" fill="#fff" opacity=".35"/><ellipse cx="14.2" cy="22.9" rx="1.55" ry="2.05" fill="#5a3b2e"/><ellipse cx="21.8" cy="22.9" rx="1.55" ry="2.05" fill="#5a3b2e"/><circle cx="14.75" cy="22.15" r=".55" fill="#fff"/><circle cx="22.35" cy="22.15" r=".55" fill="#fff"/><path d="M15.4 24.7q2.6 2.2 5.2 0" stroke="#5a3b2e" stroke-width="1" fill="none" stroke-linecap="round"/><circle cx="10.5" cy="24.6" r="1.7" fill="#F4A6B0" opacity=".7"/><circle cx="25.5" cy="24.6" r="1.7" fill="#F4A6B0" opacity=".7"/></svg></div>
       <div class="gname">Menopping Asik!</div>
       <div class="gdesc">Selesaikan pesanan customer dan dapatkan pointnya.</div>
       <div class="gbtn play">Main</div>
@@ -192,7 +193,7 @@
 
   <a class="cc-foot" id="ccBtn" href="#" target="_blank" rel="noopener">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.4a7.6 7.6 0 0 1-10.9 6.9L4 20l1.6-4.1A7.6 7.6 0 1 1 21 11.4Z"/><path d="M12.1 14.4s-2.3-1.4-2.3-3.1a1.55 1.55 0 0 1 2.3-1.35 1.55 1.55 0 0 1 2.3 1.35c0 1.7-2.3 3.1-2.3 3.1Z" fill="currentColor" stroke="none"/></svg>
-    <span>Ada kendala / kritik / saran? <b>Hubungi Customer Care</b></span>
+    <span>Ada kendala / kritik / saran? <b>Hubungi Customer Care</b> <svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-2px" aria-hidden="true"><path d="M12 20.3l-1.45-1.32C5.4 14.24 2 11.16 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.66-3.4 6.74-8.55 11.49L12 20.3Z" fill="#FF4D7D"/></svg></span>
   </a>
 
 </div>
@@ -228,34 +229,15 @@
     } else { if(bar) bar.style.width='16%'; }
   }
   function render(){
-    var box=document.getElementById('rewardPopuler'), hd=document.getElementById('rwPopHd');
-    if(!box || !(window.OmaOpa&&window.OmaOpa.listRewardsPublic)) return;
+    if(!(window.OmaOpa&&window.OmaOpa.listRewardsPublic)) return;
     window.OmaOpa.listRewardsPublic().then(function(list){
-      if(!list||!list.length){ box.innerHTML=''; if(hd) hd.style.display='none'; return; }
-      var sorted=list.slice().sort(function(a,b){return (a.cost||0)-(b.cost||0);});
-      rwList=sorted;
-      box.innerHTML=sorted.slice(0,3).map(function(r){ return '<div class="rw" data-rw="1"><span class="rwic">'+TICKET+'</span><span class="rwt"><b>'+esc(r.title)+'</b><span>'+esc(r.note||'Tukar dengan poin kamu')+'</span></span><span class="rwc">'+(r.cost||0)+' poin</span></div>'; }).join('');
-      if(hd) hd.style.display='';
-      Array.prototype.forEach.call(box.querySelectorAll('[data-rw]'),function(el){ el.onclick=function(){ if(window.OmaOpa&&window.OmaOpa.openRewards) window.OmaOpa.openRewards(); else { var rb=document.getElementById('rewardBtn'); if(rb) rb.click(); } }; });
-      setHero();
+      if(list&&list.length){ rwList=list.slice().sort(function(a,b){return (a.cost||0)-(b.cost||0);}); setHero(); }
     }).catch(function(){});
   }
-  (function(){ var hero=document.getElementById('heroCard'); if(!hero) return; var cols=['#FF6A3D','#1FBF96','#FF93B5','#5A3017','#FFFFFF']; for(var i=0;i<11;i++){ var sp=document.createElement('span'); sp.className='spr'; sp.style.background=cols[i%cols.length]; sp.style.left=(6+Math.random()*86)+'%'; sp.style.top=(10+Math.random()*72)+'%'; sp.style.transform='rotate('+Math.floor(Math.random()*180)+'deg)'; sp.style.opacity=(0.5+Math.random()*0.4).toFixed(2); hero.appendChild(sp); } })();
+  (function(){ var hero=document.getElementById('heroCard'); if(!hero) return; var cols=['#FF6A3D','#1FBF96','#FF93B5','#5A3017','#FFFFFF']; for(var i=0;i<14;i++){ var sp=document.createElement('span'); sp.className='spr'; var rot=Math.floor(Math.random()*180); var op=(0.4+Math.random()*0.4); var dur=(6+Math.random()*7); var bob=(1.6+Math.random()*1.8); var delay=-(Math.random()*dur); sp.style.background=cols[i%cols.length]; sp.style.top=(8+Math.random()*76)+'%'; sp.style.left=(Math.random()*100)+'%'; sp.style.opacity=op.toFixed(2); sp.style.transform='rotate('+rot+'deg)'; sp.style.setProperty('--rot',rot+'deg'); sp.style.setProperty('--op0',op.toFixed(2)); sp.style.setProperty('--fy',(4+Math.random()*6).toFixed(1)+'px'); sp.style.animation='ooDrift '+dur.toFixed(1)+'s linear '+delay.toFixed(1)+'s infinite, ooBob '+bob.toFixed(1)+'s ease-in-out infinite'; hero.appendChild(sp); } })();
   setHero();
   window.addEventListener('omaopa:ready', function(){ render(); setHero(); });
   window.addEventListener('omaopa:change', setHero);
-  (function(){
-    var wrap=document.getElementById('bnrWrap'), dots=document.getElementById('bnrDots');
-    if(wrap&&dots){
-      var n=wrap.children.length, i=0;
-      var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      function go(k){ i=(k+n)%n; wrap.style.transform='translateX(-'+(i*100)+'%)'; Array.prototype.forEach.call(dots.children,function(d,j){ d.className=(j===i)?'on':''; }); }
-      Array.prototype.forEach.call(dots.children,function(d,j){ d.onclick=function(){ go(j); }; });
-      var ref=document.getElementById('bnrRef'); if(ref) ref.onclick=function(e){ e.preventDefault(); if(window.OmaOpa&&window.OmaOpa.getUser&&window.OmaOpa.getUser()){ if(window.OmaOpa.openProfile) window.OmaOpa.openProfile(); } else if(window.OmaOpa&&window.OmaOpa.openLogin){ window.OmaOpa.openLogin(); } };
-      var rwd=document.getElementById('bnrRwd'); if(rwd) rwd.onclick=function(e){ e.preventDefault(); if(window.OmaOpa&&window.OmaOpa.openRewards) window.OmaOpa.openRewards(); else { var rb=document.getElementById('rewardBtn'); if(rb) rb.click(); } };
-      if(!reduce) setInterval(function(){ go(i+1); }, 4200);
-    }
-  })();
   (function(){ var hc=document.getElementById('heroCard'); if(hc) hc.onclick=function(){ if(window.OmaOpa&&window.OmaOpa.openRewards) window.OmaOpa.openRewards(); else { var rb=document.getElementById('rewardBtn'); if(rb) rb.click(); } }; })();
   var tierDone=false;
   function loadTier(){ var el=document.getElementById('tierBadge'); if(!el) return;
@@ -273,7 +255,7 @@
 
 <script src="menu-data.js?v=69"></script>
 <script src="outlets-data.js?v=69"></script>
-<script type="module" src="core-omaopa.js?v=78"></script>
+<script type="module" src="core-omaopa.js?v=79"></script>
 <script>
   try{ var _ci=document.getElementById('coin'); if(_ci) _ci.textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){}
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -493,45 +475,37 @@
   setTimeout(refreshCheckinCard, 1200);
 </script>
 <script>
-/* Banner promo dari admin (settings/announcement) */
+/* Banner carousel dari admin (koleksi 'banners') */
 (function(){
-  function show(a){
-    var app=document.querySelector('.app')||document.body;
-    if(!a||!a.active||(!a.image&&!a.text)){ var ex=document.getElementById('omaPromo'); if(ex) ex.style.display='none'; return; }
-    if(!document.getElementById('omaPromoCss')){
-      var st=document.createElement('style'); st.id='omaPromoCss';
-      st.textContent='@keyframes omaPromoIn{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}'
-        +'@keyframes omaPromoShine{0%{transform:translateX(-130%) skewX(-18deg)}55%,100%{transform:translateX(360%) skewX(-18deg)}}'
-        +'@keyframes omaPromoMega{0%,100%{transform:rotate(0)}25%{transform:rotate(-13deg)}75%{transform:rotate(13deg)}}'
-        +'#omaPromo{position:sticky;top:0;z-index:600;overflow:hidden;animation:omaPromoIn .55s cubic-bezier(.2,.85,.25,1)}'
-        +'#omaPromo.txt{background:linear-gradient(90deg,#FFDD55,#FFC21A 45%,#FFD23E);color:#5A3A05;font-weight:800;font-size:.9rem;letter-spacing:.2px;padding:11px 40px 11px 16px;text-align:center;box-shadow:0 3px 12px rgba(224,177,0,.45);border-bottom:2px solid #E5A100}'
-        +'#omaPromo.img{line-height:0;box-shadow:0 3px 12px rgba(224,177,0,.4)}'
-        +'#omaPromo.img img{display:block;width:100%;height:auto}'
-        +'#omaPromo .shine{position:absolute;top:0;left:0;height:100%;width:32%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.65),transparent);animation:omaPromoShine 3.6s ease-in-out infinite;pointer-events:none;z-index:2}'
-        +'#omaPromo .mega{display:inline-block;animation:omaPromoMega 1.7s ease-in-out infinite;transform-origin:65% 65%;margin-right:3px}'
-        +'#omaPromo .ptxt{position:relative;z-index:1}'
-        +'#omaPromo .pclose{position:absolute;right:8px;border:none;width:24px;height:24px;border-radius:50%;font-weight:900;cursor:pointer;line-height:1;z-index:3}'
-        +'#omaPromo.txt .pclose{top:50%;transform:translateY(-50%);background:rgba(90,58,5,.16);color:#5A3A05}'
-        +'#omaPromo.img .pclose{top:8px;background:rgba(40,25,10,.45);color:#fff}'
-        +'@media(prefers-reduced-motion:reduce){#omaPromo,#omaPromo .shine,#omaPromo .mega{animation:none}}';
+  function esc(t){ return String(t==null?'':t).replace(/"/g,'&quot;'); }
+  function render(items){
+    var box=document.getElementById('bannerCar'); if(!box) return;
+    if(!items || !items.length){ box.innerHTML=''; box.style.display='none'; return; }
+    box.style.display='block';
+    if(!document.getElementById('bannerCarCss')){
+      var st=document.createElement('style'); st.id='bannerCarCss';
+      st.textContent='.bcar{position:relative;border-radius:18px;overflow:hidden;box-shadow:0 8px 20px -12px rgba(90,48,23,.5)}'
+        +'.bcar .bwrp{display:flex;transition:transform .5s cubic-bezier(.5,.05,.2,1)}'
+        +'.bcar .bsl{min-width:100%;display:block;line-height:0}'
+        +'.bcar .bsl img{display:block;width:100%;height:auto}'
+        +'.bcar .bdt{position:absolute;bottom:9px;left:0;right:0;display:flex;justify-content:center;gap:6px;z-index:2}'
+        +'.bcar .bdt i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.6);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.3s}'
+        +'.bcar .bdt i.on{background:#fff;width:18px;border-radius:99px}'
+        +'@media(prefers-reduced-motion:reduce){.bcar .bwrp{transition:none}}';
       document.head.appendChild(st);
     }
-    var d=document.getElementById('omaPromo');
-    if(!d){ d=document.createElement('div'); d.id='omaPromo'; app.insertBefore(d, app.firstChild); }
-    else if(d.parentNode!==app){ app.insertBefore(d, app.firstChild); }
-    d.style.display='block';
-    if(a.image){
-      d.className='img';
-      var L=a.link?('<a href="'+String(a.link).replace(/"/g,'&quot;')+'" target="_blank" rel="noopener">'):'';
-      var LE=a.link?'</a>':'';
-      d.innerHTML='<span class="shine"></span>'+L+'<img src="'+a.image+'" alt="Promo">'+LE+'<button class="pclose" aria-label="tutup">×</button>';
-    } else {
-      d.className='txt';
-      d.innerHTML='<span class="shine"></span><span class="mega">📣</span><span class="ptxt">'+String(a.text).replace(/</g,'&lt;')+'</span><button class="pclose" aria-label="tutup">×</button>';
+    var slides=items.map(function(b){ var img='<img src="'+esc(b.image)+'" alt="Banner">'; return b.link ? '<a class="bsl" href="'+esc(b.link)+'" target="_blank" rel="noopener">'+img+'</a>' : '<div class="bsl">'+img+'</div>'; }).join('');
+    var dots = items.length>1 ? '<div class="bdt">'+items.map(function(_,i){return '<i class="'+(i===0?'on':'')+'"></i>';}).join('')+'</div>' : '';
+    box.innerHTML='<div class="bcar"><div class="bwrp" id="bcWrp">'+slides+'</div>'+dots+'</div>';
+    if(items.length>1){
+      var wrap=document.getElementById('bcWrp'); var dotsEl=box.querySelector('.bdt');
+      var n=items.length, idx=0; var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      function go(k){ idx=(k+n)%n; wrap.style.transform='translateX(-'+(idx*100)+'%)'; if(dotsEl) Array.prototype.forEach.call(dotsEl.children,function(d,j){ d.className=(j===idx)?'on':''; }); }
+      if(dotsEl) Array.prototype.forEach.call(dotsEl.children,function(d,j){ d.onclick=function(){ go(j); }; });
+      if(!reduce) setInterval(function(){ go(idx+1); }, 4500);
     }
-    d.querySelector('.pclose').onclick=function(e){ if(e&&e.preventDefault) e.preventDefault(); d.style.display='none'; };
   }
-  function load(){ try{ if(window.OmaOpa&&window.OmaOpa.getAnnouncement){ window.OmaOpa.getAnnouncement().then(show).catch(function(){}); } }catch(e){} }
+  function load(){ try{ if(window.OmaOpa&&window.OmaOpa.listBannersPublic){ window.OmaOpa.listBannersPublic().then(render).catch(function(){}); } }catch(e){} }
   window.addEventListener('omaopa:ready', load); setTimeout(load, 1000);
 })();
 </script>

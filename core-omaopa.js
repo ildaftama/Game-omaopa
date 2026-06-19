@@ -1129,6 +1129,34 @@ async function saveBanner(opts){ if(!(await isSuper())) throw {message:'Khusus a
   if(opts.active!==undefined) patch.active=!!opts.active;
   await setDoc(doc(db,'settings','announcement'), patch, {merge:true}); }
 
+// ===== Multi-banner carousel (koleksi 'banners', slot b1..b3) =====
+async function _bumpBannerVer(){ try{ await setDoc(doc(db,'settings','bannerVer'), { v:Date.now() }, {merge:true}); }catch(e){} }
+async function listBanners(){ if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  const snap=await getDocs(collection(db,'banners'));
+  const rows=snap.docs.map(d=>({ id:d.id, image:d.data().image||'', link:d.data().link||'', active:d.data().active!==false, order:Number(d.data().order)||0 }));
+  rows.sort((a,b)=>(a.order||0)-(b.order||0));
+  return rows;
+}
+async function saveBannerItem(id, data){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; data=data||{};
+  const rid=(id||('bn_'+Date.now().toString(36))).trim();
+  await setDoc(doc(db,'banners',rid), { image:String(data.image||''), link:String(data.link||''), active:data.active!==false, order:Number(data.order)||0, updatedAt:serverTimestamp() }, {merge:true});
+  await _bumpBannerVer(); return { id:rid };
+}
+async function deleteBannerItem(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'banners',(id||'').trim())); await _bumpBannerVer(); }
+async function listBannersPublic(){
+  try{
+    let ver=0;
+    try{ const vs=await getDoc(doc(db,'settings','bannerVer')); if(vs.exists()) ver=vs.data().v||0; }catch(e){}
+    try{ const c=JSON.parse(localStorage.getItem('omaopa_banners')||'null'); if(c && c.v===ver && Array.isArray(c.items)) return c.items; }catch(e){}
+    const snap=await getDocs(query(collection(db,'banners'), where('active','==',true)));
+    let items=snap.docs.map(d=>({ image:d.data().image||'', link:d.data().link||'', order:Number(d.data().order)||0 })).filter(b=>b.image);
+    items.sort((a,b)=>(a.order||0)-(b.order||0));
+    items=items.map(b=>({ image:b.image, link:b.link }));
+    try{ localStorage.setItem('omaopa_banners', JSON.stringify({ v:ver, items:items })); }catch(e){}
+    return items;
+  }catch(e){ return []; }
+}
+
 // ---- order (pesanan web) ----
 async function logOrder(o){
   o=o||{}; const items=(o.items||[]).map(it=>({ id:it.id||'', cat:it.cat||'', name:it.name||'', price:it.price||0, qty:it.qty||0 }));
@@ -1197,7 +1225,7 @@ window.OmaOpa = {
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
-  getAnnouncement, setAnnouncement, saveBanner, logOrder, listOrders,
+  getAnnouncement, setAnnouncement, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel,
   tierOf, TIERS, getMyTier,
   signOut: doSignOut,

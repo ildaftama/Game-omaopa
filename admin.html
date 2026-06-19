@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root{ --kuning:#FACC1A; --kuning-d:#E0B100; --coklat:#613925; --cream:#FFF8EC; }
+  :root{ --kuning:#FFC21A; --kuning-hi:#FFD64A; --kuning-d:#E5A100; --coklat:#5A3017; --cream:#FFF6E6; --cream2:#FFE9C2; --pop:#FF6A3D; --merah:#E2425A; }
   *{box-sizing:border-box}
   body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
     background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream); min-height:100vh; padding:16px 12px 60px; }
@@ -58,18 +58,18 @@
   table.mt{ width:100%; border-collapse:collapse; font-size:.8rem; }
   table.mt th{ text-align:left; font-size:.66rem; text-transform:uppercase; color:#a9743c; padding:6px 6px; border-bottom:2px solid #EFE2C4; }
   table.mt td{ padding:8px 6px; border-bottom:1px solid #F2E8D5; font-weight:700; }
-  table.mt tr{ cursor:pointer; } table.mt tr:hover td{ background:#FFF8EC; }
+  table.mt tr{ cursor:pointer; } table.mt tr:hover td{ background:#FFF6E6; }
   .bar{ margin:9px 0; } .bar .bl{ display:flex; justify-content:space-between; gap:8px; font-size:.78rem; font-weight:800; color:#5b4636; margin-bottom:3px; }
   .bar .bt{ height:13px; background:#EFE6D2; border-radius:999px; overflow:hidden; }
-  .bar .bf{ height:100%; background:linear-gradient(90deg,#FACC1A,#E0915B); border-radius:999px; }
+  .bar .bf{ height:100%; background:linear-gradient(90deg,#FFC21A,#E0915B); border-radius:999px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div style="display:flex;gap:7px;margin-bottom:12px">
-    <span style="flex:1;text-align:center;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FACC1A;color:#613925">🛠️ Admin</span>
-    <a href="rekap.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">📊 Rekap</a>
-    <a href="staff.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">🧾 Kasir</a>
+    <span style="flex:1;text-align:center;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E5A100;background:#FFC21A;color:#5A3017">🛠️ Admin</span>
+    <a href="rekap.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E5A100;background:#FFF6E6;color:#5A3017">📊 Rekap</a>
+    <a href="staff.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E5A100;background:#FFF6E6;color:#5A3017">🧾 Kasir</a>
   </div>
   <div class="head"><h1>Admin Oma Opa</h1><span class="badge" id="roleBadge">ADMIN</span></div>
   <div id="gate" class="card"><div class="muted">Menyiapkan…</div></div>
@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=74"></script>
+<script type="module" src="core-omaopa.js?v=79"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -98,7 +98,7 @@
   var MEMBERS=null, TXN=null; // cache
   var memStack=[null], memPage=0; // paginasi member (cursor)
   var curOf='baru', curOrders=[], OUTLETS_CACHE=[];
-  var PAL=['#FACC1A','#E0915B','#7CC9B5','#C98A4B','#88B0E0','#F4A6B0','#9a8b78','#B7D77A','#caa6e0'];
+  var PAL=['#FFC21A','#E0915B','#7CC9B5','#C98A4B','#88B0E0','#F4A6B0','#9a8b78','#B7D77A','#caa6e0'];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
   function num(n){ try{ return Number(n||0).toLocaleString('id-ID'); }catch(e){ return ''+n; } }
@@ -115,7 +115,7 @@
         +'<div class="uid">'+esc(u.uid)+'</div><button class="btn sec" id="out">Keluar / ganti akun</button>';
       document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} }; app.style.display='none'; return; }
     try{ canEdit=await O.isSuper(); }catch(e){ canEdit=false; }
-    var rbg=document.getElementById('roleBadge'); if(rbg){ rbg.textContent=canEdit?'ADMIN UTAMA':'LIHAT-SAJA'; rbg.style.background=canEdit?'#613925':'#9a8b78'; }
+    var rbg=document.getElementById('roleBadge'); if(rbg){ rbg.textContent=canEdit?'ADMIN UTAMA':'LIHAT-SAJA'; rbg.style.background=canEdit?'#5A3017':'#9a8b78'; }
     gate.style.display='none'; app.style.display=''; render();
   }
   document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
@@ -148,7 +148,7 @@
     var ent=Object.keys(data).map(function(k){return {k:k,v:data[k]};}).filter(function(e){return e.v>0;}).sort(function(a,b){return b.v-a.v;});
     var total=ent.reduce(function(s,e){return s+e.v;},0)||1; var r=52,C=2*Math.PI*r,off=0;
     var circ=ent.map(function(e,i){ var len=e.v/total*C; var s='<circle cx="70" cy="70" r="'+r+'" fill="none" stroke="'+PAL[i%PAL.length]+'" stroke-width="22" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 70 70)"/>'; off+=len; return s; }).join('');
-    var svg='<svg viewBox="0 0 140 140" width="132" height="132">'+circ+'<text x="70" y="67" text-anchor="middle" font-size="15" font-weight="900" fill="#613925">'+total+'</text><text x="70" y="83" text-anchor="middle" font-size="9" fill="#9a7a5e">total</text></svg>';
+    var svg='<svg viewBox="0 0 140 140" width="132" height="132">'+circ+'<text x="70" y="67" text-anchor="middle" font-size="15" font-weight="900" fill="#5A3017">'+total+'</text><text x="70" y="83" text-anchor="middle" font-size="9" fill="#9a7a5e">total</text></svg>';
     var leg=ent.map(function(e,i){ return '<div class="lg" data-segf="'+esc(field||'')+'" data-segv="'+esc(e.k)+'" style="cursor:pointer"><span class="dot" style="background:'+PAL[i%PAL.length]+'"></span>'+esc(e.k)+' <b>'+e.v+'</b> ('+Math.round(e.v/total*100)+'%) ›</div>'; }).join('');
     return '<div class="chart"><div class="chart-h">'+esc(title)+'</div><div class="chart-b"><div>'+svg+'</div><div class="legend">'+leg+'</div></div></div>';
   }
@@ -175,43 +175,52 @@
       +'<div class="kpi"><div class="v">'+num(txn.length)+'</div><div class="l">Total transaksi</div></div>'
       +'</div>';
     html+='<div class="card"><div class="muted" style="margin-bottom:2px;font-size:.74rem">Ketuk legenda untuk lihat membernya 👇</div>'+donut('Umur member', tally(mem,'age'),'age')+donut('Jenis kelamin', tally(mem,'gender'),'gender')+donut('Pekerjaan', tally(mem,'occupation'),'occupation')+donut('Tier member', tierCnt,'')+'</div>';
-    if(canEdit) html+='<div class="card"><div class="nm">📣 Banner promo di app</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
+    if(canEdit) html+='<div class="card"><div class="nm">📣 Banner carousel (maks 3)</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
     html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=62">Buka Halaman Rekap →</a></div>';
     tabEl.innerHTML=html;
     tabEl.querySelectorAll('.lg[data-segf]').forEach(function(el){ el.onclick=function(){ var f=el.getAttribute('data-segf'); if(f) applySegment(f, el.getAttribute('data-segv')); }; });
     if(canEdit) loadBanner();
   }
   async function loadBanner(){
-    var w=document.getElementById('bnWrap'); if(!w) return; var b={text:'',active:false,image:'',link:''}; try{ b=await O.getAnnouncement(); }catch(e){}
-    w.classList.remove('muted');
-    var pending=null;
-    w.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:8px">Upload <b>gambar banner</b> (persegi panjang). Disarankan <b>1080 × 360 px</b> (rasio 3:1), JPG/PNG. Gambar otomatis dikecilkan & dikompres.</div>'
-      +'<div id="bnPrev" style="margin-bottom:8px"></div>'
-      +'<label>Pilih gambar banner</label><input type="file" id="bnFile" accept="image/*">'
-      +'<label style="margin-top:10px">Link saat banner diklik (opsional)</label><input id="bnLink" value="'+esc(b.link||'')+'" placeholder="https://... (mis. WA / IG / promo)">'
-      +'<label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="bnAct" style="width:auto" '+(b.active?'checked':'')+'> Tampilkan banner di app</label>'
-      +'<div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="bnSave">Simpan banner</button><button class="btn sec" id="bnDel">Hapus gambar</button></div><div id="bnMsg"></div>';
-    function renderPrev(src){ var p=document.getElementById('bnPrev'); if(!p) return; if(!src){ p.innerHTML='<div class="muted" style="font-size:.78rem">Belum ada gambar.</div>'; return; } p.innerHTML='<img src="'+src+'" style="width:100%;border-radius:12px;border:2px solid #EFE2C4;display:block">'; }
-    renderPrev(b.image||'');
-    document.getElementById('bnFile').onchange=function(){
-      var f=this.files&&this.files[0]; if(!f) return; var m=document.getElementById('bnMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Memproses gambar…</div>';
-      var rd=new FileReader();
-      rd.onload=function(){ var img=new Image(); img.onload=function(){
-        var maxW=1080; var sc=Math.min(1, maxW/img.width); var cw=Math.round(img.width*sc), ch=Math.round(img.height*sc);
-        var cv=document.createElement('canvas'); cv.width=cw; cv.height=ch; cv.getContext('2d').drawImage(img,0,0,cw,ch);
-        var q=0.82; pending=cv.toDataURL('image/jpeg',q);
-        while(pending.length>900000 && q>0.4){ q-=0.12; pending=cv.toDataURL('image/jpeg',q); }
-        renderPrev(pending); var kb=Math.round(pending.length*0.75/1024);
-        m.innerHTML='<div class="res ok">✓ Gambar siap ('+cw+'×'+ch+', ~'+kb+'KB). Klik "Simpan banner".</div>';
-      }; img.onerror=function(){ m.innerHTML='<div class="res bad">Gambar tidak terbaca.</div>'; }; img.src=rd.result; };
-      rd.readAsDataURL(f);
-    };
-    document.getElementById('bnSave').onclick=async function(){ if(busy)return; busy=true; var m=document.getElementById('bnMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
-      try{ var opts={ link:document.getElementById('bnLink').value, active:document.getElementById('bnAct').checked }; if(pending) opts.image=pending;
-        await O.saveBanner(opts); m.innerHTML='<div class="res ok">✓ Banner disimpan.</div>'; pending=null;
-      }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
-    document.getElementById('bnDel').onclick=async function(){ if(busy)return; if(!confirm('Hapus gambar banner?')) return; busy=true; var m=document.getElementById('bnMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Menghapus…</div>';
-      try{ await O.saveBanner({ image:'', active:false }); pending=null; renderPrev(''); var ac=document.getElementById('bnAct'); if(ac) ac.checked=false; m.innerHTML='<div class="res ok">✓ Gambar dihapus.</div>'; }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+    var w=document.getElementById('bnWrap'); if(!w) return; w.classList.remove('muted');
+    var map={}; try{ (await O.listBanners()).forEach(function(x){ map[x.id]=x; }); }catch(e){}
+    var ANIM_MAX=700*1024;
+    w.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:10px">Sampai <b>3 banner</b> (jadi carousel di beranda). Rasio disarankan <b>3:1</b> (mis. 1080×360), JPG/PNG. Untuk animasi pakai <b>GIF/WebP</b> \u2014 maks ~700KB/banner (WebP paling ringan).</div>';
+    [1,2,3].forEach(function(n){
+      var id='b'+n; var b=map[id]||{}; var pending=null;
+      var box=document.createElement('div'); box.style.cssText='border:1.5px solid #EFE2C4;border-radius:13px;padding:11px;margin-bottom:10px';
+      box.innerHTML='<div style="font-weight:800;color:var(--coklat);margin-bottom:6px">Banner '+n+'</div>'
+        +'<div id="bp'+n+'" style="margin-bottom:8px"></div>'
+        +'<input type="file" id="bf'+n+'" accept="image/*">'
+        +'<label style="margin-top:8px">Link saat diklik (opsional)</label><input id="bl'+n+'" value="'+esc(b.link||'')+'" placeholder="https://... (WA / IG / promo)">'
+        +'<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="ba'+n+'" style="width:auto" '+((b.active!==false&&b.image)?'checked':'')+'> Tampilkan di beranda</label>'
+        +'<div style="display:flex;gap:8px;margin-top:6px"><button class="btn" id="bs'+n+'">Simpan</button><button class="btn sec" id="bd'+n+'">Kosongkan</button></div><div id="bm'+n+'"></div>';
+      w.appendChild(box);
+      function prev(src){ var pp=document.getElementById('bp'+n); if(!pp) return; pp.innerHTML = src ? '<img src="'+src+'" style="width:100%;border-radius:10px;border:2px solid #EFE2C4;display:block">' : '<div class="muted" style="font-size:.76rem">Belum ada gambar.</div>'; }
+      prev(b.image||'');
+      document.getElementById('bf'+n).onchange=function(){
+        var f=this.files&&this.files[0]; if(!f) return; var m=document.getElementById('bm'+n);
+        var anim=(f.type==='image/gif'||f.type==='image/webp');
+        if(anim){
+          if(f.size>ANIM_MAX){ m.innerHTML='<div class="res bad">Animasi kegedean ('+Math.round(f.size/1024)+'KB). Maks ~700KB.</div>'; this.value=''; return; }
+          var r1=new FileReader(); r1.onload=function(){ pending=r1.result; prev(pending); m.innerHTML='<div class="res ok">\u2713 Animasi siap (~'+Math.round(f.size/1024)+'KB). Klik Simpan.</div>'; }; r1.readAsDataURL(f); return;
+        }
+        m.innerHTML='<div class="muted" style="margin-top:8px">Memproses\u2026</div>';
+        var rd=new FileReader(); rd.onload=function(){ var img=new Image(); img.onload=function(){
+          var maxW=1080; var sc=Math.min(1,maxW/img.width); var cw=Math.round(img.width*sc), ch=Math.round(img.height*sc);
+          var cv=document.createElement('canvas'); cv.width=cw; cv.height=ch; cv.getContext('2d').drawImage(img,0,0,cw,ch);
+          var q=0.82; pending=cv.toDataURL('image/jpeg',q); while(pending.length>900000 && q>0.4){ q-=0.12; pending=cv.toDataURL('image/jpeg',q); }
+          prev(pending); m.innerHTML='<div class="res ok">\u2713 Gambar siap ('+cw+'\u00d7'+ch+', ~'+Math.round(pending.length*0.75/1024)+'KB). Klik Simpan.</div>';
+        }; img.onerror=function(){ m.innerHTML='<div class="res bad">Gambar tidak terbaca.</div>'; }; img.src=rd.result; }; rd.readAsDataURL(f);
+      };
+      document.getElementById('bs'+n).onclick=async function(){ if(busy)return; busy=true; var m=document.getElementById('bm'+n); m.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan\u2026</div>';
+        try{ var img=pending||b.image||''; if(!img){ m.innerHTML='<div class="res bad">Pilih gambar dulu.</div>'; busy=false; return; }
+          await O.saveBannerItem(id, { image:img, link:document.getElementById('bl'+n).value, active:document.getElementById('ba'+n).checked, order:n });
+          b.image=img; pending=null; m.innerHTML='<div class="res ok">\u2713 Banner '+n+' disimpan.</div>';
+        }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+      document.getElementById('bd'+n).onclick=async function(){ if(busy)return; if(!confirm('Kosongkan Banner '+n+'?')) return; busy=true; var m=document.getElementById('bm'+n); m.innerHTML='<div class="muted" style="margin-top:8px">Menghapus\u2026</div>';
+        try{ await O.deleteBannerItem(id); b={}; pending=null; prev(''); var ac=document.getElementById('ba'+n); if(ac) ac.checked=false; var li=document.getElementById('bl'+n); if(li) li.value=''; m.innerHTML='<div class="res ok">\u2713 Banner '+n+' dikosongkan.</div>'; }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+    });
   }
 
   /* ---------- MEMBER ---------- */
@@ -671,7 +680,7 @@
     var keys=Object.keys(g).sort(function(a,b){ return g[b].length-g[a].length; });
     var html='<div class="muted" style="margin-bottom:4px">Total <b>'+arr.length+'</b> voucher terpakai · '+keys.length+' jenis reward</div>';
     keys.forEach(function(t){ var items=g[t];
-      html+='<div style="margin:11px 0 3px;font-weight:900;color:#613925">🎁 '+esc(t)+' <span class="pts">'+items.length+'x</span></div>';
+      html+='<div style="margin:11px 0 3px;font-weight:900;color:#5A3017">🎁 '+esc(t)+' <span class="pts">'+items.length+'x</span></div>';
       html+=items.slice(0,40).map(function(v){ var when=v.ts?new Date(v.ts).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
         return '<div class="row" style="padding:5px 0"><div class="grow"><div class="sub" style="font-weight:700;color:#5b4636">'+esc(v.name||'-')+' · '+esc(v.code)+'</div><div class="sub">'+esc(v.outlet||'-')+' · '+esc(when)+'</div></div></div>'; }).join('');
       if(items.length>40) html+='<div class="hint">Tampil 40 dari '+items.length+'.</div>';
