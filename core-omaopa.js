@@ -202,7 +202,7 @@ async function doSignOut(){ await fbSignOut(auth); }
 // ============================================================
 //  UI LOGIN (disuntik sendiri ke halaman manapun)
 // ============================================================
-const K='#FACC1A', KD='#E0B100', CO='#613925', CR='#FFF8EC';
+const K='#FFC21A', KD='#E5A100', CO='#5A3017', CR='#FFF6E6';
 const style = document.createElement('style');
 style.textContent = `
 .oo-bk{position:fixed;inset:0;background:rgba(80,55,30,.55);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:99999;padding:16px;font-family:'Nunito',system-ui,sans-serif}
@@ -372,7 +372,7 @@ function rewardIcon(rw){
   const bolu = ic==='bolu'||id==='ft'||id==='fm'||id==='fmt'||t.indexOf('malmil')>=0||t.indexOf('topping')>=0;
   if(umbrella){
     bg='#FFF3CC';
-    svg='<svg viewBox="0 0 24 24" width="30" height="30" fill="none"><path d="M3 11 Q3 3.2 12 3 Q21 3.2 21 11 Q19 9.3 17 11 Q15 9.3 13 11 Q11 9.3 9 11 Q7 9.3 5 11 Q4 9.5 3 11 Z" fill="#FACC1A" stroke="#E0B100" stroke-width="1" stroke-linejoin="round"/><path d="M12 3 V2.1" stroke="#7A5A12" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="1.8" r=".9" fill="#7A5A12"/><path d="M12 11 V18.2" stroke="#7A5A12" stroke-width="1.6" stroke-linecap="round"/><path d="M12 18.2 Q12 20.4 9.6 20.4 Q8.2 20.4 8.2 19.2" fill="none" stroke="#7A5A12" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    svg='<svg viewBox="0 0 24 24" width="30" height="30" fill="none"><path d="M3 11 Q3 3.2 12 3 Q21 3.2 21 11 Q19 9.3 17 11 Q15 9.3 13 11 Q11 9.3 9 11 Q7 9.3 5 11 Q4 9.5 3 11 Z" fill="#FFC21A" stroke="#E5A100" stroke-width="1" stroke-linejoin="round"/><path d="M12 3 V2.1" stroke="#7A5A12" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="1.8" r=".9" fill="#7A5A12"/><path d="M12 11 V18.2" stroke="#7A5A12" stroke-width="1.6" stroke-linecap="round"/><path d="M12 18.2 Q12 20.4 9.6 20.4 Q8.2 20.4 8.2 19.2" fill="none" stroke="#7A5A12" stroke-width="1.6" stroke-linecap="round"/></svg>';
   } else if(tote){
     bg='#F3E6D2';
     svg='<svg viewBox="0 0 24 24" width="30" height="30" fill="none"><path d="M6 8.3h12l1 11.2a1 1 0 0 1-1 1.1H6a1 1 0 0 1-1-1.1Z" fill="#E0B17A" stroke="#A9743C" stroke-width="1.1" stroke-linejoin="round"/><path d="M9 8.5V6.7a3 3 0 0 1 6 0v1.8" stroke="#A9743C" stroke-width="1.6" stroke-linecap="round"/><path d="M9.4 12.5h5.2" stroke="#A9743C" stroke-width="1.3" stroke-linecap="round" opacity=".6"/></svg>';
@@ -406,6 +406,7 @@ async function loadRewardCatalog(){
   return list;
 }
 async function listRewardStock(){ await loadRewardCatalog(); return rewardStock; }
+async function listRewardsPublic(){ try{ await loadRewardCatalog(); return (rewardCatalog||[]).filter(r=>r.active!==false).map(r=>({ id:r.id, title:r.title||'', cost:Number(r.cost)||0, note:r.note||'' })); }catch(e){ return []; } }
 function genCode(){
   const t = Date.now().toString(36).toUpperCase().slice(-4);
   const r = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4).padEnd(4,'X');
@@ -652,7 +653,7 @@ styleR.textContent = `
 .rw-btn{border:none;background:${K};color:${CO};font-weight:900;border-radius:10px;padding:7px 14px;font-size:.84rem;cursor:pointer;box-shadow:0 2px 0 ${KD};font-family:inherit}
 .rw-btn:active{transform:translateY(2px);box-shadow:0 0 0 ${KD}}
 .rw-btn[disabled]{background:#EFEDE6;color:#A9A498;box-shadow:none;cursor:default}
-.rw-voucher{background:#fff;border:2px dashed #E0B100;border-radius:14px;padding:11px 13px;margin-bottom:9px}
+.rw-voucher{background:#fff;border:2px dashed #E5A100;border-radius:14px;padding:11px 13px;margin-bottom:9px}
 .rw-vt{font-weight:800;color:${CO};font-size:.9rem}
 .rw-vc{font-family:monospace;font-size:1.05rem;font-weight:800;letter-spacing:1px;color:#7A5A12;margin:3px 0}
 .rw-vs{display:inline-block;font-size:.7rem;font-weight:900;border-radius:999px;padding:2px 9px}
@@ -666,22 +667,22 @@ styleR.textContent = `
 .rw-act .rw-c{margin-bottom:0}
 .rw-stock{font-size:.66rem;font-weight:800;color:#9a7a5e;margin-top:6px}
 .rw-bar{height:6px;background:#EFE6D2;border-radius:999px;overflow:hidden;margin-top:3px}
-.rw-bar>span{display:block;height:100%;background:linear-gradient(90deg,#FACC1A,#E0915B);border-radius:999px;transition:width .4s}
+.rw-bar>span{display:block;height:100%;background:linear-gradient(90deg,#FFC21A,#E0915B);border-radius:999px;transition:width .4s}
 .rw-badge{display:inline-block;font-size:.6rem;font-weight:900;background:#FFE2E2;color:#C0392B;border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:middle}
 .rw-item.rw-out{opacity:.6}
 .lb-body{max-height:60vh;overflow:auto;margin-top:4px}
 .lb-loading,.lb-empty{text-align:center;color:#b59a7e;font-weight:700;font-size:.85rem;padding:22px 8px;line-height:1.5}
 .lb-pts{display:block;width:max-content;margin:2px auto 12px;background:#fff;border:2px solid #F1E4CC;border-radius:999px;padding:6px 16px;font-weight:900;color:#7A5A12}
 .lb-row{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:9px 12px;margin-bottom:7px}
-.lb-row.lb-me{border-color:#FACC1A;background:#FFFBEC}
+.lb-row.lb-me{border-color:#FFC21A;background:#FFFBEC}
 .lb-rank{font-weight:900;color:#C98A1B;min-width:28px;text-align:center;font-size:.98rem}
-.lb-name{flex:1;min-width:0;font-weight:800;color:#613925;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lb-youtag{font-size:.58rem;font-weight:900;background:#FACC1A;color:#5A3A05;border-radius:999px;padding:1px 7px;vertical-align:middle;margin-left:4px}
+.lb-name{flex:1;min-width:0;font-weight:800;color:#5A3017;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-youtag{font-size:.58rem;font-weight:900;background:#FFC21A;color:#5A3A05;border-radius:999px;padding:1px 7px;vertical-align:middle;margin-left:4px}
 .lb-val{font-weight:900;color:#7A5A12;font-size:.9rem;white-space:nowrap}
 .hs-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:9px 12px;margin-bottom:7px}
-.hs-out{font-weight:800;color:#613925;font-size:.9rem}
+.hs-out{font-weight:800;color:#5A3017;font-size:.9rem}
 .hs-date{font-size:.7rem;color:#9a7a5e;font-weight:700;margin-top:1px}
-.hs-nom{font-weight:900;color:#613925;font-size:.9rem;text-align:right}
+.hs-nom{font-weight:900;color:#5A3017;font-size:.9rem;text-align:right}
 .hs-pts{font-size:.72rem;color:#2E7D32;font-weight:900;text-align:right;margin-top:1px}
 `;
 document.head.appendChild(styleR);
@@ -789,7 +790,7 @@ async function openMemberCard(){
   mountMc();
   mcBk.querySelector('#mcName').textContent=(profile&&profile.name)||'Member';
   mcBk.querySelector('#mcPts').innerHTML='🪙 '+points+' poin';
-  (async()=>{ try{ const txs=await listMyTransactions(); const spend=txs.reduce((s,t)=>s+(t.nominal||0),0); const tr=tierOf(spend); const el=mcBk.querySelector('#mcTier'); if(el) el.innerHTML='<span style="display:inline-block;background:'+tr.color+';color:#fff;font-weight:900;font-size:.72rem;border-radius:999px;padding:3px 12px">★ Member '+tr.name+'</span>'; }catch(e){} })();
+  (async()=>{ try{ const txs=await listMyTransactions(); const spend=txs.reduce((s,t)=>s+(t.nominal||0),0); const tr=tierOf(spend); const el=mcBk.querySelector('#mcTier'); if(el) el.innerHTML='<span style="display:inline-block;background:'+tr.color+';color:#fff;font-weight:900;font-size:.72rem;border-radius:999px;padding:3px 12px">★ '+tr.name+'</span>'; }catch(e){} })();
   const box=mcBk.querySelector('#mcQR'); box.innerHTML='<span style="color:#b59a7e;font-weight:700;font-size:.8rem">Memuat QR…</span>';
   mcBk.classList.add('show');
   try{ await ensureQRLib(); box.innerHTML=''; new QRCode(box,{text:'OMAOPA:MEMBER:'+user.uid, width:188, height:188, correctLevel:QRCode.CorrectLevel.M}); }
@@ -836,7 +837,7 @@ async function openProfile(){
   (async()=>{ try{ const txs=await listMyTransactions(); const spend=txs.reduce((s,t)=>s+(t.nominal||0),0); const tr=tierOf(spend);
     pfBk.querySelector('#pfSpent').textContent='Rp'+spend.toLocaleString('id-ID');
     pfBk.querySelector('#pfTx').textContent=txs.length;
-    const te=pfBk.querySelector('#pfTier'); if(te) te.innerHTML='<span style="display:inline-block;background:'+tr.color+';color:#fff;font-weight:900;font-size:.72rem;border-radius:999px;padding:3px 14px">★ Member '+tr.name+'</span>';
+    const te=pfBk.querySelector('#pfTier'); if(te) te.innerHTML='<span style="display:inline-block;background:'+tr.color+';color:#fff;font-weight:900;font-size:.72rem;border-radius:999px;padding:3px 14px">★ '+tr.name+'</span>';
   }catch(e){} })();
   (async()=>{ try{ const sc=await getMemberScore(user.uid); const se=pfBk.querySelector('#pfScore'); if(se) se.textContent=sc; }catch(e){} })();
 }
@@ -1173,8 +1174,9 @@ async function adminClearOrders(){
 }
 
 // ---- tier member (berdasarkan total belanja) ----
-const TIERS=[{name:'Gold',min:2000000,color:'#E0B100'},{name:'Silver',min:500000,color:'#9AA0A6'},{name:'Bronze',min:0,color:'#C98A4B'}];
+const TIERS=[{name:'Cucu Kesayangan',min:3000000,color:'#E5A100'},{name:'Bestie',min:1000000,color:'#FF9E2C'},{name:'Sahabat',min:500000,color:'#FF8FA3'},{name:'Teman Baru',min:0,color:'#B98A5E'}];
 function tierOf(spend){ spend=Number(spend)||0; for(let i=0;i<TIERS.length;i++){ if(spend>=TIERS[i].min) return TIERS[i]; } return TIERS[TIERS.length-1]; }
+async function getMyTier(){ try{ if(!user) return null; const txs=await listMyTransactions(); const spend=txs.reduce((s,t)=>s+(t.nominal||0),0); const tr=tierOf(spend); return { name:tr.name, color:tr.color, spend:spend }; }catch(e){ return null; } }
 
 // ============================================================
 //  API publik
@@ -1185,7 +1187,7 @@ window.OmaOpa = {
   openMemberCard, openProfile, getCheckinStatus, dailyCheckin, openCheckin,
   openLeaderboard, openScoreboard, openHistory,
   submitScore, listPointLeaderboard, listScoreLeaderboard, listMyTransactions,
-  redeem, listVouchers,
+  redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers,
@@ -1197,7 +1199,7 @@ window.OmaOpa = {
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
   getAnnouncement, setAnnouncement, saveBanner, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel,
-  tierOf, TIERS,
+  tierOf, TIERS, getMyTier,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'', phone:(profile&&profile.phone)||'' } : null,
   getPoints: ()=> points,
