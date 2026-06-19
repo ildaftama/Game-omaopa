@@ -421,17 +421,20 @@ async function redeem(rewardId){
   const code = genCode();
   const vref = doc(db,'vouchers',code);
   const nm = (profile&&profile.name)||user.displayName||'';
+  const today=_todayStr();
   await runTransaction(db, async (tx)=>{
     const us = await tx.get(uref);
     const rs = await tx.get(rref);
+    if(us.exists() && us.data().lastRedeem===today) throw {message:'Kamu sudah menukar reward hari ini 🙂 Balik lagi besok ya!'};
     const cur = (us.exists() && typeof us.data().points==='number') ? us.data().points : 0;
     const claimed = (rs.exists() && typeof rs.data().claimed==='number') ? rs.data().claimed : 0;
     if(typeof rw.limit==='number' && claimed >= rw.limit) throw {message:'Yah, stok hadiah ini sudah habis 😢'};
     if(cur < rw.cost) throw {message:'Poin belum cukup.'};
-    tx.set(uref, { points: cur - rw.cost, updatedAt: serverTimestamp() }, {merge:true});
+    tx.set(uref, { points: cur - rw.cost, lastRedeem: today, updatedAt: serverTimestamp() }, {merge:true});
     tx.set(rref, { claimed: claimed + 1, limit: (rw.limit||null), title: rw.title, updatedAt: serverTimestamp() }, {merge:true});
     tx.set(vref, { code:code, uid:user.uid, name:nm, rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, status:'aktif', createdAt: serverTimestamp() });
   });
+  if(profile) profile.lastRedeem=today;
   rewardStock[rw.id] = (rewardStock[rw.id]||0) + 1;
   return code;
 }
@@ -734,7 +737,7 @@ function renderRewards(){
         +`${remain!==null?`<div class="rw-stock">${stockTxt}</div><div class="rw-bar"><span style="width:${pct}%"></span></div>`:''}</div>`
         +`<div class="rw-act"><div class="rw-c">${rw.cost} poin</div>`
         +`<button class="rw-btn" data-rid="${rw.id}" ${dis}>${label}</button></div></div>`;
-    }).join('') + `<div class="oo-mini">Stok terbatas — siapa cepat dia dapat! Tunjukkan kode/QR voucher ke kasir Oma Opa.</div><div class="oo-tc">Jumlah poin & ketentuan reward sepenuhnya kebijakan Oma Opa Cakery dan dapat berubah sewaktu-waktu. Poin dari kecurangan atau pemanfaatan celah dapat dibatalkan & akun ditangguhkan.</div>`;
+    }).join('') + `<div class="oo-mini"><b>Maksimal tukar 1 reward per hari per akun.</b> Stok terbatas — siapa cepat dia dapat! Tunjukkan kode/QR voucher ke kasir Oma Opa.</div><div class="oo-tc">Jumlah poin & ketentuan reward sepenuhnya kebijakan Oma Opa Cakery dan dapat berubah sewaktu-waktu. Poin dari kecurangan atau pemanfaatan celah dapat dibatalkan & akun ditangguhkan.</div>`;
   } else {
     body.innerHTML = `<div class="rw-empty">Memuat voucher…</div>`;
     listVouchers().then(list=>{
