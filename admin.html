@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=79"></script>
+<script type="module" src="core-omaopa.js?v=81"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -176,10 +176,21 @@
       +'</div>';
     html+='<div class="card"><div class="muted" style="margin-bottom:2px;font-size:.74rem">Ketuk legenda untuk lihat membernya 👇</div>'+donut('Umur member', tally(mem,'age'),'age')+donut('Jenis kelamin', tally(mem,'gender'),'gender')+donut('Pekerjaan', tally(mem,'occupation'),'occupation')+donut('Tier member', tierCnt,'')+'</div>';
     if(canEdit) html+='<div class="card"><div class="nm">📣 Banner carousel (maks 3)</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
+    if(canEdit) html+='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
     html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=62">Buka Halaman Rekap →</a></div>';
     tabEl.innerHTML=html;
     tabEl.querySelectorAll('.lg[data-segf]').forEach(function(el){ el.onclick=function(){ var f=el.getAttribute('data-segf'); if(f) applySegment(f, el.getAttribute('data-segv')); }; });
-    if(canEdit) loadBanner();
+    if(canEdit){ loadBanner(); loadMessages(); }
+  }
+  async function loadMessages(){
+    var w=document.getElementById('msgWrap'); if(!w) return; w.classList.remove('muted');
+    var m={cc:'',order:''}; try{ m=await O.getMessages(); }catch(e){}
+    w.innerHTML='<div class="muted" style="font-size:.74rem;margin-bottom:8px">Teks pembuka WhatsApp. Untuk order, detail pesanan otomatis ditambahkan setelah teks ini.</div>'
+      +'<label>Pesan tombol Customer Care</label><textarea id="msgCc" rows="3">'+esc(m.cc||'')+'</textarea>'
+      +'<label style="margin-top:8px">Pesan pembuka order (CS order)</label><textarea id="msgOrder" rows="2">'+esc(m.order||'')+'</textarea>'
+      +'<div style="margin-top:8px"><button class="btn" id="msgSave">Simpan pesan</button></div><div id="msgMsg"></div>';
+    document.getElementById('msgSave').onclick=async function(){ if(busy)return; busy=true; var mm=document.getElementById('msgMsg'); mm.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+      try{ await O.setMessages({ cc:document.getElementById('msgCc').value, order:document.getElementById('msgOrder').value }); mm.innerHTML='<div class="res ok">✓ Pesan otomatis disimpan.</div>'; }catch(e){ mm.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
   }
   async function loadBanner(){
     var w=document.getElementById('bnWrap'); if(!w) return; w.classList.remove('muted');

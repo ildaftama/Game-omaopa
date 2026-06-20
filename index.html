@@ -192,16 +192,19 @@
   </div>
 
   <a class="cc-foot" id="ccBtn" href="#" target="_blank" rel="noopener">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.4a7.6 7.6 0 0 1-10.9 6.9L4 20l1.6-4.1A7.6 7.6 0 1 1 21 11.4Z"/><path d="M12.1 14.4s-2.3-1.4-2.3-3.1a1.55 1.55 0 0 1 2.3-1.35 1.55 1.55 0 0 1 2.3 1.35c0 1.7-2.3 3.1-2.3 3.1Z" fill="currentColor" stroke="none"/></svg>
     <span>Ada kendala / kritik / saran? <b>Hubungi Customer Care</b> <svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-2px" aria-hidden="true"><path d="M12 20.3l-1.45-1.32C5.4 14.24 2 11.16 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.66-3.4 6.74-8.55 11.49L12 20.3Z" fill="#FF4D7D"/></svg></span>
   </a>
 
 </div>
 
 <script>
+  window.__orderMsg='Halo Minmil, aku mau pesan dongg 🙏';
   (function(){
     var cc=document.getElementById('ccBtn');
-    if(cc){ cc.href='https://wa.me/6288216106216?text='+encodeURIComponent('Halo Customer Care Oma Opa Cakery 😊\n\nSaya mau menyampaikan kritik / saran / kendala soal web:\n'); }
+    function setCc(t){ if(cc) cc.href='https://wa.me/6288216106216?text='+encodeURIComponent(t||'Halo minmil, saya ingin menyampaikan kritik / kendala nih'); }
+    setCc('Halo minmil, saya ingin menyampaikan kritik / kendala nih');
+    function load(){ try{ if(window.OmaOpa&&window.OmaOpa.getMessages){ window.OmaOpa.getMessages().then(function(m){ if(!m) return; if(m.cc) setCc(m.cc); if(m.order) window.__orderMsg=m.order; }).catch(function(){}); } }catch(e){} }
+    window.addEventListener('omaopa:ready', load); setTimeout(load, 1000);
   })();
 </script>
 
@@ -255,7 +258,7 @@
 
 <script src="menu-data.js?v=69"></script>
 <script src="outlets-data.js?v=69"></script>
-<script type="module" src="core-omaopa.js?v=80"></script>
+<script type="module" src="core-omaopa.js?v=81"></script>
 <script>
   try{ var _ci=document.getElementById('coin'); if(_ci) _ci.textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){}
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -422,7 +425,7 @@
       if(miss.length){ var mm='Lengkapi dulu: '+miss.join(', '); if(err) err.innerHTML='<div class="cf-err">'+mm+'</div>'; try{ if(err&&err.scrollIntoView) err.scrollIntoView({block:'center'}); }catch(e){} try{ alert(mm); }catch(e){} return; }
       var ol=orderLines(); if(!ol.length){ view='list'; render(); return; }
       var kue=ol.map(function(x){ return '- '+x.q+'x '+x.m.cat+' - '+x.m.name+' ('+rpid(x.sub)+')'; }).join('\n');
-      var msg='Halo Minmil, aku mau pesan dongg 🙏\n\n'
+      var msg=(window.__orderMsg||'Halo Minmil, aku mau pesan dongg 🙏')+'\n\n'
         +'PESANAN DIAMBIL SENDIRI\n'
         +'Nama : '+form.nama.trim()+'\n'
         +'Hari dan tanggal pengambilan : '+fmtTgl(form.tgl)+'\n'

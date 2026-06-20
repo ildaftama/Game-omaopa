@@ -1132,6 +1132,12 @@ async function saveBanner(opts){ if(!(await isSuper())) throw {message:'Khusus a
   if(opts.active!==undefined) patch.active=!!opts.active;
   await setDoc(doc(db,'settings','announcement'), patch, {merge:true}); }
 
+// ===== Pesan otomatis WA (CC & order) — editable admin =====
+const DEF_CC_MSG='Halo minmil, saya ingin menyampaikan kritik / kendala nih';
+const DEF_ORDER_MSG='Halo Minmil, aku mau pesan dongg 🙏';
+async function getMessages(){ try{ const s=await getDoc(doc(db,'settings','messages')); const d=(s.exists()&&s.data())||{}; return { cc:(d.cc||DEF_CC_MSG), order:(d.order||DEF_ORDER_MSG) }; }catch(e){ return { cc:DEF_CC_MSG, order:DEF_ORDER_MSG }; } }
+async function setMessages(m){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; m=m||{}; await setDoc(doc(db,'settings','messages'), { cc:String(m.cc||''), order:String(m.order||''), updatedAt:serverTimestamp() }, {merge:true}); }
+
 // ===== Multi-banner carousel (koleksi 'banners', slot b1..b3) =====
 async function _bumpBannerVer(){ try{ await setDoc(doc(db,'settings','bannerVer'), { v:Date.now() }, {merge:true}); }catch(e){} }
 async function listBanners(){ if(!(await isSuper())) throw {message:'Khusus admin utama.'};
@@ -1228,7 +1234,7 @@ window.OmaOpa = {
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
-  getAnnouncement, setAnnouncement, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
+  getAnnouncement, setAnnouncement, getMessages, setMessages, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel,
   tierOf, TIERS, getMyTier,
   signOut: doSignOut,
