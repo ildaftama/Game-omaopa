@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=85"></script>
+<script type="module" src="core-omaopa.js?v=86"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -675,12 +675,13 @@
       +'<label>Catatan (opsional)</label><input id="rN" placeholder="cth: min. belanja 50rb">'
       +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Harga poin</label><input id="rC" inputmode="numeric" placeholder="cth: 150"></div><div style="flex:1"><label>Stok (limit)</label><input id="rL" inputmode="numeric" placeholder="cth: 100"></div></div>'
       +'<label>Jenis voucher (buat dipakai di transaksi CS)</label><select id="rDT"><option value="none">Tidak ada</option><option value="percent">Diskon persen (%)</option><option value="freeitem">Item gratis</option></select>'
-      +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Nilai % (kalau persen)</label><input id="rDV" inputmode="numeric" placeholder="cth: 15"></div><div style="flex:1"><label>Item gratis (kalau item)</label><select id="rFI"><option value="">— pilih —</option>'+(window.OMA_MENU||[]).map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>';}).join('')+'</select></div></div>'
+      +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Nilai % (kalau persen)</label><input id="rDV" inputmode="numeric" placeholder="cth: 15"></div><div style="flex:1"><label>Maks potongan Rp (opsional)</label><input id="rDM" inputmode="numeric" placeholder="cth: 50000"></div></div>'
+      +'<label>Item gratis (kalau item)</label><select id="rFI"><option value="">— pilih —</option>'+(window.OMA_MENU||[]).map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>';}).join('')+'</select>'
       +'<button class="btn" id="rAdd">＋ Tambah reward</button><div id="rMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola reward.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar reward</div><button class="btn sm sec" id="rReload">↻</button></div><div id="rList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){ document.getElementById('rAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('rMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       try{ var _dt=document.getElementById('rDT').value; var _pl={ title:document.getElementById('rT').value, note:document.getElementById('rN').value, cost:document.getElementById('rC').value, limit:document.getElementById('rL').value, active:true, discType:_dt };
-        if(_dt==='percent') _pl.discValue=document.getElementById('rDV').value;
+        if(_dt==='percent'){ _pl.discValue=document.getElementById('rDV').value; _pl.discMax=document.getElementById('rDM').value; }
         if(_dt==='freeitem'){ var _fid=document.getElementById('rFI').value; var _mi=(window.OMA_MENU||[]).find(function(m){return m.id===_fid;}); _pl.freeItemId=_fid; _pl.freeItemName=_mi?((_mi.cat?_mi.cat+' — ':'')+_mi.name):''; _pl.freeItemPrice=_mi?_mi.price:0; }
         await O.saveReward(_eid,_pl);
         msg.innerHTML='<div class="res ok">✓ '+(_eid?'Reward diperbarui.':'Reward ditambahkan.')+'</div>'; resetRewardForm(); loadRewards();
@@ -709,8 +710,8 @@
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada reward.</div>'; return; }
     box.innerHTML=arr.map(function(r){ var rem=(r.limit!=null)?('sisa '+Math.max(0,r.limit-r.claimed)+'/'+r.limit):'tanpa limit';
       return '<div class="row"><div class="grow"><div class="nm">'+esc(r.title)+(r.active?'':' <span class="tag off">OFF</span>')+(r.custom?' <span class="tag adm">custom</span>':'')+'</div>'
-        +'<div class="sub"><span class="pts">'+r.cost+' poin</span> · '+rem+(r.discType==='percent'?(' · <b>−'+r.discValue+'%</b>'):'')+(r.discType==='freeitem'?(' · <b>gratis '+esc(r.freeItemName||'item')+'</b>'):'')+(r.note?(' · '+esc(r.note)):'')+'</div></div>'
-        +(canEdit ? ('<button class="btn sm sec" data-redit=\''+esc(JSON.stringify({id:r.id,title:r.title,note:r.note,cost:r.cost,limit:r.limit,discType:r.discType,discValue:r.discValue,freeItemId:r.freeItemId,freeItemName:r.freeItemName,freeItemPrice:r.freeItemPrice}))+'\'>Edit</button>'
+        +'<div class="sub"><span class="pts">'+r.cost+' poin</span> · '+rem+(r.discType==='percent'?(' · <b>−'+r.discValue+'%'+(r.discMax?(' maks '+rp(r.discMax)):'')+'</b>'):'')+(r.discType==='freeitem'?(' · <b>gratis '+esc(r.freeItemName||'item')+'</b>'):'')+(r.note?(' · '+esc(r.note)):'')+'</div></div>'
+        +(canEdit ? ('<button class="btn sm sec" data-redit=\''+esc(JSON.stringify({id:r.id,title:r.title,note:r.note,cost:r.cost,limit:r.limit,discType:r.discType,discValue:r.discValue,discMax:r.discMax,freeItemId:r.freeItemId,freeItemName:r.freeItemName,freeItemPrice:r.freeItemPrice}))+'\'>Edit</button>'
           +'<button class="btn sm sec" data-ract="'+esc(r.id)+'" data-on="'+(r.active?'1':'0')+'">'+(r.active?'Off':'On')+'</button>'
           +'<button class="btn sm red" data-rdel="'+esc(r.id)+'">Hapus</button>') : '')+'</div>'; }).join('');
     if(!canEdit) return;
@@ -719,7 +720,7 @@
     box.querySelectorAll('[data-redit]').forEach(function(b){ b.onclick=function(){ var r=JSON.parse(b.getAttribute('data-redit')); editReward(r); }; });
   }
   function resetRewardForm(){
-    ['rT','rN','rC','rL','rDV'].forEach(function(i){ var e=document.getElementById(i); if(e) e.value=''; });
+    ['rT','rN','rC','rL','rDV','rDM'].forEach(function(i){ var e=document.getElementById(i); if(e) e.value=''; });
     var dt=document.getElementById('rDT'); if(dt) dt.value='none';
     var fi=document.getElementById('rFI'); if(fi) fi.value='';
     var add=document.getElementById('rAdd'); if(add){ add.textContent='＋ Tambah reward'; delete add.dataset.editId; }
@@ -728,7 +729,7 @@
   function editReward(r){
     var g=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
     g('rT',r.title); g('rN',r.note||''); g('rC',r.cost); g('rL',r.limit==null?'':r.limit);
-    g('rDT', r.discType||'none'); g('rDV', (r.discType==='percent'?(r.discValue||''):''));
+    g('rDT', r.discType||'none'); g('rDV', (r.discType==='percent'?(r.discValue||''):'')); g('rDM', (r.discType==='percent'?(r.discMax||''):''));
     var fi=document.getElementById('rFI'); if(fi) fi.value=(r.discType==='freeitem'?(r.freeItemId||''):'');
     var add=document.getElementById('rAdd'); if(add){ add.textContent='💾 Simpan perubahan'; add.dataset.editId=r.id; }
     var msg=document.getElementById('rMsg'); if(msg) msg.innerHTML='<div class="muted" style="margin-top:6px">Mengedit <b>'+esc(r.title)+'</b> — ubah di form atas (item gratis tinggal pilih dari menu, harga ikut menu), lalu Simpan. <a href="#" id="rCancel">Batal</a></div>';

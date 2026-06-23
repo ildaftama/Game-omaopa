@@ -274,7 +274,7 @@
 
 <script src="menu-data.js?v=69"></script>
 <script src="outlets-data.js?v=69"></script>
-<script type="module" src="core-omaopa.js?v=85"></script>
+<script type="module" src="core-omaopa.js?v=86"></script>
 <script>
   try{ var _ci=document.getElementById('coin'); if(_ci) _ci.textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){}
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -432,7 +432,7 @@
     }
     function chg(id,d){ cart[id]=Math.max(0,(cart[id]||0)+d); if(!cart[id]) delete cart[id]; renderList(); }
     function total(){ var t=0; MENU.forEach(function(m){ if(cart[m.id]) t+=m.price*cart[m.id]; }); return t; }
-    function vDisc(){ if(selVoucher && selVoucher.discType==='percent'){ return Math.floor(total()*(Number(selVoucher.discValue)||0)/100); } return 0; }
+    function vDisc(){ if(selVoucher && selVoucher.discType==='percent'){ var d=Math.floor(total()*(Number(selVoucher.discValue)||0)/100); var cap=Number(selVoucher.discMax)||0; if(cap>0 && d>cap) d=cap; return d; } return 0; }
     function vFree(){ if(selVoucher && selVoucher.discType==='freeitem' && selVoucher.freeItemName){ return { name:selVoucher.freeItemName, id:selVoucher.freeItemId||'' }; } return null; }
     function grandTotal(){ return Math.max(0, total()-vDisc()); }
     function updateTotal(){ var t=(view==='form')?grandTotal():total(); totalEl.textContent=rpid(t); if(goBtn) goBtn.disabled=(view==='list' && total()<=0); }

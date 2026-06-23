@@ -398,10 +398,10 @@ async function loadRewardCatalog(){
       title:(o.title!=null?o.title:rw.title), note:(o.note!=null?o.note:(rw.note||'')),
       cost:(num(o.cost)!=null?o.cost:rw.cost), limit:(num(o.limit)!=null?o.limit:(rw.limit!=null?rw.limit:null)),
       claimed:(num(o.claimed)!=null?o.claimed:0), active:(o.active!==false), icon:(o.icon||''),
-      discType:(o.discType||'none'), discValue:(num(o.discValue)!=null?o.discValue:0), freeItemId:(o.freeItemId||''), freeItemName:(o.freeItemName||''), freeItemPrice:(num(o.freeItemPrice)!=null?o.freeItemPrice:0), custom:false });
+      discType:(o.discType||'none'), discValue:(num(o.discValue)!=null?o.discValue:0), discMax:(num(o.discMax)!=null?o.discMax:0), freeItemId:(o.freeItemId||''), freeItemName:(o.freeItemName||''), freeItemPrice:(num(o.freeItemPrice)!=null?o.freeItemPrice:0), custom:false });
     delete docs[rw.id]; });
   Object.keys(docs).forEach(id=>{ const x=docs[id]; if(x.deleted) return; if(num(x.cost)==null) return;
-    list.push({ id, title:x.title||id, note:x.note||'', cost:x.cost, limit:(num(x.limit)!=null?x.limit:null), claimed:(num(x.claimed)!=null?x.claimed:0), active:(x.active!==false), icon:x.icon||'', discType:(x.discType||'none'), discValue:(num(x.discValue)!=null?x.discValue:0), freeItemId:(x.freeItemId||''), freeItemName:(x.freeItemName||''), freeItemPrice:(num(x.freeItemPrice)!=null?x.freeItemPrice:0), custom:true }); });
+    list.push({ id, title:x.title||id, note:x.note||'', cost:x.cost, limit:(num(x.limit)!=null?x.limit:null), claimed:(num(x.claimed)!=null?x.claimed:0), active:(x.active!==false), icon:x.icon||'', discType:(x.discType||'none'), discValue:(num(x.discValue)!=null?x.discValue:0), discMax:(num(x.discMax)!=null?x.discMax:0), freeItemId:(x.freeItemId||''), freeItemName:(x.freeItemName||''), freeItemPrice:(num(x.freeItemPrice)!=null?x.freeItemPrice:0), custom:true }); });
   list.sort((a,b)=>a.cost-b.cost);
   rewardCatalog=list; rewardStock={}; list.forEach(r=>rewardStock[r.id]=r.claimed);
   return list;
@@ -434,7 +434,7 @@ async function redeem(rewardId){
     tx.set(uref, { points: cur - rw.cost, lastRedeem: today, updatedAt: serverTimestamp() }, {merge:true});
     tx.set(rref, { claimed: claimed + 1, limit: (rw.limit||null), title: rw.title, updatedAt: serverTimestamp() }, {merge:true});
     const _rd=(rs.exists()&&rs.data())||{};
-    tx.set(vref, { code:code, uid:user.uid, name:nm, rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, status:'aktif', discType:(_rd.discType||rw.discType||'none'), discValue:(_rd.discValue!=null?_rd.discValue:(rw.discValue||0)), freeItemId:(_rd.freeItemId||rw.freeItemId||''), freeItemName:(_rd.freeItemName||rw.freeItemName||''), freeItemPrice:(_rd.freeItemPrice!=null?_rd.freeItemPrice:(rw.freeItemPrice||0)), createdAt: serverTimestamp() });
+    tx.set(vref, { code:code, uid:user.uid, name:nm, rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, status:'aktif', discType:(_rd.discType||rw.discType||'none'), discValue:(_rd.discValue!=null?_rd.discValue:(rw.discValue||0)), discMax:(_rd.discMax!=null?_rd.discMax:(rw.discMax||0)), freeItemId:(_rd.freeItemId||rw.freeItemId||''), freeItemName:(_rd.freeItemName||rw.freeItemName||''), freeItemPrice:(_rd.freeItemPrice!=null?_rd.freeItemPrice:(rw.freeItemPrice||0)), createdAt: serverTimestamp() });
   });
   if(profile) profile.lastRedeem=today;
   rewardStock[rw.id] = (rewardStock[rw.id]||0) + 1;
@@ -1096,6 +1096,7 @@ async function saveReward(id, patch){
   if(patch.active!=null) data.active=!!patch.active;
   if(patch.discType!=null) data.discType=String(patch.discType||'none');
   if(patch.discValue!=null && patch.discValue!=='') data.discValue=Math.max(0,Number(patch.discValue)||0);
+  if(patch.discMax!=null && patch.discMax!=='') data.discMax=Math.max(0,Math.floor(Number(patch.discMax)||0));
   if(patch.freeItemId!=null) data.freeItemId=String(patch.freeItemId||'');
   if(patch.freeItemName!=null) data.freeItemName=String(patch.freeItemName||'');
   if(patch.freeItemPrice!=null && patch.freeItemPrice!=='') data.freeItemPrice=Math.max(0,Math.floor(Number(patch.freeItemPrice)||0));
