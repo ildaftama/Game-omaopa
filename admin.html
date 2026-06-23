@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=84"></script>
+<script type="module" src="core-omaopa.js?v=85"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -712,7 +712,7 @@
         +'<div class="sub"><span class="pts">'+r.cost+' poin</span> · '+rem+(r.discType==='percent'?(' · <b>−'+r.discValue+'%</b>'):'')+(r.discType==='freeitem'?(' · <b>gratis '+esc(r.freeItemName||'item')+'</b>'):'')+(r.note?(' · '+esc(r.note)):'')+'</div></div>'
         +(canEdit ? ('<button class="btn sm sec" data-redit=\''+esc(JSON.stringify({id:r.id,title:r.title,note:r.note,cost:r.cost,limit:r.limit,discType:r.discType,discValue:r.discValue,freeItemId:r.freeItemId,freeItemName:r.freeItemName,freeItemPrice:r.freeItemPrice}))+'\'>Edit</button>'
           +'<button class="btn sm sec" data-ract="'+esc(r.id)+'" data-on="'+(r.active?'1':'0')+'">'+(r.active?'Off':'On')+'</button>'
-          +(r.custom?'<button class="btn sm red" data-rdel="'+esc(r.id)+'">Hapus</button>':'')) : '')+'</div>'; }).join('');
+          +'<button class="btn sm red" data-rdel="'+esc(r.id)+'">Hapus</button>') : '')+'</div>'; }).join('');
     if(!canEdit) return;
     box.querySelectorAll('[data-ract]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.setRewardActive(b.getAttribute('data-ract'), b.getAttribute('data-on')!=='1'); loadRewards(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-rdel]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus reward ini?')) return; busy=true; b.disabled=true; try{ await O.deleteReward(b.getAttribute('data-rdel')); loadRewards(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });

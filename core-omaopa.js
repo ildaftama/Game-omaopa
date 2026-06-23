@@ -393,14 +393,14 @@ async function loadRewardCatalog(){
   try{ const snap=await getDocs(collection(db,'rewards')); snap.forEach(d=>{ docs[d.id]=d.data()||{}; }); }catch(e){}
   const num=(v)=> (typeof v==='number')?v:null;
   const list=[];
-  REWARDS.forEach(rw=>{ const o=docs[rw.id]||{};
+  REWARDS.forEach(rw=>{ const o=docs[rw.id]||{}; if(o.deleted){ delete docs[rw.id]; return; }
     list.push({ id:rw.id,
       title:(o.title!=null?o.title:rw.title), note:(o.note!=null?o.note:(rw.note||'')),
       cost:(num(o.cost)!=null?o.cost:rw.cost), limit:(num(o.limit)!=null?o.limit:(rw.limit!=null?rw.limit:null)),
       claimed:(num(o.claimed)!=null?o.claimed:0), active:(o.active!==false), icon:(o.icon||''),
       discType:(o.discType||'none'), discValue:(num(o.discValue)!=null?o.discValue:0), freeItemId:(o.freeItemId||''), freeItemName:(o.freeItemName||''), freeItemPrice:(num(o.freeItemPrice)!=null?o.freeItemPrice:0), custom:false });
     delete docs[rw.id]; });
-  Object.keys(docs).forEach(id=>{ const x=docs[id]; if(num(x.cost)==null) return;
+  Object.keys(docs).forEach(id=>{ const x=docs[id]; if(x.deleted) return; if(num(x.cost)==null) return;
     list.push({ id, title:x.title||id, note:x.note||'', cost:x.cost, limit:(num(x.limit)!=null?x.limit:null), claimed:(num(x.claimed)!=null?x.claimed:0), active:(x.active!==false), icon:x.icon||'', discType:(x.discType||'none'), discValue:(num(x.discValue)!=null?x.discValue:0), freeItemId:(x.freeItemId||''), freeItemName:(x.freeItemName||''), freeItemPrice:(num(x.freeItemPrice)!=null?x.freeItemPrice:0), custom:true }); });
   list.sort((a,b)=>a.cost-b.cost);
   rewardCatalog=list; rewardStock={}; list.forEach(r=>rewardStock[r.id]=r.claimed);
@@ -1104,7 +1104,7 @@ async function saveReward(id, patch){
 }
 async function setRewardActive(id, active){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'rewards',(id||'').trim()), { active:!!active, updatedAt:serverTimestamp() },{merge:true}); }
 async function resetRewardClaimed(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'rewards',(id||'').trim()), { claimed:0, updatedAt:serverTimestamp() },{merge:true}); }
-async function deleteReward(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'rewards',(id||'').trim())); }
+async function deleteReward(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); if(REWARDS.some(function(r){return r.id===id;})){ await setDoc(doc(db,'rewards',id), { deleted:true, active:false, updatedAt:serverTimestamp() }, {merge:true}); } else { await deleteDoc(doc(db,'rewards',id)); } }
 
 // ---- voucher (admin) ----
 async function adminClearUsedVouchers(){
