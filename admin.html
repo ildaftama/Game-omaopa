@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=81"></script>
+<script type="module" src="core-omaopa.js?v=84"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -480,7 +480,7 @@
     tabEl.querySelectorAll('[data-of]').forEach(function(b){ b.onclick=function(){ curOf=b.getAttribute('data-of'); loadOrders(curOf); }; });
     loadOrders(curOf);
   }
-  function orderAct(fn){ if(busy) return; busy=true; Promise.resolve().then(fn).then(function(){ busy=false; loadOrders(curOf); }).catch(function(e){ busy=false; alert((e&&e.message)||'Gagal'); }); }
+  function orderAct(fn){ if(busy) return; busy=true; Promise.resolve().then(fn).then(function(res){ busy=false; if(res&&res.voucherWarn){ alert('⚠️ Voucher '+(res.voucherCode||'')+' sudah terpakai sebelumnya — diskon TIDAK berlaku lagi. Cek pesanan ini manual ya.'); } loadOrders(curOf); }).catch(function(e){ busy=false; alert((e&&e.message)||'Gagal'); }); }
   async function loadOrders(f){
     var box=document.getElementById('oList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     var arr=[]; try{ arr=await O.listOrders(1000); }catch(e){}
@@ -493,7 +493,7 @@
       var when=o.ts?new Date(o.ts).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
       return '<div class="row" style="flex-wrap:wrap"><div class="grow"><div class="nm" style="font-size:.9rem">'+esc(o.nama||'(tanpa nama)')+' '+badge+'</div>'
         +'<div class="sub">'+esc(o.outlet||'-')+' · '+rp(o.total)+' · '+esc(when)+'</div>'
-        +'<div class="sub" style="margin-top:3px">'+esc(items||'(tanpa item)')+(o.note?(' · 📝 '+esc(o.note)):'')+'</div>'
+        +'<div class="sub" style="margin-top:3px">'+esc(items||'(tanpa item)')+(o.voucherCode?(' · 🎟️ '+esc(o.voucherCode)+(o.voucherDisc?(' (−'+rp(o.voucherDisc)+')'):'')):'')+(o.note?(' · 📝 '+esc(o.note)):'')+'</div>'
         +(o.telp?'<div class="sub">'+esc(o.telp)+'</div>':'')+'</div>'
         +(canEdit ? ('<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;width:100%">'
         +(st!=='approved'?'<button class="btn sm green" data-oapp="'+esc(o.id)+'">✓ Approve</button>':'')
@@ -674,11 +674,16 @@
       +'<label>Judul</label><input id="rT" placeholder="cth: Gratis Kopi">'
       +'<label>Catatan (opsional)</label><input id="rN" placeholder="cth: min. belanja 50rb">'
       +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Harga poin</label><input id="rC" inputmode="numeric" placeholder="cth: 150"></div><div style="flex:1"><label>Stok (limit)</label><input id="rL" inputmode="numeric" placeholder="cth: 100"></div></div>'
+      +'<label>Jenis voucher (buat dipakai di transaksi CS)</label><select id="rDT"><option value="none">Tidak ada</option><option value="percent">Diskon persen (%)</option><option value="freeitem">Item gratis</option></select>'
+      +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Nilai % (kalau persen)</label><input id="rDV" inputmode="numeric" placeholder="cth: 15"></div><div style="flex:1"><label>Item gratis (kalau item)</label><select id="rFI"><option value="">— pilih —</option>'+(window.OMA_MENU||[]).map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>';}).join('')+'</select></div></div>'
       +'<button class="btn" id="rAdd">＋ Tambah reward</button><div id="rMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola reward.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar reward</div><button class="btn sm sec" id="rReload">↻</button></div><div id="rList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){ document.getElementById('rAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('rMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
-      try{ await O.saveReward(null,{ title:document.getElementById('rT').value, note:document.getElementById('rN').value, cost:document.getElementById('rC').value, limit:document.getElementById('rL').value, active:true });
-        msg.innerHTML='<div class="res ok">✓ Reward ditambahkan.</div>'; ['rT','rN','rC','rL'].forEach(function(i){document.getElementById(i).value='';}); loadRewards();
+      try{ var _dt=document.getElementById('rDT').value; var _pl={ title:document.getElementById('rT').value, note:document.getElementById('rN').value, cost:document.getElementById('rC').value, limit:document.getElementById('rL').value, active:true, discType:_dt };
+        if(_dt==='percent') _pl.discValue=document.getElementById('rDV').value;
+        if(_dt==='freeitem'){ var _fid=document.getElementById('rFI').value; var _mi=(window.OMA_MENU||[]).find(function(m){return m.id===_fid;}); _pl.freeItemId=_fid; _pl.freeItemName=_mi?_mi.name:''; _pl.freeItemPrice=_mi?_mi.price:0; }
+        await O.saveReward(null,_pl);
+        msg.innerHTML='<div class="res ok">✓ Reward ditambahkan.</div>'; ['rT','rN','rC','rL','rDV'].forEach(function(i){var e=document.getElementById(i); if(e) e.value='';}); var _rdt=document.getElementById('rDT'); if(_rdt)_rdt.value='none'; var _rfi=document.getElementById('rFI'); if(_rfi)_rfi.value=''; loadRewards();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     var vh=document.getElementById('vhBtn'); if(vh) vh.onclick=loadVoucherHistory;
     document.getElementById('rReload').onclick=loadRewards; loadRewards();
@@ -704,8 +709,8 @@
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada reward.</div>'; return; }
     box.innerHTML=arr.map(function(r){ var rem=(r.limit!=null)?('sisa '+Math.max(0,r.limit-r.claimed)+'/'+r.limit):'tanpa limit';
       return '<div class="row"><div class="grow"><div class="nm">'+esc(r.title)+(r.active?'':' <span class="tag off">OFF</span>')+(r.custom?' <span class="tag adm">custom</span>':'')+'</div>'
-        +'<div class="sub"><span class="pts">'+r.cost+' poin</span> · '+rem+(r.note?(' · '+esc(r.note)):'')+'</div></div>'
-        +(canEdit ? ('<button class="btn sm sec" data-redit=\''+esc(JSON.stringify({id:r.id,title:r.title,note:r.note,cost:r.cost,limit:r.limit}))+'\'>Edit</button>'
+        +'<div class="sub"><span class="pts">'+r.cost+' poin</span> · '+rem+(r.discType==='percent'?(' · <b>−'+r.discValue+'%</b>'):'')+(r.discType==='freeitem'?(' · <b>gratis '+esc(r.freeItemName||'item')+'</b>'):'')+(r.note?(' · '+esc(r.note)):'')+'</div></div>'
+        +(canEdit ? ('<button class="btn sm sec" data-redit=\''+esc(JSON.stringify({id:r.id,title:r.title,note:r.note,cost:r.cost,limit:r.limit,discType:r.discType,discValue:r.discValue,freeItemId:r.freeItemId,freeItemName:r.freeItemName,freeItemPrice:r.freeItemPrice}))+'\'>Edit</button>'
           +'<button class="btn sm sec" data-ract="'+esc(r.id)+'" data-on="'+(r.active?'1':'0')+'">'+(r.active?'Off':'On')+'</button>'
           +(r.custom?'<button class="btn sm red" data-rdel="'+esc(r.id)+'">Hapus</button>':'')) : '')+'</div>'; }).join('');
     if(!canEdit) return;
@@ -718,7 +723,11 @@
     var c=prompt('Harga poin:', r.cost); if(c==null) return;
     var l=prompt('Stok (limit), kosong = tetap:', r.limit==null?'':r.limit);
     var n=prompt('Catatan:', r.note||'');
-    busy=true; O.saveReward(r.id,{ title:t, cost:c, limit:l, note:n }).then(function(){ busy=false; loadRewards(); }).catch(function(e){ busy=false; alert((e&&e.message)||'Gagal'); });
+    var dt=prompt('Jenis voucher: none / percent / freeitem', r.discType||'none'); if(dt==null) dt=r.discType||'none';
+    var patch={ title:t, cost:c, limit:l, note:n, discType:dt };
+    if(dt==='percent'){ var dv=prompt('Nilai persen (%):', r.discValue||''); if(dv!=null) patch.discValue=dv; }
+    if(dt==='freeitem'){ var fn=prompt('Nama item gratis:', r.freeItemName||''); var fp=prompt('Harga item gratis (Rp):', r.freeItemPrice||''); patch.freeItemName=fn||''; patch.freeItemPrice=fp||0; patch.freeItemId=r.freeItemId||''; }
+    busy=true; O.saveReward(r.id,patch).then(function(){ busy=false; loadRewards(); }).catch(function(e){ busy=false; alert((e&&e.message)||'Gagal'); });
   }
 
   window.addEventListener('omaopa:ready', boot);

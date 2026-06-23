@@ -397,10 +397,11 @@ async function loadRewardCatalog(){
     list.push({ id:rw.id,
       title:(o.title!=null?o.title:rw.title), note:(o.note!=null?o.note:(rw.note||'')),
       cost:(num(o.cost)!=null?o.cost:rw.cost), limit:(num(o.limit)!=null?o.limit:(rw.limit!=null?rw.limit:null)),
-      claimed:(num(o.claimed)!=null?o.claimed:0), active:(o.active!==false), icon:(o.icon||''), custom:false });
+      claimed:(num(o.claimed)!=null?o.claimed:0), active:(o.active!==false), icon:(o.icon||''),
+      discType:(o.discType||'none'), discValue:(num(o.discValue)!=null?o.discValue:0), freeItemId:(o.freeItemId||''), freeItemName:(o.freeItemName||''), freeItemPrice:(num(o.freeItemPrice)!=null?o.freeItemPrice:0), custom:false });
     delete docs[rw.id]; });
   Object.keys(docs).forEach(id=>{ const x=docs[id]; if(num(x.cost)==null) return;
-    list.push({ id, title:x.title||id, note:x.note||'', cost:x.cost, limit:(num(x.limit)!=null?x.limit:null), claimed:(num(x.claimed)!=null?x.claimed:0), active:(x.active!==false), icon:x.icon||'', custom:true }); });
+    list.push({ id, title:x.title||id, note:x.note||'', cost:x.cost, limit:(num(x.limit)!=null?x.limit:null), claimed:(num(x.claimed)!=null?x.claimed:0), active:(x.active!==false), icon:x.icon||'', discType:(x.discType||'none'), discValue:(num(x.discValue)!=null?x.discValue:0), freeItemId:(x.freeItemId||''), freeItemName:(x.freeItemName||''), freeItemPrice:(num(x.freeItemPrice)!=null?x.freeItemPrice:0), custom:true }); });
   list.sort((a,b)=>a.cost-b.cost);
   rewardCatalog=list; rewardStock={}; list.forEach(r=>rewardStock[r.id]=r.claimed);
   return list;
@@ -432,7 +433,8 @@ async function redeem(rewardId){
     if(cur < rw.cost) throw {message:'Poin belum cukup.'};
     tx.set(uref, { points: cur - rw.cost, lastRedeem: today, updatedAt: serverTimestamp() }, {merge:true});
     tx.set(rref, { claimed: claimed + 1, limit: (rw.limit||null), title: rw.title, updatedAt: serverTimestamp() }, {merge:true});
-    tx.set(vref, { code:code, uid:user.uid, name:nm, rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, status:'aktif', createdAt: serverTimestamp() });
+    const _rd=(rs.exists()&&rs.data())||{};
+    tx.set(vref, { code:code, uid:user.uid, name:nm, rewardId:rw.id, title:rw.title, note:rw.note||'', cost:rw.cost, status:'aktif', discType:(_rd.discType||rw.discType||'none'), discValue:(_rd.discValue!=null?_rd.discValue:(rw.discValue||0)), freeItemId:(_rd.freeItemId||rw.freeItemId||''), freeItemName:(_rd.freeItemName||rw.freeItemName||''), freeItemPrice:(_rd.freeItemPrice!=null?_rd.freeItemPrice:(rw.freeItemPrice||0)), createdAt: serverTimestamp() });
   });
   if(profile) profile.lastRedeem=today;
   rewardStock[rw.id] = (rewardStock[rw.id]||0) + 1;
@@ -707,6 +709,7 @@ function mountRw(){ if(!document.body.contains(rwBk)) document.body.appendChild(
 if(document.body) mountRw(); else document.addEventListener('DOMContentLoaded', mountRw);
 let rwTab='katalog', rwBanner='';
 function openRewards(){ mountRw(); rwTab='katalog'; rwBanner=''; renderRewards(); rwBk.classList.add('show'); refreshStock(); }
+function openVouchers(){ mountRw(); rwTab='voucher'; rwBanner=''; renderRewards(); rwBk.classList.add('show'); }
 function closeRewards(){ rwBk.classList.remove('show'); rwBanner=''; }
 function refreshStock(){ loadRewardCatalog().then(()=>{ if(rwBk.classList.contains('show') && rwTab==='katalog') renderRewards(); }); }
 rwBk.querySelector('#rwX').onclick = closeRewards;
@@ -1091,6 +1094,11 @@ async function saveReward(id, patch){
   if(patch.cost!=null && patch.cost!=='') data.cost=Math.max(0,Math.floor(Number(patch.cost)||0));
   if(patch.limit!=null && patch.limit!=='') data.limit=Math.max(0,Math.floor(Number(patch.limit)||0));
   if(patch.active!=null) data.active=!!patch.active;
+  if(patch.discType!=null) data.discType=String(patch.discType||'none');
+  if(patch.discValue!=null && patch.discValue!=='') data.discValue=Math.max(0,Number(patch.discValue)||0);
+  if(patch.freeItemId!=null) data.freeItemId=String(patch.freeItemId||'');
+  if(patch.freeItemName!=null) data.freeItemName=String(patch.freeItemName||'');
+  if(patch.freeItemPrice!=null && patch.freeItemPrice!=='') data.freeItemPrice=Math.max(0,Math.floor(Number(patch.freeItemPrice)||0));
   data.updatedAt=serverTimestamp();
   await setDoc(doc(db,'rewards',id), data, {merge:true}); return { id:id };
 }
@@ -1171,10 +1179,11 @@ async function logOrder(o){
   o=o||{}; const items=(o.items||[]).map(it=>({ id:it.id||'', cat:it.cat||'', name:it.name||'', price:it.price||0, qty:it.qty||0 }));
   try{ await addDoc(collection(db,'orders'), { items:items, total:o.total||0, count:items.reduce((s,i)=>s+(i.qty||0),0),
     outlet:o.outlet||'', nama:o.nama||'', telp:o.telp||'', tgl:o.tgl||'', jam:o.jam||'', note:o.note||'',
+    voucherCode:o.voucherCode||'', voucherDisc:o.voucherDisc||0,
     uid:(user?user.uid:''), status:'baru', createdAt:serverTimestamp() }); }catch(e){}
 }
 async function listOrders(n){ n=n||1000;
-  function row(d){ const x=d.data(); return { id:d.id, items:x.items||[], total:x.total||0, count:x.count||0, outlet:x.outlet||'', nama:x.nama||'', telp:x.telp||'', jam:x.jam||'', tgl:x.tgl||'', note:x.note||'', status:x.status||'baru', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }; }
+  function row(d){ const x=d.data(); return { id:d.id, items:x.items||[], total:x.total||0, count:x.count||0, outlet:x.outlet||'', nama:x.nama||'', telp:x.telp||'', jam:x.jam||'', tgl:x.tgl||'', note:x.note||'', voucherCode:x.voucherCode||'', voucherDisc:x.voucherDisc||0, status:x.status||'baru', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }; }
   try{ const snap=await getDocs(query(collection(db,'orders'), orderBy('createdAt','desc'), limit(n))); const arr=[]; snap.forEach(d=>arr.push(row(d))); return arr;
   }catch(e){ try{ const snap=await getDocs(collection(db,'orders')); const arr=[]; snap.forEach(d=>arr.push(row(d))); arr.sort((a,b)=>b.ts-a.ts); return arr; }catch(e2){ return []; } }
 }
@@ -1193,8 +1202,16 @@ function pushOrderItems(id, x, action){
 }
 async function setOrderStatus(id, status){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim();
   await setDoc(doc(db,'orders',id), { status:String(status||'baru'), updatedAt:serverTimestamp() },{merge:true});
-  try{ if(String(status)==='approved'){ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const d=s.data(); pushOrderRow(id, d, 'upsert'); pushOrderItems(id, d, 'replace'); await awardOrderPoints(id, d); } }
+  let voucherWarn=false, voucherCode='';
+  try{ if(String(status)==='approved'){ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const d=s.data(); pushOrderRow(id, d, 'upsert'); pushOrderItems(id, d, 'replace'); await awardOrderPoints(id, d);
+        voucherCode=String(d.voucherCode||'').trim();
+        if(voucherCode){
+          try{ await runTransaction(db, async (tx)=>{ const vref=doc(db,'vouchers',voucherCode); const vs=await tx.get(vref); if(!vs.exists()){ voucherWarn=true; return; } const vd=vs.data()||{}; if(vd.status && vd.status!=='aktif'){ voucherWarn=true; return; } tx.set(vref, { status:'terpakai', usedAt:serverTimestamp(), usedVia:'order', usedOrder:id, usedBy:(user?user.uid:'') }, {merge:true}); }); }catch(e){ voucherWarn=true; }
+          if(!voucherWarn){ try{ pushToSheet({ type:'voucher', waktu:new Date().toISOString(), outlet:(d.outlet||''), kode:voucherCode, title:'', nama:(d.nama||''), uid:(d.uid||'') }); }catch(e){} }
+        }
+      } }
        else { pushToSheet({ type:'pesanan', action:'delete', id:id }); pushOrderItems(id, null, 'delete'); } }catch(e){}
+  return { voucherWarn:voucherWarn, voucherCode:voucherCode };
 }
 async function updateOrder(id, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); const data=Object.assign({updatedAt:serverTimestamp()}, patch||{}); if(data.total!=null) data.total=Math.round(Number(data.total)||0); await setDoc(doc(db,'orders',id), data, {merge:true});
   try{ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const d=s.data(); if((d.status||'baru')==='approved'){ pushOrderRow(id, d, 'upsert'); pushOrderItems(id, d, 'replace'); } } }catch(e){}
@@ -1220,7 +1237,7 @@ async function getMyTier(){ try{ if(!user) return null; const txs=await listMyTr
 // ============================================================
 window.OmaOpa = {
   openLogin, closeLogin,
-  openRewards, closeRewards,
+  openRewards, openVouchers, closeRewards,
   openMemberCard, openProfile, getCheckinStatus, dailyCheckin, openCheckin,
   openLeaderboard, openScoreboard, openHistory,
   submitScore, listPointLeaderboard, listScoreLeaderboard, listMyTransactions,
