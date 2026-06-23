@@ -678,12 +678,12 @@
       +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Nilai % (kalau persen)</label><input id="rDV" inputmode="numeric" placeholder="cth: 15"></div><div style="flex:1"><label>Item gratis (kalau item)</label><select id="rFI"><option value="">— pilih —</option>'+(window.OMA_MENU||[]).map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>';}).join('')+'</select></div></div>'
       +'<button class="btn" id="rAdd">＋ Tambah reward</button><div id="rMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola reward.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar reward</div><button class="btn sm sec" id="rReload">↻</button></div><div id="rList"><div class="muted">Memuat…</div></div></div>';
-    if(canEdit){ document.getElementById('rAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('rMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+    if(canEdit){ document.getElementById('rAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('rMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       try{ var _dt=document.getElementById('rDT').value; var _pl={ title:document.getElementById('rT').value, note:document.getElementById('rN').value, cost:document.getElementById('rC').value, limit:document.getElementById('rL').value, active:true, discType:_dt };
         if(_dt==='percent') _pl.discValue=document.getElementById('rDV').value;
         if(_dt==='freeitem'){ var _fid=document.getElementById('rFI').value; var _mi=(window.OMA_MENU||[]).find(function(m){return m.id===_fid;}); _pl.freeItemId=_fid; _pl.freeItemName=_mi?_mi.name:''; _pl.freeItemPrice=_mi?_mi.price:0; }
-        await O.saveReward(null,_pl);
-        msg.innerHTML='<div class="res ok">✓ Reward ditambahkan.</div>'; ['rT','rN','rC','rL','rDV'].forEach(function(i){var e=document.getElementById(i); if(e) e.value='';}); var _rdt=document.getElementById('rDT'); if(_rdt)_rdt.value='none'; var _rfi=document.getElementById('rFI'); if(_rfi)_rfi.value=''; loadRewards();
+        await O.saveReward(_eid,_pl);
+        msg.innerHTML='<div class="res ok">✓ '+(_eid?'Reward diperbarui.':'Reward ditambahkan.')+'</div>'; resetRewardForm(); loadRewards();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     var vh=document.getElementById('vhBtn'); if(vh) vh.onclick=loadVoucherHistory;
     document.getElementById('rReload').onclick=loadRewards; loadRewards();
@@ -718,16 +718,22 @@
     box.querySelectorAll('[data-rdel]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus reward ini?')) return; busy=true; b.disabled=true; try{ await O.deleteReward(b.getAttribute('data-rdel')); loadRewards(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-redit]').forEach(function(b){ b.onclick=function(){ var r=JSON.parse(b.getAttribute('data-redit')); editReward(r); }; });
   }
+  function resetRewardForm(){
+    ['rT','rN','rC','rL','rDV'].forEach(function(i){ var e=document.getElementById(i); if(e) e.value=''; });
+    var dt=document.getElementById('rDT'); if(dt) dt.value='none';
+    var fi=document.getElementById('rFI'); if(fi) fi.value='';
+    var add=document.getElementById('rAdd'); if(add){ add.textContent='＋ Tambah reward'; delete add.dataset.editId; }
+    var msg=document.getElementById('rMsg'); if(msg) msg.innerHTML='';
+  }
   function editReward(r){
-    var t=prompt('Judul:', r.title); if(t==null) return;
-    var c=prompt('Harga poin:', r.cost); if(c==null) return;
-    var l=prompt('Stok (limit), kosong = tetap:', r.limit==null?'':r.limit);
-    var n=prompt('Catatan:', r.note||'');
-    var dt=prompt('Jenis voucher: none / percent / freeitem', r.discType||'none'); if(dt==null) dt=r.discType||'none';
-    var patch={ title:t, cost:c, limit:l, note:n, discType:dt };
-    if(dt==='percent'){ var dv=prompt('Nilai persen (%):', r.discValue||''); if(dv!=null) patch.discValue=dv; }
-    if(dt==='freeitem'){ var fn=prompt('Nama item gratis:', r.freeItemName||''); var fp=prompt('Harga item gratis (Rp):', r.freeItemPrice||''); patch.freeItemName=fn||''; patch.freeItemPrice=fp||0; patch.freeItemId=r.freeItemId||''; }
-    busy=true; O.saveReward(r.id,patch).then(function(){ busy=false; loadRewards(); }).catch(function(e){ busy=false; alert((e&&e.message)||'Gagal'); });
+    var g=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
+    g('rT',r.title); g('rN',r.note||''); g('rC',r.cost); g('rL',r.limit==null?'':r.limit);
+    g('rDT', r.discType||'none'); g('rDV', (r.discType==='percent'?(r.discValue||''):''));
+    var fi=document.getElementById('rFI'); if(fi) fi.value=(r.discType==='freeitem'?(r.freeItemId||''):'');
+    var add=document.getElementById('rAdd'); if(add){ add.textContent='💾 Simpan perubahan'; add.dataset.editId=r.id; }
+    var msg=document.getElementById('rMsg'); if(msg) msg.innerHTML='<div class="muted" style="margin-top:6px">Mengedit <b>'+esc(r.title)+'</b> — ubah di form atas (item gratis tinggal pilih dari menu, harga ikut menu), lalu Simpan. <a href="#" id="rCancel">Batal</a></div>';
+    var cc=document.getElementById('rCancel'); if(cc) cc.onclick=function(e){ e.preventDefault(); resetRewardForm(); };
+    try{ document.getElementById('rT').scrollIntoView({block:'center'}); }catch(e){}
   }
 
   window.addEventListener('omaopa:ready', boot);
