@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=86"></script>
+<script type="module" src="core-omaopa.js?v=87"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -452,9 +452,23 @@
     html+='<div class="card">'+lineChart('Tren transaksi 14 hari', buckets, labels)+'</div>';
     html+='<div class="card">'+barH('Menu terlaris (order disetujui)', best)+'</div>';
     html+='<div class="card">'+barH('Omzet per outlet (transaksi kasir)', outRows)+'</div>';
+    html+='<div class="card" id="rrCard"><div class="nm">🔁 Repeat rate per outlet</div>'
+      +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Member yang transaksi <b>≥2x</b> ÷ member yang transaksi <b>≥1x</b> di outlet itu, pada periode terpilih.</div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:10px" id="rrPer"><button class="btn sm rrp" data-m="1">1 bulan</button><button class="btn sm sec rrp" data-m="2">2 bulan</button><button class="btn sm sec rrp" data-m="3">3 bulan</button></div>'
+      +'<div id="rrBody" class="muted">Memuat…</div></div>';
     if(!appr.length){ html+='<div class="muted" style="margin-top:8px">Menu terlaris terisi setelah ada pesanan web yang kamu <b>approve</b> di tab Pesanan.</div>'; }
     tabEl.innerHTML=html;
     var pn=document.getElementById('pendNote'); if(pn) pn.onclick=function(){ setActiveTab('pesanan'); render(); };
+    function loadRepeat(m){ var body=document.getElementById('rrBody'); if(!body) return; body.innerHTML='<div class="muted">Menghitung…</div>';
+      O.repeatRateByOutlet(m).then(function(rows){
+        if(!rows||!rows.length){ body.innerHTML='<div class="muted">Belum ada data transaksi pada periode ini.</div>'; return; }
+        var h='<table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr style="text-align:left;color:#9a7a5e"><th style="padding:4px 6px">Outlet</th><th style="padding:4px 6px;text-align:right">Member</th><th style="padding:4px 6px;text-align:right">Balik ≥2x</th><th style="padding:4px 6px;text-align:right">Repeat</th></tr>';
+        rows.forEach(function(r){ var pct=Math.round(r.rate*100); h+='<tr style="border-top:1px solid #EFE2C4"><td style="padding:6px 6px">'+esc(r.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</td><td style="padding:6px 6px;text-align:right">'+r.totalMembers+'</td><td style="padding:6px 6px;text-align:right">'+r.repeatMembers+'</td><td style="padding:6px 6px;text-align:right"><b>'+pct+'%</b></td></tr>'; });
+        h+='</table>'; body.innerHTML=h;
+      }).catch(function(){ body.innerHTML='<div class="res bad">Gagal memuat.</div>'; });
+    }
+    var rrp=document.querySelectorAll('#rrPer .rrp'); Array.prototype.forEach.call(rrp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(rrp,function(x){ x.className='btn sm sec rrp'; }); b.className='btn sm rrp'; loadRepeat(Number(b.dataset.m)); }; });
+    loadRepeat(1);
   }
 
   /* ---------- PESANAN (approval) ---------- */

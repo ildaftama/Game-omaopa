@@ -583,6 +583,18 @@ async function listTransactions(outlet){
     arr.sort((a,b)=>b.ts-a.ts); return arr;
   }catch(e){ return []; }
 }
+async function repeatRateByOutlet(months){
+  months = Math.max(1, Number(months)||1);
+  const cutoff=(function(){ const d=new Date(); d.setMonth(d.getMonth()-months); return d.getTime(); })();
+  let txs=[];
+  try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ uid:x.uid||'', outlet:(x.outlet||'').trim(), kind:x.kind||'', ts:ts }); }); }catch(e){ return []; }
+  const byOutlet={};
+  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral') return; const o=t.outlet; if(!o || /^referral/i.test(o)) return; if(!byOutlet[o]) byOutlet[o]={}; byOutlet[o][t.uid]=(byOutlet[o][t.uid]||0)+1; });
+  const rows=[];
+  Object.keys(byOutlet).forEach(o=>{ const m=byOutlet[o]; const uids=Object.keys(m); const total=uids.length; const repeat=uids.filter(u=>m[u]>=2).length; const visits=uids.reduce((s,u)=>s+m[u],0); rows.push({ outlet:o, totalMembers:total, repeatMembers:repeat, visits:visits, rate:(total?(repeat/total):0) }); });
+  rows.sort((a,b)=>b.totalMembers-a.totalMembers);
+  return rows;
+}
 async function listUsedVouchers(outlet){
   try{
     const q = query(collection(db,'vouchers'), where('status','==','terpakai'));
@@ -1245,7 +1257,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet,
   isAdmin, isSuper, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
