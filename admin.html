@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=87"></script>
+<script type="module" src="core-omaopa.js?v=89"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -456,6 +456,12 @@
       +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Member yang transaksi <b>≥2x</b> ÷ member yang transaksi <b>≥1x</b> di outlet itu, pada periode terpilih.</div>'
       +'<div style="display:flex;gap:6px;margin-bottom:10px" id="rrPer"><button class="btn sm rrp" data-m="1">1 bulan</button><button class="btn sm sec rrp" data-m="2">2 bulan</button><button class="btn sm sec rrp" data-m="3">3 bulan</button></div>'
       +'<div id="rrBody" class="muted">Memuat…</div></div>';
+    html+='<div class="card" id="trCard"><div class="nm">🌐 Traffic & Online</div>'
+      +'<div class="kpis" style="margin-top:8px"><div class="kpi"><div class="v" id="trOnline" style="font-size:1.05rem">…</div><div class="l">Online sekarang</div></div><div class="kpi"><div class="v" id="trToday">…</div><div class="l">Kunjungan hari ini</div></div></div>'
+      +'<div class="kpis"><div class="kpi"><div class="v" id="trMonth">…</div><div class="l">Bulan ini</div></div><div class="kpi"><div class="v" id="tr3">…</div><div class="l">3 bulan</div></div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 8px" id="trPer"><button class="btn sm sec trp" data-d="7">7 hari</button><button class="btn sm trp" data-d="30">30 hari</button><button class="btn sm sec trp" data-d="90">3 bln</button><button class="btn sm sec trp" data-d="180">6 bln</button><button class="btn sm sec trp" data-d="365">12 bln</button></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:.8rem"><input type="date" id="trFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="trTo" style="flex:1;min-width:0"><button class="btn sm" id="trGo">OK</button></div>'
+      +'<div id="trBody" class="muted">Memuat…</div></div>';
     if(!appr.length){ html+='<div class="muted" style="margin-top:8px">Menu terlaris terisi setelah ada pesanan web yang kamu <b>approve</b> di tab Pesanan.</div>'; }
     tabEl.innerHTML=html;
     var pn=document.getElementById('pendNote'); if(pn) pn.onclick=function(){ setActiveTab('pesanan'); render(); };
@@ -469,6 +475,31 @@
     }
     var rrp=document.querySelectorAll('#rrPer .rrp'); Array.prototype.forEach.call(rrp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(rrp,function(x){ x.className='btn sm sec rrp'; }); b.className='btn sm rrp'; loadRepeat(Number(b.dataset.m)); }; });
     loadRepeat(1);
+    (function(){
+      function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+      function parseYmd(x){ var q=String(x).split('-'); return new Date(+q[0],+q[1]-1,+q[2]); }
+      function dAgo(n){ var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-(n-1)); return d; }
+      function loadRange(fromY,toY){ var body=document.getElementById('trBody'); if(!body) return; body.innerHTML='<div class="muted">Menghitung…</div>';
+        O.getTrafficStats(fromY,toY).then(function(st){
+          var days=[]; var d0=parseYmd(fromY), d1=parseYmd(toY); for(var d=new Date(d0); d<=d1; d.setDate(d.getDate()+1)){ days.push(ymd(new Date(d))); }
+          var buckets=[],labels=[]; days.forEach(function(dd){ buckets.push(st.series[dd]||0); labels.push(dd.slice(8)+'/'+dd.slice(5,7)); });
+          var hoursRows=st.hours.map(function(v,h){ return {label:(h<10?'0'+h:h)+':00', value:v, sub:num(v)}; }).filter(function(r){return r.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,6);
+          var h='<div style="font-size:.82rem;margin-bottom:8px">Total <b>'+num(st.total)+'</b> kunjungan · '+num(st.members)+' member · '+num(st.guests)+' tamu</div>';
+          h+=lineChart('Tren kunjungan', buckets, labels);
+          if(hoursRows.length) h+='<div style="margin-top:10px">'+barH('Jam tersibuk', hoursRows)+'</div>'; else h+='<div class="muted" style="margin-top:8px;font-size:.76rem">Jam tersibuk muncul setelah ada kunjungan tercatat.</div>';
+          body.innerHTML=h;
+        }).catch(function(){ body.innerHTML='<div class="res bad">Gagal memuat.</div>'; });
+      }
+      var today=ymd(new Date());
+      O.getTrafficStats(today,today).then(function(s){ var e=document.getElementById('trToday'); if(e) e.textContent=num(s.total); });
+      O.getTrafficStats(ymd(new Date(new Date().getFullYear(),new Date().getMonth(),1)),today).then(function(s){ var e=document.getElementById('trMonth'); if(e) e.textContent=num(s.total); });
+      O.getTrafficStats(ymd(dAgo(90)),today).then(function(s){ var e=document.getElementById('tr3'); if(e) e.textContent=num(s.total); });
+      function onl(){ if(!document.getElementById('trOnline')) return; O.getOnlineCount().then(function(c){ var e=document.getElementById('trOnline'); if(e) e.textContent=c.total+(c.members?(' · '+c.members+' mbr'):''); }); }
+      onl(); var onlTimer=setInterval(function(){ if(!document.getElementById('trOnline')){ clearInterval(onlTimer); return; } onl(); }, 30000);
+      var trp=document.querySelectorAll('#trPer .trp'); Array.prototype.forEach.call(trp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(trp,function(x){x.className='btn sm sec trp';}); b.className='btn sm trp'; loadRange(ymd(dAgo(Number(b.dataset.d))), ymd(new Date())); }; });
+      var go=document.getElementById('trGo'); if(go) go.onclick=function(){ var f=document.getElementById('trFrom').value, t=document.getElementById('trTo').value; if(f&&t){ Array.prototype.forEach.call(trp,function(x){x.className='btn sm sec trp';}); loadRange(f,t); } };
+      loadRange(ymd(dAgo(30)), today);
+    })();
   }
 
   /* ---------- PESANAN (approval) ---------- */

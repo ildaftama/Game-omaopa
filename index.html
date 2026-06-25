@@ -267,6 +267,8 @@
     window.addEventListener('omaopa:ready', refreshVch);
     window.addEventListener('omaopa:change', refreshVch);
     setTimeout(refreshVch, 1500);
+    function initTraffic(){ try{ if(window.OmaOpa){ if(window.OmaOpa.trackVisit) window.OmaOpa.trackVisit(); if(window.OmaOpa.startPresence) window.OmaOpa.startPresence(); } }catch(e){} }
+    window.addEventListener('omaopa:ready', initTraffic); setTimeout(initTraffic, 1600);
   })();
   setTimeout(function(){ render(); setHero(); }, 1300);
 })();
@@ -274,7 +276,7 @@
 
 <script src="menu-data.js?v=69"></script>
 <script src="outlets-data.js?v=69"></script>
-<script type="module" src="core-omaopa.js?v=86"></script>
+<script type="module" src="core-omaopa.js?v=89"></script>
 <script>
   try{ var _ci=document.getElementById('coin'); if(_ci) _ci.textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){}
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }

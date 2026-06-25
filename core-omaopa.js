@@ -589,11 +589,45 @@ async function repeatRateByOutlet(months){
   let txs=[];
   try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ uid:x.uid||'', outlet:(x.outlet||'').trim(), kind:x.kind||'', ts:ts }); }); }catch(e){ return []; }
   const byOutlet={};
-  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral') return; const o=t.outlet; if(!o || /^referral/i.test(o)) return; if(!byOutlet[o]) byOutlet[o]={}; byOutlet[o][t.uid]=(byOutlet[o][t.uid]||0)+1; });
+  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral') return; const o=t.outlet; if(!o || /^referral/i.test(o) || /penyesuaian/i.test(o)) return; const key=o.toLowerCase().replace(/\s+/g,' ').trim(); if(!byOutlet[key]) byOutlet[key]={ name:o, m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1; });
   const rows=[];
-  Object.keys(byOutlet).forEach(o=>{ const m=byOutlet[o]; const uids=Object.keys(m); const total=uids.length; const repeat=uids.filter(u=>m[u]>=2).length; const visits=uids.reduce((s,u)=>s+m[u],0); rows.push({ outlet:o, totalMembers:total, repeatMembers:repeat, visits:visits, rate:(total?(repeat/total):0) }); });
+  Object.keys(byOutlet).forEach(k=>{ const g=byOutlet[k]; const m=g.m; const uids=Object.keys(m); const total=uids.length; const repeat=uids.filter(u=>m[u]>=2).length; const visits=uids.reduce((s,u)=>s+m[u],0); rows.push({ outlet:g.name, totalMembers:total, repeatMembers:repeat, visits:visits, rate:(total?(repeat/total):0) }); });
   rows.sort((a,b)=>b.totalMembers-a.totalMembers);
   return rows;
+}
+// ===== Traffic & Online (Firestore-only, rollup harian) =====
+function _today(){ return _ymd(new Date()); }
+async function trackVisit(){
+  try{
+    if(typeof sessionStorage!=='undefined'){ if(sessionStorage.getItem('oo_visited')) return; sessionStorage.setItem('oo_visited','1'); }
+    const today=_today(); const h=new Date().getHours();
+    const patch={ date:today, count:increment(1) }; patch[user?'members':'guests']=increment(1); patch['h'+h]=increment(1);
+    await setDoc(doc(db,'stats','d_'+today), patch, {merge:true});
+  }catch(e){}
+}
+let _presId=null, _presTimer=null;
+function startPresence(){
+  try{
+    if(typeof sessionStorage==='undefined') return;
+    if(!_presId){ _presId=sessionStorage.getItem('oo_pres')||('p_'+Date.now().toString(36)+Math.random().toString(36).slice(2,8)); sessionStorage.setItem('oo_pres',_presId); }
+    const beat=function(){ try{ setDoc(doc(db,'presence',_presId), { lastSeen:serverTimestamp(), member:!!user, uid:(user?user.uid:'') }, {merge:true}); }catch(e){} };
+    beat(); if(_presTimer) clearInterval(_presTimer); _presTimer=setInterval(beat, 45000);
+    try{ window.addEventListener('beforeunload', function(){ try{ deleteDoc(doc(db,'presence',_presId)); }catch(e){} }); }catch(e){}
+  }catch(e){}
+}
+async function getOnlineCount(){
+  try{ const snap=await getDocs(collection(db,'presence')); const now=Date.now(); let total=0, members=0;
+    snap.forEach(d=>{ const x=d.data(); const ls=(x.lastSeen&&x.lastSeen.seconds)?x.lastSeen.seconds*1000:0; if(now-ls<=90000){ total++; if(x.member) members++; } });
+    return { total:total, members:members };
+  }catch(e){ return { total:0, members:0 }; }
+}
+async function getTrafficStats(fromYmd, toYmd){
+  try{
+    const q=query(collection(db,'stats'), where('date','>=',fromYmd), where('date','<=',toYmd));
+    const snap=await getDocs(q); let total=0, guests=0, members=0; const hours=new Array(24).fill(0); const series={};
+    snap.forEach(d=>{ const x=d.data(); if(!x.date) return; total+=(x.count||0); guests+=(x.guests||0); members+=(x.members||0); for(let h=0;h<24;h++){ hours[h]+=(x['h'+h]||0); } series[x.date]=(x.count||0); });
+    return { total:total, guests:guests, members:members, hours:hours, series:series };
+  }catch(e){ return { total:0, guests:0, members:0, hours:new Array(24).fill(0), series:{} }; }
 }
 async function listUsedVouchers(outlet){
   try{
@@ -1257,7 +1291,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats,
   isAdmin, isSuper, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
