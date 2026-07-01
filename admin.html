@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=89"></script>
+<script type="module" src="core-omaopa.js?v=91"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -362,6 +362,7 @@
         +'<button class="btn" id="adBtn">Terapkan penyesuaian poin</button>'
         +'<label style="margin-top:14px">Set poin jadi</label><input id="spv" inputmode="numeric" placeholder="angka pasti"><button class="btn sec" id="spBtn">Set poin</button>'
         +'<label style="margin-top:14px">Set skor game jadi</label><input id="ssv" inputmode="numeric" placeholder="angka"><button class="btn sec" id="ssBtn">Set skor</button>'
+        +(m.phone?('<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #E7D7B6"><label>Reset PIN member (kalau lupa)</label><div style="display:flex;gap:6px"><input id="rpv" inputmode="numeric" maxlength="6" placeholder="PIN baru 6 angka" style="flex:1"><button class="btn sec" id="rpGen" style="width:auto;margin:0">Acak</button></div><button class="btn" id="rpBtn" style="background:#f60909;border-color:#f60909;color:#fff">🔑 Reset PIN member</button></div>'):'')
         ) : '<div class="res warn" style="margin-top:10px">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengubah poin & skor.</div>')
       +'<div style="margin-top:16px" class="nm">Voucher member ini</div>'+vhtml
       +'<div id="mmsg"></div></div>';
@@ -373,6 +374,8 @@
       document.getElementById('spBtn').onclick=function(){ run(function(){ return O.adminSetPoints(uid, parseInt(document.getElementById('spv').value||'0',10)||0, document.getElementById('adr').value||'Set poin admin'); },'Poin di-set.'); };
       document.getElementById('ssBtn').onclick=function(){ run(function(){ return O.adminSetScore(uid, parseInt(document.getElementById('ssv').value||'0',10)||0); },'Skor di-set.'); };
       d.querySelectorAll('[data-vtog]').forEach(function(b){ b.onclick=function(){ run(function(){ return O.adminSetVoucherStatus(b.getAttribute('data-vtog'), b.getAttribute('data-on')!=='1'); },'Status voucher diubah.'); }; });
+      var rpGen=document.getElementById('rpGen'); if(rpGen) rpGen.onclick=function(){ document.getElementById('rpv').value=String(Math.floor(100000+Math.random()*900000)); };
+      var rpBtn=document.getElementById('rpBtn'); if(rpBtn) rpBtn.onclick=function(){ if(busy) return; var msg=document.getElementById('mmsg'); var pin=(document.getElementById('rpv').value||'').trim(); if(!/^\d{6}$/.test(pin)){ msg.innerHTML='<div class="res bad" style="margin-top:10px">PIN harus 6 angka.</div>'; return; } if(!confirm('Reset PIN member ini jadi '+pin+'? Pastikan kamu kasih ke member yang benar.')) return; busy=true; msg.innerHTML='<div class="muted" style="margin-top:10px">Mereset PIN…</div>'; Promise.resolve().then(function(){ return O.adminResetPin(uid, pin); }).then(function(){ busy=false; msg.innerHTML='<div class="res ok" style="margin-top:10px">✓ PIN direset jadi <b style="font-size:1.15rem">'+pin+'</b><br>Kasih PIN ini ke member via WA, lalu minta dia ganti sendiri di menu Profil ya.</div>'; }).catch(function(e){ busy=false; msg.innerHTML='<div class="res bad" style="margin-top:10px">Gagal: '+esc((e&&e.message)||'')+'</div>'; }); };
     }
   }
   async function doVoucher(code){

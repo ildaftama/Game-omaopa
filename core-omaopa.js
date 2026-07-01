@@ -8,6 +8,7 @@ import {
   getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
   GoogleAuthProvider, signInWithPopup,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword,
   signOut as fbSignOut, updateProfile
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
@@ -48,7 +49,7 @@ function pushToSheet(row){
   }catch(e){}
 }
 
-let user = null, profile = null, points = 0, unsubDoc = null, mergedOnce = false;
+let user = null, profile = null, points = 0, unsubDoc = null, mergedOnce = false, _pinReminded = false;
 const listeners = [];
 
 // ---------- util ----------
@@ -145,6 +146,7 @@ onAuthStateChanged(auth, async (u)=>{
       points = (typeof data.points==='number') ? data.points : 0;
       emit();
       if(d.exists()) mirrorLeaderboard(data.name, points);
+      if(d.exists() && data.mustChangePin && !_pinReminded){ _pinReminded=true; setTimeout(function(){ try{ openProfile(); }catch(e){} }, 900); }
       if(d.exists() && !staffFlag && !data.refCode && !refCodeChecked){ refCodeChecked=true; ensureRefCode().catch(()=>{}); }
     }, ()=>{});
   } else {
@@ -165,6 +167,17 @@ async function loginPhonePin(phone, pin){
   if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
   await signInWithEmailAndPassword(auth, phoneEmail(phone), pin);
   await ensureDoc();
+}
+async function changeMyPin(currentPin, newPin){
+  if(!user) throw {message:'Masuk dulu ya.'};
+  if(!validPin(newPin)) throw {message:'PIN baru harus 6 angka.'};
+  const ph=(profile&&profile.phone)||'';
+  if(!ph) throw {message:'Akun ini tidak memakai PIN.'};
+  try{ const cred=EmailAuthProvider.credential(phoneEmail(ph), String(currentPin)); await reauthenticateWithCredential(user, cred); }
+  catch(e){ throw {message:'PIN lama salah.'}; }
+  await updatePassword(user, String(newPin));
+  try{ await setDoc(doc(db,'users',user.uid), { mustChangePin:false }, {merge:true}); }catch(e){}
+  return true;
 }
 async function registerPhonePin(data){
   const { phone, pin, name, gender, age, occupation, consent, ref } = data;
@@ -198,6 +211,20 @@ async function registerPhonePin(data){
   });
 }
 async function doSignOut(){ await fbSignOut(auth); }
+async function adminResetPin(targetUid, newPin){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  targetUid=String(targetUid||'').trim(); newPin=String(newPin||'');
+  if(!targetUid) throw {message:'Member tidak valid.'};
+  if(!/^\d{6}$/.test(newPin)) throw {message:'PIN harus 6 angka.'};
+  let idToken=''; try{ idToken=await user.getIdToken(); }catch(e){ throw {message:'Sesi admin kedaluwarsa, login ulang.'}; }
+  let j=null;
+  try{
+    const res=await fetch(SHEET_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ type:'resetpin', idToken:idToken, uid:targetUid, pin:newPin }) });
+    j=await res.json();
+  }catch(e){ throw {message:'Gagal menghubungi server reset. Cek koneksi / setup Apps Script.'}; }
+  if(!j || !j.ok) throw {message:(j&&j.error)||'Reset PIN gagal.'};
+  return true;
+}
 
 // ============================================================
 //  UI LOGIN (disuntik sendiri ke halaman manapun)
@@ -867,6 +894,14 @@ pfBk.innerHTML = `<div class="oo-card" style="position:relative">
   <div id="pfData" style="background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:2px 12px"></div>
   <div class="oo-mini" style="margin-top:8px">Data tidak bisa diubah sendiri. Untuk koreksi data, hubungi kasir Oma Opa ya 🙏</div>
   <button class="oo-out" id="pfCard" style="margin-top:12px;background:${K};color:#5A3A05;border-color:${K}">Lihat Kartu Member (QR) →</button>
+  <button class="oo-out" id="pfPin" style="margin-top:8px">🔑 Ganti PIN</button>
+  <div id="pfPinBox" style="display:none;background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:12px;margin-top:8px">
+    <input class="oo-in" id="pfPinOld" type="password" inputmode="numeric" maxlength="6" placeholder="PIN lama" style="margin-bottom:8px">
+    <input class="oo-in" id="pfPinNew" type="password" inputmode="numeric" maxlength="6" placeholder="PIN baru (6 angka)" style="margin-bottom:8px">
+    <input class="oo-in" id="pfPin2" type="password" inputmode="numeric" maxlength="6" placeholder="Ulangi PIN baru" style="margin-bottom:8px">
+    <div id="pfPinMsg" style="font-size:.8rem;margin-bottom:8px"></div>
+    <button class="oo-out" id="pfPinSave" style="background:${K};color:#5A3A05;border-color:${K}">Simpan PIN baru</button>
+  </div>
   <button class="oo-out" id="pfOut" style="margin-top:8px">Keluar akun</button>
 </div>`;
 function mountPf(){ if(!document.body.contains(pfBk)) document.body.appendChild(pfBk); }
@@ -874,6 +909,17 @@ if(document.body) mountPf(); else document.addEventListener('DOMContentLoaded', 
 pfBk.querySelector('#pfX').onclick = ()=> pfBk.classList.remove('show');
 pfBk.querySelector('#pfOut').onclick = async ()=>{ try{ await doSignOut(); }catch(e){} pfBk.classList.remove('show'); };
 pfBk.querySelector('#pfCard').onclick = ()=>{ pfBk.classList.remove('show'); openMemberCard(); };
+pfBk.querySelector('#pfPin').onclick = ()=>{ const b=pfBk.querySelector('#pfPinBox'); b.style.display=(b.style.display==='none'?'block':'none'); };
+pfBk.querySelector('#pfPinSave').onclick = async ()=>{
+  const q=(id)=>pfBk.querySelector(id); const msg=q('#pfPinMsg');
+  const o=q('#pfPinOld').value, n=q('#pfPinNew').value, n2=q('#pfPin2').value;
+  msg.style.color='#C0392B';
+  if(!validPin(n)){ msg.textContent='PIN baru harus 6 angka.'; return; }
+  if(n!==n2){ msg.textContent='Ulangi PIN belum sama.'; return; }
+  msg.style.color='#7A5A12'; msg.textContent='Menyimpan…';
+  try{ await changeMyPin(o, n); msg.style.color='#1E7A46'; msg.textContent='✓ PIN berhasil diganti!'; q('#pfPinOld').value=''; q('#pfPinNew').value=''; q('#pfPin2').value=''; }
+  catch(e){ msg.style.color='#C0392B'; msg.textContent=(e&&e.message)||'Gagal — coba lagi.'; }
+};
 pfBk.addEventListener('click', e=>{ if(e.target===pfBk) pfBk.classList.remove('show'); });
 async function openProfile(){
   if(!user){ openLogin(); return; }
@@ -886,6 +932,7 @@ async function openProfile(){
   pfBk.querySelector('#pfData').innerHTML=rows.map((r,i)=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;'+(i?'border-top:1px solid #F2E8D5;':'')+'font-size:.86rem"><span style="color:#9a7a5e;font-weight:700">'+r[0]+'</span><span style="font-weight:800;color:'+CO+';text-align:right">'+esc(r[1]||'-')+'</span></div>').join('');
   pfBk.querySelector('#pfTier').innerHTML='';
   pfBk.classList.add('show');
+  if(profile && profile.mustChangePin){ const pb=pfBk.querySelector('#pfPinBox'); if(pb) pb.style.display='block'; const pm=pfBk.querySelector('#pfPinMsg'); if(pm){ pm.style.color='#C0392B'; pm.textContent='PIN kamu baru direset admin. Isi PIN sementara sebagai "PIN lama", lalu buat PIN baru.'; } }
   (async()=>{ try{ const txs=await listMyTransactions(); const spend=txs.reduce((s,t)=>s+(t.nominal||0),0); const tr=tierOf(spend);
     pfBk.querySelector('#pfSpent').textContent='Rp'+spend.toLocaleString('id-ID');
     pfBk.querySelector('#pfTx').textContent=txs.length;
@@ -1285,7 +1332,7 @@ async function getMyTier(){ try{ if(!user) return null; const txs=await listMyTr
 window.OmaOpa = {
   openLogin, closeLogin,
   openRewards, openVouchers, closeRewards,
-  openMemberCard, openProfile, getCheckinStatus, dailyCheckin, openCheckin,
+  openMemberCard, openProfile, changeMyPin, getCheckinStatus, dailyCheckin, openCheckin,
   openLeaderboard, openScoreboard, openHistory,
   submitScore, listPointLeaderboard, listScoreLeaderboard, listMyTransactions,
   redeem, listVouchers, listRewardsPublic,
@@ -1299,7 +1346,7 @@ window.OmaOpa = {
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
   getAnnouncement, setAnnouncement, getMessages, setMessages, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
-  setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel,
+  setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel, adminResetPin,
   tierOf, TIERS, getMyTier,
   signOut: doSignOut,
   getUser: ()=> user ? { uid:user.uid, name:(profile&&profile.name)||user.displayName||'', phone:(profile&&profile.phone)||'' } : null,
