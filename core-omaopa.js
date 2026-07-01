@@ -332,11 +332,17 @@ function renderForm(){
       <label class="oo-l">PIN (6 angka)</label>
       <input class="oo-in" id="ooPin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••">
       <button class="oo-btn" id="ooGo">Masuk</button>
+      <div style="text-align:center;margin-top:11px"><a href="#" id="ooForgot" style="color:#9a7a5e;font-size:.82rem;text-decoration:underline;font-weight:700">Lupa PIN?</a></div>
     </div>`;
     f.querySelector('#ooGo').onclick = async (ev)=>{
       setErr(''); const b=ev.target; b.disabled=true; b.textContent='Memproses…';
       try{ await loginPhonePin(f.querySelector('#ooPhone').value, f.querySelector('#ooPin').value); closeLogin(); }
       catch(e){ setErr(errMsg(e)); b.disabled=false; b.textContent='Masuk'; }
+    };
+    f.querySelector('#ooForgot').onclick = async (ev)=>{
+      ev.preventDefault(); let msg=DEF_LUPAPIN_MSG;
+      try{ const m=await getMessages(); if(m&&m.lupapin) msg=m.lupapin; }catch(e){}
+      try{ window.open('https://wa.me/'+WA_CC+'?text='+encodeURIComponent(msg), '_blank'); }catch(e){}
     };
   } else {
     f.innerHTML = `<div class="oo-f">
@@ -1237,8 +1243,10 @@ async function saveBanner(opts){ if(!(await isSuper())) throw {message:'Khusus a
 // ===== Pesan otomatis WA (CC & order) — editable admin =====
 const DEF_CC_MSG='Halo minmil, saya ingin menyampaikan kritik / kendala nih';
 const DEF_ORDER_MSG='Halo Minmil, aku mau pesan dongg 🙏';
-async function getMessages(){ try{ const s=await getDoc(doc(db,'settings','messages')); const d=(s.exists()&&s.data())||{}; return { cc:(d.cc||DEF_CC_MSG), order:(d.order||DEF_ORDER_MSG) }; }catch(e){ return { cc:DEF_CC_MSG, order:DEF_ORDER_MSG }; } }
-async function setMessages(m){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; m=m||{}; await setDoc(doc(db,'settings','messages'), { cc:String(m.cc||''), order:String(m.order||''), updatedAt:serverTimestamp() }, {merge:true}); }
+const DEF_LUPAPIN_MSG='Halo Minmil, aku lupa PIN akunku 🙏 Tolong bantu reset ya.\nNama: \nNo HP terdaftar: ';
+const WA_CC='6288216106216';
+async function getMessages(){ try{ const s=await getDoc(doc(db,'settings','messages')); const d=(s.exists()&&s.data())||{}; return { cc:(d.cc||DEF_CC_MSG), order:(d.order||DEF_ORDER_MSG), lupapin:(d.lupapin||DEF_LUPAPIN_MSG) }; }catch(e){ return { cc:DEF_CC_MSG, order:DEF_ORDER_MSG, lupapin:DEF_LUPAPIN_MSG }; } }
+async function setMessages(m){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; m=m||{}; await setDoc(doc(db,'settings','messages'), { cc:String(m.cc||''), order:String(m.order||''), lupapin:String(m.lupapin||''), updatedAt:serverTimestamp() }, {merge:true}); }
 
 // ===== Multi-banner carousel (koleksi 'banners', slot b1..b3) =====
 async function _bumpBannerVer(){ try{ await setDoc(doc(db,'settings','bannerVer'), { v:Date.now() }, {merge:true}); }catch(e){} }

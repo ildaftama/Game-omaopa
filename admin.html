@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=91"></script>
+<script type="module" src="core-omaopa.js?v=92"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -188,9 +188,10 @@
     w.innerHTML='<div class="muted" style="font-size:.74rem;margin-bottom:8px">Teks pembuka WhatsApp. Untuk order, detail pesanan otomatis ditambahkan setelah teks ini.</div>'
       +'<label>Pesan tombol Customer Care</label><textarea id="msgCc" rows="3">'+esc(m.cc||'')+'</textarea>'
       +'<label style="margin-top:8px">Pesan pembuka order (CS order)</label><textarea id="msgOrder" rows="2">'+esc(m.order||'')+'</textarea>'
+      +'<label style="margin-top:8px">Pesan tombol "Lupa PIN" (ke WA CS)</label><textarea id="msgLupapin" rows="3">'+esc(m.lupapin||'')+'</textarea>'
       +'<div style="margin-top:8px"><button class="btn" id="msgSave">Simpan pesan</button></div><div id="msgMsg"></div>';
     document.getElementById('msgSave').onclick=async function(){ if(busy)return; busy=true; var mm=document.getElementById('msgMsg'); mm.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
-      try{ await O.setMessages({ cc:document.getElementById('msgCc').value, order:document.getElementById('msgOrder').value }); mm.innerHTML='<div class="res ok">✓ Pesan otomatis disimpan.</div>'; }catch(e){ mm.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+      try{ await O.setMessages({ cc:document.getElementById('msgCc').value, order:document.getElementById('msgOrder').value, lupapin:document.getElementById('msgLupapin').value }); mm.innerHTML='<div class="res ok">✓ Pesan otomatis disimpan.</div>'; }catch(e){ mm.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
   }
   async function loadBanner(){
     var w=document.getElementById('bnWrap'); if(!w) return; w.classList.remove('muted');
