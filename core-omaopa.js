@@ -332,18 +332,14 @@ function renderForm(){
       <label class="oo-l">PIN (6 angka)</label>
       <input class="oo-in" id="ooPin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••">
       <button class="oo-btn" id="ooGo">Masuk</button>
-      <div style="text-align:center;margin-top:11px"><a href="#" id="ooForgot" style="color:#9a7a5e;font-size:.82rem;text-decoration:underline;font-weight:700">Lupa PIN?</a></div>
+      <div style="text-align:center;margin-top:11px"><a href="https://wa.me/${WA_CC}?text=${encodeURIComponent(DEF_LUPAPIN_MSG)}" target="_blank" rel="noopener" id="ooForgot" style="color:#9a7a5e;font-size:.82rem;text-decoration:underline;font-weight:700">Lupa PIN?</a></div>
     </div>`;
     f.querySelector('#ooGo').onclick = async (ev)=>{
       setErr(''); const b=ev.target; b.disabled=true; b.textContent='Memproses…';
       try{ await loginPhonePin(f.querySelector('#ooPhone').value, f.querySelector('#ooPin').value); closeLogin(); }
       catch(e){ setErr(errMsg(e)); b.disabled=false; b.textContent='Masuk'; }
     };
-    f.querySelector('#ooForgot').onclick = async (ev)=>{
-      ev.preventDefault(); let msg=DEF_LUPAPIN_MSG;
-      try{ const m=await getMessages(); if(m&&m.lupapin) msg=m.lupapin; }catch(e){}
-      try{ window.open('https://wa.me/'+WA_CC+'?text='+encodeURIComponent(msg), '_blank'); }catch(e){}
-    };
+    (async()=>{ try{ const m=await getMessages(); if(m&&m.lupapin){ const a=f.querySelector('#ooForgot'); if(a) a.href='https://wa.me/'+WA_CC+'?text='+encodeURIComponent(m.lupapin); } }catch(e){} })();
   } else {
     f.innerHTML = `<div class="oo-f">
       <label class="oo-l">Nama</label>
