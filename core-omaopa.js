@@ -8,7 +8,7 @@ import {
   getAuth, onAuthStateChanged, setPersistence, browserLocalPersistence,
   GoogleAuthProvider, signInWithPopup,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  EmailAuthProvider, reauthenticateWithCredential, updatePassword, deleteUser,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword,
   signOut as fbSignOut, updateProfile
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
@@ -178,21 +178,6 @@ async function changeMyPin(currentPin, newPin){
   catch(e){ throw {message:'PIN lama salah.'}; }
   await updatePassword(user, String(newPin));
   try{ await setDoc(doc(db,'users',user.uid), { mustChangePin:false }, {merge:true}); }catch(e){}
-  return true;
-}
-async function deleteMyAccount(currentPin){
-  if(!user) throw {message:'Masuk dulu ya.'};
-  const u=user; const ph=(profile&&profile.phone)||'';
-  if(ph){
-    try{ const cred=EmailAuthProvider.credential(phoneEmail(ph), String(currentPin)); await reauthenticateWithCredential(u, cred); }
-    catch(e){ throw {message:'PIN salah.'}; }
-  }
-  const uid=u.uid;
-  try{ await deleteDoc(doc(db,'users',uid)); }catch(e){}
-  try{ await deleteDoc(doc(db,'leaderboard',uid)); }catch(e){}
-  try{ await deleteDoc(doc(db,'scores',uid)); }catch(e){}
-  try{ await deleteUser(u); }
-  catch(e){ if(e && e.code==='auth/requires-recent-login') throw {message:'Demi keamanan, keluar lalu masuk lagi, baru hapus akun.'}; throw {message:'Gagal menghapus akun. Coba lagi.'}; }
   return true;
 }
 async function registerPhonePin(data){
@@ -965,13 +950,6 @@ pfBk.innerHTML = `<div class="oo-card" style="position:relative">
     <button class="oo-out" id="pfPinSave" style="background:${K};color:#5A3A05;border-color:${K}">Simpan PIN baru</button>
   </div>
   <button class="oo-out" id="pfOut" style="margin-top:8px">Keluar akun</button>
-  <button class="oo-out" id="pfDel" style="margin-top:8px;color:#C0392B;border-color:#F0C4C4">Hapus akun</button>
-  <div id="pfDelBox" style="display:none;background:#FDECEC;border:2px solid #F3C2C2;border-radius:13px;padding:12px;margin-top:8px">
-    <div style="font-size:.82rem;color:#C0392B;font-weight:700;margin-bottom:9px">⚠️ Akun & poinmu akan dihapus permanen dan tidak bisa dikembalikan.</div>
-    <input class="oo-in" id="pfDelPin" type="password" inputmode="numeric" maxlength="6" placeholder="Ketik PIN untuk konfirmasi" style="margin-bottom:8px">
-    <div id="pfDelMsg" style="font-size:.8rem;margin-bottom:8px"></div>
-    <button class="oo-out" id="pfDelYes" style="background:#f60909;color:#fff;border-color:#f60909">Ya, hapus akun permanen</button>
-  </div>
   <button class="oo-out" id="pfDel" style="margin-top:8px;color:#a11;border-color:#e5b4b4;font-size:.82rem">Hapus akun</button>
 </div>`;
 function mountPf(){ if(!document.body.contains(pfBk)) document.body.appendChild(pfBk); }
@@ -989,15 +967,6 @@ pfBk.querySelector('#pfPinSave').onclick = async ()=>{
   msg.style.color='#7A5A12'; msg.textContent='Menyimpan…';
   try{ await changeMyPin(o, n); msg.style.color='#1E7A46'; msg.textContent='✓ PIN berhasil diganti!'; q('#pfPinOld').value=''; q('#pfPinNew').value=''; q('#pfPin2').value=''; }
   catch(e){ msg.style.color='#C0392B'; msg.textContent=(e&&e.message)||'Gagal — coba lagi.'; }
-};
-pfBk.querySelector('#pfDel').onclick = ()=>{ const b=pfBk.querySelector('#pfDelBox'); b.style.display=(b.style.display==='none'?'block':'none'); };
-pfBk.querySelector('#pfDelYes').onclick = async ()=>{
-  const q=(id)=>pfBk.querySelector(id); const msg=q('#pfDelMsg'); const pin=q('#pfDelPin').value;
-  msg.style.color='#C0392B';
-  if(profile && profile.phone && !validPin(pin)){ msg.textContent='Ketik PIN 6 angka untuk konfirmasi.'; return; }
-  msg.style.color='#7A5A12'; msg.textContent='Menghapus…';
-  try{ await deleteMyAccount(pin); pfBk.classList.remove('show'); try{ alert('Akun kamu sudah dihapus. Sampai jumpa 👋'); }catch(e){} }
-  catch(e){ msg.style.color='#C0392B'; msg.textContent=(e&&e.message)||'Gagal menghapus.'; }
 };
 var _pfDel=pfBk.querySelector('#pfDel'); if(_pfDel) _pfDel.onclick=async ()=>{
   if(!confirm('Hapus akunmu? Poin & riwayat akan hilang PERMANEN dan tidak bisa dikembalikan.')) return;
@@ -1420,7 +1389,7 @@ async function getMyTier(){ try{ if(!user) return null; const txs=await listMyTr
 window.OmaOpa = {
   openLogin, closeLogin,
   openRewards, openVouchers, closeRewards,
-  openMemberCard, openProfile, changeMyPin, deleteMyAccount, getCheckinStatus, dailyCheckin, openCheckin,
+  openMemberCard, openProfile, changeMyPin, getCheckinStatus, dailyCheckin, openCheckin,
   openLeaderboard, openScoreboard, openHistory,
   submitScore, listPointLeaderboard, listScoreLeaderboard, listMyTransactions,
   redeem, listVouchers, listRewardsPublic,
