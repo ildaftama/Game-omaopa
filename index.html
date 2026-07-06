@@ -477,9 +477,10 @@
     function close(){ if(bk) bk.classList.remove('show'); }
     window.openCart=open;
   })();
-  function openLogin(){ if(window.OmaOpa){ window.OmaOpa.openLogin(); } else { alert('Sedang menyiapkan login, coba lagi sebentar…'); } }
-  function openMemberCard(){ if(window.OmaOpa){ window.OmaOpa.openMemberCard(); } else { soon(); } }
-  function openProfile(){ if(window.OmaOpa && window.OmaOpa.openProfile){ window.OmaOpa.openProfile(); } else { soon(); } }
+  function whenReady(fn){ if(window.OmaOpa){ try{ fn(); }catch(e){} return; } var done=false; var go=function(){ if(done||!window.OmaOpa) return; done=true; try{ fn(); }catch(e){} }; window.addEventListener('omaopa:ready', go, {once:true}); var n=0, iv=setInterval(function(){ n++; if(done||n>30){ clearInterval(iv); return; } go(); }, 200); }
+  function openLogin(){ whenReady(function(){ window.OmaOpa.openLogin(); }); }
+  function openMemberCard(){ whenReady(function(){ if(window.OmaOpa.openMemberCard) window.OmaOpa.openMemberCard(); }); }
+  function openProfile(){ whenReady(function(){ if(window.OmaOpa.openProfile) window.OmaOpa.openProfile(); }); }
   function loggedIn(){ return !!(window.OmaOpa && window.OmaOpa.getUser && window.OmaOpa.getUser()); }
   function refreshCheckinCard(){
     var c=document.getElementById('checkinCard'); if(!c) return;
