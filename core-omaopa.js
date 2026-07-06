@@ -1385,3 +1385,5 @@ window.OmaOpa = {
 };
 emit();
 try{ window.dispatchEvent(new CustomEvent('omaopa:ready',{detail:snapshot()})); }catch(e){}
+// Gabungkan outlet dari database (termasuk yang ditambah via admin, mis. Kronggahan) ke daftar picker
+(async function(){ try{ const fs=await listOutlets(); if(fs && fs.length){ const byName={}; (window.OMA_OUTLETS||[]).forEach(o=>{ byName[(o.name||'').toLowerCase().trim()]=o; }); fs.forEach(o=>{ if(o && o.name && o.active!==false) byName[(o.name||'').toLowerCase().trim()]={ name:o.name, area:o.area, maps:o.maps }; }); window.OMA_OUTLETS=Object.keys(byName).map(k=>byName[k]); } }catch(e){} })();

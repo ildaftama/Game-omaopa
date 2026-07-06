@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=96"></script>
+<script type="module" src="core-omaopa.js?v=98"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -239,11 +239,10 @@
   async function renderMember(){
     var seg=segFilter; var LM={age:'Umur',gender:'Jenis kelamin',occupation:'Pekerjaan'};
     var mOutletOpts='<option value="">— semua outlet —</option>'
-      +'<option value="__area1">🗺️ Area 1 · Jogja(5)·Klaten·Magelang</option>'
+      +'<option value="__area1">🗺️ Area 1 · Jogja·Klaten·Magelang</option>'
       +'<option value="__area2">🗺️ Area 2 · Solo Raya</option>'
       +'<option value="__area3">🗺️ Area 3 · Semarang</option>'
-      +'<option value="__kronggahan">🏢 Kronggahan (Jogja lain)</option>'
-      +'<optgroup label="— per outlet —">'+(window.OMA_OUTLETS||[]).map(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,''); return '<option>'+esc(n)+'</option>'; }).join('')+'</optgroup>';
+      +'<option value="__kronggahan">🏢 Kronggahan</option>';
     var chip = seg ? '<div class="card"><div class="row" style="border:none;padding:0"><div class="grow"><span class="muted">Filter aktif:</span> <b>'+esc(LM[seg.field]||seg.field)+' = '+esc(seg.value)+'</b></div><button class="btn sm sec" id="segClr">✕ Hapus</button></div></div>' : '';
     tabEl.innerHTML=chip
       +'<div class="card"><div class="nm">Cari / lihat member</div>'
@@ -312,10 +311,11 @@
   function memReset(){ memStack=[null]; memPage=0; }
   var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal','uii']; // 5 outlet Jogja -> Area 1; Jogja lain -> Kronggahan
   var _oam=null;
-  function outletAreaMap(){ if(_oam) return _oam; _oam={}; (window.OMA_OUTLETS||[]).forEach(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(n) _oam[n]=(o.area||'').toLowerCase(); }); return _oam; }
-  function outletGroup(homeOutlet){ var key=(homeOutlet||'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=outletAreaMap()[key]||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}); if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
+  async function ensureOam(){ if(_oam) return; _oam={}; var list=[]; try{ list=await O.listOutlets(); }catch(e){} if(!list||!list.length){ list=(window.OMA_OUTLETS||[]).slice(); } else { var seen={}; list.forEach(function(o){ seen[(o.name||'').toLowerCase().trim()]=1; }); (window.OMA_OUTLETS||[]).forEach(function(o){ if(!seen[(o.name||'').toLowerCase().trim()]) list.push(o); }); } list.forEach(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(n) _oam[n]=(o.area||'').toLowerCase(); }); }
+  function outletGroup(homeOutlet){ var key=(homeOutlet||'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=(_oam&&_oam[key])||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}); if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
   async function memByOutlet(sel){
     segFilter=null; var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
+    await ensureOam();
     var arr=[]; try{ arr=await O.listMembers('',5000); }catch(e){}
     var f, label;
     if(sel==='__kronggahan'||sel==='__area1'||sel==='__area2'||sel==='__area3'){
