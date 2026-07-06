@@ -1100,7 +1100,7 @@ async function listMembersPage(n, after){
     const q = after ? query(base, orderBy(documentId()), startAfter(after), limit(n))
                     : query(base, orderBy(documentId()), limit(n));
     const snap=await getDocs(q); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({uid:d.id,name:x.name||'',phone:x.phone||'',points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||''}); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({uid:d.id,name:x.name||'',phone:x.phone||'',points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||''}); });
     return { rows:arr, lastDoc: snap.docs.length? snap.docs[snap.docs.length-1] : null, hasMore: snap.docs.length===n };
   }catch(e){ return { rows:[], lastDoc:null, hasMore:false }; }
 }

@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=95"></script>
+<script type="module" src="core-omaopa.js?v=96"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -238,7 +238,12 @@
   /* ---------- MEMBER ---------- */
   async function renderMember(){
     var seg=segFilter; var LM={age:'Umur',gender:'Jenis kelamin',occupation:'Pekerjaan'};
-    var mOutletOpts='<option value="">— semua outlet —</option>'+(window.OMA_OUTLETS||[]).map(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,''); return '<option>'+esc(n)+'</option>'; }).join('');
+    var mOutletOpts='<option value="">— semua outlet —</option>'
+      +'<option value="__area1">🗺️ Area 1 · Jogja(5)·Klaten·Magelang</option>'
+      +'<option value="__area2">🗺️ Area 2 · Solo Raya</option>'
+      +'<option value="__area3">🗺️ Area 3 · Semarang</option>'
+      +'<option value="__kronggahan">🏢 Kronggahan (Jogja lain)</option>'
+      +'<optgroup label="— per outlet —">'+(window.OMA_OUTLETS||[]).map(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,''); return '<option>'+esc(n)+'</option>'; }).join('')+'</optgroup>';
     var chip = seg ? '<div class="card"><div class="row" style="border:none;padding:0"><div class="grow"><span class="muted">Filter aktif:</span> <b>'+esc(LM[seg.field]||seg.field)+' = '+esc(seg.value)+'</b></div><button class="btn sm sec" id="segClr">✕ Hapus</button></div></div>' : '';
     tabEl.innerHTML=chip
       +'<div class="card"><div class="nm">Cari / lihat member</div>'
@@ -305,12 +310,29 @@
     else { memReset(); loadMemberPage(); }
   }
   function memReset(){ memStack=[null]; memPage=0; }
-  async function memByOutlet(outlet){ segFilter=null; var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…'; var arr=[]; try{ arr=await O.listMembers('',5000); }catch(e){} var key=(outlet||'').toLowerCase().replace(/\s+/g,' ').trim(); var f=arr.filter(function(m){ return ((m.homeOutlet||'').toLowerCase().replace(/\s+/g,' ').trim())===key; }); renderTable(box, f, f.length+' member dengan outlet terdekat "'+esc(outlet)+'"'); }
+  var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal','uii']; // 5 outlet Jogja -> Area 1; Jogja lain -> Kronggahan
+  var _oam=null;
+  function outletAreaMap(){ if(_oam) return _oam; _oam={}; (window.OMA_OUTLETS||[]).forEach(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(n) _oam[n]=(o.area||'').toLowerCase(); }); return _oam; }
+  function outletGroup(homeOutlet){ var key=(homeOutlet||'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=outletAreaMap()[key]||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}); if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
+  async function memByOutlet(sel){
+    segFilter=null; var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
+    var arr=[]; try{ arr=await O.listMembers('',5000); }catch(e){}
+    var f, label;
+    if(sel==='__kronggahan'||sel==='__area1'||sel==='__area2'||sel==='__area3'){
+      var grp=sel.replace('__',''); f=arr.filter(function(m){ return outletGroup(m.homeOutlet)===grp; });
+      label={kronggahan:'Kronggahan',area1:'Area 1',area2:'Area 2',area3:'Area 3'}[grp];
+    } else {
+      var key=(sel||'').toLowerCase().replace(/\s+/g,' ').trim();
+      f=arr.filter(function(m){ return ((m.homeOutlet||'').toLowerCase().replace(/\s+/g,' ').trim())===key; });
+      label='outlet "'+esc(sel)+'"';
+    }
+    renderTable(box, f, f.length+' member — '+label);
+  }
   function memSearch(q){ segFilter=null; q=(q||'').trim(); if(q){ doFind(q); } else { memReset(); loadMemberPage(); } }
   async function loadMemberPage(){
     var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
     var after=memStack[memPage]||null;
-    var r; try{ r=await O.listMembersPage(100, after); }catch(e){ r={rows:[],lastDoc:null,hasMore:false}; }
+    var r; try{ r=await O.listMembersPage(25, after); }catch(e){ r={rows:[],lastDoc:null,hasMore:false}; }
     if(r.hasMore && r.lastDoc && !memStack[memPage+1]) memStack[memPage+1]=r.lastDoc;
     renderMemberPage(box, r);
   }
@@ -319,12 +341,12 @@
     if(!arr.length){ box.innerHTML='<div class="res warn">'+(memPage>0?'Tidak ada member lagi.':'Belum ada member.')+'</div>'
       +(memPage>0?'<div style="margin-top:8px"><button class="btn sm sec" id="mPrev" style="width:auto;margin:0">‹ Sebelumnya</button></div>':'');
       var pv0=box.querySelector('#mPrev'); if(pv0) pv0.onclick=function(){ if(memPage>0){ memPage--; loadMemberPage(); } }; return; }
-    var rows=arr.map(function(m){ return '<tr data-uid="'+esc(m.uid)+'"><td>'+esc(m.name||'(tanpa nama)')+'<div class="sub">'+esc(m.phone||'-')+'</div></td><td>'+esc(m.age||'-')+'</td><td>'+esc((m.gender||'-').slice(0,1))+'</td><td class="pts">'+m.points+'</td></tr>'; }).join('');
+    var rows=arr.map(function(m){ return '<tr data-uid="'+esc(m.uid)+'"><td>'+esc(m.name||'(tanpa nama)')+'<div class="sub">'+esc(m.phone||'-')+' · 📍 '+esc(m.homeOutlet||'-')+'</div></td><td>'+esc(m.age||'-')+'</td><td>'+esc((m.gender||'-').slice(0,1))+'</td><td class="pts">'+m.points+'</td></tr>'; }).join('');
     var pager='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px">'
       +'<button class="btn sm sec" id="mPrev" style="width:auto;margin:0"'+(memPage<=0?' disabled':'')+'>‹ Sebelumnya</button>'
       +'<span class="muted" style="font-size:.78rem;font-weight:800">Halaman '+(memPage+1)+'</span>'
       +'<button class="btn sm sec" id="mNext" style="width:auto;margin:0"'+(r.hasMore?'':' disabled')+'>Berikutnya ›</button></div>';
-    box.innerHTML='<div class="muted" style="margin-bottom:6px">Menampilkan '+arr.length+' member (100/halaman). Ketik nama/HP di atas untuk mencari satu member.</div>'
+    box.innerHTML='<div class="muted" style="margin-bottom:6px">Menampilkan '+arr.length+' member (25/halaman). Ketik nama/HP di atas untuk mencari satu member.</div>'
       +'<table class="mt"><tr><th>Nama / HP</th><th>Umur</th><th>JK</th><th>Poin</th></tr>'+rows+'</table>'+pager;
     box.querySelectorAll('tr[data-uid]').forEach(function(tr){ tr.onclick=function(){ openMember(tr.getAttribute('data-uid')); window.scrollTo({top:0,behavior:'smooth'}); }; });
     var pv=box.querySelector('#mPrev'); if(pv) pv.onclick=function(){ if(memPage>0){ memPage--; loadMemberPage(); } };
@@ -332,7 +354,7 @@
   }
   function renderTable(box, arr, note){
     if(!arr.length){ box.innerHTML='<div class="res warn">Tidak ada member.</div>'; return; }
-    var rows=arr.slice(0,80).map(function(m){ return '<tr data-uid="'+esc(m.uid)+'"><td>'+esc(m.name||'(tanpa nama)')+'<div class="sub">'+esc(m.phone||'-')+'</div></td>'
+    var rows=arr.slice(0,80).map(function(m){ return '<tr data-uid="'+esc(m.uid)+'"><td>'+esc(m.name||'(tanpa nama)')+'<div class="sub">'+esc(m.phone||'-')+' · 📍 '+esc(m.homeOutlet||'-')+'</div></td>'
       +'<td>'+esc(m.age||'-')+'</td><td>'+esc((m.gender||'-').slice(0,1))+'</td><td class="pts">'+m.points+'</td></tr>'; }).join('');
     box.innerHTML='<div class="muted" style="margin-bottom:6px">'+(note||(arr.length+' member'))+(arr.length>80?' (tampil 80 teratas)':'')+'</div>'
       +'<table class="mt"><tr><th>Nama / HP</th><th>Umur</th><th>JK</th><th>Poin</th></tr>'+rows+'</table>';
