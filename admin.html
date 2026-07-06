@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=92"></script>
+<script type="module" src="core-omaopa.js?v=95"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -238,10 +238,12 @@
   /* ---------- MEMBER ---------- */
   async function renderMember(){
     var seg=segFilter; var LM={age:'Umur',gender:'Jenis kelamin',occupation:'Pekerjaan'};
+    var mOutletOpts='<option value="">— semua outlet —</option>'+(window.OMA_OUTLETS||[]).map(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,''); return '<option>'+esc(n)+'</option>'; }).join('');
     var chip = seg ? '<div class="card"><div class="row" style="border:none;padding:0"><div class="grow"><span class="muted">Filter aktif:</span> <b>'+esc(LM[seg.field]||seg.field)+' = '+esc(seg.value)+'</b></div><button class="btn sm sec" id="segClr">✕ Hapus</button></div></div>' : '';
     tabEl.innerHTML=chip
       +'<div class="card"><div class="nm">Cari / lihat member</div>'
       +'<label>Nama atau No. HP (kosongkan = semua)</label><input id="mq" placeholder="cth: Budi / 0812...">'
+      +'<label style="margin-top:8px">Shortlist by outlet terdekat</label><select id="mOutlet">'+mOutletOpts+'</select>'
       +'<button class="btn" id="mfind">Tampilkan</button><div id="mlist" class="muted" style="margin-top:8px">Memuat…</div></div>'
       +'<div id="mdetail"></div>'
       +'<div class="card"><div class="nm">🎟️ Cari & batalkan voucher (kode)</div>'
@@ -296,12 +298,14 @@
       busy=false;
     };
     document.getElementById('mfind').onclick=function(){ memSearch(document.getElementById('mq').value); };
+    var mo=document.getElementById('mOutlet'); if(mo) mo.onchange=function(){ var v=mo.value; if(v){ memByOutlet(v); } else { document.getElementById('mq').value=''; memReset(); loadMemberPage(); } };
     document.getElementById('mq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ memSearch(e.target.value); } });
     document.getElementById('vfind').onclick=function(){ doVoucher(document.getElementById('vq').value.trim()); };
     if(seg){ var clr=document.getElementById('segClr'); if(clr) clr.onclick=function(){ segFilter=null; render(); }; showSegment(seg); }
     else { memReset(); loadMemberPage(); }
   }
   function memReset(){ memStack=[null]; memPage=0; }
+  async function memByOutlet(outlet){ segFilter=null; var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…'; var arr=[]; try{ arr=await O.listMembers('',5000); }catch(e){} var key=(outlet||'').toLowerCase().replace(/\s+/g,' ').trim(); var f=arr.filter(function(m){ return ((m.homeOutlet||'').toLowerCase().replace(/\s+/g,' ').trim())===key; }); renderTable(box, f, f.length+' member dengan outlet terdekat "'+esc(outlet)+'"'); }
   function memSearch(q){ segFilter=null; q=(q||'').trim(); if(q){ doFind(q); } else { memReset(); loadMemberPage(); } }
   async function loadMemberPage(){
     var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';

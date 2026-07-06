@@ -49,7 +49,7 @@ function pushToSheet(row){
   }catch(e){}
 }
 
-let user = null, profile = null, points = 0, unsubDoc = null, mergedOnce = false, _pinReminded = false;
+let user = null, profile = null, points = 0, unsubDoc = null, mergedOnce = false, _pinReminded = false, _outletAsked = false;
 const listeners = [];
 
 // ---------- util ----------
@@ -147,6 +147,7 @@ onAuthStateChanged(auth, async (u)=>{
       emit();
       if(d.exists()) mirrorLeaderboard(data.name, points);
       if(d.exists() && data.mustChangePin && !_pinReminded){ _pinReminded=true; setTimeout(function(){ try{ openProfile(); }catch(e){} }, 900); }
+      if(d.exists() && data.profileComplete && !data.homeOutlet && !data.mustChangePin && !staffFlag && !_outletAsked){ _outletAsked=true; setTimeout(function(){ try{ askHomeOutlet(); }catch(e){} }, 1400); }
       if(d.exists() && !staffFlag && !data.refCode && !refCodeChecked){ refCodeChecked=true; ensureRefCode().catch(()=>{}); }
     }, ()=>{});
   } else {
@@ -180,13 +181,14 @@ async function changeMyPin(currentPin, newPin){
   return true;
 }
 async function registerPhonePin(data){
-  const { phone, pin, name, gender, age, occupation, consent, ref } = data;
+  const { phone, pin, name, gender, age, occupation, homeOutlet, consent, ref } = data;
   if(!name || name.trim().length<2) throw {message:'Isi nama dulu ya.'};
   if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
   if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
   if(!gender) throw {message:'Pilih jenis kelamin dulu ya.'};
   if(!age) throw {message:'Pilih usia dulu ya.'};
   if(!occupation) throw {message:'Isi/pilih pekerjaan dulu ya.'};
+  if(!homeOutlet) throw {message:'Pilih outlet terdekat dulu ya.'};
   if(!consent) throw {message:'Centang persetujuan dulu ya.'};
   const res = await createUserWithEmailAndPassword(auth, phoneEmail(phone), pin);
   user = res.user;
@@ -197,7 +199,7 @@ async function registerPhonePin(data){
   if(rc){ try{ const rm=await getDoc(doc(db,'refcodes',rc)); if(rm.exists()){ const ru=(rm.data().uid||''); if(ru && ru!==user.uid) referredBy=ru; } }catch(e){} }
   // buat kode referral unik untuk akun ini
   const myCode=await ensureUniqueRefCode();
-  await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, occupation, consent:true, provider:'phone', profileComplete:true, refCode:myCode, referredBy:referredBy, refRewarded:false });
+  await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, occupation, homeOutlet, consent:true, provider:'phone', profileComplete:true, refCode:myCode, referredBy:referredBy, refRewarded:false });
   try{ await setDoc(doc(db,'refcodes',myCode), { uid:user.uid, name:name.trim(), createdAt:serverTimestamp() }); }catch(e){}
   pushToSheet({
     type: 'member',
@@ -207,10 +209,29 @@ async function registerPhonePin(data){
     no_hp: normPhone(phone),
     gender: gender,
     usia: age,
-    pekerjaan: occupation
+    pekerjaan: occupation,
+    outlet_terdekat: homeOutlet
   });
 }
 async function doSignOut(){ await fbSignOut(auth); }
+function askHomeOutlet(){
+  if(!user || !profile || document.getElementById('ooOutletAsk')) return;
+  var outs=(window.OMA_OUTLETS||[]); var byArea={}; outs.forEach(function(o){ var a=o.area||'Lainnya'; (byArea[a]=byArea[a]||[]).push((o.name||'').replace(/^Oma Opa Cakery\s*/i,'')); });
+  var opt='<option value="">— pilih outlet terdekat —</option>'; Object.keys(byArea).forEach(function(a){ opt+='<optgroup label="'+a+'">'; byArea[a].forEach(function(n){ opt+='<option>'+n+'</option>'; }); opt+='</optgroup>'; });
+  var bk=document.createElement('div'); bk.id='ooOutletAsk';
+  bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  bk.innerHTML='<div style="background:#FFF9EC;border-radius:18px;padding:20px;max-width:340px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+    +'<div style="font-weight:800;font-size:1.1rem;color:#5A3017;margin-bottom:6px">📍 Outlet terdekatmu?</div>'
+    +'<div style="font-size:.85rem;color:#7A5A3A;margin-bottom:12px">Bantu kami tahu outlet Oma Opa yang paling dekat / sering kamu kunjungi ya 🙏</div>'
+    +'<select id="aoSel" style="width:100%;padding:11px;border:2px solid #E7D7B6;border-radius:11px;font-size:.95rem;margin-bottom:8px;background:#fff">'+opt+'</select>'
+    +'<div id="aoMsg" style="font-size:.8rem;color:#C0392B;margin-bottom:8px"></div>'
+    +'<button id="aoSave" style="width:100%;padding:12px;border:none;border-radius:11px;background:#FACC1A;color:#5A3A05;font-weight:800;font-size:.95rem;cursor:pointer">Simpan</button>'
+    +'<button id="aoSkip" style="width:100%;padding:9px;border:none;background:none;color:#9a7a5e;font-size:.82rem;margin-top:6px;cursor:pointer;text-decoration:underline">Nanti aja</button>'
+    +'</div>';
+  document.body.appendChild(bk);
+  bk.querySelector('#aoSave').onclick=async function(){ var v=bk.querySelector('#aoSel').value; if(!v){ bk.querySelector('#aoMsg').textContent='Pilih dulu ya.'; return; } var btn=this; btn.disabled=true; btn.textContent='Menyimpan…'; try{ await setDoc(doc(db,'users',user.uid),{homeOutlet:v},{merge:true}); bk.remove(); }catch(e){ bk.querySelector('#aoMsg').textContent='Gagal, coba lagi.'; btn.disabled=false; btn.textContent='Simpan'; } };
+  bk.querySelector('#aoSkip').onclick=function(){ bk.remove(); };
+}
 async function adminResetPin(targetUid, newPin){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   targetUid=String(targetUid||'').trim(); newPin=String(newPin||'');
@@ -341,6 +362,7 @@ function renderForm(){
     };
     (async()=>{ try{ const m=await getMessages(); if(m&&m.lupapin){ const a=f.querySelector('#ooForgot'); if(a) a.href='https://wa.me/'+WA_CC+'?text='+encodeURIComponent(m.lupapin); } }catch(e){} })();
   } else {
+    const outletOpts = (function(){ var outs=(window.OMA_OUTLETS||[]); var byArea={}; outs.forEach(function(o){ var a=o.area||'Lainnya'; (byArea[a]=byArea[a]||[]).push((o.name||'').replace(/^Oma Opa Cakery\s*/i,'')); }); var h='<option value="">— pilih outlet terdekat —</option>'; Object.keys(byArea).forEach(function(a){ h+='<optgroup label="'+a+'">'; byArea[a].forEach(function(n){ h+='<option>'+n+'</option>'; }); h+='</optgroup>'; }); return h; })();
     f.innerHTML = `<div class="oo-f">
       <label class="oo-l">Nama</label>
       <input class="oo-in" id="rName" placeholder="Nama panggilan">
@@ -350,13 +372,15 @@ function renderForm(){
       <input class="oo-in" id="rPin" type="password" inputmode="numeric" maxlength="6" placeholder="buat PIN">
       <div class="oo-row">
         <div><label class="oo-l">Jenis kelamin</label>
-          <select class="oo-se" id="rGender"><option value="">—</option><option>Laki-laki</option><option>Perempuan</option><option>Lainnya</option></select></div>
+          <select class="oo-se" id="rGender"><option value="">—</option><option>Laki-laki</option><option>Perempuan</option></select></div>
         <div><label class="oo-l">Usia</label>
           <select class="oo-se" id="rAge"><option value="">—</option><option>≤17</option><option>18-24</option><option>25-34</option><option>35-44</option><option>45+</option></select></div>
       </div>
       <label class="oo-l">Pekerjaan</label>
       <select class="oo-se" id="rJob"><option value="">—</option><option>PNS</option><option>Pelajar</option><option>Mahasiswa</option><option>Karyawan swasta</option><option>Pengusaha</option><option>Ibu Rumah Tangga</option><option>Lainnya</option></select>
       <input class="oo-in" id="rJobOther" placeholder="Tulis pekerjaanmu" style="display:none">
+      <label class="oo-l">Outlet terdekat</label>
+      <select class="oo-se" id="rOutlet">${outletOpts}</select>
       <label class="oo-l">Kode referral (opsional)</label>
       <input class="oo-in" id="rRef" placeholder="Punya kode teman? isi di sini" style="text-transform:uppercase">
       <label class="oo-ck"><input type="checkbox" id="rConsent"> Saya setuju data saya digunakan sebagai member & riset customer, serta menyetujui <b>Ketentuan Poin &amp; Reward</b> Oma Opa.</label>
@@ -370,6 +394,7 @@ function renderForm(){
         await registerPhonePin({
           name:f.querySelector('#rName').value, phone:f.querySelector('#rPhone').value, pin:f.querySelector('#rPin').value,
           gender:f.querySelector('#rGender').value, age:f.querySelector('#rAge').value, occupation:occ,
+          homeOutlet:f.querySelector('#rOutlet').value,
           consent:f.querySelector('#rConsent').checked, ref:f.querySelector('#rRef').value
         });
         closeLogin();
@@ -1063,7 +1088,7 @@ async function listMembers(qstr, n){
   try{ const snap=await getDocs(query(collection(db,'users'), limit(n))); const arr=[];
     snap.forEach(d=>{ const x=d.data(); const nm=(x.name||''), ph=(x.phone||'');
       if(qstr && nm.toLowerCase().indexOf(qstr)<0 && ph.indexOf(qstr)<0) return;
-      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||'', earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
+      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||'', earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
     arr.sort((a,b)=>b.points-a.points); return arr;
   }catch(e){ return []; }
 }

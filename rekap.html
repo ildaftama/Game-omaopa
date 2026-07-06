@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root{ --kuning:#FACC1A; --kuning-d:#E0B100; --coklat:#613925; --cream:#FFF8EC; }
+  :root{ --kuning:#FFC21A; --kuning-hi:#FFD64A; --kuning-d:#E5A100; --coklat:#5A3017; --cream:#FFF6E6; --cream2:#FFE9C2; --pop:#FF6A3D; --merah:#E2425A; }
   *{box-sizing:border-box}
   body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
     background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream);
@@ -50,9 +50,9 @@
 <body>
 <div class="wrap">
   <div style="display:flex;gap:7px;margin-bottom:12px">
-    <a href="admin.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">🛠️ Admin</a>
-    <span style="flex:1;text-align:center;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FACC1A;color:#613925">📊 Rekap</span>
-    <a href="staff.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">🧾 Kasir</a>
+    <a href="admin.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E5A100;background:#FFF6E6;color:#5A3017">🛠️ Admin</a>
+    <span style="flex:1;text-align:center;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E5A100;background:#FFC21A;color:#5A3017">📊 Rekap</span>
+    <a href="staff.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E5A100;background:#FFF6E6;color:#5A3017">🧾 Kasir</a>
   </div>
   <div class="head">
     <h1>📊 Rekap Oma Opa</h1><span class="badge" id="roleBadge">…</span>
@@ -60,7 +60,7 @@
   <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=74"></script>
+<script type="module" src="core-omaopa.js?v=95"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
@@ -128,7 +128,7 @@
   function renderShell(){
     var to=new Date(); to.setDate(to.getDate()+30); var from=new Date(); from.setDate(from.getDate()-29);
     panel.innerHTML=
-      '<div class="muted" style="margin-bottom:10px">Outlet: <b style="color:#613925">'+(info.admin?'Semua (admin)':esc(info.outlet||'-'))+'</b></div>'
+      '<div class="muted" style="margin-bottom:10px">Outlet: <b style="color:#5A3017">'+(info.admin?'Semua (admin)':esc(info.outlet||'-'))+'</b></div>'
       + '<div class="filters">'
       +   '<div><label>Dari tanggal</label><input type="date" id="from" value="'+ymd(from)+'"></div>'
       +   '<div><label>Sampai tanggal</label><input type="date" id="to" value="'+ymd(to)+'"></div>'
@@ -292,12 +292,14 @@
   }
   function csvCell(s){ s=String(s==null?'':s); return '"'+s.replace(/"/g,'""')+'"'; }
   function inPeriod(ms, st){ if(!st.period) return true; var p=pkl(ms,st.mode); return p.k===st.period; }
-  function exportCSV(){
+  var MEMBER_PH=null;
+  async function exportCSV(){
     var lines=[], fname;
+    if(!MEMBER_PH){ MEMBER_PH={}; try{ var _mem=await window.OmaOpa.listMembers('',6000); (_mem||[]).forEach(function(m){ if(m&&m.uid) MEMBER_PH[m.uid]=m.phone||''; }); }catch(e){} }
     if(tab==='txn'){
       var st=view.txn; var rows=filterRows(allTxn).filter(function(x){return inPeriod(x.ts,st);});
-      lines.push(['Waktu','Outlet','Member','UID','Nominal','Poin'].map(csvCell).join(','));
-      rows.forEach(function(x){ lines.push([fmt(x.ts),x.outlet,x.name,x.uid,x.nominal,x.points].map(csvCell).join(',')); });
+      lines.push(['Waktu','Outlet','Member','No HP','UID','Nominal','Poin'].map(csvCell).join(','));
+      rows.forEach(function(x){ lines.push([fmt(x.ts),x.outlet,x.name,(x.phone||MEMBER_PH[x.uid]||''),x.uid,x.nominal,x.points].map(csvCell).join(',')); });
       fname='rekap-transaksi'+(st.period?('-'+st.period):'')+'.csv';
     } else if(tab==='vou'){
       var sv=view.vou; var rows2=filterRows(allVou).filter(function(x){return inPeriod(x.ts,sv);});
