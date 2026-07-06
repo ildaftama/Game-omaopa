@@ -90,7 +90,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=98"></script>
+<script type="module" src="core-omaopa.js?v=99"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -390,6 +390,7 @@
         +'<label style="margin-top:14px">Set poin jadi</label><input id="spv" inputmode="numeric" placeholder="angka pasti"><button class="btn sec" id="spBtn">Set poin</button>'
         +'<label style="margin-top:14px">Set skor game jadi</label><input id="ssv" inputmode="numeric" placeholder="angka"><button class="btn sec" id="ssBtn">Set skor</button>'
         +(m.phone?('<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #E7D7B6"><label>Reset PIN member (kalau lupa)</label><div style="display:flex;gap:6px"><input id="rpv" inputmode="numeric" maxlength="6" placeholder="PIN baru 6 angka" style="flex:1"><button class="btn sec" id="rpGen" style="width:auto;margin:0">Acak</button></div><button class="btn" id="rpBtn" style="background:#f60909;border-color:#f60909;color:#fff">🔑 Reset PIN member</button></div>'):'')
+        +'<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E7D7B6"><button class="btn" id="delMemBtn" style="background:#7a0b0b;border-color:#7a0b0b;color:#fff">🗑️ Hapus akun member ini</button></div>'
         ) : '<div class="res warn" style="margin-top:10px">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengubah poin & skor.</div>')
       +'<div style="margin-top:16px" class="nm">Voucher member ini</div>'+vhtml
       +'<div id="mmsg"></div></div>';
@@ -403,6 +404,7 @@
       d.querySelectorAll('[data-vtog]').forEach(function(b){ b.onclick=function(){ run(function(){ return O.adminSetVoucherStatus(b.getAttribute('data-vtog'), b.getAttribute('data-on')!=='1'); },'Status voucher diubah.'); }; });
       var rpGen=document.getElementById('rpGen'); if(rpGen) rpGen.onclick=function(){ document.getElementById('rpv').value=String(Math.floor(100000+Math.random()*900000)); };
       var rpBtn=document.getElementById('rpBtn'); if(rpBtn) rpBtn.onclick=function(){ if(busy) return; var msg=document.getElementById('mmsg'); var pin=(document.getElementById('rpv').value||'').trim(); if(!/^\d{6}$/.test(pin)){ msg.innerHTML='<div class="res bad" style="margin-top:10px">PIN harus 6 angka.</div>'; return; } if(!confirm('Reset PIN member ini jadi '+pin+'? Pastikan kamu kasih ke member yang benar.')) return; busy=true; msg.innerHTML='<div class="muted" style="margin-top:10px">Mereset PIN…</div>'; Promise.resolve().then(function(){ return O.adminResetPin(uid, pin); }).then(function(){ busy=false; msg.innerHTML='<div class="res ok" style="margin-top:10px">✓ PIN direset jadi <b style="font-size:1.15rem">'+pin+'</b><br>Kasih PIN ini ke member via WA, lalu minta dia ganti sendiri di menu Profil ya.</div>'; }).catch(function(e){ busy=false; msg.innerHTML='<div class="res bad" style="margin-top:10px">Gagal: '+esc((e&&e.message)||'')+'</div>'; }); };
+      var delBtn=document.getElementById('delMemBtn'); if(delBtn) delBtn.onclick=function(){ if(busy) return; var nm=(m.name||'member ini'); if(!confirm('HAPUS akun "'+nm+'"?\n\nAkun & login-nya dihapus PERMANEN. Poin & riwayat tidak bisa dikembalikan.')) return; if(!confirm('Yakin banget mau hapus "'+nm+'"? Ini permanen.')) return; var msg=document.getElementById('mmsg'); busy=true; msg.innerHTML='<div class="muted" style="margin-top:10px">Menghapus akun…</div>'; Promise.resolve().then(function(){ return O.adminDeleteMember(uid); }).then(function(){ busy=false; MEMBERS=null; alert('Akun "'+nm+'" sudah dihapus.'); memReset(); renderMember(); }).catch(function(e){ busy=false; msg.innerHTML='<div class="res bad" style="margin-top:10px">Gagal: '+esc((e&&e.message)||'')+'</div>'; }); };
     }
   }
   async function doVoucher(code){
@@ -683,7 +685,8 @@
     if(canEdit){ document.getElementById('oAdd').onclick=async function(){ if(busy) return; busy=true; var msg=document.getElementById('oMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       try{ await O.addOutlet({ name:document.getElementById('oNm').value, area:document.getElementById('oAr').value, maps:document.getElementById('oMp').value });
         msg.innerHTML='<div class="res ok">✓ Outlet ditambahkan.</div>'; document.getElementById('oNm').value=''; document.getElementById('oMp').value=''; loadOutlets();
-      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+      var sFind=document.getElementById('sFind'); if(sFind) sFind.onclick=async function(){ var q=(document.getElementById('sSearch').value||'').trim(); var pick=document.getElementById('sPick'); if(!q){ pick.innerHTML='<div class="muted">Ketik nama / No. HP dulu.</div>'; return; } pick.innerHTML='<div class="muted">Mencari…</div>'; var arr=[]; try{ if(/^[0-9+]/.test(q)){ var one=await O.getMemberByPhone(q); arr=one?[one]:[]; } if(!arr.length) arr=await O.listMembers(q,50); }catch(e){} if(!arr.length){ pick.innerHTML='<div class="muted">Member tidak ditemukan.</div>'; return; } pick.innerHTML=arr.slice(0,30).map(function(m){ return '<div class="row sPickRow" data-uid="'+esc(m.uid)+'" data-nm="'+esc(m.name||'')+'" data-ph="'+esc(m.phone||'')+'" data-ho="'+esc(m.homeOutlet||'')+'" style="cursor:pointer"><div class="grow"><div class="nm" style="font-size:.86rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+esc(m.phone||'-')+(m.homeOutlet?(' · 📍 '+esc(m.homeOutlet)):'')+'</div></div><div class="btn sm">Pilih</div></div>'; }).join(''); pick.querySelectorAll('.sPickRow').forEach(function(r){ r.onclick=function(){ document.getElementById('sUid').value=r.getAttribute('data-uid'); var ho=r.getAttribute('data-ho'); if(ho && !document.getElementById('sOut').value) document.getElementById('sOut').value=ho; pick.innerHTML='<div class="res ok">✓ Terpilih: <b>'+esc(r.getAttribute('data-nm')||'(tanpa nama)')+'</b> ('+esc(r.getAttribute('data-ph')||'-')+')</div>'; }; }); }; }
     document.getElementById('oReload').onclick=loadOutlets; loadOutlets();
   }
   async function loadOutlets(){
@@ -709,16 +712,17 @@
   /* ---------- STAFF ---------- */
   async function renderStaff(){
     tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah staff / kasir</div>'
-      +'<label>UID akun (dari halaman kasir saat "belum terdaftar")</label><input id="sUid" placeholder="tempel UID di sini">'
+      +'<label>Cari member untuk dijadikan staff</label><div style="display:flex;gap:6px"><input id="sSearch" placeholder="nama / No. HP member"><button class="btn sec" id="sFind" style="width:auto;margin:0">Cari</button></div><div id="sPick" style="margin-top:7px"></div><input type="hidden" id="sUid">'
       +'<label>Outlet</label><input id="sOut" placeholder="cth: Oma Opa Cakery UMS">'
       +'<label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="sAdm" style="width:auto"> Bisa buka dashboard (admin)</label>'
       +'<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="sSup" style="width:auto"> Admin Utama (bisa mengubah poin & semua data)</label>'
       +'<button class="btn" id="sAdd">＋ Tambah staff</button><div id="sMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola staff.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar staff</div><button class="btn sm sec" id="sReload">↻</button></div><div id="sList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){ document.getElementById('sAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('sMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
-      try{ await O.addStaff(document.getElementById('sUid').value, document.getElementById('sOut').value, document.getElementById('sAdm').checked);
-        if(document.getElementById('sSup').checked){ await O.updateStaff(document.getElementById('sUid').value.trim(), {super:true, admin:true}); }
-        msg.innerHTML='<div class="res ok">✓ Staff ditambahkan.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sAdm').checked=false; document.getElementById('sSup').checked=false; loadStaff();
+      var _u=(document.getElementById('sUid').value||'').trim(); if(!_u){ msg.innerHTML='<div class="res bad">Pilih member dulu lewat pencarian di atas.</div>'; busy=false; return; }
+      try{ await O.addStaff(_u, document.getElementById('sOut').value, document.getElementById('sAdm').checked);
+        if(document.getElementById('sSup').checked){ await O.updateStaff(_u, {super:true, admin:true}); }
+        msg.innerHTML='<div class="res ok">✓ Staff ditambahkan.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sAdm').checked=false; document.getElementById('sSup').checked=false; loadStaff();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     document.getElementById('sReload').onclick=loadStaff; loadStaff();
   }
