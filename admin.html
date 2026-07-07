@@ -721,9 +721,8 @@
   async function renderStaff(){
     tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah staff / kasir</div>'
       +'<label>Cari member untuk dijadikan staff</label><div style="display:flex;gap:6px"><input id="sSearch" placeholder="nama / No. HP member"><button class="btn sec" id="sFind" style="width:auto;margin:0">Cari</button></div><div id="sPick" style="margin-top:7px"></div><input type="hidden" id="sUid">'
-      +'<label>Outlet</label><input id="sOut" placeholder="cth: Oma Opa Cakery UMS">'
-      +'<label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="sAdm" style="width:auto"> Bisa buka dashboard (admin)</label>'
-      +'<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="sSup" style="width:auto"> Admin Utama (bisa mengubah poin & semua data)</label>'
+      +'<label>Peran</label><select id="sRole"><option value="kasir">🧾 Kasir (akun outlet)</option><option value="admin">🛠️ Admin (bisa buka dashboard)</option><option value="super">👑 Admin Utama (bisa ubah poin & semua data)</option></select>'
+      +'<label>Outlet <span style="color:#C0392B;font-size:.78rem">(wajib untuk Kasir)</span></label><input id="sOut" placeholder="cth: Oma Opa Cakery UMS">'
       +'<button class="btn" id="sAdd">＋ Tambah staff</button><div id="sMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola staff.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar staff</div><button class="btn sm sec" id="sReload">↻</button></div><div id="sList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){
@@ -739,9 +738,11 @@
       var _sInp=document.getElementById('sSearch'); if(_sInp) _sInp.onkeydown=function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); document.getElementById('sFind').onclick(); } };
       document.getElementById('sAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('sMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       var _u=(document.getElementById('sUid').value||'').trim(); if(!_u){ msg.innerHTML='<div class="res bad">Pilih member dulu lewat pencarian di atas.</div>'; busy=false; return; }
-      try{ await O.addStaff(_u, document.getElementById('sOut').value, document.getElementById('sAdm').checked);
-        if(document.getElementById('sSup').checked){ await O.updateStaff(_u, {super:true, admin:true}); }
-        msg.innerHTML='<div class="res ok">✓ Staff ditambahkan.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sAdm').checked=false; document.getElementById('sSup').checked=false; loadStaff();
+      var _role=document.getElementById('sRole').value; var _out=(document.getElementById('sOut').value||'').trim();
+      if(_role==='kasir' && !_out){ msg.innerHTML='<div class="res bad">Outlet wajib diisi untuk Kasir.</div>'; busy=false; return; }
+      try{ await O.addStaff(_u, _out, _role!=='kasir');
+        await O.updateStaff(_u, { super:_role==='super', admin:_role!=='kasir' });
+        msg.innerHTML='<div class="res ok">✓ Ditambahkan sebagai '+(_role==='super'?'Admin Utama':(_role==='admin'?'Admin':'Kasir'))+'.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sRole').value='kasir'; loadStaff();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     document.getElementById('sReload').onclick=loadStaff; loadStaff();
   }
