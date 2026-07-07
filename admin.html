@@ -726,7 +726,18 @@
       +'<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="sSup" style="width:auto"> Admin Utama (bisa mengubah poin & semua data)</label>'
       +'<button class="btn" id="sAdd">＋ Tambah staff</button><div id="sMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola staff.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar staff</div><button class="btn sm sec" id="sReload">↻</button></div><div id="sList"><div class="muted">Memuat…</div></div></div>';
-    if(canEdit){ document.getElementById('sAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('sMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+    if(canEdit){
+      document.getElementById('sFind').onclick=async function(){
+        var q=(document.getElementById('sSearch').value||'').trim(); var pick=document.getElementById('sPick');
+        if(!q){ pick.innerHTML='<div class="muted">Ketik nama / No. HP dulu.</div>'; return; }
+        pick.innerHTML='<div class="muted">Mencari…</div>';
+        var arr=[]; try{ if(/^[0-9+]/.test(q)){ var one=await O.getMemberByPhone(q); arr=one?[one]:[]; } if(!arr.length) arr=await O.listMembers(q,50); }catch(e){}
+        if(!arr.length){ pick.innerHTML='<div class="muted">Tidak ada member cocok. Coba nama lain / No. HP.</div>'; return; }
+        pick.innerHTML=arr.slice(0,20).map(function(m){ return '<button type="button" class="btn sm sec" data-pick="'+esc(m.uid)+'" data-nm="'+esc(m.name||'')+'" data-out="'+esc(m.homeOutlet||'')+'" style="display:block;width:100%;text-align:left;margin:3px 0">'+esc(m.name||'(tanpa nama)')+' · '+esc(m.phone||'-')+'</button>'; }).join('');
+        pick.querySelectorAll('[data-pick]').forEach(function(b){ b.onclick=function(){ document.getElementById('sUid').value=b.getAttribute('data-pick'); var so=document.getElementById('sOut'); if(so && !so.value && b.getAttribute('data-out')) so.value=b.getAttribute('data-out'); pick.innerHTML='<div class="res ok">Dipilih: <b>'+esc(b.getAttribute('data-nm'))+'</b> — sekarang isi outlet & centang lalu Tambah.</div>'; }; });
+      };
+      var _sInp=document.getElementById('sSearch'); if(_sInp) _sInp.onkeydown=function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); document.getElementById('sFind').onclick(); } };
+      document.getElementById('sAdd').onclick=async function(){ if(busy)return; busy=true; var msg=document.getElementById('sMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       var _u=(document.getElementById('sUid').value||'').trim(); if(!_u){ msg.innerHTML='<div class="res bad">Pilih member dulu lewat pencarian di atas.</div>'; busy=false; return; }
       try{ await O.addStaff(_u, document.getElementById('sOut').value, document.getElementById('sAdm').checked);
         if(document.getElementById('sSup').checked){ await O.updateStaff(_u, {super:true, admin:true}); }
