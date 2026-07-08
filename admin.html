@@ -80,8 +80,10 @@
       <button data-tab="outlet">🏪 Outlet</button>
       <button data-tab="staff">🧑‍🍳 Staff</button>
       <button data-tab="reward">🎁 Reward</button>
+      <button data-tab="promo">📣 Promo</button>
       <button data-tab="analitik">📈 Analitik</button>
       <button data-tab="pesanan">🧾 Pesanan</button>
+      <button data-tab="pengaturan">⚙️ Pengaturan</button>
     </div>
     <div id="tab"></div>
   </div>
@@ -90,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=99"></script>
+<script type="module" src="core-omaopa.js?v=101"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -121,7 +123,7 @@
   document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
     tab=b.getAttribute('data-tab'); document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on'); render();
   }; });
-  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, analitik:renderAnalitik, pesanan:renderPesanan}[tab]||renderHome)(); }
+  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, pengaturan:renderPengaturan}[tab]||renderHome)(); }
   function setActiveTab(name){ tab=name; document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-tab')===name); }); }
   function applySegment(field,val){ segFilter={field:field, value:val}; setActiveTab('member'); render(); }
 
@@ -175,12 +177,54 @@
       +'<div class="kpi"><div class="v">'+num(txn.length)+'</div><div class="l">Total transaksi</div></div>'
       +'</div>';
     html+='<div class="card"><div class="muted" style="margin-bottom:2px;font-size:.74rem">Ketuk legenda untuk lihat membernya 👇</div>'+donut('Umur member', tally(mem,'age'),'age')+donut('Jenis kelamin', tally(mem,'gender'),'gender')+donut('Pekerjaan', tally(mem,'occupation'),'occupation')+donut('Tier member', tierCnt,'')+'</div>';
-    if(canEdit) html+='<div class="card"><div class="nm">📣 Banner carousel (maks 3)</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
-    if(canEdit) html+='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
     html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=62">Buka Halaman Rekap →</a></div>';
     tabEl.innerHTML=html;
     tabEl.querySelectorAll('.lg[data-segf]').forEach(function(el){ el.onclick=function(){ var f=el.getAttribute('data-segf'); if(f) applySegment(f, el.getAttribute('data-segv')); }; });
-    if(canEdit){ loadBanner(); loadMessages(); }
+  }
+  async function renderPromo(){
+    if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
+    tabEl.innerHTML='<div class="card"><div class="nm">📣 Banner carousel (maks 3)</div><div class="muted" style="font-size:.76rem;margin:4px 0 2px">Banner promo di beranda. (Desain banner-nya kamu buat sendiri, tinggal upload.)</div><div id="bnWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
+      +'<div class="card" id="promoBonusCard"><div class="nm">🎁 Bonus poin pendaftaran</div><div id="pbWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
+    loadBanner(); loadPromoBonus();
+  }
+  async function renderPengaturan(){
+    if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
+    tabEl.innerHTML='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
+      +'<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya</div>'
+        +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Reset <b>SEMUA</b> poin member ke 0 (termasuk poin game & check-in). Berguna untuk mulai dari bersih setelah masa uji coba. <b>Tidak bisa dibatalkan.</b></div>'
+        +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in</label>'
+        +'<button class="btn red" id="rsBtn">Reset semua poin ke 0</button><div id="rsMsg"></div>'
+        +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
+        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>SEMUA transaksi kasir</b> (termasuk penyesuaian poin admin). Membersihkan grafik omzet & tren dari data uji coba. <b>Tidak bisa dibatalkan.</b></div>'
+        +'<button class="btn red" id="txBtn">Hapus semua transaksi kasir</button><div id="txMsg"></div>'
+        +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
+        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>SEMUA voucher yang sudah terpakai</b> (membersihkan riwayat penukaran). Voucher yang masih aktif tidak terhapus. <b>Tidak bisa dibatalkan.</b></div>'
+        +'<button class="btn red" id="vcBtn">Hapus semua voucher terpakai</button><div id="vcMsg"></div></div>';
+    loadMessages();
+    var rb=document.getElementById('rsBtn'); if(rb) rb.onclick=async function(){
+      if(busy) return;
+      if(!confirm('Yakin reset SEMUA poin member jadi 0? Tindakan ini TIDAK bisa dibatalkan.')) return;
+      if(!confirm('Sekali lagi \u2014 poin SEMUA member akan jadi 0. Lanjutkan?')) return;
+      busy=true; var msg=document.getElementById('rsMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Mereset\u2026 (jangan tutup halaman)</div>';
+      try{ var r=await O.adminResetPoints({ scores: document.getElementById('rsScores').checked }); MEMBERS=null; TXN=null;
+        msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' member di-reset ke 0 poin.</div>'; }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+    var tb=document.getElementById('txBtn'); if(tb) tb.onclick=async function(){
+      if(busy) return;
+      if(!confirm('Hapus SEMUA transaksi kasir? Grafik omzet & tren akan kosong. Tidak bisa dibatalkan.')) return;
+      if(!confirm('Sekali lagi \u2014 semua catatan transaksi kasir akan hilang. Lanjutkan?')) return;
+      busy=true; var msg=document.getElementById('txMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus\u2026 (jangan tutup halaman)</div>';
+      try{ var r=await O.adminClearTransactions(); TXN=null;
+        msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' transaksi dihapus.</div>'; }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+    var vc=document.getElementById('vcBtn'); if(vc) vc.onclick=async function(){
+      if(busy) return;
+      if(!confirm('Hapus SEMUA voucher yang sudah terpakai? Riwayat penukaran akan hilang. Tidak bisa dibatalkan.')) return;
+      if(!confirm('Sekali lagi \u2014 semua voucher terpakai akan dihapus. Lanjutkan?')) return;
+      busy=true; var msg=document.getElementById('vcMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus\u2026 (jangan tutup halaman)</div>';
+      try{ var r=await O.adminClearUsedVouchers();
+        msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' voucher terpakai dihapus.</div>'; }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
   }
   async function loadMessages(){
     var w=document.getElementById('msgWrap'); if(!w) return; w.classList.remove('muted');
@@ -190,14 +234,14 @@
       +'<label style="margin-top:8px">Pesan pembuka order (CS order)</label><textarea id="msgOrder" rows="2">'+esc(m.order||'')+'</textarea>'
       +'<label style="margin-top:8px">Pesan tombol "Lupa PIN" (ke WA CS)</label><textarea id="msgLupapin" rows="3">'+esc(m.lupapin||'')+'</textarea>'
       +'<div style="margin-top:8px"><button class="btn" id="msgSave">Simpan pesan</button></div><div id="msgMsg"></div>';
-    document.getElementById('msgSave').onclick=async function(){ if(busy)return; busy=true; var mm=document.getElementById('msgMsg'); mm.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
-      try{ await O.setMessages({ cc:document.getElementById('msgCc').value, order:document.getElementById('msgOrder').value, lupapin:document.getElementById('msgLupapin').value }); mm.innerHTML='<div class="res ok">✓ Pesan otomatis disimpan.</div>'; }catch(e){ mm.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+    document.getElementById('msgSave').onclick=async function(){ if(busy)return; busy=true; var mm=document.getElementById('msgMsg'); mm.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan\u2026</div>';
+      try{ await O.setMessages({ cc:document.getElementById('msgCc').value, order:document.getElementById('msgOrder').value, lupapin:document.getElementById('msgLupapin').value }); mm.innerHTML='<div class="res ok">\u2713 Pesan otomatis disimpan.</div>'; }catch(e){ mm.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
   }
   async function loadBanner(){
     var w=document.getElementById('bnWrap'); if(!w) return; w.classList.remove('muted');
     var map={}; try{ (await O.listBanners()).forEach(function(x){ map[x.id]=x; }); }catch(e){}
     var ANIM_MAX=700*1024;
-    w.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:10px">Sampai <b>3 banner</b> (jadi carousel di beranda). Rasio disarankan <b>3:1</b> (mis. 1080×360), JPG/PNG. Untuk animasi pakai <b>GIF/WebP</b> \u2014 maks ~700KB/banner (WebP paling ringan).</div>';
+    w.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:10px">Sampai <b>3 banner</b> (jadi carousel di beranda). Rasio disarankan <b>3:1</b> (mis. 1080\u00d7360), JPG/PNG. Untuk animasi pakai <b>GIF/WebP</b> \u2014 maks ~700KB/banner (WebP paling ringan).</div>';
     [1,2,3].forEach(function(n){
       var id='b'+n; var b=map[id]||{}; var pending=null;
       var box=document.createElement('div'); box.style.cssText='border:1.5px solid #EFE2C4;border-radius:13px;padding:11px;margin-bottom:10px';
@@ -234,73 +278,45 @@
         try{ await O.deleteBannerItem(id); b={}; pending=null; prev(''); var ac=document.getElementById('ba'+n); if(ac) ac.checked=false; var li=document.getElementById('bl'+n); if(li) li.value=''; m.innerHTML='<div class="res ok">\u2713 Banner '+n+' dikosongkan.</div>'; }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
     });
   }
-
-  /* ---------- MEMBER ---------- */
+  async function loadPromoBonus(){
+    var w=document.getElementById('pbWrap'); if(!w) return; w.classList.remove('muted');
+    var p={active:false,start:'',end:'',bonus:0}; try{ p=await O.getPromo(); }catch(e){}
+    w.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:9px">Member yang <b>tanggal daftarnya</b> ada di rentang ini otomatis dapat bonus poin — <b>berlaku juga untuk yang sudah daftar sebelumnya</b> (bonusnya masuk saat mereka buka app). 1 member 1× per rentang.</div>'
+      +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:700"><input type="checkbox" id="pbActive" style="width:auto" '+(p.active?'checked':'')+'> Aktifkan promo bonus</label>'
+      +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Dari tanggal</label><input type="date" id="pbStart" value="'+esc(p.start||'')+'"></div><div style="flex:1"><label>Sampai tanggal</label><input type="date" id="pbEnd" value="'+esc(p.end||'')+'"></div></div>'
+      +'<label>Jumlah bonus poin</label><input id="pbBonus" inputmode="numeric" placeholder="cth: 500" value="'+(p.bonus||'')+'">'
+      +'<button class="btn" id="pbSave">Simpan promo</button><div id="pbMsg"></div>';
+    document.getElementById('pbSave').onclick=async function(){ if(busy)return; busy=true; var m=document.getElementById('pbMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+      var act=document.getElementById('pbActive').checked, st=document.getElementById('pbStart').value, en=document.getElementById('pbEnd').value, bo=parseInt(document.getElementById('pbBonus').value||'0',10)||0;
+      if(act && (!st||!en||bo<=0)){ m.innerHTML='<div class="res bad">Isi tanggal & jumlah bonus dulu.</div>'; busy=false; return; }
+      if(act && st>en){ m.innerHTML='<div class="res bad">Tanggal "Dari" harus sebelum/sama dengan "Sampai".</div>'; busy=false; return; }
+      try{ await O.setPromo({active:act,start:st,end:en,bonus:bo}); m.innerHTML='<div class="res ok">✓ Promo disimpan.'+(act?(' Member yang daftar '+st+' s/d '+en+' dapat '+bo+' poin.'):' (nonaktif).')+'</div>'; }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+  }
   async function renderMember(){
     var seg=segFilter; var LM={age:'Umur',gender:'Jenis kelamin',occupation:'Pekerjaan'};
-    var mOutletOpts='<option value="">— semua outlet —</option>'
-      +'<option value="__area1">🗺️ Area 1 · Jogja·Klaten·Magelang</option>'
-      +'<option value="__area2">🗺️ Area 2 · Solo Raya</option>'
-      +'<option value="__area3">🗺️ Area 3 · Semarang</option>'
-      +'<option value="__kronggahan">🏢 Kronggahan</option>';
-    var chip = seg ? '<div class="card"><div class="row" style="border:none;padding:0"><div class="grow"><span class="muted">Filter aktif:</span> <b>'+esc(LM[seg.field]||seg.field)+' = '+esc(seg.value)+'</b></div><button class="btn sm sec" id="segClr">✕ Hapus</button></div></div>' : '';
+    var mOutletOpts='<option value="">\u2014 semua outlet \u2014</option>'
+      +'<option value="__area1">\ud83d\uddfa\ufe0f Area 1 \u00b7 Jogja\u00b7Klaten\u00b7Magelang</option>'
+      +'<option value="__area2">\ud83d\uddfa\ufe0f Area 2 \u00b7 Solo Raya</option>'
+      +'<option value="__area3">\ud83d\uddfa\ufe0f Area 3 \u00b7 Semarang</option>'
+      +'<option value="__kronggahan">\ud83c\udfe2 Kronggahan</option>';
+    var chip = seg ? '<div class="card"><div class="row" style="border:none;padding:0"><div class="grow"><span class="muted">Filter aktif:</span> <b>'+esc(LM[seg.field]||seg.field)+' = '+esc(seg.value)+'</b></div><button class="btn sm sec" id="segClr">\u2715 Hapus</button></div></div>' : '';
     tabEl.innerHTML=chip
       +'<div class="card"><div class="nm">Cari / lihat member</div>'
       +'<label>Nama atau No. HP (kosongkan = semua)</label><input id="mq" placeholder="cth: Budi / 0812...">'
       +'<label style="margin-top:8px">Shortlist by outlet terdekat</label><select id="mOutlet">'+mOutletOpts+'</select>'
-      +'<button class="btn" id="mfind">Tampilkan</button><div id="mlist" class="muted" style="margin-top:8px">Memuat…</div></div>'
+      +'<button class="btn" id="mfind">Tampilkan</button><div id="mlist" class="muted" style="margin-top:8px">Memuat\u2026</div></div>'
       +'<div id="mdetail"></div>'
-      +'<div class="card"><div class="nm">🎟️ Cari & batalkan voucher (kode)</div>'
+      +'<div class="card"><div class="nm">\ud83c\udf9f\ufe0f Cari & batalkan voucher (kode)</div>'
       +'<label>Kode voucher</label><input id="vq" placeholder="OO-XXXXXXXX" style="text-transform:uppercase">'
       +'<button class="btn sec" id="vfind">Cek voucher</button><div id="vout"></div></div>'
-      +'<div class="card"><div class="nm">😴 Member tidak aktif (win-back)</div>'
+      +'<div class="card"><div class="nm">\ud83d\ude34 Member tidak aktif (win-back)</div>'
       +'<div style="display:flex;gap:6px;margin:9px 0"><button class="btn sm sec" data-inact="30">30 hari</button><button class="btn sm sec" data-inact="60">60 hari</button><button class="btn sm sec" data-inact="90">90 hari</button></div>'
       +'<div id="inact" class="muted">Pilih rentang di atas untuk lihat member yang sudah lama tidak belanja, lalu sapa via WhatsApp.</div></div>'
-      +'<div class="card"><div class="nm">🛡️ Audit poin (deteksi tidak wajar)</div>'
-      +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Membandingkan poin dengan total belanja. Poin dari game & check-in itu wajar, jadi pakai ini untuk <b>menyaring kandidat yang perlu dicek</b> sebelum kasih hadiah besar — bukan vonis.</div>'
-      +'<button class="btn sec" id="auditBtn">Tampilkan audit poin</button><div id="auditOut" style="margin-top:8px"></div></div>'
-      +(canEdit ? ('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya</div>'
-        +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Reset <b>SEMUA</b> poin member ke 0 (termasuk poin game & check-in). Berguna untuk mulai dari bersih setelah masa uji coba. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in</label>'
-        +'<button class="btn red" id="rsBtn">Reset semua poin ke 0</button><div id="rsMsg"></div>'
-        +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
-        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>SEMUA transaksi kasir</b> (termasuk penyesuaian poin admin). Membersihkan grafik omzet & tren dari data uji coba. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<button class="btn red" id="txBtn">Hapus semua transaksi kasir</button><div id="txMsg"></div>'
-        +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
-        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>SEMUA voucher yang sudah terpakai</b> (membersihkan riwayat penukaran). Voucher yang masih aktif tidak terhapus. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<button class="btn red" id="vcBtn">Hapus semua voucher terpakai</button><div id="vcMsg"></div></div>') : '');
+      +'<div class="card"><div class="nm">\ud83d\udee1\ufe0f Audit poin (deteksi tidak wajar)</div>'
+      +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Membandingkan poin dengan total belanja. Poin dari game & check-in itu wajar, jadi pakai ini untuk <b>menyaring kandidat yang perlu dicek</b> sebelum kasih hadiah besar \u2014 bukan vonis.</div>'
+      +'<button class="btn sec" id="auditBtn">Tampilkan audit poin</button><div id="auditOut" style="margin-top:8px"></div></div>';
     tabEl.querySelectorAll('[data-inact]').forEach(function(b){ b.onclick=function(){ loadInactive(parseInt(b.getAttribute('data-inact'),10)); }; });
     var ab=document.getElementById('auditBtn'); if(ab) ab.onclick=loadAudit;
-    var rb=document.getElementById('rsBtn'); if(rb) rb.onclick=async function(){
-      if(busy) return;
-      if(!confirm('Yakin reset SEMUA poin member jadi 0? Tindakan ini TIDAK bisa dibatalkan.')) return;
-      if(!confirm('Sekali lagi — poin SEMUA member akan jadi 0. Lanjutkan?')) return;
-      busy=true; var msg=document.getElementById('rsMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Mereset… (jangan tutup halaman)</div>';
-      try{ var r=await O.adminResetPoints({ scores: document.getElementById('rsScores').checked }); MEMBERS=null; TXN=null;
-        msg.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' member di-reset ke 0 poin.</div>'; }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-      busy=false;
-    };
-    var tb=document.getElementById('txBtn'); if(tb) tb.onclick=async function(){
-      if(busy) return;
-      if(!confirm('Hapus SEMUA transaksi kasir? Grafik omzet & tren akan kosong. Tidak bisa dibatalkan.')) return;
-      if(!confirm('Sekali lagi — semua catatan transaksi kasir akan hilang. Lanjutkan?')) return;
-      busy=true; var msg=document.getElementById('txMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus… (jangan tutup halaman)</div>';
-      try{ var r=await O.adminClearTransactions(); TXN=null;
-        msg.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' transaksi dihapus.</div>'; }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-      busy=false;
-    };
-    var vc=document.getElementById('vcBtn'); if(vc) vc.onclick=async function(){
-      if(busy) return;
-      if(!confirm('Hapus SEMUA voucher yang sudah terpakai? Riwayat penukaran akan hilang. Tidak bisa dibatalkan.')) return;
-      if(!confirm('Sekali lagi — semua voucher terpakai akan dihapus. Lanjutkan?')) return;
-      busy=true; var msg=document.getElementById('vcMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus… (jangan tutup halaman)</div>';
-      try{ var r=await O.adminClearUsedVouchers();
-        msg.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' voucher terpakai dihapus.</div>'; }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-      busy=false;
-    };
     document.getElementById('mfind').onclick=function(){ memSearch(document.getElementById('mq').value); };
     var mo=document.getElementById('mOutlet'); if(mo) mo.onchange=function(){ var v=mo.value; if(v){ memByOutlet(v); } else { document.getElementById('mq').value=''; memReset(); loadMemberPage(); } };
     document.getElementById('mq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ memSearch(e.target.value); } });
@@ -354,11 +370,22 @@
   }
   function renderTable(box, arr, note){
     if(!arr.length){ box.innerHTML='<div class="res warn">Tidak ada member.</div>'; return; }
-    var rows=arr.slice(0,80).map(function(m){ return '<tr data-uid="'+esc(m.uid)+'"><td>'+esc(m.name||'(tanpa nama)')+'<div class="sub">'+esc(m.phone||'-')+' · 📍 '+esc(m.homeOutlet||'-')+'</div></td>'
-      +'<td>'+esc(m.age||'-')+'</td><td>'+esc((m.gender||'-').slice(0,1))+'</td><td class="pts">'+m.points+'</td></tr>'; }).join('');
-    box.innerHTML='<div class="muted" style="margin-bottom:6px">'+(note||(arr.length+' member'))+(arr.length>80?' (tampil 80 teratas)':'')+'</div>'
-      +'<table class="mt"><tr><th>Nama / HP</th><th>Umur</th><th>JK</th><th>Poin</th></tr>'+rows+'</table>';
-    box.querySelectorAll('tr[data-uid]').forEach(function(tr){ tr.onclick=function(){ openMember(tr.getAttribute('data-uid')); window.scrollTo({top:0,behavior:'smooth'}); }; });
+    var PAGE=25, shown=0;
+    box.innerHTML='<div class="muted" style="margin-bottom:6px">'+(note||(arr.length+' member'))+'</div>'
+      +'<table class="mt"><tr><th>Nama / HP</th><th>Umur</th><th>JK</th><th>Poin</th></tr><tbody id="mtBody"></tbody></table>'
+      +'<div id="mtMore" style="text-align:center;margin-top:8px"></div>';
+    var body=box.querySelector('#mtBody'), more=box.querySelector('#mtMore');
+    function loadMore(){
+      var next=arr.slice(shown, shown+PAGE);
+      var html=next.map(function(m){ return '<tr data-uid="'+esc(m.uid)+'"><td>'+esc(m.name||'(tanpa nama)')+'<div class="sub">'+esc(m.phone||'-')+' · 📍 '+esc(m.homeOutlet||'-')+'</div></td>'
+        +'<td>'+esc(m.age||'-')+'</td><td>'+esc((m.gender||'-').slice(0,1))+'</td><td class="pts">'+m.points+'</td></tr>'; }).join('');
+      body.insertAdjacentHTML('beforeend', html); shown+=next.length;
+      body.querySelectorAll('tr[data-uid]').forEach(function(tr){ tr.onclick=function(){ openMember(tr.getAttribute('data-uid')); window.scrollTo({top:0,behavior:'smooth'}); }; });
+      var rem=arr.length-shown;
+      more.innerHTML= rem>0 ? '<button class="btn sm sec" id="mtMoreBtn">Muat '+Math.min(PAGE,rem)+' lagi · '+rem+' sisa</button>' : (arr.length>PAGE?'<div class="muted" style="font-size:.75rem">Semua '+arr.length+' member tampil.</div>':'');
+      var mb=document.getElementById('mtMoreBtn'); if(mb) mb.onclick=loadMore;
+    }
+    loadMore();
   }
   async function doFind(q){
     var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
@@ -502,6 +529,9 @@
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 8px" id="trPer"><button class="btn sm sec trp" data-d="7">7 hari</button><button class="btn sm trp" data-d="30">30 hari</button><button class="btn sm sec trp" data-d="90">3 bln</button><button class="btn sm sec trp" data-d="180">6 bln</button><button class="btn sm sec trp" data-d="365">12 bln</button></div>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:.8rem"><input type="date" id="trFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="trTo" style="flex:1;min-width:0"><button class="btn sm" id="trGo">OK</button></div>'
       +'<div id="trBody" class="muted">Memuat…</div></div>';
+    html+='<div class="card" id="bdCard"><div class="nm">🎂 Ulang tahun per bulan</div>'
+      +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Kelompok member berdasarkan bulan lahir — buat kirim ucapan/promo ultah. Klik bulan untuk lihat daftarnya.</div>'
+      +'<div id="bdBody" class="muted">Memuat…</div></div>';
     if(!appr.length){ html+='<div class="muted" style="margin-top:8px">Menu terlaris terisi setelah ada pesanan web yang kamu <b>approve</b> di tab Pesanan.</div>'; }
     tabEl.innerHTML=html;
     var pn=document.getElementById('pendNote'); if(pn) pn.onclick=function(){ setActiveTab('pesanan'); render(); };
@@ -515,6 +545,25 @@
     }
     var rrp=document.querySelectorAll('#rrPer .rrp'); Array.prototype.forEach.call(rrp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(rrp,function(x){ x.className='btn sm sec rrp'; }); b.className='btn sm rrp'; loadRepeat(Number(b.dataset.m)); }; });
     loadRepeat(1);
+    async function loadBirthdays(){
+      var box=document.getElementById('bdBody'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+      var mem=await getMembers();
+      var MO=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+      var by=[[],[],[],[],[],[],[],[],[],[],[],[]]; var noDob=0;
+      mem.forEach(function(m){ if(m.dob){ var d=new Date(m.dob); if(!isNaN(d.getTime())){ by[d.getMonth()].push(m); return; } } noDob++; });
+      var h='<div style="display:flex;flex-wrap:wrap;gap:5px">';
+      for(var i=0;i<12;i++){ h+='<button class="btn sm sec bdm" data-mo="'+i+'" style="flex:0 0 auto">'+MO[i].slice(0,3)+' ('+by[i].length+')</button>'; }
+      h+='</div><div id="bdList" class="muted" style="margin-top:10px">Klik bulan di atas untuk lihat daftar member.'+(noDob?(' <br><span style="font-size:.76rem">'+noDob+' member belum isi tanggal lahir.</span>'):'')+'</div>';
+      box.innerHTML=h;
+      box.querySelectorAll('.bdm').forEach(function(b){ b.onclick=function(){
+        box.querySelectorAll('.bdm').forEach(function(x){ x.className='btn sm sec bdm'; }); b.className='btn sm bdm';
+        var i=Number(b.dataset.mo); var list=by[i].slice().sort(function(a,c){ return new Date(a.dob).getDate()-new Date(c.dob).getDate(); });
+        var el=document.getElementById('bdList');
+        if(!list.length){ el.innerHTML='<div class="muted">Belum ada member yang lahir di '+MO[i]+'.</div>'; return; }
+        el.innerHTML='<div class="muted" style="margin-bottom:6px">'+list.length+' member lahir di '+MO[i]+':</div>'+list.map(function(m){ var d=new Date(m.dob); var dd=d.getDate(); var ph=(m.phone||'').replace(/^0/,'62'); return '<div class="row"><div class="grow"><div class="nm" style="font-size:.85rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+dd+' '+MO[i]+' · '+esc(m.phone||'-')+'</div></div>'+(ph?('<a class="btn sm sec" style="text-decoration:none" href="https://wa.me/'+ph+'" target="_blank" rel="noopener">WA</a>'):'')+'</div>'; }).join('');
+      }; });
+    }
+    loadBirthdays();
     (function(){
       function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
       function parseYmd(x){ var q=String(x).split('-'); return new Date(+q[0],+q[1]-1,+q[2]); }

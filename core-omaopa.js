@@ -49,7 +49,7 @@ function pushToSheet(row){
   }catch(e){}
 }
 
-let user = null, profile = null, points = 0, unsubDoc = null, mergedOnce = false, _pinReminded = false, _outletAsked = false;
+let user = null, profile = null, points = 0, unsubDoc = null, mergedOnce = false, _pinReminded = false, _outletAsked = false, _dobAsked = false;
 const listeners = [];
 
 // ---------- util ----------
@@ -67,6 +67,7 @@ function normPhone(raw){
   return s;
 }
 function phoneEmail(raw){ return normPhone(raw) + PHONE_DOMAIN; }
+function _ageBucket(dobStr){ if(!dobStr) return ''; var d=new Date(dobStr); if(isNaN(d.getTime())) return ''; var now=new Date(); var age=now.getFullYear()-d.getFullYear(); var mm=now.getMonth()-d.getMonth(); if(mm<0 || (mm===0 && now.getDate()<d.getDate())) age--; if(age<0||age>120) return ''; if(age<=17) return '≤17'; if(age<=24) return '18-24'; if(age<=34) return '25-34'; if(age<=44) return '35-44'; return '45+'; }
 function validPin(p){ return /^\d{6}$/.test(String(p||'')); }
 function errMsg(e){
   const c = (e && e.code) || '';
@@ -148,6 +149,8 @@ onAuthStateChanged(auth, async (u)=>{
       if(d.exists()) mirrorLeaderboard(data.name, points);
       if(d.exists() && data.mustChangePin && !_pinReminded){ _pinReminded=true; setTimeout(function(){ try{ openProfile(); }catch(e){} }, 900); }
       if(d.exists() && data.profileComplete && !data.homeOutlet && !data.mustChangePin && !staffFlag && !_outletAsked){ _outletAsked=true; setTimeout(function(){ try{ askHomeOutlet(); }catch(e){} }, 1400); }
+      if(d.exists() && data.profileComplete && data.homeOutlet && !data.dob && !data.mustChangePin && !staffFlag && !_dobAsked){ _dobAsked=true; setTimeout(function(){ try{ askBirthday(); }catch(e){} }, 1400); }
+      if(d.exists() && !staffFlag){ maybeGrantRegBonus(); }
       if(d.exists() && !staffFlag && !data.refCode && !refCodeChecked){ refCodeChecked=true; ensureRefCode().catch(()=>{}); }
     }, ()=>{});
   } else {
@@ -181,11 +184,12 @@ async function changeMyPin(currentPin, newPin){
   return true;
 }
 async function registerPhonePin(data){
-  const { phone, pin, name, gender, age, occupation, homeOutlet, consent, ref } = data;
+  const { phone, pin, name, gender, age, dob, occupation, homeOutlet, consent, ref } = data;
   if(!name || name.trim().length<2) throw {message:'Isi nama dulu ya.'};
   if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
   if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
   if(!gender) throw {message:'Pilih jenis kelamin dulu ya.'};
+  if(!dob) throw {message:'Isi tanggal lahir dulu ya.'};
   if(!age) throw {message:'Pilih usia dulu ya.'};
   if(!occupation) throw {message:'Isi/pilih pekerjaan dulu ya.'};
   if(!homeOutlet) throw {message:'Pilih outlet terdekat dulu ya.'};
@@ -199,7 +203,7 @@ async function registerPhonePin(data){
   if(rc){ try{ const rm=await getDoc(doc(db,'refcodes',rc)); if(rm.exists()){ const ru=(rm.data().uid||''); if(ru && ru!==user.uid) referredBy=ru; } }catch(e){} }
   // buat kode referral unik untuk akun ini
   const myCode=await ensureUniqueRefCode();
-  await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, occupation, homeOutlet, consent:true, provider:'phone', profileComplete:true, refCode:myCode, referredBy:referredBy, refRewarded:false });
+  await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, dob, occupation, homeOutlet, consent:true, provider:'phone', profileComplete:true, refCode:myCode, referredBy:referredBy, refRewarded:false });
   try{ await setDoc(doc(db,'refcodes',myCode), { uid:user.uid, name:name.trim(), createdAt:serverTimestamp() }); }catch(e){}
   pushToSheet({
     type: 'member',
@@ -209,6 +213,7 @@ async function registerPhonePin(data){
     no_hp: normPhone(phone),
     gender: gender,
     usia: age,
+    tgl_lahir: dob,
     pekerjaan: occupation,
     outlet_terdekat: homeOutlet
   });
@@ -231,6 +236,22 @@ function askHomeOutlet(){
   document.body.appendChild(bk);
   bk.querySelector('#aoSave').onclick=async function(){ var v=bk.querySelector('#aoSel').value; if(!v){ bk.querySelector('#aoMsg').textContent='Pilih dulu ya.'; return; } var btn=this; btn.disabled=true; btn.textContent='Menyimpan…'; try{ await setDoc(doc(db,'users',user.uid),{homeOutlet:v},{merge:true}); bk.remove(); }catch(e){ bk.querySelector('#aoMsg').textContent='Gagal, coba lagi.'; btn.disabled=false; btn.textContent='Simpan'; } };
   bk.querySelector('#aoSkip').onclick=function(){ bk.remove(); };
+}
+function askBirthday(){
+  if(!user || !profile || document.getElementById('ooDobAsk')) return;
+  var bk=document.createElement('div'); bk.id='ooDobAsk';
+  bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  bk.innerHTML='<div style="background:#FFF9EC;border-radius:18px;padding:20px;max-width:340px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+    +'<div style="font-weight:800;font-size:1.1rem;color:#5A3017;margin-bottom:6px">🎂 Tanggal lahirmu?</div>'
+    +'<div style="font-size:.85rem;color:#7A5A3A;margin-bottom:12px">Biar kami bisa kasih kejutan pas hari ulang tahunmu 🎁</div>'
+    +'<input type="date" id="adDob" style="width:100%;padding:11px;border:2px solid #E7D7B6;border-radius:11px;font-size:.95rem;margin-bottom:8px;background:#fff">'
+    +'<div id="adMsg" style="font-size:.8rem;color:#C0392B;margin-bottom:8px"></div>'
+    +'<button id="adSave" style="width:100%;padding:12px;border:none;border-radius:11px;background:#FACC1A;color:#5A3A05;font-weight:800;font-size:.95rem;cursor:pointer">Simpan</button>'
+    +'<button id="adSkip" style="width:100%;padding:9px;border:none;background:none;color:#9a7a5e;font-size:.82rem;margin-top:6px;cursor:pointer;text-decoration:underline">Nanti aja</button>'
+    +'</div>';
+  document.body.appendChild(bk);
+  bk.querySelector('#adSave').onclick=async function(){ var v=bk.querySelector('#adDob').value; if(!v){ bk.querySelector('#adMsg').textContent='Pilih tanggal dulu ya.'; return; } var btn=this; btn.disabled=true; btn.textContent='Menyimpan…'; try{ await setDoc(doc(db,'users',user.uid),{ dob:v, age:_ageBucket(v) },{merge:true}); bk.remove(); }catch(e){ bk.querySelector('#adMsg').textContent='Gagal, coba lagi.'; btn.disabled=false; btn.textContent='Simpan'; } };
+  bk.querySelector('#adSkip').onclick=function(){ bk.remove(); };
 }
 async function deleteMyAccount(currentPin){
   if(!user) throw {message:'Masuk dulu ya.'};
@@ -393,8 +414,8 @@ function renderForm(){
       <div class="oo-row">
         <div><label class="oo-l">Jenis kelamin</label>
           <select class="oo-se" id="rGender"><option value="">—</option><option>Laki-laki</option><option>Perempuan</option></select></div>
-        <div><label class="oo-l">Usia</label>
-          <select class="oo-se" id="rAge"><option value="">—</option><option>≤17</option><option>18-24</option><option>25-34</option><option>35-44</option><option>45+</option></select></div>
+        <div><label class="oo-l">Tanggal lahir</label>
+          <input class="oo-in" id="rDob" type="date"></div>
       </div>
       <label class="oo-l">Pekerjaan</label>
       <select class="oo-se" id="rJob"><option value="">—</option><option>PNS</option><option>Pelajar</option><option>Mahasiswa</option><option>Karyawan swasta</option><option>Pengusaha</option><option>Ibu Rumah Tangga</option><option>Lainnya</option></select>
@@ -413,7 +434,7 @@ function renderForm(){
         let occ=f.querySelector('#rJob').value; if(occ==='Lainnya') occ=(f.querySelector('#rJobOther').value||'').trim();
         await registerPhonePin({
           name:f.querySelector('#rName').value, phone:f.querySelector('#rPhone').value, pin:f.querySelector('#rPin').value,
-          gender:f.querySelector('#rGender').value, age:f.querySelector('#rAge').value, occupation:occ,
+          gender:f.querySelector('#rGender').value, dob:f.querySelector('#rDob').value, age:_ageBucket(f.querySelector('#rDob').value), occupation:occ,
           homeOutlet:f.querySelector('#rOutlet').value,
           consent:f.querySelector('#rConsent').checked, ref:f.querySelector('#rRef').value
         });
@@ -663,7 +684,7 @@ async function repeatRateByOutlet(months){
   let txs=[];
   try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ uid:x.uid||'', outlet:(x.outlet||'').trim(), kind:x.kind||'', ts:ts }); }); }catch(e){ return []; }
   const byOutlet={};
-  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral') return; const o=t.outlet; if(!o || /^referral/i.test(o) || /penyesuaian/i.test(o)) return; const key=o.toLowerCase().replace(/\s+/g,' ').trim(); if(!byOutlet[key]) byOutlet[key]={ name:o, m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1; });
+  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral' || t.kind==='bonus') return; const o=t.outlet; if(!o || /^referral/i.test(o) || /penyesuaian/i.test(o) || /^bonus/i.test(o)) return; const key=o.toLowerCase().replace(/\s+/g,' ').trim(); if(!byOutlet[key]) byOutlet[key]={ name:o, m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1; });
   const rows=[];
   Object.keys(byOutlet).forEach(k=>{ const g=byOutlet[k]; const m=g.m; const uids=Object.keys(m); const total=uids.length; const repeat=uids.filter(u=>m[u]>=2).length; const visits=uids.reduce((s,u)=>s+m[u],0); rows.push({ outlet:g.name, totalMembers:total, repeatMembers:repeat, visits:visits, rate:(total?(repeat/total):0) }); });
   rows.sort((a,b)=>b.totalMembers-a.totalMembers);
@@ -1116,7 +1137,7 @@ async function listMembers(qstr, n){
   try{ const snap=await getDocs(query(collection(db,'users'), limit(n))); const arr=[];
     snap.forEach(d=>{ const x=d.data(); const nm=(x.name||''), ph=(x.phone||'');
       if(qstr && nm.toLowerCase().indexOf(qstr)<0 && ph.indexOf(qstr)<0) return;
-      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||'', earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
+      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', dob:x.dob||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||'', earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
     arr.sort((a,b)=>b.points-a.points); return arr;
   }catch(e){ return []; }
 }
@@ -1128,7 +1149,7 @@ async function listMembersPage(n, after){
     const q = after ? query(base, orderBy(documentId()), startAfter(after), limit(n))
                     : query(base, orderBy(documentId()), limit(n));
     const snap=await getDocs(q); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({uid:d.id,name:x.name||'',phone:x.phone||'',points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||''}); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({uid:d.id,name:x.name||'',phone:x.phone||'',points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', dob:x.dob||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||''}); });
     return { rows:arr, lastDoc: snap.docs.length? snap.docs[snap.docs.length-1] : null, hasMore: snap.docs.length===n };
   }catch(e){ return { rows:[], lastDoc:null, hasMore:false }; }
 }
@@ -1296,6 +1317,25 @@ const DEF_LUPAPIN_MSG='Halo Minmil, aku lupa PIN akunku 🙏 Tolong bantu reset 
 const WA_CC='6288216106216';
 async function getMessages(){ try{ const s=await getDoc(doc(db,'settings','messages')); const d=(s.exists()&&s.data())||{}; return { cc:(d.cc||DEF_CC_MSG), order:(d.order||DEF_ORDER_MSG), lupapin:(d.lupapin||DEF_LUPAPIN_MSG) }; }catch(e){ return { cc:DEF_CC_MSG, order:DEF_ORDER_MSG, lupapin:DEF_LUPAPIN_MSG }; } }
 async function setMessages(m){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; m=m||{}; await setDoc(doc(db,'settings','messages'), { cc:String(m.cc||''), order:String(m.order||''), lupapin:String(m.lupapin||''), updatedAt:serverTimestamp() }, {merge:true}); }
+async function getPromo(){ try{ const s=await getDoc(doc(db,'settings','promo')); const d=(s.exists()&&s.data())||{}; return { active:!!d.active, start:d.start||'', end:d.end||'', bonus:(typeof d.bonus==='number'?d.bonus:parseInt(d.bonus||0,10)||0) }; }catch(e){ return { active:false, start:'', end:'', bonus:0 }; } }
+async function setPromo(p){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; p=p||{}; await setDoc(doc(db,'settings','promo'), { active:!!p.active, start:String(p.start||''), end:String(p.end||''), bonus:Math.max(0,parseInt(p.bonus||0,10)||0), updatedAt:serverTimestamp() }, {merge:true}); }
+let _regBonusChecked=false, _promoCache=null;
+async function maybeGrantRegBonus(){
+  if(_regBonusChecked || !user || !profile) return;
+  _regBonusChecked=true;
+  try{
+    if(!_promoCache) _promoCache=await getPromo();
+    const p=_promoCache;
+    if(!p || !p.active || !(p.bonus>0) || !p.start || !p.end) return;
+    const sig=p.start+'_'+p.end;
+    if(profile.regBonusClaimed===sig) return;
+    const c=profile.createdAt; const cms=(c&&c.seconds)?c.seconds*1000:0; if(!cms) return;
+    const cd=new Date(cms); const cdStr=cd.getFullYear()+'-'+String(cd.getMonth()+1).padStart(2,'0')+'-'+String(cd.getDate()).padStart(2,'0');
+    if(cdStr<p.start || cdStr>p.end) return;
+    await runTransaction(db, async (tx)=>{ const ref=doc(db,'users',user.uid); const snap=await tx.get(ref); const d=snap.exists()?snap.data():{}; if(d.regBonusClaimed===sig) return; tx.set(ref, { points: increment(p.bonus), regBonusClaimed: sig, updatedAt: serverTimestamp() }, {merge:true}); });
+    try{ await addDoc(collection(db,'transactions'), { uid:user.uid, name:(profile.name||''), nominal:0, points:p.bonus, kind:'bonus', outlet:'Bonus pendaftaran', createdAt:serverTimestamp() }); }catch(e){}
+  }catch(e){}
+}
 
 // ===== Multi-banner carousel (koleksi 'banners', slot b1..b3) =====
 async function _bumpBannerVer(){ try{ await setDoc(doc(db,'settings','bannerVer'), { v:Date.now() }, {merge:true}); }catch(e){} }
@@ -1402,7 +1442,7 @@ window.OmaOpa = {
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
-  getAnnouncement, setAnnouncement, getMessages, setMessages, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
+  getAnnouncement, setAnnouncement, getMessages, setMessages, getPromo, setPromo, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel, adminResetPin, deleteMyAccount, adminDeleteMember,
   tierOf, TIERS, getMyTier,
   signOut: doSignOut,
