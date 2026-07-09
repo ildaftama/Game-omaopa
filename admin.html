@@ -328,7 +328,7 @@
   var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal','uii']; // 5 outlet Jogja -> Area 1; Jogja lain -> Kronggahan
   var _oam=null;
   async function ensureOam(){ if(_oam) return; _oam={}; var list=[]; try{ list=await O.listOutlets(); }catch(e){} if(!list||!list.length){ list=(window.OMA_OUTLETS||[]).slice(); } else { var seen={}; list.forEach(function(o){ seen[(o.name||'').toLowerCase().trim()]=1; }); (window.OMA_OUTLETS||[]).forEach(function(o){ if(!seen[(o.name||'').toLowerCase().trim()]) list.push(o); }); } list.forEach(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(n) _oam[n]=(o.area||'').toLowerCase(); }); }
-  function outletGroup(homeOutlet){ var key=(homeOutlet||'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=(_oam&&_oam[key])||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}); if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
+  function outletGroup(homeOutlet){ var key=(homeOutlet||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=(_oam&&_oam[key])||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}); if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
   async function memByOutlet(sel){
     segFilter=null; var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
     await ensureOam();
@@ -799,13 +799,19 @@
     var box=document.getElementById('sList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     var arr=[]; try{ arr=await O.listStaff(); }catch(e){}
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada staff.</div>'; return; }
-    box.innerHTML=arr.map(function(s){ return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':' <span class="tag off">KASIR</span>'))+'</div>'
+    await ensureOam();
+    function _sRow(s){ return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':' <span class="tag off">KASIR</span>'))+'</div>'
       +'<div class="sub">'+esc(s.outlet||'(outlet kosong)')+' · '+esc(s.phone||'')+'</div></div>'
       +(canEdit ? ('<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
         +'<button class="btn sm sec" data-edit="'+esc(s.uid)+'" data-out="'+esc(s.outlet||'')+'">Outlet</button>'
         +'<button class="btn sm sec" data-adm="'+esc(s.uid)+'" data-on="'+(s.admin?'1':'0')+'">'+(s.admin?'Cabut admin':'Jadikan admin')+'</button>'
         +'<button class="btn sm sec" data-sup="'+esc(s.uid)+'" data-on="'+(s.super?'1':'0')+'">'+(s.super?'Cabut utama':'Jadikan utama')+'</button>'
-        +'<button class="btn sm red" data-rem="'+esc(s.uid)+'">Hapus</button></div>') : '')+'</div>'; }).join('');
+        +'<button class="btn sm red" data-rem="'+esc(s.uid)+'">Hapus</button></div>') : '')+'</div>'; }
+    var _bk={kronggahan:[],area1:[],area2:[],area3:[],lain:[]};
+    arr.forEach(function(s){ var g=outletGroup(s.outlet); if(!_bk[g]) g='lain'; _bk[g].push(s); });
+    var _grp=[['kronggahan','🏢 Kronggahan'],['area1','🗺️ Area 1 · Jogja·Klaten·Magelang'],['area2','🗺️ Area 2 · Solo Raya'],['area3','🗺️ Area 3 · Semarang'],['lain','📌 Lainnya / tanpa outlet']];
+    var _html=''; _grp.forEach(function(g){ var list=_bk[g[0]]; if(!list.length) return; _html+='<div class="nm" style="margin:14px 0 6px;font-size:.92rem;color:var(--coklat);border-bottom:1.5px solid #EFE2C4;padding-bottom:4px">'+g[1]+' <span class="sub" style="font-weight:600">('+list.length+')</span></div>'+list.map(_sRow).join(''); });
+    box.innerHTML=_html;
     if(!canEdit) return;
     box.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=async function(){ var v=prompt('Outlet untuk staff ini:', b.getAttribute('data-out')); if(v==null) return; busy=true; try{ await O.updateStaff(b.getAttribute('data-edit'),{outlet:v.trim()}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-adm]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-adm'),{admin:b.getAttribute('data-on')!=='1'}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
