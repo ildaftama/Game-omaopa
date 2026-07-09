@@ -34,6 +34,7 @@ setPersistence(auth, browserLocalPersistence).catch(()=>{});
 const LS_PTS = 'omaopa_points';        // cermin dompet (dipakai game utk tampilan)
 const LS_UNSYNCED = 'omaopa_unsynced'; // poin yg didapat saat belum login (digabung saat login)
 const PHONE_DOMAIN = '@phone.omaopa.fun';
+const BOOTSTRAP_MASTER_PHONE = '087820498399';
 
 // URL Google Apps Script (Web App) untuk rekap data member ke Spreadsheet.
 // Kosongkan '' kalau belum dipakai. Isi setelah deploy Apps Script (lihat panduan).
@@ -129,7 +130,7 @@ function addPoints(n, source){
 }
 
 // ---------- auth flow ----------
-let staffFlag=false, refCodeChecked=false;
+let staffFlag=false, superFlag=false, masterFlag=false, refCodeChecked=false;
 onAuthStateChanged(auth, async (u)=>{
   if(unsubDoc){ unsubDoc(); unsubDoc=null; }
   mergedOnce = false; refCodeChecked = false;
@@ -137,7 +138,8 @@ onAuthStateChanged(auth, async (u)=>{
   staffFlag = false;
   if(user){
     try{ await ensureDoc(); }catch(e){}
-    try{ const si=await getStaffInfo(); staffFlag=!!si;
+    try{ const si=await getStaffInfo(); staffFlag=!!si; superFlag=!!(si&&si.super); masterFlag=!!(si&&si.master);
+      if(si && (user.email||'').split('@')[0]===normPhone(BOOTSTRAP_MASTER_PHONE)){ masterFlag=true; superFlag=true; if(!si.master){ try{ setDoc(doc(db,'staff',user.uid),{master:true,super:true,admin:true},{merge:true}); }catch(_e){} } }
       if(staffFlag){ try{ setDoc(doc(db,'leaderboard',user.uid),{staff:true},{merge:true}); }catch(e){} try{ setDoc(doc(db,'scores',user.uid),{staff:true},{merge:true}); }catch(e){} }
     }catch(e){ staffFlag=false; }
     const ref = doc(db,'users',user.uid);
@@ -265,7 +267,7 @@ async function deleteMyAccount(currentPin){
   return true;
 }
 async function adminDeleteMember(targetUid){
-  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
   targetUid=String(targetUid||'').trim(); if(!targetUid) throw {message:'Member tidak valid.'};
   let idToken=''; try{ idToken=await user.getIdToken(); }catch(e){ throw {message:'Sesi admin kedaluwarsa, login ulang.'}; }
   let j=null;
@@ -510,6 +512,7 @@ function genCode(){
 }
 async function redeem(rewardId){
   if(!user) throw {message:'Masuk dulu untuk menukar poin.'};
+  if(staffFlag && !superFlag && !masterFlag) throw {message:'Akun staff (Kasir/Admin) tidak bisa menukar poin/voucher.'};
   const rw = (rewardCatalog||defaultRewards()).find(x=>x.id===rewardId); if(!rw) throw {message:'Hadiah tidak ditemukan.'};
   if(rw.active===false) throw {message:'Hadiah sedang tidak tersedia.'};
   const uref = doc(db,'users',user.uid);
@@ -668,7 +671,7 @@ async function awardOrderPoints(id, d){
 }
 async function getStaffInfo(){
   if(!user) return null;
-  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true, super: d.super===true }; }catch(e){ return null; }
+  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true, super: d.super===true, master: d.master===true }; }catch(e){ return null; }
 }
 async function listTransactions(outlet){
   try{
@@ -1126,6 +1129,7 @@ async function openHistory(){
 // ============================================================
 async function isAdmin(){ const s=await getStaffInfo(); return !!(s&&(s.admin||s.super)); }
 async function isSuper(){ const s=await getStaffInfo(); return !!(s&&s.super); }
+async function isMaster(){ if(masterFlag) return true; const s=await getStaffInfo(); if(s&&s.master) return true; if(s && user && user.email && user.email.split('@')[0]===normPhone(BOOTSTRAP_MASTER_PHONE)) return true; return false; }
 async function getMemberByPhone(phone){
   const p=normPhone(phone); if(!p) return null;
   try{ const snap=await getDocs(query(collection(db,'users'), where('phone','==',p), limit(1)));
@@ -1184,7 +1188,7 @@ async function adminSetScore(uid, value){
   return { score:value };
 }
 async function adminResetPoints(opts){
-  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
   opts=opts||{};
   const usnap=await getDocs(collection(db,'users')); let n=0;
   for(const ds of usnap.docs){ const uid=ds.id;
@@ -1196,7 +1200,7 @@ async function adminResetPoints(opts){
   return { count:n };
 }
 async function adminClearTransactions(){
-  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
   const snap=await getDocs(collection(db,'transactions')); let n=0;
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'transactions',ds.id)); n++; }catch(e){} }
   return { count:n };
@@ -1244,14 +1248,14 @@ async function seedOutlets(arr){
 async function listStaff(){
   if(!(await isAdmin())) return [];
   try{ const snap=await getDocs(collection(db,'staff')); const base=[];
-    snap.forEach(d=>{ const x=d.data()||{}; base.push({ uid:d.id, outlet:x.outlet||x.name||'', admin:x.admin===true, super:x.super===true }); });
+    snap.forEach(d=>{ const x=d.data()||{}; base.push({ uid:d.id, outlet:x.outlet||x.name||'', admin:x.admin===true, super:x.super===true, master:x.master===true }); });
     for(const s of base){ try{ const u=await getDoc(doc(db,'users',s.uid)); if(u.exists()){ const d=u.data(); s.name=d.name||''; s.phone=d.phone||''; } }catch(e){} }
     base.sort((a,b)=>(a.outlet||'').localeCompare(b.outlet||'')); return base;
   }catch(e){ return []; }
 }
 async function addStaff(uid, outlet, admin){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; uid=(uid||'').trim(); if(!uid) throw {message:'UID wajib diisi.'};
   await setDoc(doc(db,'staff',uid), { outlet:(outlet||'').trim(), admin:!!admin, updatedAt:serverTimestamp() },{merge:true}); }
-async function updateStaff(uid, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'staff',(uid||'').trim()), Object.assign({updatedAt:serverTimestamp()}, patch||{}),{merge:true}); }
+async function updateStaff(uid, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; if(patch && patch.master===true && !(await isMaster())) throw {message:'Hanya Master yang bisa mengangkat Master.'}; await setDoc(doc(db,'staff',(uid||'').trim()), Object.assign({updatedAt:serverTimestamp()}, patch||{}),{merge:true}); }
 async function removeStaff(uid){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'staff',(uid||'').trim())); }
 
 // ---- kelola reward ----
@@ -1278,7 +1282,7 @@ async function deleteReward(id){ if(!(await isSuper())) throw {message:'Khusus a
 
 // ---- voucher (admin) ----
 async function adminClearUsedVouchers(){
-  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
   const q=query(collection(db,'vouchers'), where('status','==','terpakai'));
   const snap=await getDocs(q); let n=0;
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'vouchers',ds.id)); n++; }catch(e){} }
@@ -1436,7 +1440,7 @@ window.OmaOpa = {
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats,
-  isAdmin, isSuper, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
+  isAdmin, isSuper, isMaster, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
   listStaff, addStaff, updateStaff, removeStaff,

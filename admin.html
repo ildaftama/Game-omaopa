@@ -92,11 +92,11 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=101"></script>
+<script type="module" src="core-omaopa.js?v=102"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
-  var tab='home', busy=false, segFilter=null, canEdit=false;
+  var tab='home', busy=false, segFilter=null, canEdit=false, masterEdit=false;
   var MEMBERS=null, TXN=null; // cache
   var memStack=[null], memPage=0; // paginasi member (cursor)
   var curOf='baru', curOrders=[], OUTLETS_CACHE=[];
@@ -117,6 +117,7 @@
         +'<div class="uid">'+esc(u.uid)+'</div><button class="btn sec" id="out">Keluar / ganti akun</button>';
       document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} }; app.style.display='none'; return; }
     try{ canEdit=await O.isSuper(); }catch(e){ canEdit=false; }
+    try{ masterEdit=await O.isMaster(); }catch(e){ masterEdit=false; }
     var rbg=document.getElementById('roleBadge'); if(rbg){ rbg.textContent=canEdit?'ADMIN UTAMA':'LIHAT-SAJA'; rbg.style.background=canEdit?'#5A3017':'#9a8b78'; }
     gate.style.display='none'; app.style.display=''; render();
   }
@@ -127,7 +128,8 @@
   function setActiveTab(name){ tab=name; document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-tab')===name); }); }
   function applySegment(field,val){ segFilter={field:field, value:val}; setActiveTab('member'); render(); }
 
-  async function getMembers(force){ if(MEMBERS&&!force) return MEMBERS; try{ MEMBERS=await O.listMembers('',2000); }catch(e){ MEMBERS=[]; } return MEMBERS; }
+  var STAFF_UIDS=null; async function getStaffUids(){ if(STAFF_UIDS) return STAFF_UIDS; STAFF_UIDS={}; try{ (await O.listStaff()).forEach(function(x){ if(x.uid) STAFF_UIDS[x.uid]=1; }); }catch(e){} return STAFF_UIDS; }
+  async function getMembers(force){ if(MEMBERS&&!force) return MEMBERS; try{ var all=await O.listMembers('',2000); var st=await getStaffUids(); MEMBERS=all.filter(function(m){ return !st[m.uid]; }); }catch(e){ MEMBERS=[]; } return MEMBERS; }
   async function getTxn(force){ if(TXN&&!force) return TXN; try{ TXN=await O.listTransactions(''); }catch(e){ TXN=[]; } return TXN; }
   function barH(title, rows){
     var max=Math.max.apply(null, rows.map(function(r){return r.value;}).concat([1]));
@@ -190,7 +192,7 @@
   async function renderPengaturan(){
     if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
     tabEl.innerHTML='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
-      +'<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya</div>'
+      +(masterEdit?('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya</div>'
         +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Reset <b>SEMUA</b> poin member ke 0 (termasuk poin game & check-in). Berguna untuk mulai dari bersih setelah masa uji coba. <b>Tidak bisa dibatalkan.</b></div>'
         +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in</label>'
         +'<button class="btn red" id="rsBtn">Reset semua poin ke 0</button><div id="rsMsg"></div>'
@@ -199,7 +201,7 @@
         +'<button class="btn red" id="txBtn">Hapus semua transaksi kasir</button><div id="txMsg"></div>'
         +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
         +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>SEMUA voucher yang sudah terpakai</b> (membersihkan riwayat penukaran). Voucher yang masih aktif tidak terhapus. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<button class="btn red" id="vcBtn">Hapus semua voucher terpakai</button><div id="vcMsg"></div></div>';
+        +'<button class="btn red" id="vcBtn">Hapus semua voucher terpakai</button><div id="vcMsg"></div></div>'):'<div class="card"><div class="muted" style="font-size:.82rem">🔒 Zona berbahaya (hapus data) khusus <b>Master</b>. Admin Utama tidak bisa menghapus data — biar rekap aman.</div></div>');
     loadMessages();
     var rb=document.getElementById('rsBtn'); if(rb) rb.onclick=async function(){
       if(busy) return;
@@ -293,6 +295,7 @@
       try{ await O.setPromo({active:act,start:st,end:en,bonus:bo}); m.innerHTML='<div class="res ok">✓ Promo disimpan.'+(act?(' Member yang daftar '+st+' s/d '+en+' dapat '+bo+' poin.'):' (nonaktif).')+'</div>'; }catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
   }
   async function renderMember(){
+    await getStaffUids();
     var seg=segFilter; var LM={age:'Umur',gender:'Jenis kelamin',occupation:'Pekerjaan'};
     var mOutletOpts='<option value="">\u2014 semua outlet \u2014</option>'
       +'<option value="__area1">\ud83d\uddfa\ufe0f Area 1 \u00b7 Jogja\u00b7Klaten\u00b7Magelang</option>'
@@ -353,7 +356,7 @@
     renderMemberPage(box, r);
   }
   function renderMemberPage(box, r){
-    var arr=(r.rows||[]).slice().sort(function(a,b){return b.points-a.points;});
+    var arr=(r.rows||[]).filter(function(m){ return !(STAFF_UIDS&&STAFF_UIDS[m.uid]); }).sort(function(a,b){return b.points-a.points;});
     if(!arr.length){ box.innerHTML='<div class="res warn">'+(memPage>0?'Tidak ada member lagi.':'Belum ada member.')+'</div>'
       +(memPage>0?'<div style="margin-top:8px"><button class="btn sm sec" id="mPrev" style="width:auto;margin:0">‹ Sebelumnya</button></div>':'');
       var pv0=box.querySelector('#mPrev'); if(pv0) pv0.onclick=function(){ if(memPage>0){ memPage--; loadMemberPage(); } }; return; }
@@ -369,6 +372,7 @@
     var nx=box.querySelector('#mNext'); if(nx) nx.onclick=function(){ if(r.hasMore){ memPage++; loadMemberPage(); } };
   }
   function renderTable(box, arr, note){
+    arr=(arr||[]).filter(function(m){ return !(STAFF_UIDS&&STAFF_UIDS[m.uid]); });
     if(!arr.length){ box.innerHTML='<div class="res warn">Tidak ada member.</div>'; return; }
     var PAGE=25, shown=0;
     box.innerHTML='<div class="muted" style="margin-bottom:6px">'+(note||(arr.length+' member'))+'</div>'
@@ -420,7 +424,7 @@
         +'<label style="margin-top:14px">Set poin jadi</label><input id="spv" inputmode="numeric" placeholder="angka pasti"><button class="btn sec" id="spBtn">Set poin</button>'
         +'<label style="margin-top:14px">Set skor game jadi</label><input id="ssv" inputmode="numeric" placeholder="angka"><button class="btn sec" id="ssBtn">Set skor</button>'
         +(m.phone?('<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #E7D7B6"><label>Reset PIN member (kalau lupa)</label><div style="display:flex;gap:6px"><input id="rpv" inputmode="numeric" maxlength="6" placeholder="PIN baru 6 angka" style="flex:1"><button class="btn sec" id="rpGen" style="width:auto;margin:0">Acak</button></div><button class="btn" id="rpBtn" style="background:#f60909;border-color:#f60909;color:#fff">🔑 Reset PIN member</button></div>'):'')
-        +'<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #E7D7B6"><label>Peran & akses</label>'        +'<div class="sub" style="margin-bottom:7px">Status sekarang: <b>'+roleLbl+'</b></div>'        +'<input id="rlOut" placeholder="Outlet (untuk Kasir/Admin)" value="'+esc(roleOut)+'">'        +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">'        +'<button class="btn sm sec" id="rlKasir">Jadikan Kasir</button>'        +'<button class="btn sm sec" id="rlAdmin">Jadikan Admin</button>'        +'<button class="btn sm sec" id="rlSuper">Jadikan Admin Utama</button>'        +(st?'<button class="btn sm red" id="rlNone">Jadikan Member biasa</button>':'')        +'</div></div>'        +'<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E7D7B6"><button class="btn" id="delMemBtn" style="background:#7a0b0b;border-color:#7a0b0b;color:#fff">🗑️ Hapus akun member ini</button></div>'
+        +'<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #E7D7B6"><label>Peran & akses</label>'        +'<div class="sub" style="margin-bottom:7px">Status sekarang: <b>'+roleLbl+'</b></div>'        +'<input id="rlOut" placeholder="Outlet (untuk Kasir/Admin)" value="'+esc(roleOut)+'">'        +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">'        +'<button class="btn sm sec" id="rlKasir">Jadikan Kasir</button>'        +'<button class="btn sm sec" id="rlAdmin">Jadikan Admin</button>'        +'<button class="btn sm sec" id="rlSuper">Jadikan Admin Utama</button>'        +(masterEdit?'<button class="btn sm sec" id="rlMaster">Jadikan Master</button>':'')        +(st?'<button class="btn sm red" id="rlNone">Jadikan Member biasa</button>':'')        +'</div></div>'        +(masterEdit?('<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E7D7B6"><button class="btn" id="delMemBtn" style="background:#7a0b0b;border-color:#7a0b0b;color:#fff">🗑️ Hapus akun member ini</button></div>'):'')
         ) : '<div class="res warn" style="margin-top:10px">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengubah poin & skor.</div>')
       +'<div style="margin-top:16px" class="nm">Voucher member ini</div>'+vhtml
       +'<div id="mmsg"></div></div>';
@@ -432,10 +436,11 @@
       document.getElementById('spBtn').onclick=function(){ run(function(){ return O.adminSetPoints(uid, parseInt(document.getElementById('spv').value||'0',10)||0, document.getElementById('adr').value||'Set poin admin'); },'Poin di-set.'); };
       document.getElementById('ssBtn').onclick=function(){ run(function(){ return O.adminSetScore(uid, parseInt(document.getElementById('ssv').value||'0',10)||0); },'Skor di-set.'); };
       d.querySelectorAll('[data-vtog]').forEach(function(b){ b.onclick=function(){ run(function(){ return O.adminSetVoucherStatus(b.getAttribute('data-vtog'), b.getAttribute('data-on')!=='1'); },'Status voucher diubah.'); }; });
-      function setRole(role){ run(function(){ var out=(document.getElementById('rlOut').value||'').trim(); if(role==='none'){ return O.removeStaff(uid); } return O.addStaff(uid, out, role==='admin'||role==='super').then(function(){ return O.updateStaff(uid, { super: role==='super', admin: role==='admin'||role==='super' }); }); }, 'Peran diperbarui.'); }
+      function setRole(role){ run(function(){ var out=(document.getElementById('rlOut').value||'').trim(); if(role==='none'){ return O.removeStaff(uid); } return O.addStaff(uid, out, role!=='kasir').then(function(){ return O.updateStaff(uid, { super:(role==='super'||role==='master'), admin: role!=='kasir', master: role==='master' }); }); }, 'Peran diperbarui.'); }
       var _rk=document.getElementById('rlKasir'); if(_rk) _rk.onclick=function(){ setRole('kasir'); };
       var _ra=document.getElementById('rlAdmin'); if(_ra) _ra.onclick=function(){ setRole('admin'); };
-      var _rs=document.getElementById('rlSuper'); if(_rs) _rs.onclick=function(){ if(confirm('Jadikan Admin Utama? Dia bisa ubah poin & semua data.')) setRole('super'); };
+      var _rs=document.getElementById('rlSuper'); if(_rs) _rs.onclick=function(){ if(confirm('Jadikan Admin Utama? Kelola semua data, tapi tak bisa hapus.')) setRole('super'); };
+      var _rm=document.getElementById('rlMaster'); if(_rm) _rm.onclick=function(){ if(confirm('Jadikan MASTER? Akses penuh + bisa HAPUS data.')) setRole('master'); };
       var _rn=document.getElementById('rlNone'); if(_rn) _rn.onclick=function(){ if(confirm('Cabut semua akses staff, jadikan member biasa?')) setRole('none'); };
       var rpGen=document.getElementById('rpGen'); if(rpGen) rpGen.onclick=function(){ document.getElementById('rpv').value=String(Math.floor(100000+Math.random()*900000)); };
       var rpBtn=document.getElementById('rpBtn'); if(rpBtn) rpBtn.onclick=function(){ if(busy) return; var msg=document.getElementById('mmsg'); var pin=(document.getElementById('rpv').value||'').trim(); if(!/^\d{6}$/.test(pin)){ msg.innerHTML='<div class="res bad" style="margin-top:10px">PIN harus 6 angka.</div>'; return; } if(!confirm('Reset PIN member ini jadi '+pin+'? Pastikan kamu kasih ke member yang benar.')) return; busy=true; msg.innerHTML='<div class="muted" style="margin-top:10px">Mereset PIN…</div>'; Promise.resolve().then(function(){ return O.adminResetPin(uid, pin); }).then(function(){ busy=false; msg.innerHTML='<div class="res ok" style="margin-top:10px">✓ PIN direset jadi <b style="font-size:1.15rem">'+pin+'</b><br>Kasih PIN ini ke member via WA, lalu minta dia ganti sendiri di menu Profil ya.</div>'; }).catch(function(e){ busy=false; msg.innerHTML='<div class="res bad" style="margin-top:10px">Gagal: '+esc((e&&e.message)||'')+'</div>'; }); };
@@ -772,11 +777,11 @@
     var sOutletOpts=buildOutletOpts();
     tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah staff / kasir</div>'
       +'<label>Cari member untuk dijadikan staff</label><div style="display:flex;gap:6px"><input id="sSearch" placeholder="nama / No. HP member"><button class="btn sec" id="sFind" style="width:auto;margin:0">Cari</button></div><div id="sPick" style="margin-top:7px"></div><input type="hidden" id="sUid">'
-      +'<label>Peran</label><select id="sRole"><option value="kasir">🧾 Kasir (akun outlet)</option><option value="admin">🛠️ Admin (bisa buka dashboard)</option><option value="super">👑 Admin Utama (bisa ubah poin & semua data)</option></select>'
+      +'<label>Peran</label><select id="sRole"><option value="kasir">🧾 Kasir (akun outlet)</option><option value="admin">🛠️ Admin (buka dashboard)</option><option value="super">⭐ Admin Utama (kelola semua, tak bisa hapus)</option>'+(masterEdit?'<option value="master">👑 Master (akses penuh + hapus data)</option>':'')+'</select>'
       +'<label>Outlet <span style="color:#C0392B;font-size:.78rem">(wajib untuk Kasir)</span></label><select id="sOut">'+sOutletOpts+'</select>'
       +'<button class="btn" id="sAdd">＋ Tambah staff</button><div id="sMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola staff.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar staff</div><button class="btn sm sec" id="sReload">↻</button></div>'
-      +'<select id="sFilter" style="margin-bottom:8px"><option value="">— semua area —</option><option value="kronggahan">🏢 Kronggahan</option><option value="area1">🗺️ Area 1</option><option value="area2">🗺️ Area 2</option><option value="area3">🗺️ Area 3</option><option value="lain">📌 Lainnya</option></select>'
+      +'<select id="sFilter" style="margin-bottom:8px"><option value="">— semua peran —</option><option value="master">👑 Master</option><option value="super">⭐ Admin Utama</option><option value="admin">🛠️ Admin</option><option value="kronggahan">🏢 Kasir Kronggahan</option><option value="area1">🗺️ Kasir Area 1</option><option value="area2">🗺️ Kasir Area 2</option><option value="area3">🗺️ Kasir Area 3</option><option value="lain">📌 Kasir Lainnya</option></select>'
       +'<div id="sList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){
       document.getElementById('sFind').onclick=async function(){
@@ -794,8 +799,8 @@
       var _role=document.getElementById('sRole').value; var _out=(document.getElementById('sOut').value||'').trim();
       if(_role==='kasir' && !_out){ msg.innerHTML='<div class="res bad">Outlet wajib diisi untuk Kasir.</div>'; busy=false; return; }
       try{ await O.addStaff(_u, _out, _role!=='kasir');
-        await O.updateStaff(_u, { super:_role==='super', admin:_role!=='kasir' });
-        msg.innerHTML='<div class="res ok">✓ Ditambahkan sebagai '+(_role==='super'?'Admin Utama':(_role==='admin'?'Admin':'Kasir'))+'.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sRole').value='kasir'; loadStaff();
+        await O.updateStaff(_u, { super:(_role==='super'||_role==='master'), admin:_role!=='kasir', master:_role==='master' });
+        msg.innerHTML='<div class="res ok">✓ Ditambahkan sebagai '+(_role==='master'?'Master':(_role==='super'?'Admin Utama':(_role==='admin'?'Admin':'Kasir')))+'.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sRole').value='kasir'; loadStaff();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     document.getElementById('sReload').onclick=loadStaff; var _sf=document.getElementById('sFilter'); if(_sf) _sf.onchange=loadStaff; loadStaff();
   }
@@ -804,22 +809,24 @@
     var arr=[]; try{ arr=await O.listStaff(); }catch(e){}
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada staff.</div>'; return; }
     await ensureOam();
-    function _sRow(s){ return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':' <span class="tag off">KASIR</span>'))+'</div>'
+    function _sRow(s){ return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.master?' <span class="tag adm">MASTER</span>':(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':' <span class="tag off">KASIR</span>')))+'</div>'
       +'<div class="sub">'+esc(s.outlet||'(outlet kosong)')+' · '+esc(s.phone||'')+'</div></div>'
       +(canEdit ? ('<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
         +'<button class="btn sm sec" data-edit="'+esc(s.uid)+'" data-out="'+esc(s.outlet||'')+'">Outlet</button>'
         +'<button class="btn sm sec" data-adm="'+esc(s.uid)+'" data-on="'+(s.admin?'1':'0')+'">'+(s.admin?'Cabut admin':'Jadikan admin')+'</button>'
         +'<button class="btn sm sec" data-sup="'+esc(s.uid)+'" data-on="'+(s.super?'1':'0')+'">'+(s.super?'Cabut utama':'Jadikan utama')+'</button>'
+        +(masterEdit?('<button class="btn sm sec" data-mst="'+esc(s.uid)+'" data-on="'+(s.master?'1':'0')+'">'+(s.master?'Cabut master':'Jadikan master')+'</button>'):'')
         +'<button class="btn sm red" data-rem="'+esc(s.uid)+'">Hapus</button></div>') : '')+'</div>'; }
-    var _bk={kronggahan:[],area1:[],area2:[],area3:[],lain:[]};
-    arr.forEach(function(s){ var g=outletGroup(s.outlet); if(!_bk[g]) g='lain'; _bk[g].push(s); });
-    var _grp=[['kronggahan','🏢 Kronggahan'],['area1','🗺️ Area 1 · Jogja·Klaten·Magelang'],['area2','🗺️ Area 2 · Solo Raya'],['area3','🗺️ Area 3 · Semarang'],['lain','📌 Lainnya / tanpa outlet']];
+    var _bk={master:[],super:[],admin:[],kronggahan:[],area1:[],area2:[],area3:[],lain:[]};
+    arr.forEach(function(s){ var g; if(s.master) g='master'; else if(s.super) g='super'; else if(s.admin) g='admin'; else { g=outletGroup(s.outlet); if(!_bk[g]) g='lain'; } _bk[g].push(s); });
+    var _grp=[['master','👑 Master'],['super','⭐ Admin Utama'],['admin','🛠️ Admin'],['kronggahan','🏢 Kasir · Kronggahan'],['area1','🗺️ Kasir · Area 1'],['area2','🗺️ Kasir · Area 2'],['area3','🗺️ Kasir · Area 3'],['lain','📌 Kasir · Lainnya']];
     var _f=(document.getElementById('sFilter')||{}).value||''; var _html=''; _grp.forEach(function(g){ if(_f && g[0]!==_f) return; var list=_bk[g[0]]; if(!list.length) return; _html+='<div class="nm" style="margin:14px 0 6px;font-size:.92rem;color:var(--coklat);border-bottom:1.5px solid #EFE2C4;padding-bottom:4px">'+g[1]+' <span class="sub" style="font-weight:600">('+list.length+')</span></div>'+list.map(_sRow).join(''); });
     box.innerHTML=_html||'<div class="muted">Tidak ada staff di grup ini.</div>';
     if(!canEdit) return;
     box.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ var uid=b.getAttribute('data-edit'); var cur=b.getAttribute('data-out')||''; var bk=document.createElement('div'); bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px'; bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:340px;width:100%"><div style="font-weight:800;color:var(--coklat);margin-bottom:10px">Pilih outlet staff</div><select id="soEdit">'+buildOutletOpts()+'</select><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="soSave" style="flex:1">Simpan</button><button class="btn sec" id="soCancel" style="flex:1">Batal</button></div></div>'; document.body.appendChild(bk); var sel=bk.querySelector('#soEdit'); if(cur) sel.value=cur; bk.querySelector('#soCancel').onclick=function(){ bk.remove(); }; bk.querySelector('#soSave').onclick=async function(){ var v=sel.value; if(!v){ alert('Pilih outlet dulu.'); return; } busy=true; this.disabled=true; try{ await O.updateStaff(uid,{outlet:v}); bk.remove(); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; } busy=false; }; }; });
     box.querySelectorAll('[data-adm]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-adm'),{admin:b.getAttribute('data-on')!=='1'}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-sup]').forEach(function(b){ b.onclick=async function(){ var mk=b.getAttribute('data-on')!=='1'; busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-sup'), mk?{super:true,admin:true}:{super:false}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-mst]').forEach(function(b){ b.onclick=async function(){ var mk=b.getAttribute('data-on')!=='1'; if(mk && !confirm('Jadikan MASTER? Master bisa hapus data & akses penuh.')) return; busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-mst'), mk?{master:true,super:true,admin:true}:{master:false}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-rem]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus akses staff ini?')) return; busy=true; b.disabled=true; try{ await O.removeStaff(b.getAttribute('data-rem')); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
 
