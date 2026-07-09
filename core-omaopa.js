@@ -1384,7 +1384,30 @@ async function maybeGrantRegBonus(){
     if(cdStr<p.start || cdStr>p.end) return;
     await runTransaction(db, async (tx)=>{ const ref=doc(db,'users',user.uid); const snap=await tx.get(ref); const d=snap.exists()?snap.data():{}; if(d.regBonusClaimed===sig) return; tx.set(ref, { points: increment(p.bonus), regBonusClaimed: sig, updatedAt: serverTimestamp() }, {merge:true}); });
     try{ await addDoc(collection(db,'transactions'), { uid:user.uid, name:(profile.name||''), nominal:0, points:p.bonus, kind:'bonus', outlet:'Bonus pendaftaran', createdAt:serverTimestamp() }); }catch(e){}
+    setTimeout(function(){ try{ showRegBonusPopupWhenClear(p.bonus); }catch(e){} }, 1000);
   }catch(e){}
+}
+function showRegBonusPopupWhenClear(bonus, tries){
+  tries=tries||0;
+  var pfOpen = (pfBk && pfBk.classList && pfBk.classList.contains('show'));
+  if((document.getElementById('ooOutletAsk') || document.getElementById('ooDobAsk') || pfOpen) && tries<40){
+    setTimeout(function(){ showRegBonusPopupWhenClear(bonus, tries+1); }, 1000);
+    return;
+  }
+  showRegBonusPopup(bonus);
+}
+function showRegBonusPopup(bonus){
+  if(document.getElementById('ooBonusPop')) return;
+  var bk=document.createElement('div'); bk.id='ooBonusPop';
+  bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+  bk.innerHTML='<div style="background:#FFF9EC;border-radius:18px;padding:24px 20px;max-width:340px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)">'
+    +'<div style="font-size:2.6rem;line-height:1;margin-bottom:8px">🎁</div>'
+    +'<div style="font-weight:900;font-size:1.15rem;color:#5A3017;margin-bottom:6px">Yeay, dapat poin bonus!</div>'
+    +'<div style="font-size:.9rem;color:#7A5A3A;margin-bottom:16px">Sebagai member Oma Opa, kamu dapat hadiah <b>+'+bonus+' poin</b> otomatis dari promo yang sedang berlangsung 🎉</div>'
+    +'<button id="ooBonusOk" style="width:100%;padding:12px;border:none;border-radius:11px;background:#FACC1A;color:#5A3A05;font-weight:800;font-size:.95rem;cursor:pointer">Asiiap, makasih!</button>'
+    +'</div>';
+  document.body.appendChild(bk);
+  bk.querySelector('#ooBonusOk').onclick=function(){ bk.remove(); };
 }
 
 // ===== Multi-banner carousel (koleksi 'banners', slot b1..b3) =====

@@ -92,11 +92,11 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=105"></script>
+<script type="module" src="core-omaopa.js?v=106"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
-  var tab='home', busy=false, segFilter=null, canEdit=false, masterEdit=false;
+  var tab='home', busy=false, segFilter=null, canEdit=false, masterEdit=false, sPage=0;
   var MEMBERS=null, TXN=null; // cache
   var memStack=[null], memPage=0; // paginasi member (cursor)
   var curOf='baru', curOrders=[], OUTLETS_CACHE=[];
@@ -844,6 +844,7 @@
   /* ---------- STAFF ---------- */
   function buildOutletOpts(){ var by={}; (window.OMA_OUTLETS||[]).forEach(function(o){ var a=o.area||'Lainnya'; (by[a]=by[a]||[]).push((o.name||'').replace(/^Oma Opa Cakery\s*/i,'')); }); var h='<option value="">— pilih outlet —</option>'; Object.keys(by).sort().forEach(function(a){ h+='<optgroup label="'+esc(a)+'">'+by[a].sort().map(function(n){return '<option>'+esc(n)+'</option>';}).join('')+'</optgroup>'; }); return h; }
   async function renderStaff(){
+    sPage=0;
     var sOutletOpts=buildOutletOpts();
     tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah staff / kasir</div>'
       +'<label>Cari member untuk dijadikan staff</label><div style="display:flex;gap:6px"><input id="sSearch" placeholder="nama / No. HP member"><button class="btn sec" id="sFind" style="width:auto;margin:0">Cari</button></div><div id="sPick" style="margin-top:7px"></div><input type="hidden" id="sUid">'
@@ -872,7 +873,7 @@
         await O.updateStaff(_u, { super:(_role==='super'||_role==='master'), admin:_role!=='kasir', master:_role==='master' });
         msg.innerHTML='<div class="res ok">✓ Ditambahkan sebagai '+(_role==='master'?'Master':(_role==='super'?'Admin Utama':(_role==='admin'?'Admin':'Kasir')))+'.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sRole').value='kasir'; loadStaff();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
-    document.getElementById('sReload').onclick=loadStaff; var _sf=document.getElementById('sFilter'); if(_sf) _sf.onchange=loadStaff; loadStaff();
+    document.getElementById('sReload').onclick=function(){ sPage=0; loadStaff(); }; var _sf=document.getElementById('sFilter'); if(_sf) _sf.onchange=function(){ sPage=0; loadStaff(); }; loadStaff();
   }
   async function loadStaff(){
     var box=document.getElementById('sList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
@@ -890,14 +891,17 @@
     var _bk={master:[],super:[],admin:[],kronggahan:[],area1:[],area2:[],area3:[],lain:[]};
     arr.forEach(function(s){ var g; if(s.master) g='master'; else if(s.super) g='super'; else if(s.admin) g='admin'; else { g=outletGroup(s.outlet); if(!_bk[g]) g='lain'; } _bk[g].push(s); });
     var _grp=[['master','👑 Master'],['super','⭐ Admin Utama'],['admin','🛠️ Admin'],['kronggahan','🏢 Kasir · Kronggahan'],['area1','🗺️ Kasir · Area 1'],['area2','🗺️ Kasir · Area 2'],['area3','🗺️ Kasir · Area 3'],['lain','📌 Kasir · Lainnya']];
-    var _f=(document.getElementById('sFilter')||{}).value||''; var _html=''; var _budget=_f?Infinity:10; var _totalShown=0, _totalAll=arr.length;
-    _grp.forEach(function(g){ if(_f && g[0]!==_f) return; var list=_bk[g[0]]; if(!list.length) return;
-      var take=Math.max(0, Math.min(list.length, _budget-_totalShown));
-      var shown=list.slice(0,take); _totalShown+=shown.length;
-      if(!shown.length) return;
-      _html+='<div class="nm" style="margin:14px 0 6px;font-size:.92rem;color:var(--coklat);border-bottom:1.5px solid #EFE2C4;padding-bottom:4px">'+g[1]+' <span class="sub" style="font-weight:600">('+list.length+')</span></div>'+shown.map(_sRow).join(''); });
-    if(!_f && _totalAll>10){ _html+='<div class="muted" style="font-size:.76rem;margin:6px 0 2px">Menampilkan 10 dari '+_totalAll+' staff \u2014 pakai filter di atas untuk lihat per peran/area.</div>'; }
+    var _f=(document.getElementById('sFilter')||{}).value||'';
+    var flat=[]; _grp.forEach(function(g){ if(_f && g[0]!==_f) return; var list=_bk[g[0]]; list.forEach(function(s){ flat.push({s:s, gk:g[0], gl:g[1], gt:list.length}); }); });
+    var PAGE=10, totalPages=Math.max(1,Math.ceil(flat.length/PAGE));
+    if(sPage>=totalPages) sPage=totalPages-1; if(sPage<0) sPage=0;
+    var pageItems=flat.slice(sPage*PAGE, sPage*PAGE+PAGE);
+    var _html=''; var lastG=null;
+    pageItems.forEach(function(it){ if(it.gk!==lastG){ lastG=it.gk; _html+='<div class="nm" style="margin:14px 0 6px;font-size:.92rem;color:var(--coklat);border-bottom:1.5px solid #EFE2C4;padding-bottom:4px">'+it.gl+' <span class="sub" style="font-weight:600">('+it.gt+')</span></div>'; } _html+=_sRow(it.s); });
+    if(flat.length){ _html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px"><button class="btn sm sec" id="sPrev" '+(sPage<=0?'disabled':'')+'>← Sebelumnya</button><span class="muted" style="font-size:.78rem">Halaman '+(sPage+1)+'/'+totalPages+' · '+flat.length+' staff</span><button class="btn sm sec" id="sNext" '+(sPage>=totalPages-1?'disabled':'')+'>Selanjutnya →</button></div>'; }
     box.innerHTML=_html||'<div class="muted">Tidak ada staff di grup ini.</div>';
+    var _sp=document.getElementById('sPrev'); if(_sp) _sp.onclick=function(){ sPage--; loadStaff(); };
+    var _sn=document.getElementById('sNext'); if(_sn) _sn.onclick=function(){ sPage++; loadStaff(); };
     if(!canEdit) return;
     box.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ var uid=b.getAttribute('data-edit'); var cur=b.getAttribute('data-out')||''; var bk=document.createElement('div'); bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px'; bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:340px;width:100%"><div style="font-weight:800;color:var(--coklat);margin-bottom:10px">Pilih outlet staff</div><select id="soEdit">'+buildOutletOpts()+'</select><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="soSave" style="flex:1">Simpan</button><button class="btn sec" id="soCancel" style="flex:1">Batal</button></div></div>'; document.body.appendChild(bk); var sel=bk.querySelector('#soEdit'); if(cur) sel.value=cur; bk.querySelector('#soCancel').onclick=function(){ bk.remove(); }; bk.querySelector('#soSave').onclick=async function(){ var v=sel.value; if(!v){ alert('Pilih outlet dulu.'); return; } busy=true; this.disabled=true; try{ await O.updateStaff(uid,{outlet:v}); bk.remove(); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; } busy=false; }; }; });
     box.querySelectorAll('[data-adm]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-adm'),{admin:b.getAttribute('data-on')!=='1'}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
