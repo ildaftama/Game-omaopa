@@ -273,6 +273,7 @@ async function adminDeleteMember(targetUid){
   let j=null;
   try{ const res=await fetch(SHEET_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ type:'deletemember', idToken:idToken, uid:targetUid }) }); j=await res.json(); }catch(e){ throw {message:'Gagal menghubungi server. Cek koneksi / setup Apps Script.'}; }
   if(!j || !j.ok) throw {message:(j&&j.error)||'Hapus akun gagal.'};
+  logAudit('hapus_member', 'Hapus akun member (uid:'+targetUid+').');
   return true;
 }
 async function adminResetPin(targetUid, newPin){
@@ -287,6 +288,7 @@ async function adminResetPin(targetUid, newPin){
     j=await res.json();
   }catch(e){ throw {message:'Gagal menghubungi server reset. Cek koneksi / setup Apps Script.'}; }
   if(!j || !j.ok) throw {message:(j&&j.error)||'Reset PIN gagal.'};
+  logAudit('reset_pin', 'Reset PIN member (uid:'+targetUid+').');
   return true;
 }
 
@@ -963,6 +965,7 @@ pfBk.innerHTML = `<div class="oo-card" style="position:relative">
   </div>
   <div style="font-weight:900;color:${CO};font-size:.9rem;margin:14px 2px 6px">Data diri</div>
   <div id="pfData" style="background:#fff;border:2px solid #EFE2C4;border-radius:13px;padding:2px 12px"></div>
+  <div id="pfRefCode" class="oo-ref" style="margin-top:10px"></div>
   <div class="oo-mini" style="margin-top:8px">Data tidak bisa diubah sendiri. Untuk koreksi data, hubungi kasir Oma Opa ya 🙏</div>
   <button class="oo-out" id="pfCard" style="margin-top:12px;background:${K};color:#5A3A05;border-color:${K}">Lihat Kartu Member (QR) →</button>
   <button class="oo-out" id="pfPin" style="margin-top:8px">🔑 Ganti PIN</button>
@@ -1009,6 +1012,13 @@ async function openProfile(){
   const ph=(((profile&&profile.phone)||'')+'').replace(/^62/,'0');
   const rows=[['No. HP',ph],['Jenis kelamin',(profile&&profile.gender)||''],['Usia',(profile&&profile.age)||''],['Pekerjaan',(profile&&profile.occupation)||'']];
   pfBk.querySelector('#pfData').innerHTML=rows.map((r,i)=>'<div style="display:flex;justify-content:space-between;gap:10px;padding:9px 0;'+(i?'border-top:1px solid #F2E8D5;':'')+'font-size:.86rem"><span style="color:#9a7a5e;font-weight:700">'+r[0]+'</span><span style="font-weight:800;color:'+CO+';text-align:right">'+esc(r[1]||'-')+'</span></div>').join('');
+  var _rc=(profile&&profile.refCode)||'';
+  var _rcEl=pfBk.querySelector('#pfRefCode'); if(_rcEl){ _rcEl.innerHTML = _rc
+    ? ('Kode referral kamu<b id="pfRefVal">'+esc(_rc)+'</b><span style="font-size:.72rem;color:#8a6a3a">Ajak teman daftar pakai kodemu, kalian berdua dapat poin 🎉</span><button class="oo-out" id="pfRefShare" style="margin-top:8px;padding:9px">Bagikan kode</button>')
+    : 'Menyiapkan kode referral…';
+    var _rsb=pfBk.querySelector('#pfRefShare'); if(_rsb) _rsb.onclick=()=>shareRef(_rc);
+    if(!_rc){ ensureRefCode().then(function(c){ var el=document.getElementById('pfRefVal'); if(c && pfBk.classList.contains('show')) openProfile(); }).catch(()=>{}); }
+  }
   pfBk.querySelector('#pfTier').innerHTML='';
   pfBk.classList.add('show');
   if(profile && profile.mustChangePin){ const pb=pfBk.querySelector('#pfPinBox'); if(pb) pb.style.display='block'; const pm=pfBk.querySelector('#pfPinMsg'); if(pm){ pm.style.color='#C0392B'; pm.textContent='PIN kamu baru direset admin. Isi PIN sementara sebagai "PIN lama", lalu buat PIN baru.'; } }
@@ -1157,6 +1167,22 @@ async function listMembersPage(n, after){
     return { rows:arr, lastDoc: snap.docs.length? snap.docs[snap.docs.length-1] : null, hasMore: snap.docs.length===n };
   }catch(e){ return { rows:[], lastDoc:null, hasMore:false }; }
 }
+function logAudit(action, detail){
+  try{
+    addDoc(collection(db,'auditlog'), {
+      action:String(action||''), detail:String(detail||''),
+      byUid:(user?user.uid:''), byName:(profile&&profile.name)||'',
+      createdAt:serverTimestamp()
+    }).catch(()=>{});
+  }catch(e){}
+}
+async function listAudit(n){
+  n=n||50;
+  try{ const snap=await getDocs(query(collection(db,'auditlog'), orderBy('createdAt','desc'), limit(n))); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, action:x.action||'', detail:x.detail||'', byName:x.byName||'', byUid:x.byUid||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    return arr;
+  }catch(e){ return []; }
+}
 async function adminAdjustPoints(uid, delta, reason){
   uid=(uid||'').trim(); delta=Math.floor(Number(delta)||0);
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
@@ -1172,6 +1198,7 @@ async function adminAdjustPoints(uid, delta, reason){
     const tref=doc(collection(db,'transactions'));
     tx.set(tref,{ uid:uid, name:mname, nominal:0, points:applied, outlet:(reason||'Penyesuaian admin'), kind:'adjust', staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
   });
+  logAudit('adjust_poin', 'Member '+(mname||uid)+' '+(applied>=0?'+':'')+applied+' poin (jadi '+newTotal+'). Alasan: '+(reason||'-'));
   return { newTotal:newTotal, applied:applied, name:mname };
 }
 async function adminSetPoints(uid, value, reason){
@@ -1197,15 +1224,28 @@ async function adminResetPoints(opts){
     if(opts.scores){ try{ await deleteDoc(doc(db,'scores',uid)); }catch(e){} }
     n++;
   }
+  logAudit('reset_semua_poin', 'Reset poin SEMUA member ('+n+' akun) ke 0'+(opts.scores?' + reset skor game/streak':'')+'.');
   return { count:n };
 }
 async function adminClearTransactions(){
   if(!(await isMaster())) throw {message:'Khusus Master.'};
   const snap=await getDocs(collection(db,'transactions')); let n=0;
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'transactions',ds.id)); n++; }catch(e){} }
+  logAudit('hapus_semua_transaksi', 'Hapus SEMUA transaksi kasir ('+n+' baris).');
   return { count:n };
 }
-async function deleteTransaction(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); if(!id) throw {message:'ID kosong.'}; await deleteDoc(doc(db,'transactions',id)); }
+async function adminDeleteTransactions(ids){
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
+  ids=(ids||[]).map(x=>String(x||'').trim()).filter(Boolean);
+  if(!ids.length) throw {message:'Pilih transaksi dulu.'};
+  let n=0; const detail=[];
+  for(const id of ids){
+    try{ const s=await getDoc(doc(db,'transactions',id)); if(s.exists()){ const x=s.data(); detail.push((x.name||'?')+'/'+(x.outlet||'-')+'/Rp'+(x.nominal||0)); } await deleteDoc(doc(db,'transactions',id)); n++; }catch(e){}
+  }
+  logAudit('hapus_transaksi', 'Hapus '+n+' transaksi terpilih: '+detail.slice(0,8).join('; ')+(detail.length>8?(' … (+'+(detail.length-8)+' lagi)'):''));
+  return { count:n };
+}
+async function deleteTransaction(id){ if(!(await isMaster())) throw {message:'Khusus Master.'}; id=(id||'').trim(); if(!id) throw {message:'ID kosong.'}; let info=''; try{ const s=await getDoc(doc(db,'transactions',id)); if(s.exists()){ const x=s.data(); info=(x.name||'?')+' · '+(x.outlet||'-')+' · '+(x.nominal||0)+' · '+(x.points||0)+' poin'; } }catch(e){} await deleteDoc(doc(db,'transactions',id)); logAudit('hapus_transaksi', 'Hapus 1 transaksi: '+info+' (id:'+id+')'); }
 function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || ('o'+Date.now()); }
 async function listOutlets(){
   try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
@@ -1254,9 +1294,12 @@ async function listStaff(){
   }catch(e){ return []; }
 }
 async function addStaff(uid, outlet, admin){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; uid=(uid||'').trim(); if(!uid) throw {message:'UID wajib diisi.'};
-  await setDoc(doc(db,'staff',uid), { outlet:(outlet||'').trim(), admin:!!admin, updatedAt:serverTimestamp() },{merge:true}); }
-async function updateStaff(uid, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; if(patch && patch.master===true && !(await isMaster())) throw {message:'Hanya Master yang bisa mengangkat Master.'}; await setDoc(doc(db,'staff',(uid||'').trim()), Object.assign({updatedAt:serverTimestamp()}, patch||{}),{merge:true}); }
-async function removeStaff(uid){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'staff',(uid||'').trim())); }
+  await setDoc(doc(db,'staff',uid), { outlet:(outlet||'').trim(), admin:!!admin, updatedAt:serverTimestamp() },{merge:true});
+  logAudit('tambah_staff', 'Tambah staff (uid:'+uid+') outlet:'+(outlet||'-')+' admin:'+(!!admin)); }
+async function updateStaff(uid, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; if(patch && patch.master===true && !(await isMaster())) throw {message:'Hanya Master yang bisa mengangkat Master.'}; await setDoc(doc(db,'staff',(uid||'').trim()), Object.assign({updatedAt:serverTimestamp()}, patch||{}),{merge:true});
+  logAudit('ubah_peran_staff', 'Ubah peran staff (uid:'+uid+'): '+JSON.stringify(patch||{})); }
+async function removeStaff(uid){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'staff',(uid||'').trim()));
+  logAudit('cabut_staff', 'Cabut akses staff (uid:'+uid+').'); }
 
 // ---- kelola reward ----
 async function listRewardsAdmin(){ return await loadRewardCatalog(); }
@@ -1286,6 +1329,7 @@ async function adminClearUsedVouchers(){
   const q=query(collection(db,'vouchers'), where('status','==','terpakai'));
   const snap=await getDocs(q); let n=0;
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'vouchers',ds.id)); n++; }catch(e){} }
+  logAudit('hapus_voucher_terpakai', 'Hapus SEMUA voucher terpakai ('+n+' baris).');
   return { count:n };
 }
 async function deleteVoucherRec(code){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; code=(code||'').trim(); if(!code) throw {message:'Kode kosong.'}; await deleteDoc(doc(db,'vouchers',code)); }
@@ -1320,9 +1364,11 @@ const DEF_ORDER_MSG='Halo Minmil, aku mau pesan dongg 🙏';
 const DEF_LUPAPIN_MSG='Halo Minmil, aku lupa PIN akunku 🙏 Tolong bantu reset ya.\nNama: \nNo HP terdaftar: ';
 const WA_CC='6288216106216';
 async function getMessages(){ try{ const s=await getDoc(doc(db,'settings','messages')); const d=(s.exists()&&s.data())||{}; return { cc:(d.cc||DEF_CC_MSG), order:(d.order||DEF_ORDER_MSG), lupapin:(d.lupapin||DEF_LUPAPIN_MSG) }; }catch(e){ return { cc:DEF_CC_MSG, order:DEF_ORDER_MSG, lupapin:DEF_LUPAPIN_MSG }; } }
-async function setMessages(m){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; m=m||{}; await setDoc(doc(db,'settings','messages'), { cc:String(m.cc||''), order:String(m.order||''), lupapin:String(m.lupapin||''), updatedAt:serverTimestamp() }, {merge:true}); }
+async function setMessages(m){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; m=m||{}; await setDoc(doc(db,'settings','messages'), { cc:String(m.cc||''), order:String(m.order||''), lupapin:String(m.lupapin||''), updatedAt:serverTimestamp() }, {merge:true});
+  logAudit('ubah_pesan_wa', 'Ubah pesan otomatis WhatsApp.'); }
 async function getPromo(){ try{ const s=await getDoc(doc(db,'settings','promo')); const d=(s.exists()&&s.data())||{}; return { active:!!d.active, start:d.start||'', end:d.end||'', bonus:(typeof d.bonus==='number'?d.bonus:parseInt(d.bonus||0,10)||0) }; }catch(e){ return { active:false, start:'', end:'', bonus:0 }; } }
-async function setPromo(p){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; p=p||{}; await setDoc(doc(db,'settings','promo'), { active:!!p.active, start:String(p.start||''), end:String(p.end||''), bonus:Math.max(0,parseInt(p.bonus||0,10)||0), updatedAt:serverTimestamp() }, {merge:true}); }
+async function setPromo(p){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; p=p||{}; await setDoc(doc(db,'settings','promo'), { active:!!p.active, start:String(p.start||''), end:String(p.end||''), bonus:Math.max(0,parseInt(p.bonus||0,10)||0), updatedAt:serverTimestamp() }, {merge:true});
+  logAudit('pasang_promo', (p.active?('Aktifkan promo bonus pendaftaran: '+p.start+' s/d '+p.end+', +'+p.bonus+' poin.'):'Nonaktifkan promo bonus pendaftaran.')); }
 let _regBonusChecked=false, _promoCache=null;
 async function maybeGrantRegBonus(){
   if(_regBonusChecked || !user || !profile) return;
@@ -1352,9 +1398,12 @@ async function listBanners(){ if(!(await isSuper())) throw {message:'Khusus admi
 async function saveBannerItem(id, data){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; data=data||{};
   const rid=(id||('bn_'+Date.now().toString(36))).trim();
   await setDoc(doc(db,'banners',rid), { image:String(data.image||''), link:String(data.link||''), active:data.active!==false, order:Number(data.order)||0, updatedAt:serverTimestamp() }, {merge:true});
-  await _bumpBannerVer(); return { id:rid };
+  await _bumpBannerVer();
+  logAudit('upload_banner', 'Simpan banner ('+rid+'), aktif:'+(data.active!==false)+'.');
+  return { id:rid };
 }
-async function deleteBannerItem(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'banners',(id||'').trim())); await _bumpBannerVer(); }
+async function deleteBannerItem(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await deleteDoc(doc(db,'banners',(id||'').trim())); await _bumpBannerVer();
+  logAudit('hapus_banner', 'Kosongkan banner ('+id+').'); }
 async function listBannersPublic(){
   try{
     let ver=0;
@@ -1439,7 +1488,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
