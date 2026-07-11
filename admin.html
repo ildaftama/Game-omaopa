@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=107"></script>
+<script type="module" src="core-omaopa.js?v=108"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -200,11 +200,13 @@
         +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in</label>'
         +'<button class="btn red" id="rsBtn">Reset semua poin ke 0</button><div id="rsMsg"></div>'
         +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
-        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>SEMUA transaksi kasir</b> (termasuk penyesuaian poin admin). Membersihkan grafik omzet & tren dari data uji coba. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<button class="btn red" id="txBtn">Hapus semua transaksi kasir</button><div id="txMsg"></div>'
+        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>transaksi kasir</b> (termasuk penyesuaian poin admin). Kosongkan tanggal untuk hapus SEMUA, atau isi rentang untuk hapus periode tertentu saja. <b>Tidak bisa dibatalkan.</b></div>'
+        +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="txFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="txTo" style="flex:1;min-width:0"></div>'
+        +'<button class="btn red" id="txBtn">Hapus transaksi</button><div id="txMsg"></div>'
         +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
-        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>SEMUA voucher yang sudah terpakai</b> (membersihkan riwayat penukaran). Voucher yang masih aktif tidak terhapus. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<button class="btn red" id="vcBtn">Hapus semua voucher terpakai</button><div id="vcMsg"></div></div>'
+        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>voucher yang sudah terpakai</b> (membersihkan riwayat penukaran, berdasarkan tanggal dipakai). Kosongkan tanggal untuk hapus SEMUA. Voucher yang masih aktif tidak terhapus. <b>Tidak bisa dibatalkan.</b></div>'
+        +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="vcFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="vcTo" style="flex:1;min-width:0"></div>'
+        +'<button class="btn red" id="vcBtn">Hapus voucher terpakai</button><div id="vcMsg"></div></div>'
         +'<div class="card"><div class="nm">🗑️ Hapus transaksi detail (pilih sendiri)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Cari & pilih transaksi tertentu untuk dihapus — tidak perlu hapus semua sekaligus.</div>'
         +'<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="dtOutlet" placeholder="Filter outlet (opsional)" style="flex:1;min-width:140px"><input type="date" id="dtFrom" style="flex:1;min-width:120px"><input type="date" id="dtTo" style="flex:1;min-width:120px"></div>'
         +'<button class="btn sec" id="dtSearch" style="margin-top:8px">Cari transaksi</button>'
@@ -270,18 +272,22 @@
       catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
     var tb=document.getElementById('txBtn'); if(tb) tb.onclick=async function(){
       if(busy) return;
-      if(!confirm('Hapus SEMUA transaksi kasir? Grafik omzet & tren akan kosong. Tidak bisa dibatalkan.')) return;
-      if(!confirm('Sekali lagi \u2014 semua catatan transaksi kasir akan hilang. Lanjutkan?')) return;
+      var tf=(document.getElementById('txFrom')||{}).value||'', tt=(document.getElementById('txTo')||{}).value||'';
+      var scope = (tf||tt) ? ('periode '+(tf||'awal')+' s/d '+(tt||'sekarang')) : 'SEMUA';
+      if(!confirm('Hapus transaksi kasir ('+scope+')? Tidak bisa dibatalkan.')) return;
+      if(!confirm('Sekali lagi \u2014 transaksi ('+scope+') akan hilang permanen. Lanjutkan?')) return;
       busy=true; var msg=document.getElementById('txMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus\u2026 (jangan tutup halaman)</div>';
-      try{ var r=await O.adminClearTransactions(); TXN=null;
+      try{ var r=await O.adminClearTransactions({from:tf,to:tt}); TXN=null;
         msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' transaksi dihapus.</div>'; }
       catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
     var vc=document.getElementById('vcBtn'); if(vc) vc.onclick=async function(){
       if(busy) return;
-      if(!confirm('Hapus SEMUA voucher yang sudah terpakai? Riwayat penukaran akan hilang. Tidak bisa dibatalkan.')) return;
-      if(!confirm('Sekali lagi \u2014 semua voucher terpakai akan dihapus. Lanjutkan?')) return;
+      var vf=(document.getElementById('vcFrom')||{}).value||'', vt=(document.getElementById('vcTo')||{}).value||'';
+      var vscope = (vf||vt) ? ('periode '+(vf||'awal')+' s/d '+(vt||'sekarang')) : 'SEMUA';
+      if(!confirm('Hapus voucher terpakai ('+vscope+')? Tidak bisa dibatalkan.')) return;
+      if(!confirm('Sekali lagi \u2014 voucher terpakai ('+vscope+') akan hilang permanen. Lanjutkan?')) return;
       busy=true; var msg=document.getElementById('vcMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus\u2026 (jangan tutup halaman)</div>';
-      try{ var r=await O.adminClearUsedVouchers();
+      try{ var r=await O.adminClearUsedVouchers({from:vf,to:vt});
         msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' voucher terpakai dihapus.</div>'; }
       catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
   }
@@ -602,6 +608,12 @@
       +'<div class="nm" style="margin-top:16px;font-size:.88rem">🏆 Top 5 repeat rate tertinggi</div><div id="rrTop" class="muted" style="margin-top:6px">-</div>'
       +'<div class="nm" style="margin-top:14px;font-size:.88rem">📉 Top 5 repeat rate terendah</div><div id="rrBottom" class="muted" style="margin-top:6px">-</div>'
       +'</div>';
+    html+='<div class="card" id="btCard"><div class="nm">💰 Rata-rata transaksi (basket size)</div>'
+      +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Rata-rata nominal per transaksi kasir/order (hanya transaksi bernominal, bukan poin bonus/referral/penyesuaian).</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="btPer"><button class="btn sm sec btp" data-d="7">7 hari</button><button class="btn sm btp" data-d="30">30 hari</button><button class="btn sm sec btp" data-d="90">3 bln</button><button class="btn sm sec btp" data-d="180">6 bln</button><button class="btn sm sec btp" data-d="365">12 bln</button></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="btFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="btTo" style="flex:1;min-width:0"><button class="btn sm" id="btGo">OK</button></div>'
+      +'<select id="btGroup" style="margin-bottom:10px"><option value="">— semua outlet —</option><option value="metavest">🏢 Metavest (Area 1+2+3)</option><option value="kronggahan">🏢 Kronggahan</option><option value="area1">🗺️ Area 1</option><option value="area2">🗺️ Area 2</option><option value="area3">🗺️ Area 3</option></select>'
+      +'<div id="btBody" class="muted">Memuat…</div></div>';
     html+='<div class="card" id="trCard"><div class="nm">🌐 Traffic & Online</div>'
       +'<div class="kpis" style="margin-top:8px"><div class="kpi"><div class="v" id="trOnline" style="font-size:1.05rem">…</div><div class="l">Online sekarang</div></div><div class="kpi"><div class="v" id="trToday">…</div><div class="l">Kunjungan hari ini</div></div></div>'
       +'<div class="kpis"><div class="kpi"><div class="v" id="trMonth">…</div><div class="l">Bulan ini</div></div><div class="kpi"><div class="v" id="tr3">…</div><div class="l">3 bulan</div></div></div>'
@@ -642,6 +654,33 @@
       if(botEl) botEl.innerHTML = sorted.slice().reverse().slice(0,5).map(rankRow).join('') || '-';
     }
     var _rg=document.getElementById('rrGroup'); if(_rg) _rg.onchange=renderRepeat;
+
+    var _btDays=30, _btFrom='', _btTo='';
+    function _btMatch(outlet, grp){ if(!grp) return true; var g=outletGroup(outlet); if(grp==='metavest') return g==='area1'||g==='area2'||g==='area3'; return g===grp; }
+    async function loadBasket(){
+      var body=document.getElementById('btBody'); if(!body) return; body.innerHTML='<div class="muted">Menghitung…</div>';
+      await ensureOam();
+      var fromMs, toMs;
+      if(_btFrom||_btTo){ fromMs=_btFrom?new Date(_btFrom+'T00:00:00').getTime():0; toMs=_btTo?new Date(_btTo+'T23:59:59').getTime():0; }
+      else { toMs=Date.now(); fromMs=toMs-(_btDays*86400000); }
+      var r; try{ r=await O.avgTransactionStats(fromMs,toMs); }catch(e){ r={overall:{avg:0,count:0,total:0},byOutlet:[]}; }
+      var grp=(document.getElementById('btGroup')||{}).value||'';
+      var rows=(r.byOutlet||[]).filter(function(x){ return _btMatch(x.outlet, grp); });
+      var tCount=rows.reduce(function(s,x){return s+x.count;},0), tTotal=rows.reduce(function(s,x){return s+x.total;},0);
+      var avg = tCount? Math.round(tTotal/tCount) : 0;
+      var h='<div class="kpis"><div class="kpi"><div class="v">Rp'+num(avg)+'</div><div class="l">Rata-rata / transaksi</div></div><div class="kpi"><div class="v">'+num(tCount)+'</div><div class="l">Jumlah transaksi</div></div></div>'
+        +'<div class="kpis"><div class="kpi"><div class="v">Rp'+num(tTotal)+'</div><div class="l">Total omzet (periode ini)</div></div></div>';
+      if(rows.length){
+        h+='<table style="width:100%;border-collapse:collapse;font-size:.8rem;margin-top:10px"><tr style="text-align:left;color:#9a7a5e"><th style="padding:4px 6px">Outlet</th><th style="padding:4px 6px;text-align:right">Transaksi</th><th style="padding:4px 6px;text-align:right">Rata-rata</th></tr>'
+          +rows.map(function(x){ return '<tr style="border-top:1px solid #EFE2C4"><td style="padding:6px 6px">'+esc(x.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</td><td style="padding:6px 6px;text-align:right">'+num(x.count)+'</td><td style="padding:6px 6px;text-align:right"><b>Rp'+num(x.avg)+'</b></td></tr>'; }).join('')
+          +'</table>';
+      } else { h+='<div class="muted" style="margin-top:8px">Belum ada transaksi bernominal pada periode/filter ini.</div>'; }
+      body.innerHTML=h;
+    }
+    var btp=document.querySelectorAll('#btPer .btp'); Array.prototype.forEach.call(btp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(btp,function(x){ x.className='btn sm sec btp'; }); b.className='btn sm btp'; _btDays=Number(b.dataset.d); _btFrom=''; _btTo=''; document.getElementById('btFrom').value=''; document.getElementById('btTo').value=''; loadBasket(); }; });
+    var _btg=document.getElementById('btGo'); if(_btg) _btg.onclick=function(){ _btFrom=document.getElementById('btFrom').value; _btTo=document.getElementById('btTo').value; if(_btFrom||_btTo){ Array.prototype.forEach.call(btp,function(x){ x.className='btn sm sec btp'; }); } loadBasket(); };
+    var _btGr=document.getElementById('btGroup'); if(_btGr) _btGr.onchange=loadBasket;
+    loadBasket();
     var rrp=document.querySelectorAll('#rrPer .rrp'); Array.prototype.forEach.call(rrp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(rrp,function(x){ x.className='btn sm sec rrp'; }); b.className='btn sm rrp'; loadRepeat(Number(b.dataset.m)); }; });
     loadRepeat(1);
     async function loadBirthdays(){

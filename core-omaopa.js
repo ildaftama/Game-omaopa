@@ -683,6 +683,17 @@ async function listTransactions(outlet){
     arr.sort((a,b)=>b.ts-a.ts); return arr;
   }catch(e){ return []; }
 }
+async function avgTransactionStats(fromMs, toMs){
+  let txs=[];
+  try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ outlet:(x.outlet||'').trim(), nominal:x.nominal||0, ts:ts }); }); }catch(e){ return { overall:{avg:0,count:0,total:0}, byOutlet:[] }; }
+  txs=txs.filter(t=> t.nominal>0 && (!fromMs || t.ts>=fromMs) && (!toMs || t.ts<=toMs));
+  const byOutlet={};
+  txs.forEach(t=>{ const key=t.outlet.toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return; if(!byOutlet[key]) byOutlet[key]={name:t.outlet,count:0,total:0}; byOutlet[key].count++; byOutlet[key].total+=t.nominal; });
+  const rows=Object.keys(byOutlet).map(k=>{ const o=byOutlet[k]; return { outlet:o.name, count:o.count, total:o.total, avg: o.count?Math.round(o.total/o.count):0 }; });
+  rows.sort((a,b)=>b.total-a.total);
+  const totalCount=txs.length, totalNominal=txs.reduce((s,t)=>s+t.nominal,0);
+  return { overall:{ avg: totalCount?Math.round(totalNominal/totalCount):0, count:totalCount, total:totalNominal }, byOutlet:rows };
+}
 async function repeatRateByOutlet(months){
   months = Math.max(1, Number(months)||1);
   const cutoff=(function(){ const d=new Date(); d.setMonth(d.getMonth()-months); return d.getTime(); })();
@@ -1227,11 +1238,17 @@ async function adminResetPoints(opts){
   logAudit('reset_semua_poin', 'Reset poin SEMUA member ('+n+' akun) ke 0'+(opts.scores?' + reset skor game/streak':'')+'.');
   return { count:n };
 }
-async function adminClearTransactions(){
+async function adminClearTransactions(range){
   if(!(await isMaster())) throw {message:'Khusus Master.'};
+  const fromMs=(range&&range.from)?new Date(range.from+'T00:00:00').getTime():0;
+  const toMs=(range&&range.to)?new Date(range.to+'T23:59:59').getTime():0;
   const snap=await getDocs(collection(db,'transactions')); let n=0;
-  for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'transactions',ds.id)); n++; }catch(e){} }
-  logAudit('hapus_semua_transaksi', 'Hapus SEMUA transaksi kasir ('+n+' baris).');
+  for(const ds of snap.docs){
+    const x=ds.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0;
+    if(fromMs && ts<fromMs) continue; if(toMs && ts>toMs) continue;
+    try{ await deleteDoc(doc(db,'transactions',ds.id)); n++; }catch(e){}
+  }
+  logAudit('hapus_semua_transaksi', 'Hapus transaksi kasir'+((range&&(range.from||range.to))?(' periode '+(range.from||'awal')+' s/d '+(range.to||'sekarang')):' (SEMUA)')+' ('+n+' baris).');
   return { count:n };
 }
 async function adminDeleteTransactions(ids){
@@ -1324,12 +1341,18 @@ async function resetRewardClaimed(id){ if(!(await isSuper())) throw {message:'Kh
 async function deleteReward(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); if(REWARDS.some(function(r){return r.id===id;})){ await setDoc(doc(db,'rewards',id), { deleted:true, active:false, updatedAt:serverTimestamp() }, {merge:true}); } else { await deleteDoc(doc(db,'rewards',id)); } }
 
 // ---- voucher (admin) ----
-async function adminClearUsedVouchers(){
+async function adminClearUsedVouchers(range){
   if(!(await isMaster())) throw {message:'Khusus Master.'};
+  const fromMs=(range&&range.from)?new Date(range.from+'T00:00:00').getTime():0;
+  const toMs=(range&&range.to)?new Date(range.to+'T23:59:59').getTime():0;
   const q=query(collection(db,'vouchers'), where('status','==','terpakai'));
   const snap=await getDocs(q); let n=0;
-  for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'vouchers',ds.id)); n++; }catch(e){} }
-  logAudit('hapus_voucher_terpakai', 'Hapus SEMUA voucher terpakai ('+n+' baris).');
+  for(const ds of snap.docs){
+    const x=ds.data(); const ts=(x.usedAt&&x.usedAt.seconds)?x.usedAt.seconds*1000:0;
+    if(fromMs && ts<fromMs) continue; if(toMs && ts>toMs) continue;
+    try{ await deleteDoc(doc(db,'vouchers',ds.id)); n++; }catch(e){}
+  }
+  logAudit('hapus_voucher_terpakai', 'Hapus voucher terpakai'+((range&&(range.from||range.to))?(' periode '+(range.from||'awal')+' s/d '+(range.to||'sekarang')):' (SEMUA)')+' ('+n+' baris).');
   return { count:n };
 }
 async function deleteVoucherRec(code){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; code=(code||'').trim(); if(!code) throw {message:'Kode kosong.'}; await deleteDoc(doc(db,'vouchers',code)); }
@@ -1511,7 +1534,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
