@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=106"></script>
+<script type="module" src="core-omaopa.js?v=107"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -596,8 +596,12 @@
     html+='<div class="card">'+barH('Omzet per outlet (transaksi kasir)', outRows)+'</div>';
     html+='<div class="card" id="rrCard"><div class="nm">🔁 Repeat rate per outlet</div>'
       +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Member yang transaksi <b>≥2x</b> ÷ member yang transaksi <b>≥1x</b> di outlet itu, pada periode terpilih.</div>'
-      +'<div style="display:flex;gap:6px;margin-bottom:10px" id="rrPer"><button class="btn sm rrp" data-m="1">1 bulan</button><button class="btn sm sec rrp" data-m="2">2 bulan</button><button class="btn sm sec rrp" data-m="3">3 bulan</button></div>'
-      +'<div id="rrBody" class="muted">Memuat…</div></div>';
+      +'<div style="display:flex;gap:6px;margin-bottom:8px" id="rrPer"><button class="btn sm rrp" data-m="1">1 bulan</button><button class="btn sm sec rrp" data-m="2">2 bulan</button><button class="btn sm sec rrp" data-m="3">3 bulan</button></div>'
+      +'<select id="rrGroup" style="margin-bottom:10px"><option value="">— semua outlet —</option><option value="metavest">🏢 Metavest (Area 1+2+3)</option><option value="kronggahan">🏢 Kronggahan</option><option value="area1">🗺️ Area 1</option><option value="area2">🗺️ Area 2</option><option value="area3">🗺️ Area 3</option></select>'
+      +'<div id="rrBody" class="muted">Memuat…</div>'
+      +'<div class="nm" style="margin-top:16px;font-size:.88rem">🏆 Top 5 repeat rate tertinggi</div><div id="rrTop" class="muted" style="margin-top:6px">-</div>'
+      +'<div class="nm" style="margin-top:14px;font-size:.88rem">📉 Top 5 repeat rate terendah</div><div id="rrBottom" class="muted" style="margin-top:6px">-</div>'
+      +'</div>';
     html+='<div class="card" id="trCard"><div class="nm">🌐 Traffic & Online</div>'
       +'<div class="kpis" style="margin-top:8px"><div class="kpi"><div class="v" id="trOnline" style="font-size:1.05rem">…</div><div class="l">Online sekarang</div></div><div class="kpi"><div class="v" id="trToday">…</div><div class="l">Kunjungan hari ini</div></div></div>'
       +'<div class="kpis"><div class="kpi"><div class="v" id="trMonth">…</div><div class="l">Bulan ini</div></div><div class="kpi"><div class="v" id="tr3">…</div><div class="l">3 bulan</div></div></div>'
@@ -610,14 +614,34 @@
     if(!appr.length){ html+='<div class="muted" style="margin-top:8px">Menu terlaris terisi setelah ada pesanan web yang kamu <b>approve</b> di tab Pesanan.</div>'; }
     tabEl.innerHTML=html;
     var pn=document.getElementById('pendNote'); if(pn) pn.onclick=function(){ setActiveTab('pesanan'); render(); };
-    function loadRepeat(m){ var body=document.getElementById('rrBody'); if(!body) return; body.innerHTML='<div class="muted">Menghitung…</div>';
-      O.repeatRateByOutlet(m).then(function(rows){
-        if(!rows||!rows.length){ body.innerHTML='<div class="muted">Belum ada data transaksi pada periode ini.</div>'; return; }
-        var h='<table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr style="text-align:left;color:#9a7a5e"><th style="padding:4px 6px">Outlet</th><th style="padding:4px 6px;text-align:right">Member</th><th style="padding:4px 6px;text-align:right">Balik ≥2x</th><th style="padding:4px 6px;text-align:right">Repeat</th></tr>';
-        rows.forEach(function(r){ var pct=Math.round(r.rate*100); h+='<tr style="border-top:1px solid #EFE2C4"><td style="padding:6px 6px">'+esc(r.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</td><td style="padding:6px 6px;text-align:right">'+r.totalMembers+'</td><td style="padding:6px 6px;text-align:right">'+r.repeatMembers+'</td><td style="padding:6px 6px;text-align:right"><b>'+pct+'%</b></td></tr>'; });
-        h+='</table>'; body.innerHTML=h;
-      }).catch(function(){ body.innerHTML='<div class="res bad">Gagal memuat.</div>'; });
+    var _rrRows=null, _rrMonth=1;
+    function _rrMatch(outlet, grp){
+      if(!grp) return true;
+      var g=outletGroup(outlet);
+      if(grp==='metavest') return g==='area1'||g==='area2'||g==='area3';
+      return g===grp;
     }
+    async function loadRepeat(m){
+      _rrMonth=m; var body=document.getElementById('rrBody'); if(!body) return; body.innerHTML='<div class="muted">Menghitung…</div>';
+      await ensureOam();
+      try{ _rrRows=await O.repeatRateByOutlet(m); }catch(e){ _rrRows=[]; }
+      renderRepeat();
+    }
+    function renderRepeat(){
+      var body=document.getElementById('rrBody'), topEl=document.getElementById('rrTop'), botEl=document.getElementById('rrBottom');
+      if(!body) return;
+      var grp=(document.getElementById('rrGroup')||{}).value||'';
+      var rows=(_rrRows||[]).filter(function(r){ return _rrMatch(r.outlet, grp); });
+      if(!rows.length){ body.innerHTML='<div class="muted">Belum ada data transaksi pada periode/filter ini.</div>'; if(topEl)topEl.innerHTML='-'; if(botEl)botEl.innerHTML='-'; return; }
+      var h='<table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr style="text-align:left;color:#9a7a5e"><th style="padding:4px 6px">Outlet</th><th style="padding:4px 6px;text-align:right">Member</th><th style="padding:4px 6px;text-align:right">Balik ≥2x</th><th style="padding:4px 6px;text-align:right">Repeat</th></tr>';
+      rows.forEach(function(r){ var pct=Math.round(r.rate*100); h+='<tr style="border-top:1px solid #EFE2C4"><td style="padding:6px 6px">'+esc(r.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</td><td style="padding:6px 6px;text-align:right">'+r.totalMembers+'</td><td style="padding:6px 6px;text-align:right">'+r.repeatMembers+'</td><td style="padding:6px 6px;text-align:right"><b>'+pct+'%</b></td></tr>'; });
+      h+='</table>'; body.innerHTML=h;
+      var sorted=rows.slice().sort(function(a,b){return b.rate-a.rate;});
+      function rankRow(r,i){ var pct=Math.round(r.rate*100); return '<div class="row" style="padding:6px 0"><div class="grow"><b>#'+(i+1)+'</b> '+esc(r.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</div><div><b>'+pct+'%</b> <span class="sub">('+r.totalMembers+' member)</span></div></div>'; }
+      if(topEl) topEl.innerHTML = sorted.slice(0,5).map(rankRow).join('') || '-';
+      if(botEl) botEl.innerHTML = sorted.slice().reverse().slice(0,5).map(rankRow).join('') || '-';
+    }
+    var _rg=document.getElementById('rrGroup'); if(_rg) _rg.onchange=renderRepeat;
     var rrp=document.querySelectorAll('#rrPer .rrp'); Array.prototype.forEach.call(rrp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(rrp,function(x){ x.className='btn sm sec rrp'; }); b.className='btn sm rrp'; loadRepeat(Number(b.dataset.m)); }; });
     loadRepeat(1);
     async function loadBirthdays(){
