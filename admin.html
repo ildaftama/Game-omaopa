@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=109"></script>
+<script type="module" src="core-omaopa.js?v=111"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -384,6 +384,7 @@
     await getStaffUids();
     var seg=segFilter; var LM={age:'Umur',gender:'Jenis kelamin',occupation:'Pekerjaan'};
     var mOutletOpts='<option value="">\u2014 semua outlet \u2014</option>'
+      +'<option value="__metavest">\ud83c\udfe2 Metavest (Area 1+2+3)</option>'
       +'<option value="__area1">\ud83d\uddfa\ufe0f Area 1 \u00b7 Jogja\u00b7Klaten\u00b7Magelang</option>'
       +'<option value="__area2">\ud83d\uddfa\ufe0f Area 2 \u00b7 Solo Raya</option>'
       +'<option value="__area3">\ud83d\uddfa\ufe0f Area 3 \u00b7 Semarang</option>'
@@ -414,16 +415,19 @@
     else { memReset(); loadMemberPage(); }
   }
   function memReset(){ memStack=[null]; memPage=0; }
-  var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal','uii']; // 5 outlet Jogja -> Area 1; Jogja lain -> Kronggahan
+  var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal','uii']; // Jogja -> Area 1/Metavest; kecuali yg mengandung "kyai mojo" (itu Kronggahan meski namanya mirip Godean)
   var _oam=null;
   async function ensureOam(){ if(_oam) return; _oam={}; var list=[]; try{ list=await O.listOutlets(); }catch(e){} if(!list||!list.length){ list=(window.OMA_OUTLETS||[]).slice(); } else { var seen={}; list.forEach(function(o){ seen[(o.name||'').toLowerCase().trim()]=1; }); (window.OMA_OUTLETS||[]).forEach(function(o){ if(!seen[(o.name||'').toLowerCase().trim()]) list.push(o); }); } list.forEach(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(n) _oam[n]=(o.area||'').toLowerCase(); }); }
-  function outletGroup(homeOutlet){ var key=(homeOutlet||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=(_oam&&_oam[key])||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}); if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
+  function outletGroup(homeOutlet){ var key=(homeOutlet||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=(_oam&&_oam[key])||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}) && key.indexOf('kyai mojo')<0; if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
   async function memByOutlet(sel){
     segFilter=null; var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
     await ensureOam();
     var arr=[]; try{ arr=await O.listMembers('',5000); }catch(e){}
     var f, label;
-    if(sel==='__kronggahan'||sel==='__area1'||sel==='__area2'||sel==='__area3'){
+    if(sel==='__metavest'){
+      f=arr.filter(function(m){ var g=outletGroup(m.homeOutlet); return g==='area1'||g==='area2'||g==='area3'; });
+      label='Metavest (Area 1+2+3)';
+    } else if(sel==='__kronggahan'||sel==='__area1'||sel==='__area2'||sel==='__area3'){
       var grp=sel.replace('__',''); f=arr.filter(function(m){ return outletGroup(m.homeOutlet)===grp; });
       label={kronggahan:'Kronggahan',area1:'Area 1',area2:'Area 2',area3:'Area 3'}[grp];
     } else {
