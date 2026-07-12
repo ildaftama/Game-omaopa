@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=108"></script>
+<script type="module" src="core-omaopa.js?v=109"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -194,11 +194,15 @@
   async function renderPengaturan(){
     if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
     tabEl.innerHTML='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">📜 Rekap Audit (riwayat tindakan)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Catatan semua tindakan penting admin/master: adjust poin, hapus data, ubah promo/banner/pesan, ubah peran staff, dll — lengkap siapa & kapan.</div><div id="auWrap" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">📜 Rekap Audit (riwayat tindakan)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Catatan semua tindakan penting admin/master: adjust poin, hapus data, ubah promo/banner/pesan, ubah peran staff, dll — lengkap siapa & kapan.</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="auPer"><button class="btn sm sec aup" data-m="1">1 bulan</button><button class="btn sm sec aup" data-m="2">2 bulan</button><button class="btn sm sec aup" data-m="3">3 bulan</button><button class="btn sm sec aup" data-m="6">6 bulan</button><button class="btn sm sec aup" data-m="12">12 bulan</button></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:.8rem"><input type="date" id="auFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="auTo" style="flex:1;min-width:0"><button class="btn sm" id="auGo">OK</button></div>'
+      +'<div id="auWrap" class="muted">Pilih periode di atas untuk melihat riwayat tindakan.</div></div>'
       +(masterEdit?('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya</div>'
-        +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Reset <b>SEMUA</b> poin member ke 0 (termasuk poin game & check-in). Berguna untuk mulai dari bersih setelah masa uji coba. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in</label>'
-        +'<button class="btn red" id="rsBtn">Reset semua poin ke 0</button><div id="rsMsg"></div>'
+        +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan tanggal untuk reset <b>SEMUA</b> poin member ke 0 (termasuk poin game & check-in). Isi rentang tanggal untuk <b>hanya mengurangi</b> poin yang didapat dari transaksi pada periode itu saja (saldo di luar periode tidak disentuh). <b>Tidak bisa dibatalkan.</b></div>'
+        +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="rsFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="rsTo" style="flex:1;min-width:0"></div>'
+        +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in (hanya berlaku kalau tanggal dikosongkan)</label>'
+        +'<button class="btn red" id="rsBtn">Reset / kurangi poin</button><div id="rsMsg"></div>'
         +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
         +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>transaksi kasir</b> (termasuk penyesuaian poin admin). Kosongkan tanggal untuk hapus SEMUA, atau isi rentang untuk hapus periode tertentu saja. <b>Tidak bisa dibatalkan.</b></div>'
         +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="txFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="txTo" style="flex:1;min-width:0"></div>'
@@ -212,7 +216,7 @@
         +'<button class="btn sec" id="dtSearch" style="margin-top:8px">Cari transaksi</button>'
         +'<div id="dtList" class="muted" style="margin-top:10px"></div></div>')
       :'<div class="card"><div class="muted" style="font-size:.82rem">🔒 Zona berbahaya (hapus data) khusus <b>Master</b>. Admin Utama tidak bisa menghapus data — biar rekap aman.</div></div>');
-    loadMessages(); loadAuditLog();
+    loadMessages();
     var _dts=document.getElementById('dtSearch'); if(_dts) _dts.onclick=loadDetailTx;
     async function loadDetailTx(){
       var box=document.getElementById('dtList'); if(!box) return; box.innerHTML='<div class="muted">Mencari…</div>';
@@ -243,11 +247,11 @@
         catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false;
       };
     }
-    async function loadAuditLog(){
-      var w=document.getElementById('auWrap'); if(!w) return; w.classList.remove('muted');
-      var LBL={adjust_poin:'🔧 Adjust poin', reset_semua_poin:'⚠️ Reset semua poin', hapus_semua_transaksi:'⚠️ Hapus semua transaksi', hapus_transaksi:'🗑️ Hapus transaksi', hapus_voucher_terpakai:'⚠️ Hapus voucher terpakai', hapus_member:'⚠️ Hapus member', reset_pin:'🔑 Reset PIN', tambah_staff:'👤 Tambah staff', ubah_peran_staff:'👤 Ubah peran staff', cabut_staff:'👤 Cabut staff', ubah_pesan_wa:'💬 Ubah pesan WA', pasang_promo:'📣 Pasang promo', upload_banner:'🖼️ Upload banner', hapus_banner:'🖼️ Hapus banner'};
-      var arr=[]; try{ arr=await O.listAudit(100); }catch(e){}
-      if(!arr.length){ w.innerHTML='<div class="muted">Belum ada tindakan tercatat.</div>'; return; }
+    async function loadAuditLog(from, to){
+      var w=document.getElementById('auWrap'); if(!w) return; w.classList.remove('muted'); w.innerHTML='<div class="muted">Memuat…</div>';
+      var LBL={adjust_poin:'🔧 Adjust poin', reset_semua_poin:'⚠️ Reset semua poin', reset_poin_periode:'⚠️ Kurangi poin (periode)', hapus_semua_transaksi:'⚠️ Hapus transaksi', hapus_transaksi:'🗑️ Hapus transaksi', hapus_voucher_terpakai:'⚠️ Hapus voucher terpakai', hapus_member:'⚠️ Hapus member', reset_pin:'🔑 Reset PIN', tambah_staff:'👤 Tambah staff', ubah_peran_staff:'👤 Ubah peran staff', cabut_staff:'👤 Cabut staff', ubah_pesan_wa:'💬 Ubah pesan WA', pasang_promo:'📣 Pasang promo', upload_banner:'🖼️ Upload banner', hapus_banner:'🖼️ Hapus banner'};
+      var arr=[]; try{ arr=await O.listAudit({limit:150, from:from||'', to:to||''}); }catch(e){}
+      if(!arr.length){ w.innerHTML='<div class="muted">Tidak ada tindakan tercatat pada periode ini.</div>'; return; }
       var PAGE=25, shown=0;
       w.innerHTML='<div id="auList"></div><div id="auMore" style="text-align:center;margin-top:8px"></div>';
       var list=document.getElementById('auList'), more=document.getElementById('auMore');
@@ -257,18 +261,24 @@
         var html=next.map(function(a){ return '<div class="row" style="align-items:flex-start"><div class="grow"><div class="nm" style="font-size:.85rem">'+(LBL[a.action]||a.action)+'</div><div class="sub">'+esc(a.detail)+'</div><div class="sub" style="margin-top:2px;color:#9a7a5e">oleh <b>'+esc(a.byName||'?')+'</b> · '+fmtT(a.ts)+'</div></div></div>'; }).join('');
         list.insertAdjacentHTML('beforeend', html); shown+=next.length;
         var rem=arr.length-shown;
-        more.innerHTML= rem>0 ? '<button class="btn sm sec" id="auMoreBtn">Muat '+Math.min(PAGE,rem)+' lagi · '+rem+' sisa</button>' : '<div class="muted" style="font-size:.75rem">Menampilkan '+arr.length+' tindakan terakhir.</div>';
+        more.innerHTML= rem>0 ? '<button class="btn sm sec" id="auMoreBtn">Muat '+Math.min(PAGE,rem)+' lagi · '+rem+' sisa</button>' : '<div class="muted" style="font-size:.75rem">Menampilkan '+arr.length+' tindakan.</div>';
         var mb=document.getElementById('auMoreBtn'); if(mb) mb.onclick=loadMore;
       }
       loadMore();
     }
+    var _auFrom='', _auTo='';
+    var aup=document.querySelectorAll('#auPer .aup'); Array.prototype.forEach.call(aup,function(b){ b.onclick=function(){ Array.prototype.forEach.call(aup,function(x){ x.className='btn sm sec aup'; }); b.className='btn sm aup'; var d=new Date(); d.setMonth(d.getMonth()-Number(b.dataset.m)); _auFrom=d.toISOString().slice(0,10); _auTo=''; document.getElementById('auFrom').value=''; document.getElementById('auTo').value=''; loadAuditLog(_auFrom,_auTo); }; });
+    var _aug=document.getElementById('auGo'); if(_aug) _aug.onclick=function(){ _auFrom=document.getElementById('auFrom').value; _auTo=document.getElementById('auTo').value; if(_auFrom||_auTo){ Array.prototype.forEach.call(aup,function(x){ x.className='btn sm sec aup'; }); loadAuditLog(_auFrom,_auTo); } };
     var rb=document.getElementById('rsBtn'); if(rb) rb.onclick=async function(){
       if(busy) return;
-      if(!confirm('Yakin reset SEMUA poin member jadi 0? Tindakan ini TIDAK bisa dibatalkan.')) return;
-      if(!confirm('Sekali lagi \u2014 poin SEMUA member akan jadi 0. Lanjutkan?')) return;
-      busy=true; var msg=document.getElementById('rsMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Mereset\u2026 (jangan tutup halaman)</div>';
-      try{ var r=await O.adminResetPoints({ scores: document.getElementById('rsScores').checked }); MEMBERS=null; TXN=null;
-        msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' member di-reset ke 0 poin.</div>'; }
+      var rf=(document.getElementById('rsFrom')||{}).value||'', rt=(document.getElementById('rsTo')||{}).value||'';
+      var isRange = !!(rf||rt);
+      var msg1 = isRange ? ('Kurangi poin yang didapat dari transaksi periode '+(rf||'awal')+' s/d '+(rt||'sekarang')+'? (saldo di luar periode tidak disentuh)') : 'Yakin reset SEMUA poin member jadi 0? Tindakan ini TIDAK bisa dibatalkan.';
+      if(!confirm(msg1)) return;
+      if(!confirm('Sekali lagi \u2014 tindakan ini TIDAK bisa dibatalkan. Lanjutkan?')) return;
+      busy=true; var msg=document.getElementById('rsMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Memproses\u2026 (jangan tutup halaman)</div>';
+      try{ var r=await O.adminResetPoints({ scores: document.getElementById('rsScores').checked, from:rf, to:rt }); MEMBERS=null; TXN=null;
+        msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' member '+(isRange?'terdampak (poin dikurangi).':'di-reset ke 0 poin.')+'</div>'; }
       catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
     var tb=document.getElementById('txBtn'); if(tb) tb.onclick=async function(){
       if(busy) return;
@@ -602,18 +612,18 @@
     html+='<div class="card">'+barH('Omzet per outlet (transaksi kasir)', outRows)+'</div>';
     html+='<div class="card" id="rrCard"><div class="nm">🔁 Repeat rate per outlet</div>'
       +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Member yang transaksi <b>≥2x</b> ÷ member yang transaksi <b>≥1x</b> di outlet itu, pada periode terpilih.</div>'
-      +'<div style="display:flex;gap:6px;margin-bottom:8px" id="rrPer"><button class="btn sm rrp" data-m="1">1 bulan</button><button class="btn sm sec rrp" data-m="2">2 bulan</button><button class="btn sm sec rrp" data-m="3">3 bulan</button></div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:8px" id="rrPer"><button class="btn sm sec rrp" data-m="1">1 bulan</button><button class="btn sm sec rrp" data-m="2">2 bulan</button><button class="btn sm sec rrp" data-m="3">3 bulan</button></div>'
       +'<select id="rrGroup" style="margin-bottom:10px"><option value="">— semua outlet —</option><option value="metavest">🏢 Metavest (Area 1+2+3)</option><option value="kronggahan">🏢 Kronggahan</option><option value="area1">🗺️ Area 1</option><option value="area2">🗺️ Area 2</option><option value="area3">🗺️ Area 3</option></select>'
-      +'<div id="rrBody" class="muted">Memuat…</div>'
+      +'<div id="rrBody" class="muted">Pilih periode di atas untuk menghitung repeat rate.</div>'
       +'<div class="nm" style="margin-top:16px;font-size:.88rem">🏆 Top 5 repeat rate tertinggi</div><div id="rrTop" class="muted" style="margin-top:6px">-</div>'
       +'<div class="nm" style="margin-top:14px;font-size:.88rem">📉 Top 5 repeat rate terendah</div><div id="rrBottom" class="muted" style="margin-top:6px">-</div>'
       +'</div>';
     html+='<div class="card" id="btCard"><div class="nm">💰 Rata-rata transaksi (basket size)</div>'
       +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Rata-rata nominal per transaksi kasir/order (hanya transaksi bernominal, bukan poin bonus/referral/penyesuaian).</div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="btPer"><button class="btn sm sec btp" data-d="7">7 hari</button><button class="btn sm btp" data-d="30">30 hari</button><button class="btn sm sec btp" data-d="90">3 bln</button><button class="btn sm sec btp" data-d="180">6 bln</button><button class="btn sm sec btp" data-d="365">12 bln</button></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="btPer"><button class="btn sm sec btp" data-d="7">7 hari</button><button class="btn sm sec btp" data-d="30">30 hari</button><button class="btn sm sec btp" data-d="90">3 bln</button><button class="btn sm sec btp" data-d="180">6 bln</button><button class="btn sm sec btp" data-d="365">12 bln</button></div>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="btFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="btTo" style="flex:1;min-width:0"><button class="btn sm" id="btGo">OK</button></div>'
       +'<select id="btGroup" style="margin-bottom:10px"><option value="">— semua outlet —</option><option value="metavest">🏢 Metavest (Area 1+2+3)</option><option value="kronggahan">🏢 Kronggahan</option><option value="area1">🗺️ Area 1</option><option value="area2">🗺️ Area 2</option><option value="area3">🗺️ Area 3</option></select>'
-      +'<div id="btBody" class="muted">Memuat…</div></div>';
+      +'<div id="btBody" class="muted">Pilih periode di atas untuk menghitung.</div></div>';
     html+='<div class="card" id="trCard"><div class="nm">🌐 Traffic & Online</div>'
       +'<div class="kpis" style="margin-top:8px"><div class="kpi"><div class="v" id="trOnline" style="font-size:1.05rem">…</div><div class="l">Online sekarang</div></div><div class="kpi"><div class="v" id="trToday">…</div><div class="l">Kunjungan hari ini</div></div></div>'
       +'<div class="kpis"><div class="kpi"><div class="v" id="trMonth">…</div><div class="l">Bulan ini</div></div><div class="kpi"><div class="v" id="tr3">…</div><div class="l">3 bulan</div></div></div>'
@@ -642,8 +652,9 @@
     function renderRepeat(){
       var body=document.getElementById('rrBody'), topEl=document.getElementById('rrTop'), botEl=document.getElementById('rrBottom');
       if(!body) return;
+      if(_rrRows===null){ body.innerHTML='<div class="muted">Pilih periode di atas untuk menghitung repeat rate.</div>'; if(topEl)topEl.innerHTML='-'; if(botEl)botEl.innerHTML='-'; return; }
       var grp=(document.getElementById('rrGroup')||{}).value||'';
-      var rows=(_rrRows||[]).filter(function(r){ return _rrMatch(r.outlet, grp); });
+      var rows=_rrRows.filter(function(r){ return _rrMatch(r.outlet, grp); });
       if(!rows.length){ body.innerHTML='<div class="muted">Belum ada data transaksi pada periode/filter ini.</div>'; if(topEl)topEl.innerHTML='-'; if(botEl)botEl.innerHTML='-'; return; }
       var h='<table style="width:100%;border-collapse:collapse;font-size:.82rem"><tr style="text-align:left;color:#9a7a5e"><th style="padding:4px 6px">Outlet</th><th style="padding:4px 6px;text-align:right">Member</th><th style="padding:4px 6px;text-align:right">Balik ≥2x</th><th style="padding:4px 6px;text-align:right">Repeat</th></tr>';
       rows.forEach(function(r){ var pct=Math.round(r.rate*100); h+='<tr style="border-top:1px solid #EFE2C4"><td style="padding:6px 6px">'+esc(r.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</td><td style="padding:6px 6px;text-align:right">'+r.totalMembers+'</td><td style="padding:6px 6px;text-align:right">'+r.repeatMembers+'</td><td style="padding:6px 6px;text-align:right"><b>'+pct+'%</b></td></tr>'; });
@@ -653,9 +664,9 @@
       if(topEl) topEl.innerHTML = sorted.slice(0,5).map(rankRow).join('') || '-';
       if(botEl) botEl.innerHTML = sorted.slice().reverse().slice(0,5).map(rankRow).join('') || '-';
     }
-    var _rg=document.getElementById('rrGroup'); if(_rg) _rg.onchange=renderRepeat;
+    var _rg=document.getElementById('rrGroup'); if(_rg) _rg.onchange=function(){ if(_rrRows===null){ return; } renderRepeat(); };
 
-    var _btDays=30, _btFrom='', _btTo='';
+    var _btDays=30, _btFrom='', _btTo='', _btRaw=null;
     function _btMatch(outlet, grp){ if(!grp) return true; var g=outletGroup(outlet); if(grp==='metavest') return g==='area1'||g==='area2'||g==='area3'; return g===grp; }
     async function loadBasket(){
       var body=document.getElementById('btBody'); if(!body) return; body.innerHTML='<div class="muted">Menghitung…</div>';
@@ -664,8 +675,14 @@
       if(_btFrom||_btTo){ fromMs=_btFrom?new Date(_btFrom+'T00:00:00').getTime():0; toMs=_btTo?new Date(_btTo+'T23:59:59').getTime():0; }
       else { toMs=Date.now(); fromMs=toMs-(_btDays*86400000); }
       var r; try{ r=await O.avgTransactionStats(fromMs,toMs); }catch(e){ r={overall:{avg:0,count:0,total:0},byOutlet:[]}; }
+      _btRaw=r.byOutlet||[];
+      renderBasket();
+    }
+    function renderBasket(){
+      var body=document.getElementById('btBody'); if(!body) return;
+      if(_btRaw===null){ body.innerHTML='<div class="muted">Pilih periode di atas untuk menghitung.</div>'; return; }
       var grp=(document.getElementById('btGroup')||{}).value||'';
-      var rows=(r.byOutlet||[]).filter(function(x){ return _btMatch(x.outlet, grp); });
+      var rows=_btRaw.filter(function(x){ return _btMatch(x.outlet, grp); });
       var tCount=rows.reduce(function(s,x){return s+x.count;},0), tTotal=rows.reduce(function(s,x){return s+x.total;},0);
       var avg = tCount? Math.round(tTotal/tCount) : 0;
       var h='<div class="kpis"><div class="kpi"><div class="v">Rp'+num(avg)+'</div><div class="l">Rata-rata / transaksi</div></div><div class="kpi"><div class="v">'+num(tCount)+'</div><div class="l">Jumlah transaksi</div></div></div>'
@@ -678,11 +695,10 @@
       body.innerHTML=h;
     }
     var btp=document.querySelectorAll('#btPer .btp'); Array.prototype.forEach.call(btp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(btp,function(x){ x.className='btn sm sec btp'; }); b.className='btn sm btp'; _btDays=Number(b.dataset.d); _btFrom=''; _btTo=''; document.getElementById('btFrom').value=''; document.getElementById('btTo').value=''; loadBasket(); }; });
-    var _btg=document.getElementById('btGo'); if(_btg) _btg.onclick=function(){ _btFrom=document.getElementById('btFrom').value; _btTo=document.getElementById('btTo').value; if(_btFrom||_btTo){ Array.prototype.forEach.call(btp,function(x){ x.className='btn sm sec btp'; }); } loadBasket(); };
-    var _btGr=document.getElementById('btGroup'); if(_btGr) _btGr.onchange=loadBasket;
-    loadBasket();
+    var _btg=document.getElementById('btGo'); if(_btg) _btg.onclick=function(){ _btFrom=document.getElementById('btFrom').value; _btTo=document.getElementById('btTo').value; if(_btFrom||_btTo){ Array.prototype.forEach.call(btp,function(x){ x.className='btn sm sec btp'; }); loadBasket(); } };
+    var _btGr=document.getElementById('btGroup'); if(_btGr) _btGr.onchange=function(){ if(_btRaw===null){ return; } renderBasket(); };
+    renderBasket();
     var rrp=document.querySelectorAll('#rrPer .rrp'); Array.prototype.forEach.call(rrp,function(b){ b.onclick=function(){ Array.prototype.forEach.call(rrp,function(x){ x.className='btn sm sec rrp'; }); b.className='btn sm rrp'; loadRepeat(Number(b.dataset.m)); }; });
-    loadRepeat(1);
     async function loadBirthdays(){
       var box=document.getElementById('bdBody'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
       var mem=await getMembers();

@@ -1187,9 +1187,22 @@ function logAudit(action, detail){
     }).catch(()=>{});
   }catch(e){}
 }
-async function listAudit(n){
-  n=n||50;
-  try{ const snap=await getDocs(query(collection(db,'auditlog'), orderBy('createdAt','desc'), limit(n))); const arr=[];
+async function listAudit(opts){
+  opts=opts||{}; const n=opts.limit||100;
+  const fromMs=opts.from?new Date(opts.from+'T00:00:00').getTime():0;
+  const toMs=opts.to?new Date(opts.to+'T23:59:59').getTime():0;
+  try{
+    let qy;
+    if(fromMs||toMs){
+      const parts=[collection(db,'auditlog')];
+      if(fromMs) parts.push(where('createdAt','>=', new Date(fromMs)));
+      if(toMs) parts.push(where('createdAt','<=', new Date(toMs)));
+      parts.push(orderBy('createdAt','desc')); parts.push(limit(n));
+      qy=query.apply(null, parts);
+    } else {
+      qy=query(collection(db,'auditlog'), orderBy('createdAt','desc'), limit(n));
+    }
+    const snap=await getDocs(qy); const arr=[];
     snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, action:x.action||'', detail:x.detail||'', byName:x.byName||'', byUid:x.byUid||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
     return arr;
   }catch(e){ return []; }
@@ -1228,6 +1241,29 @@ async function adminSetScore(uid, value){
 async function adminResetPoints(opts){
   if(!(await isMaster())) throw {message:'Khusus Master.'};
   opts=opts||{};
+  const fromMs=opts.from?new Date(opts.from+'T00:00:00').getTime():0;
+  const toMs=opts.to?new Date(opts.to+'T23:59:59').getTime():0;
+  if(fromMs||toMs){
+    // Mode rentang: hanya KURANGI poin yang didapat dari transaksi pada periode ini (saldo di luar rentang tidak disentuh)
+    let txs=[];
+    try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; if((!fromMs||ts>=fromMs)&&(!toMs||ts<=toMs)) txs.push({ uid:x.uid||'', points:x.points||0 }); }); }catch(e){}
+    const byUid={}; txs.forEach(t=>{ if(!t.uid) return; byUid[t.uid]=(byUid[t.uid]||0)+t.points; });
+    let n=0;
+    for(const uid of Object.keys(byUid)){
+      const delta=byUid[uid]; if(!delta) continue;
+      try{
+        await runTransaction(db, async (tx)=>{
+          const ref=doc(db,'users',uid); const s=await tx.get(ref); if(!s.exists()) return;
+          const cur=(typeof s.data().points==='number')?s.data().points:0; const nt=Math.max(0, cur-delta);
+          tx.set(ref, { points:nt, updatedAt:serverTimestamp() }, {merge:true});
+          tx.set(doc(db,'leaderboard',uid), { points:nt, updatedAt:serverTimestamp() }, {merge:true});
+        });
+        n++;
+      }catch(e){}
+    }
+    logAudit('reset_poin_periode', 'Kurangi poin dari transaksi periode '+(opts.from||'awal')+' s/d '+(opts.to||'sekarang')+' — '+n+' member terdampak (saldo di luar periode tidak disentuh).');
+    return { count:n };
+  }
   const usnap=await getDocs(collection(db,'users')); let n=0;
   for(const ds of usnap.docs){ const uid=ds.id;
     try{ await setDoc(doc(db,'users',uid), { points:0, earn_game:0, earn_checkin:0, lastCheckin:'', streak:0, updatedAt:serverTimestamp() }, {merge:true}); }catch(e){}
