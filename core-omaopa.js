@@ -688,7 +688,7 @@ async function avgTransactionStats(fromMs, toMs){
   try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ outlet:(x.outlet||'').trim(), nominal:x.nominal||0, ts:ts }); }); }catch(e){ return { overall:{avg:0,count:0,total:0}, byOutlet:[] }; }
   txs=txs.filter(t=> t.nominal>0 && (!fromMs || t.ts>=fromMs) && (!toMs || t.ts<=toMs));
   const byOutlet={};
-  txs.forEach(t=>{ const key=t.outlet.toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return; if(!byOutlet[key]) byOutlet[key]={name:t.outlet,count:0,total:0}; byOutlet[key].count++; byOutlet[key].total+=t.nominal; });
+  txs.forEach(t=>{ const key=t.outlet.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim(); if(!key) return; if(!byOutlet[key]) byOutlet[key]={name:t.outlet,count:0,total:0}; byOutlet[key].count++; byOutlet[key].total+=t.nominal; });
   const rows=Object.keys(byOutlet).map(k=>{ const o=byOutlet[k]; return { outlet:o.name, count:o.count, total:o.total, avg: o.count?Math.round(o.total/o.count):0 }; });
   rows.sort((a,b)=>b.total-a.total);
   const totalCount=txs.length, totalNominal=txs.reduce((s,t)=>s+t.nominal,0);
@@ -700,7 +700,7 @@ async function repeatRateByOutlet(months){
   let txs=[];
   try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ uid:x.uid||'', outlet:(x.outlet||'').trim(), kind:x.kind||'', ts:ts }); }); }catch(e){ return []; }
   const byOutlet={};
-  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral' || t.kind==='bonus') return; const o=t.outlet; if(!o || /^referral/i.test(o) || /penyesuaian/i.test(o) || /^bonus/i.test(o)) return; const key=o.toLowerCase().replace(/\s+/g,' ').trim(); if(!byOutlet[key]) byOutlet[key]={ name:o, m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1; });
+  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral' || t.kind==='bonus') return; const o=t.outlet; if(!o || /^referral/i.test(o) || /penyesuaian/i.test(o) || /^bonus/i.test(o)) return; const key=o.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim(); if(!byOutlet[key]) byOutlet[key]={ name:o, m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1; });
   const rows=[];
   Object.keys(byOutlet).forEach(k=>{ const g=byOutlet[k]; const m=g.m; const uids=Object.keys(m); const total=uids.length; const repeat=uids.filter(u=>m[u]>=2).length; const visits=uids.reduce((s,u)=>s+m[u],0); rows.push({ outlet:g.name, totalMembers:total, repeatMembers:repeat, visits:visits, rate:(total?(repeat/total):0) }); });
   rows.sort((a,b)=>b.totalMembers-a.totalMembers);

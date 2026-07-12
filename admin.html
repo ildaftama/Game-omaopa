@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=111"></script>
+<script type="module" src="core-omaopa.js?v=112"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -415,7 +415,7 @@
     else { memReset(); loadMemberPage(); }
   }
   function memReset(){ memStack=[null]; memPage=0; }
-  var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal','uii']; // Jogja -> Area 1/Metavest; kecuali yg mengandung "kyai mojo" (itu Kronggahan meski namanya mirip Godean)
+  var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal uii']; // Jogja -> Area 1/Metavest; "jakal uii" spesifik (Jakal Bawah TETAP Kronggahan); kecuali nama mengandung "kyai mojo" (Kronggahan meski mirip Godean)
   var _oam=null;
   async function ensureOam(){ if(_oam) return; _oam={}; var list=[]; try{ list=await O.listOutlets(); }catch(e){} if(!list||!list.length){ list=(window.OMA_OUTLETS||[]).slice(); } else { var seen={}; list.forEach(function(o){ seen[(o.name||'').toLowerCase().trim()]=1; }); (window.OMA_OUTLETS||[]).forEach(function(o){ if(!seen[(o.name||'').toLowerCase().trim()]) list.push(o); }); } list.forEach(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(n) _oam[n]=(o.area||'').toLowerCase(); }); }
   function outletGroup(homeOutlet){ var key=(homeOutlet||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=(_oam&&_oam[key])||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}) && key.indexOf('kyai mojo')<0; if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
@@ -936,6 +936,7 @@
       +'<button class="btn" id="sAdd">＋ Tambah staff</button><div id="sMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola staff.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar staff</div><button class="btn sm sec" id="sReload">↻</button></div>'
       +'<select id="sFilter" style="margin-bottom:8px"><option value="">— semua peran —</option><option value="master">👑 Master</option><option value="super">⭐ Admin Utama</option><option value="admin">🛠️ Admin</option><option value="kronggahan">🏢 Kasir Kronggahan</option><option value="area1">🗺️ Kasir Area 1</option><option value="area2">🗺️ Kasir Area 2</option><option value="area3">🗺️ Kasir Area 3</option><option value="lain">📌 Kasir Lainnya</option></select>'
+      +'<select id="sOutFilter" style="margin-bottom:8px"><option value="">— cek outlet spesifik (deteksi dobel) —</option>'+sOutletOpts.replace('<option value="">— pilih outlet —</option>','')+'</select>'
       +'<div id="sList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){
       document.getElementById('sFind').onclick=async function(){
@@ -956,7 +957,7 @@
         await O.updateStaff(_u, { super:(_role==='super'||_role==='master'), admin:_role!=='kasir', master:_role==='master' });
         msg.innerHTML='<div class="res ok">✓ Ditambahkan sebagai '+(_role==='master'?'Master':(_role==='super'?'Admin Utama':(_role==='admin'?'Admin':'Kasir')))+'.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sRole').value='kasir'; loadStaff();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
-    document.getElementById('sReload').onclick=function(){ sPage=0; loadStaff(); }; var _sf=document.getElementById('sFilter'); if(_sf) _sf.onchange=function(){ sPage=0; loadStaff(); }; loadStaff();
+    document.getElementById('sReload').onclick=function(){ sPage=0; loadStaff(); }; var _sf=document.getElementById('sFilter'); if(_sf) _sf.onchange=function(){ sPage=0; var of=document.getElementById('sOutFilter'); if(of) of.value=''; loadStaff(); }; var _sof2=document.getElementById('sOutFilter'); if(_sof2) _sof2.onchange=function(){ if(_sof2.value){ document.getElementById('sFilter').value=''; } loadStaff(); }; loadStaff();
   }
   async function loadStaff(){
     var box=document.getElementById('sList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
@@ -971,6 +972,21 @@
         +'<button class="btn sm sec" data-sup="'+esc(s.uid)+'" data-on="'+(s.super?'1':'0')+'">'+(s.super?'Cabut utama':'Jadikan utama')+'</button>'
         +(masterEdit?('<button class="btn sm sec" data-mst="'+esc(s.uid)+'" data-on="'+(s.master?'1':'0')+'">'+(s.master?'Cabut master':'Jadikan master')+'</button>'):'')
         +'<button class="btn sm red" data-rem="'+esc(s.uid)+'">Hapus</button></div>') : '')+'</div>'; }
+    var _sof=(document.getElementById('sOutFilter')||{}).value||'';
+    if(_sof){
+      var okey=_sof.replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim();
+      var matched=arr.filter(function(s){ return !s.master && !s.super && !s.admin && (s.outlet||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim()===okey; });
+      var _html2 = matched.length>1 ? ('<div class="res bad" style="margin-bottom:8px">⚠️ Ada <b>'+matched.length+' akun kasir</b> untuk outlet "'+esc(_sof)+'" — cek apakah ini dobel yang tidak disengaja.</div>') : '';
+      _html2 += matched.length ? matched.map(_sRow).join('') : '<div class="muted">Tidak ada akun kasir untuk outlet ini.</div>';
+      box.innerHTML=_html2;
+      if(!canEdit) return;
+      box.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ var uid=b.getAttribute('data-edit'); var cur=b.getAttribute('data-out')||''; var bk=document.createElement('div'); bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px'; bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:340px;width:100%"><div style="font-weight:800;color:var(--coklat);margin-bottom:10px">Pilih outlet staff</div><select id="soEdit">'+buildOutletOpts()+'</select><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="soSave" style="flex:1">Simpan</button><button class="btn sec" id="soCancel" style="flex:1">Batal</button></div></div>'; document.body.appendChild(bk); var sel=bk.querySelector('#soEdit'); if(cur) sel.value=cur; bk.querySelector('#soCancel').onclick=function(){ bk.remove(); }; bk.querySelector('#soSave').onclick=async function(){ var v=sel.value; if(!v){ alert('Pilih outlet dulu.'); return; } busy=true; this.disabled=true; try{ await O.updateStaff(uid,{outlet:v}); bk.remove(); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; } busy=false; }; }; });
+      box.querySelectorAll('[data-adm]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-adm'),{admin:b.getAttribute('data-on')!=='1'}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+      box.querySelectorAll('[data-sup]').forEach(function(b){ b.onclick=async function(){ var mk=b.getAttribute('data-on')!=='1'; busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-sup'), mk?{super:true,admin:true}:{super:false}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+      box.querySelectorAll('[data-mst]').forEach(function(b){ b.onclick=async function(){ var mk=b.getAttribute('data-on')!=='1'; if(mk && !confirm('Jadikan MASTER? Master bisa hapus data & akses penuh.')) return; busy=true; b.disabled=true; try{ await O.updateStaff(b.getAttribute('data-mst'), mk?{master:true,super:true,admin:true}:{master:false}); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+      box.querySelectorAll('[data-rem]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus akses staff ini?')) return; busy=true; b.disabled=true; try{ await O.removeStaff(b.getAttribute('data-rem')); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+      return;
+    }
     var _bk={master:[],super:[],admin:[],kronggahan:[],area1:[],area2:[],area3:[],lain:[]};
     arr.forEach(function(s){ var g; if(s.master) g='master'; else if(s.super) g='super'; else if(s.admin) g='admin'; else { g=outletGroup(s.outlet); if(!_bk[g]) g='lain'; } _bk[g].push(s); });
     var _grp=[['master','👑 Master'],['super','⭐ Admin Utama'],['admin','🛠️ Admin'],['kronggahan','🏢 Kasir · Kronggahan'],['area1','🗺️ Kasir · Area 1'],['area2','🗺️ Kasir · Area 2'],['area3','🗺️ Kasir · Area 3'],['lain','📌 Kasir · Lainnya']];
