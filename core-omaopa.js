@@ -1162,7 +1162,7 @@ async function listMembers(qstr, n){
   try{ const snap=await getDocs(query(collection(db,'users'), limit(n))); const arr=[];
     snap.forEach(d=>{ const x=d.data(); const nm=(x.name||''), ph=(x.phone||'');
       if(qstr && nm.toLowerCase().indexOf(qstr)<0 && ph.indexOf(qstr)<0) return;
-      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', dob:x.dob||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||'', earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
+      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', dob:x.dob||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0, earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
     arr.sort((a,b)=>b.points-a.points); return arr;
   }catch(e){ return []; }
 }
@@ -1391,7 +1391,7 @@ async function adminClearUsedVouchers(range){
   logAudit('hapus_voucher_terpakai', 'Hapus voucher terpakai'+((range&&(range.from||range.to))?(' periode '+(range.from||'awal')+' s/d '+(range.to||'sekarang')):' (SEMUA)')+' ('+n+' baris).');
   return { count:n };
 }
-async function deleteVoucherRec(code){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; code=(code||'').trim(); if(!code) throw {message:'Kode kosong.'}; await deleteDoc(doc(db,'vouchers',code)); }
+async function deleteVoucherRec(code){ if(!(await isMaster())) throw {message:'Khusus Master.'}; code=(code||'').trim(); if(!code) throw {message:'Kode kosong.'}; let info=''; try{ const s=await getDoc(doc(db,'vouchers',code)); if(s.exists()){ const x=s.data(); info=(x.name||'?')+' · '+(x.title||code)+' · '+(x.status||''); } }catch(e){} await deleteDoc(doc(db,'vouchers',code)); logAudit('hapus_voucher', 'Hapus 1 voucher: '+info+' (kode:'+code+')'); }
 async function adminSetVoucherStatus(code, active){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'}; code=(code||'').trim().toUpperCase(); if(!code) throw {message:'Kode kosong.'};
   if(active){ await setDoc(doc(db,'vouchers',code), { status:'aktif', usedAt:null, usedOutlet:null, usedBy:null, updatedAt:serverTimestamp() },{merge:true}); }
@@ -1542,14 +1542,16 @@ async function setOrderStatus(id, status){ if(!(await isSuper())) throw {message
 async function updateOrder(id, patch){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); const data=Object.assign({updatedAt:serverTimestamp()}, patch||{}); if(data.total!=null) data.total=Math.round(Number(data.total)||0); await setDoc(doc(db,'orders',id), data, {merge:true});
   try{ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const d=s.data(); if((d.status||'baru')==='approved'){ pushOrderRow(id, d, 'upsert'); pushOrderItems(id, d, 'replace'); } } }catch(e){}
 }
-async function deleteOrder(id){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; id=(id||'').trim(); await deleteDoc(doc(db,'orders',id));
+async function deleteOrder(id){ if(!(await isMaster())) throw {message:'Khusus Master.'}; id=(id||'').trim(); let info=''; try{ const s=await getDoc(doc(db,'orders',id)); if(s.exists()){ const x=s.data(); info=(x.nama||'?')+' · '+(x.outlet||'-')+' · Rp'+(x.total||0); } }catch(e){} await deleteDoc(doc(db,'orders',id));
   try{ pushToSheet({ type:'pesanan', action:'delete', id:id }); pushOrderItems(id, null, 'delete'); }catch(e){}
+  logAudit('hapus_pesanan', 'Hapus 1 pesanan web: '+info+' (id:'+id+')');
 }
 async function adminClearOrders(){
-  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
   const snap=await getDocs(collection(db,'orders')); let n=0;
   for(const ds of snap.docs){ try{ await deleteDoc(doc(db,'orders',ds.id)); n++; }catch(e){} }
   try{ pushToSheet({ type:'pesanan', action:'clear' }); pushOrderItems(null, null, 'clear'); }catch(e){}
+  logAudit('hapus_semua_pesanan', 'Hapus SEMUA pesanan web ('+n+' baris).');
   return { count:n };
 }
 

@@ -60,7 +60,7 @@
   <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=112"></script>
+<script type="module" src="core-omaopa.js?v=113"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
@@ -117,7 +117,7 @@
     panel.innerHTML='<div class="muted">Memeriksa akses…</div>';
     try{ info=await window.OmaOpa.getStaffInfo(); }catch(e){ info=null; }
     if(!info){ roleBadge.textContent='—'; panel.innerHTML='<div class="muted" style="color:#C0392B;font-weight:900">Akun ini bukan staff.</div><div class="uid"></div><button class="btn sec" id="o" style="margin-top:10px">Keluar</button>'; document.getElementById('o').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} }; return; }
-    info.admin = !!(info.admin || info.super);
+    info.admin = !!(info.admin || info.master);
     roleBadge.textContent = info.admin ? 'ADMIN' : 'STAFF';
     roleBadge.className = 'badge'+(info.admin?' adm':'');
     renderShell();
@@ -211,9 +211,9 @@
     var opt={ rows:rows, msOf:function(x){return x.ts;}, mode:st.mode, period:st.period, perLabel:'transaksi',
       metaOf:function(g){ var o=0; g.list.forEach(function(x){o+=(x.nominal||0);}); return rp(o); },
       stats:[{v:rows.length,k:'TRANSAKSI'},{v:rp(omzet),k:'OMZET'},{v:poin,k:'POIN'}],
-      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Member'},{t:'Nominal',r:1},{t:'Poin',r:1}].concat(info.super?[{t:''}]:[]),
+      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Member'},{t:'Nominal',r:1},{t:'Poin',r:1}].concat(info.master?[{t:''}]:[]),
       detailRow:function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.name||(x.uid?x.uid.slice(0,6):'-'))+'</td><td class="right">'+rp(x.nominal)+'</td><td class="right">+'+(x.points||0)+'</td>'+delCell('txn',x.id)+'</tr>'; },
-      detailFoot:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.nominal||0);p+=(x.points||0);}); return '<tr style="font-weight:900"><td colspan="3">SUBTOTAL</td><td class="right">'+rp(o)+'</td><td class="right">+'+p+'</td>'+(info.super?'<td></td>':'')+'</tr>'; },
+      detailFoot:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.nominal||0);p+=(x.points||0);}); return '<tr style="font-weight:900"><td colspan="3">SUBTOTAL</td><td class="right">'+rp(o)+'</td><td class="right">+'+p+'</td>'+(info.master?'<td></td>':'')+'</tr>'; },
       summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Trx',r:1},{t:'Omzet',r:1},{t:'Poin',r:1}],
       summaryRow:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.nominal||0);p+=(x.points||0);}); return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td><td class="right">'+rp(o)+'</td><td class="right">+'+p+'</td></tr>'; },
       summaryFoot:function(){ return '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+rp(omzet)+'</td><td class="right">+'+poin+'</td></tr>'; }
@@ -225,7 +225,7 @@
     if(!rows.length){ body.innerHTML=emptyBox('',st)+'<div class="empty">Belum ada voucher terpakai pada rentang & outlet ini.</div>'; wireG(body); return; }
     var opt={ rows:rows, msOf:function(x){return x.ts;}, mode:st.mode, period:st.period, perLabel:'voucher',
       stats:[{v:rows.length,k:'VOUCHER TERPAKAI'}],
-      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Kode'},{t:'Voucher'},{t:'Member'}].concat(info.super?[{t:''}]:[]),
+      detailHead:[{t:'Waktu'},{t:'Outlet'},{t:'Kode'},{t:'Voucher'},{t:'Member'}].concat(info.master?[{t:''}]:[]),
       detailRow:function(x){ return '<tr><td>'+fmt(x.ts)+'</td><td>'+esc(x.outlet||'-')+'</td><td>'+esc(x.code||'-')+'</td><td>'+esc(x.title||'-')+'</td><td>'+esc(x.name||'-')+'</td>'+delCell('vou',x.code)+'</tr>'; },
       summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Voucher',r:1}],
       summaryRow:function(g){ return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td></tr>'; },
@@ -244,7 +244,7 @@
     var basis='<div style="display:flex;gap:7px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><span class="muted" style="font-size:.72rem;font-weight:800">Hitung per:</span>'
       +'<button class="btn sm'+(st.basis==='ambil'?'':' sec')+'" data-basis="ambil" style="width:auto;margin:0">📅 Tanggal ambil</button>'
       +'<button class="btn sm'+(st.basis==='pesan'?'':' sec')+'" data-basis="pesan" style="width:auto;margin:0">🧾 Tanggal pesan</button></div>';
-    var delBtn = info.super ? '<button class="btn" id="ordClear" style="background:#C0392B;color:#fff;box-shadow:0 3px 0 #97271b;margin-top:16px">🗑️ Hapus semua rekap pesanan (bersihkan uji coba)</button>' : '';
+    var delBtn = '';
     var basisLabel = st.basis==='ambil' ? 'tanggal pengambilan' : 'tanggal order masuk';
     var note='<div class="muted" style="font-size:.7rem;margin:6px 0 0">Dihitung per <b>'+basisLabel+'</b> · hanya pesanan ter-<b>approve</b>.</div>';
     if(!rows.length){ body.innerHTML=emptyBox(basis,st)+'<div class="empty">Belum ada pesanan deal pada rentang & outlet ini.</div>'+delBtn; wireG(body); return; }
@@ -252,16 +252,16 @@
     var opt={ rows:rows, msOf:ordMs, mode:st.mode, period:st.period, perLabel:'order', extraFilter:basis,
       metaOf:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return rp(o); },
       stats:[{v:rows.length,k:'ORDER DEAL'},{v:rp(omzet),k:'OMZET'},{v:pcs,k:'TOTAL PCS'}],
-      detailHead:[{t:'Tgl pesan'},{t:'Tgl ambil'},{t:'Outlet'},{t:'Nama'},{t:'Item'},{t:'Total',r:1}].concat(info.super?[{t:''}]:[]),
+      detailHead:[{t:'Tgl pesan'},{t:'Tgl ambil'},{t:'Outlet'},{t:'Nama'},{t:'Item'},{t:'Total',r:1}].concat(info.master?[{t:''}]:[]),
       detailRow:function(o){ var IL=(window.OmaOpa&&window.OmaOpa.itemLabel)||function(it){return (it.cat?it.cat+' – ':'')+(it.name||it.id||'');}; var itlbl=(o.items||[]).map(function(it){return it.qty+'x '+IL(it);}).join(', '); var jam=o.jam?(' '+o.jam):''; return '<tr><td>'+esc(fmt(o.ts))+'</td><td>'+esc(dShort(o.tgl)+jam)+'</td><td>'+esc(o.outlet||'-')+'</td><td>'+esc(o.nama||'-')+'</td><td>'+esc(itlbl||'-')+'</td><td class="right">'+rp(o.total)+'</td>'+delCell('ord',o.id)+'</tr>'; },
-      detailFoot:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return '<tr style="font-weight:900"><td colspan="5">SUBTOTAL</td><td class="right">'+rp(o)+'</td>'+(info.super?'<td></td>':'')+'</tr>'; },
+      detailFoot:function(g){ var o=0; g.list.forEach(function(x){o+=(x.total||0);}); return '<tr style="font-weight:900"><td colspan="5">SUBTOTAL</td><td class="right">'+rp(o)+'</td>'+(info.master?'<td></td>':'')+'</tr>'; },
       summaryHead:[{t:(st.mode==='bulanan'?'Bulan':'Tanggal')},{t:'Order',r:1},{t:'Pcs',r:1},{t:'Omzet',r:1}],
       summaryRow:function(g){ var o=0,p=0; g.list.forEach(function(x){o+=(x.total||0);p+=ordPcs(x);}); return '<tr data-period="'+esc(g.k)+'" style="cursor:pointer"><td>'+esc(g.label)+' ›</td><td class="right">'+g.list.length+'</td><td class="right">'+p+'</td><td class="right">'+rp(o)+'</td></tr>'; },
       summaryFoot:function(){ return '<tr style="font-weight:900"><td>TOTAL</td><td class="right">'+rows.length+'</td><td class="right">'+pcs+'</td><td class="right">'+rp(omzet)+'</td></tr>'; }
     };
     body.innerHTML=buildGrouped(opt)+note+delBtn; st.period=opt.period; wireG(body);
   }
-  function delCell(type, id){ if(!info.super) return ''; return '<td style="text-align:center"><button data-del="'+type+'" data-id="'+esc(String(id||''))+'" title="Hapus baris ini" style="background:#fff;border:1.5px solid #E8B4B4;color:#C0392B;border-radius:8px;padding:3px 8px;font-weight:800;cursor:pointer">🗑</button></td>'; }
+  function delCell(type, id){ if(!info || !info.master) return ''; return '<td style="text-align:center"><button data-del="'+type+'" data-id="'+esc(String(id||''))+'" title="Hapus baris ini" style="background:#fff;border:1.5px solid #E8B4B4;color:#C0392B;border-radius:8px;padding:3px 8px;font-weight:800;cursor:pointer">🗑</button></td>'; }
   function delOne(type, id){
     var label = type==='ord' ? 'pesanan' : (type==='txn' ? 'transaksi' : 'voucher terpakai');
     var extra = type==='txn' ? '\n\n(Catatan: poin yang sudah diberikan ke member TIDAK otomatis ditarik kembali.)' : '';
@@ -279,16 +279,6 @@
     var ps=body.querySelector('#periodSel'); if(ps) ps.onchange=function(){ st.period=ps.value; render(); };
     body.querySelectorAll('[data-period]').forEach(function(r){ r.onclick=function(){ st.period=r.getAttribute('data-period'); render(); }; });
     body.querySelectorAll('[data-basis]').forEach(function(t){ t.onclick=function(){ view.ord.basis=t.getAttribute('data-basis'); view.ord.period=''; render(); }; });
-    var oc=body.querySelector('#ordClear');
-    if(oc) oc.onclick=function(){
-      if(!confirm('Hapus SEMUA rekap pesanan web? Tindakan ini permanen dan tidak bisa dibatalkan.')) return;
-      if(prompt('Ketik HAPUS untuk konfirmasi:')!=='HAPUS') return;
-      oc.disabled=true; oc.textContent='Menghapus…';
-      Promise.resolve().then(function(){ return window.OmaOpa.adminClearOrders(); })
-        .then(function(r){ alert((r&&r.count||0)+' pesanan dihapus.'); view.ord.period=''; return loadData(); })
-        .then(function(){ render(); })
-        .catch(function(e){ alert((e&&e.message)||'Gagal'); oc.disabled=false; oc.textContent='🗑️ Hapus semua rekap pesanan (bersihkan uji coba)'; });
-    };
   }
   function csvCell(s){ s=String(s==null?'':s); return '"'+s.replace(/"/g,'""')+'"'; }
   function inPeriod(ms, st){ if(!st.period) return true; var p=pkl(ms,st.mode); return p.k===st.period; }

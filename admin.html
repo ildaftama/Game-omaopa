@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=112"></script>
+<script type="module" src="core-omaopa.js?v=113"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -156,7 +156,22 @@
     var leg=ent.map(function(e,i){ return '<div class="lg" data-segf="'+esc(field||'')+'" data-segv="'+esc(e.k)+'" style="cursor:pointer"><span class="dot" style="background:'+PAL[i%PAL.length]+'"></span>'+esc(e.k)+' <b>'+e.v+'</b> ('+Math.round(e.v/total*100)+'%) ›</div>'; }).join('');
     return '<div class="chart"><div class="chart-h">'+esc(title)+'</div><div class="chart-b"><div>'+svg+'</div><div class="legend">'+leg+'</div></div></div>';
   }
-  function tally(arr, key){ var m={}; arr.forEach(function(x){ var v=(x[key]||'').toString().trim()||'Tidak diisi'; m[v]=(m[v]||0)+1; }); return m; }
+  function normOcc(raw){
+    var v=(raw||'').toString().trim().toLowerCase();
+    if(!v) return 'Lainnya';
+    if(/mahasiswa|\bmhs\b/.test(v)) return 'Mahasiswa';
+    if(/pelajar|\bsiswa\b/.test(v)) return 'Pelajar';
+    if(/ibu rumah tangga|\birt\b/.test(v)) return 'Ibu Rumah Tangga';
+    if(/\bguru\b/.test(v)) return 'Guru';
+    if(/\bpns\b|\basn\b|\bpppk\b|\bpolri\b|\btni\b/.test(v)) return 'PNS/ASN/PPPK';
+    if(/pengusaha|wiraswasta|pedagang|\bowner\b/.test(v)) return 'Wiraswasta/Pengusaha';
+    if(/\bburuh\b/.test(v)) return 'Buruh';
+    if(/pensiun/.test(v)) return 'Pensiun';
+    if(/tidak diisi|^lainnya$|^other$|^-$|^\.$/.test(v)) return 'Lainnya';
+    if(/karyawan|swasta|kasir|admin|staff|pegawai|therapist|terapis|tutor|garment|\bspg\b|pegadaian|gizi|perias|marketing|toko/.test(v)) return 'Karyawan Swasta';
+    return 'Lainnya';
+  }
+  function tally(arr, key, mapper){ var m={}; arr.forEach(function(x){ var raw=(x[key]||'').toString().trim(); var v=mapper?mapper(raw):(raw||'Tidak diisi'); m[v]=(m[v]||0)+1; }); return m; }
 
   /* ---------- RINGKASAN ---------- */
   async function renderHome(){
@@ -179,7 +194,7 @@
       +'<div class="kpi"><div class="v">'+num(vou.length)+'</div><div class="l">Voucher dipakai</div></div>'
       +'<div class="kpi"><div class="v">'+num(txn.length)+'</div><div class="l">Total transaksi</div></div>'
       +'</div>';
-    html+='<div class="card"><div class="muted" style="margin-bottom:2px;font-size:.74rem">Ketuk legenda untuk lihat membernya 👇</div>'+donut('Umur member', tally(mem,'age'),'age')+donut('Jenis kelamin', tally(mem,'gender'),'gender')+donut('Pekerjaan', tally(mem,'occupation'),'occupation')+donut('Tier member', tierCnt,'')+'</div>';
+    html+='<div class="card"><div class="muted" style="margin-bottom:2px;font-size:.74rem">Ketuk legenda untuk lihat membernya 👇</div>'+donut('Umur member', tally(mem,'age'),'age')+donut('Jenis kelamin', tally(mem,'gender'),'gender')+donut('Pekerjaan', tally(mem,'occupation',normOcc),'occupation')+donut('Tier member', tierCnt,'')+'</div>';
     html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=62">Buka Halaman Rekap →</a></div>';
     tabEl.innerHTML=html;
     var _hpl=document.getElementById('homePromoLink'); if(_hpl) _hpl.onclick=function(e){ e.preventDefault(); setActiveTab('promo'); render(); };
@@ -198,23 +213,28 @@
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="auPer"><button class="btn sm sec aup" data-m="1">1 bulan</button><button class="btn sm sec aup" data-m="2">2 bulan</button><button class="btn sm sec aup" data-m="3">3 bulan</button><button class="btn sm sec aup" data-m="6">6 bulan</button><button class="btn sm sec aup" data-m="12">12 bulan</button></div>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:.8rem"><input type="date" id="auFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="auTo" style="flex:1;min-width:0"><button class="btn sm" id="auGo">OK</button></div>'
       +'<div id="auWrap" class="muted">Pilih periode di atas untuk melihat riwayat tindakan.</div></div>'
-      +(masterEdit?('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya</div>'
-        +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan tanggal untuk reset <b>SEMUA</b> poin member ke 0 (termasuk poin game & check-in). Isi rentang tanggal untuk <b>hanya mengurangi</b> poin yang didapat dari transaksi pada periode itu saja (saldo di luar periode tidak disentuh). <b>Tidak bisa dibatalkan.</b></div>'
-        +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="rsFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="rsTo" style="flex:1;min-width:0"></div>'
-        +'<label style="display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:.84rem;font-weight:700;color:#8a6a3a"><input type="checkbox" id="rsScores" style="width:auto"> Reset juga skor game & streak check-in (hanya berlaku kalau tanggal dikosongkan)</label>'
-        +'<button class="btn red" id="rsBtn">Reset / kurangi poin</button><div id="rsMsg"></div>'
-        +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
-        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>transaksi kasir</b> (termasuk penyesuaian poin admin). Kosongkan tanggal untuk hapus SEMUA, atau isi rentang untuk hapus periode tertentu saja. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="txFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="txTo" style="flex:1;min-width:0"></div>'
-        +'<button class="btn red" id="txBtn">Hapus transaksi</button><div id="txMsg"></div>'
-        +'<div style="border-top:1px dashed #E7C9C9;margin:14px 0 10px"></div>'
-        +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Hapus <b>voucher yang sudah terpakai</b> (membersihkan riwayat penukaran, berdasarkan tanggal dipakai). Kosongkan tanggal untuk hapus SEMUA. Voucher yang masih aktif tidak terhapus. <b>Tidak bisa dibatalkan.</b></div>'
-        +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:.8rem"><input type="date" id="vcFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="vcTo" style="flex:1;min-width:0"></div>'
-        +'<button class="btn red" id="vcBtn">Hapus voucher terpakai</button><div id="vcMsg"></div></div>'
-        +'<div class="card"><div class="nm">🗑️ Hapus transaksi detail (pilih sendiri)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Cari & pilih transaksi tertentu untuk dihapus — tidak perlu hapus semua sekaligus.</div>'
+      +(masterEdit?('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya — Hapus data (khusus Master)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Semua tindakan di bawah ini <b>permanen & tidak bisa dibatalkan</b>. Pilih data satu per satu (centang), atau cari berdasarkan rentang tanggal lalu pilih semua hasilnya.</div>'
+        +'<div class="nm" style="margin-top:4px">🗑️ 1. Hapus transaksi kasir</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Cari & pilih transaksi tertentu untuk dihapus.</div>'
         +'<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="dtOutlet" placeholder="Filter outlet (opsional)" style="flex:1;min-width:140px"><input type="date" id="dtFrom" style="flex:1;min-width:120px"><input type="date" id="dtTo" style="flex:1;min-width:120px"></div>'
         +'<button class="btn sec" id="dtSearch" style="margin-top:8px">Cari transaksi</button>'
-        +'<div id="dtList" class="muted" style="margin-top:10px"></div></div>')
+        +'<div id="dtList" class="muted" style="margin-top:10px"></div>'
+        +'<div style="border-top:1px dashed #E7C9C9;margin:16px 0 10px"></div>'
+        +'<div class="nm">🗑️ 2. Hapus member</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Cari nama/HP, atau cari berdasarkan tanggal daftar. Menghapus akun member permanen (login + data + poin).</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="dmQ" placeholder="Nama / No. HP (opsional)" style="flex:1;min-width:140px"><input type="date" id="dmFrom" style="flex:1;min-width:120px"><input type="date" id="dmTo" style="flex:1;min-width:120px"></div>'
+        +'<div class="muted" style="font-size:.72rem;margin:4px 0">Tanggal di atas = tanggal daftar member.</div>'
+        +'<button class="btn sec" id="dmSearch">Cari member</button>'
+        +'<div id="dmList" class="muted" style="margin-top:10px"></div>'
+        +'<div style="border-top:1px dashed #E7C9C9;margin:16px 0 10px"></div>'
+        +'<div class="nm">🗑️ 3. Hapus pesanan web</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Cari & pilih pesanan web (order) tertentu untuk dihapus.</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="doOutlet" placeholder="Filter outlet (opsional)" style="flex:1;min-width:140px"><input type="date" id="doFrom" style="flex:1;min-width:120px"><input type="date" id="doTo" style="flex:1;min-width:120px"></div>'
+        +'<button class="btn sec" id="doSearch" style="margin-top:8px">Cari pesanan</button>'
+        +'<div id="doList" class="muted" style="margin-top:10px"></div>'
+        +'<div style="border-top:1px dashed #E7C9C9;margin:16px 0 10px"></div>'
+        +'<div class="nm">🗑️ 4. Hapus voucher terpakai</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Cari & pilih voucher yang sudah dipakai untuk dihapus dari riwayat (voucher yang masih aktif tidak akan tersentuh).</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="dvQ" placeholder="Nama member / kode (opsional)" style="flex:1;min-width:140px"><input type="date" id="dvFrom" style="flex:1;min-width:120px"><input type="date" id="dvTo" style="flex:1;min-width:120px"></div>'
+        +'<div class="muted" style="font-size:.72rem;margin:4px 0">Tanggal di atas = tanggal voucher dipakai.</div>'
+        +'<button class="btn sec" id="dvSearch">Cari voucher</button>'
+        +'<div id="dvList" class="muted" style="margin-top:10px"></div></div>')
       :'<div class="card"><div class="muted" style="font-size:.82rem">🔒 Zona berbahaya (hapus data) khusus <b>Master</b>. Admin Utama tidak bisa menghapus data — biar rekap aman.</div></div>');
     loadMessages();
     var _dts=document.getElementById('dtSearch'); if(_dts) _dts.onclick=loadDetailTx;
@@ -247,9 +267,115 @@
         catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false;
       };
     }
+    var _dms=document.getElementById('dmSearch'); if(_dms) _dms.onclick=loadDetailMem;
+    async function loadDetailMem(){
+      var box=document.getElementById('dmList'); if(!box) return; box.innerHTML='<div class="muted">Mencari…</div>';
+      var q=(document.getElementById('dmQ').value||'').trim().toLowerCase();
+      var from=document.getElementById('dmFrom').value, to=document.getElementById('dmTo').value;
+      var arr=[]; try{ arr=await O.listMembers('',6000); }catch(e){}
+      if(q){ arr=arr.filter(function(m){ return (m.name||'').toLowerCase().indexOf(q)>=0 || (m.phone||'').indexOf(q)>=0; }); }
+      if(from){ var fT=new Date(from+'T00:00:00').getTime(); arr=arr.filter(function(m){return (m.createdAt||0)>=fT;}); }
+      if(to){ var tT=new Date(to+'T23:59:59').getTime(); arr=arr.filter(function(m){return (m.createdAt||0)<=tT;}); }
+      if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada member cocok.</div>'; return; }
+      var LIMIT=200; var shown=arr.slice(0,LIMIT);
+      function fmtD(ts){ if(!ts) return '-'; return new Date(ts).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}); }
+      var h='<div class="muted" style="margin-bottom:6px">'+arr.length+' member cocok'+(arr.length>LIMIT?(' (tampil '+LIMIT+')'):'')+'. Centang yang mau dihapus:</div>'
+        +'<div style="max-height:340px;overflow:auto;border:1px solid #EFE2C4;border-radius:10px;padding:6px 8px">'
+        +shown.map(function(m){ return '<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 2px;border-bottom:1px solid #F5EEDD;font-size:.82rem"><input type="checkbox" class="dmChk" value="'+esc(m.uid)+'" style="width:auto;margin-top:2px"><span><b>'+esc(m.name||'(tanpa nama)')+'</b> · '+esc(m.phone||'-')+' · '+m.points+' poin · <span style="color:#9a7a5e">daftar '+fmtD(m.createdAt)+'</span></span></label>'; }).join('')
+        +'</div>'
+        +'<div style="display:flex;gap:8px;margin-top:10px;align-items:center"><button class="btn sm sec" id="dmAll">Pilih semua</button><button class="btn sm red" id="dmDel">Hapus yang dicentang</button><span id="dmCount" class="muted" style="font-size:.78rem"></span></div><div id="dmMsg"></div>';
+      box.innerHTML=h;
+      function updCount(){ var n=box.querySelectorAll('.dmChk:checked').length; document.getElementById('dmCount').textContent = n?(n+' dipilih'):''; }
+      box.querySelectorAll('.dmChk').forEach(function(c){ c.onchange=updCount; });
+      document.getElementById('dmAll').onclick=function(){ var all=box.querySelectorAll('.dmChk'); var allOn=Array.prototype.every.call(all,function(c){return c.checked;}); all.forEach(function(c){ c.checked=!allOn; }); updCount(); };
+      document.getElementById('dmDel').onclick=async function(){
+        var ids=Array.prototype.map.call(box.querySelectorAll('.dmChk:checked'), function(c){return c.value;});
+        var m=document.getElementById('dmMsg');
+        if(!ids.length){ m.innerHTML='<div class="res bad">Belum ada yang dicentang.</div>'; return; }
+        if(!confirm('Hapus '+ids.length+' akun member terpilih? Poin & login mereka akan hilang PERMANEN. Tidak bisa dibatalkan.')) return;
+        if(busy) return; busy=true; var ok=0, fail=0;
+        for(var i=0;i<ids.length;i++){
+          m.innerHTML='<div class="muted" style="margin-top:8px">Menghapus '+(i+1)+'/'+ids.length+'…</div>';
+          try{ await O.adminDeleteMember(ids[i]); ok++; }catch(e){ fail++; }
+        }
+        MEMBERS=null;
+        m.innerHTML='<div class="res '+(fail?'bad':'ok')+'">'+(fail? ('Selesai: '+ok+' terhapus, '+fail+' gagal.') : ('✓ '+ok+' member dihapus.'))+'</div>';
+        busy=false; loadDetailMem();
+      };
+    }
+    var _dos=document.getElementById('doSearch'); if(_dos) _dos.onclick=loadDetailOrd;
+    async function loadDetailOrd(){
+      var box=document.getElementById('doList'); if(!box) return; box.innerHTML='<div class="muted">Mencari…</div>';
+      var outlet=(document.getElementById('doOutlet').value||'').trim().toLowerCase();
+      var from=document.getElementById('doFrom').value, to=document.getElementById('doTo').value;
+      var arr=[]; try{ arr=await O.listOrders(2000); }catch(e){}
+      if(outlet){ arr=arr.filter(function(o){ return (o.outlet||'').toLowerCase().indexOf(outlet)>=0; }); }
+      if(from){ var fT=new Date(from+'T00:00:00').getTime(); arr=arr.filter(function(o){return o.ts>=fT;}); }
+      if(to){ var tT=new Date(to+'T23:59:59').getTime(); arr=arr.filter(function(o){return o.ts<=tT;}); }
+      if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada pesanan cocok.</div>'; return; }
+      var LIMIT=200; var shown=arr.slice(0,LIMIT);
+      function fmtT(ts){ if(!ts) return '-'; var d=new Date(ts); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}); }
+      var h='<div class="muted" style="margin-bottom:6px">'+arr.length+' pesanan cocok'+(arr.length>LIMIT?(' (tampil '+LIMIT+')'):'')+'. Centang yang mau dihapus:</div>'
+        +'<div style="max-height:340px;overflow:auto;border:1px solid #EFE2C4;border-radius:10px;padding:6px 8px">'
+        +shown.map(function(o){ return '<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 2px;border-bottom:1px solid #F5EEDD;font-size:.82rem"><input type="checkbox" class="doChk" value="'+esc(o.id)+'" style="width:auto;margin-top:2px"><span><b>'+esc(o.nama||'?')+'</b> · '+esc(o.outlet||'-')+' · Rp'+num(o.total||0)+' · <span style="color:#8a6a3a">'+esc(o.status||'')+'</span> · <span style="color:#9a7a5e">'+fmtT(o.ts)+'</span></span></label>'; }).join('')
+        +'</div>'
+        +'<div style="display:flex;gap:8px;margin-top:10px;align-items:center"><button class="btn sm sec" id="doAll">Pilih semua</button><button class="btn sm red" id="doDel">Hapus yang dicentang</button><span id="doCount" class="muted" style="font-size:.78rem"></span></div><div id="doMsg"></div>';
+      box.innerHTML=h;
+      function updCount(){ var n=box.querySelectorAll('.doChk:checked').length; document.getElementById('doCount').textContent = n?(n+' dipilih'):''; }
+      box.querySelectorAll('.doChk').forEach(function(c){ c.onchange=updCount; });
+      document.getElementById('doAll').onclick=function(){ var all=box.querySelectorAll('.doChk'); var allOn=Array.prototype.every.call(all,function(c){return c.checked;}); all.forEach(function(c){ c.checked=!allOn; }); updCount(); };
+      document.getElementById('doDel').onclick=async function(){
+        var ids=Array.prototype.map.call(box.querySelectorAll('.doChk:checked'), function(c){return c.value;});
+        var m=document.getElementById('doMsg');
+        if(!ids.length){ m.innerHTML='<div class="res bad">Belum ada yang dicentang.</div>'; return; }
+        if(!confirm('Hapus '+ids.length+' pesanan terpilih? Tidak bisa dibatalkan.')) return;
+        if(busy) return; busy=true; var ok=0, fail=0;
+        for(var i=0;i<ids.length;i++){
+          m.innerHTML='<div class="muted" style="margin-top:8px">Menghapus '+(i+1)+'/'+ids.length+'…</div>';
+          try{ await O.deleteOrder(ids[i]); ok++; }catch(e){ fail++; }
+        }
+        m.innerHTML='<div class="res '+(fail?'bad':'ok')+'">'+(fail? ('Selesai: '+ok+' terhapus, '+fail+' gagal.') : ('✓ '+ok+' pesanan dihapus.'))+'</div>';
+        busy=false; loadDetailOrd();
+      };
+    }
+    var _dvs=document.getElementById('dvSearch'); if(_dvs) _dvs.onclick=loadDetailVou;
+    async function loadDetailVou(){
+      var box=document.getElementById('dvList'); if(!box) return; box.innerHTML='<div class="muted">Mencari…</div>';
+      var q=(document.getElementById('dvQ').value||'').trim().toLowerCase();
+      var from=document.getElementById('dvFrom').value, to=document.getElementById('dvTo').value;
+      var arr=[]; try{ arr=await O.listUsedVouchers(''); }catch(e){}
+      if(q){ arr=arr.filter(function(v){ return (v.name||'').toLowerCase().indexOf(q)>=0 || (v.code||'').toLowerCase().indexOf(q)>=0; }); }
+      if(from){ var fT=new Date(from+'T00:00:00').getTime(); arr=arr.filter(function(v){return v.ts>=fT;}); }
+      if(to){ var tT=new Date(to+'T23:59:59').getTime(); arr=arr.filter(function(v){return v.ts<=tT;}); }
+      if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada voucher terpakai yang cocok.</div>'; return; }
+      var LIMIT=200; var shown=arr.slice(0,LIMIT);
+      function fmtT(ts){ if(!ts) return '-'; var d=new Date(ts); return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}); }
+      var h='<div class="muted" style="margin-bottom:6px">'+arr.length+' voucher cocok'+(arr.length>LIMIT?(' (tampil '+LIMIT+')'):'')+'. Centang yang mau dihapus:</div>'
+        +'<div style="max-height:340px;overflow:auto;border:1px solid #EFE2C4;border-radius:10px;padding:6px 8px">'
+        +shown.map(function(v){ return '<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 2px;border-bottom:1px solid #F5EEDD;font-size:.82rem"><input type="checkbox" class="dvChk" value="'+esc(v.code)+'" style="width:auto;margin-top:2px"><span><b>'+esc(v.name||'?')+'</b> · '+esc(v.title||v.code)+' · <span style="color:#8a6a3a">'+esc(v.outlet||'-')+'</span> · <span style="color:#9a7a5e">'+fmtT(v.ts)+'</span></span></label>'; }).join('')
+        +'</div>'
+        +'<div style="display:flex;gap:8px;margin-top:10px;align-items:center"><button class="btn sm sec" id="dvAll">Pilih semua</button><button class="btn sm red" id="dvDel">Hapus yang dicentang</button><span id="dvCount" class="muted" style="font-size:.78rem"></span></div><div id="dvMsg"></div>';
+      box.innerHTML=h;
+      function updCount(){ var n=box.querySelectorAll('.dvChk:checked').length; document.getElementById('dvCount').textContent = n?(n+' dipilih'):''; }
+      box.querySelectorAll('.dvChk').forEach(function(c){ c.onchange=updCount; });
+      document.getElementById('dvAll').onclick=function(){ var all=box.querySelectorAll('.dvChk'); var allOn=Array.prototype.every.call(all,function(c){return c.checked;}); all.forEach(function(c){ c.checked=!allOn; }); updCount(); };
+      document.getElementById('dvDel').onclick=async function(){
+        var ids=Array.prototype.map.call(box.querySelectorAll('.dvChk:checked'), function(c){return c.value;});
+        var m=document.getElementById('dvMsg');
+        if(!ids.length){ m.innerHTML='<div class="res bad">Belum ada yang dicentang.</div>'; return; }
+        if(!confirm('Hapus '+ids.length+' voucher terpilih dari riwayat? Tidak bisa dibatalkan.')) return;
+        if(busy) return; busy=true; var ok=0, fail=0;
+        for(var i=0;i<ids.length;i++){
+          m.innerHTML='<div class="muted" style="margin-top:8px">Menghapus '+(i+1)+'/'+ids.length+'…</div>';
+          try{ await O.deleteVoucherRec(ids[i]); ok++; }catch(e){ fail++; }
+        }
+        m.innerHTML='<div class="res '+(fail?'bad':'ok')+'">'+(fail? ('Selesai: '+ok+' terhapus, '+fail+' gagal.') : ('✓ '+ok+' voucher dihapus.'))+'</div>';
+        busy=false; loadDetailVou();
+      };
+    }
     async function loadAuditLog(from, to){
       var w=document.getElementById('auWrap'); if(!w) return; w.classList.remove('muted'); w.innerHTML='<div class="muted">Memuat…</div>';
-      var LBL={adjust_poin:'🔧 Adjust poin', reset_semua_poin:'⚠️ Reset semua poin', reset_poin_periode:'⚠️ Kurangi poin (periode)', hapus_semua_transaksi:'⚠️ Hapus transaksi', hapus_transaksi:'🗑️ Hapus transaksi', hapus_voucher_terpakai:'⚠️ Hapus voucher terpakai', hapus_member:'⚠️ Hapus member', reset_pin:'🔑 Reset PIN', tambah_staff:'👤 Tambah staff', ubah_peran_staff:'👤 Ubah peran staff', cabut_staff:'👤 Cabut staff', ubah_pesan_wa:'💬 Ubah pesan WA', pasang_promo:'📣 Pasang promo', upload_banner:'🖼️ Upload banner', hapus_banner:'🖼️ Hapus banner'};
+      var LBL={adjust_poin:'🔧 Adjust poin', reset_semua_poin:'⚠️ Reset semua poin', reset_poin_periode:'⚠️ Kurangi poin (periode)', hapus_semua_transaksi:'⚠️ Hapus transaksi', hapus_transaksi:'🗑️ Hapus transaksi', hapus_voucher_terpakai:'⚠️ Hapus voucher terpakai', hapus_voucher:'🗑️ Hapus voucher', hapus_pesanan:'🗑️ Hapus pesanan web', hapus_member:'⚠️ Hapus member', reset_pin:'🔑 Reset PIN', tambah_staff:'👤 Tambah staff', ubah_peran_staff:'👤 Ubah peran staff', cabut_staff:'👤 Cabut staff', ubah_pesan_wa:'💬 Ubah pesan WA', pasang_promo:'📣 Pasang promo', upload_banner:'🖼️ Upload banner', hapus_banner:'🖼️ Hapus banner'};
       var arr=[]; try{ arr=await O.listAudit({limit:150, from:from||'', to:to||''}); }catch(e){}
       if(!arr.length){ w.innerHTML='<div class="muted">Tidak ada tindakan tercatat pada periode ini.</div>'; return; }
       var PAGE=25, shown=0;
@@ -269,37 +395,6 @@
     var _auFrom='', _auTo='';
     var aup=document.querySelectorAll('#auPer .aup'); Array.prototype.forEach.call(aup,function(b){ b.onclick=function(){ Array.prototype.forEach.call(aup,function(x){ x.className='btn sm sec aup'; }); b.className='btn sm aup'; var d=new Date(); d.setMonth(d.getMonth()-Number(b.dataset.m)); _auFrom=d.toISOString().slice(0,10); _auTo=''; document.getElementById('auFrom').value=''; document.getElementById('auTo').value=''; loadAuditLog(_auFrom,_auTo); }; });
     var _aug=document.getElementById('auGo'); if(_aug) _aug.onclick=function(){ _auFrom=document.getElementById('auFrom').value; _auTo=document.getElementById('auTo').value; if(_auFrom||_auTo){ Array.prototype.forEach.call(aup,function(x){ x.className='btn sm sec aup'; }); loadAuditLog(_auFrom,_auTo); } };
-    var rb=document.getElementById('rsBtn'); if(rb) rb.onclick=async function(){
-      if(busy) return;
-      var rf=(document.getElementById('rsFrom')||{}).value||'', rt=(document.getElementById('rsTo')||{}).value||'';
-      var isRange = !!(rf||rt);
-      var msg1 = isRange ? ('Kurangi poin yang didapat dari transaksi periode '+(rf||'awal')+' s/d '+(rt||'sekarang')+'? (saldo di luar periode tidak disentuh)') : 'Yakin reset SEMUA poin member jadi 0? Tindakan ini TIDAK bisa dibatalkan.';
-      if(!confirm(msg1)) return;
-      if(!confirm('Sekali lagi \u2014 tindakan ini TIDAK bisa dibatalkan. Lanjutkan?')) return;
-      busy=true; var msg=document.getElementById('rsMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Memproses\u2026 (jangan tutup halaman)</div>';
-      try{ var r=await O.adminResetPoints({ scores: document.getElementById('rsScores').checked, from:rf, to:rt }); MEMBERS=null; TXN=null;
-        msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' member '+(isRange?'terdampak (poin dikurangi).':'di-reset ke 0 poin.')+'</div>'; }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
-    var tb=document.getElementById('txBtn'); if(tb) tb.onclick=async function(){
-      if(busy) return;
-      var tf=(document.getElementById('txFrom')||{}).value||'', tt=(document.getElementById('txTo')||{}).value||'';
-      var scope = (tf||tt) ? ('periode '+(tf||'awal')+' s/d '+(tt||'sekarang')) : 'SEMUA';
-      if(!confirm('Hapus transaksi kasir ('+scope+')? Tidak bisa dibatalkan.')) return;
-      if(!confirm('Sekali lagi \u2014 transaksi ('+scope+') akan hilang permanen. Lanjutkan?')) return;
-      busy=true; var msg=document.getElementById('txMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus\u2026 (jangan tutup halaman)</div>';
-      try{ var r=await O.adminClearTransactions({from:tf,to:tt}); TXN=null;
-        msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' transaksi dihapus.</div>'; }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
-    var vc=document.getElementById('vcBtn'); if(vc) vc.onclick=async function(){
-      if(busy) return;
-      var vf=(document.getElementById('vcFrom')||{}).value||'', vt=(document.getElementById('vcTo')||{}).value||'';
-      var vscope = (vf||vt) ? ('periode '+(vf||'awal')+' s/d '+(vt||'sekarang')) : 'SEMUA';
-      if(!confirm('Hapus voucher terpakai ('+vscope+')? Tidak bisa dibatalkan.')) return;
-      if(!confirm('Sekali lagi \u2014 voucher terpakai ('+vscope+') akan hilang permanen. Lanjutkan?')) return;
-      busy=true; var msg=document.getElementById('vcMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menghapus\u2026 (jangan tutup halaman)</div>';
-      try{ var r=await O.adminClearUsedVouchers({from:vf,to:vt});
-        msg.innerHTML='<div class="res ok">\u2713 Selesai. '+r.count+' voucher terpakai dihapus.</div>'; }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
   }
   async function loadMessages(){
     var w=document.getElementById('msgWrap'); if(!w) return; w.classList.remove('muted');
@@ -489,7 +584,10 @@
   async function showSegment(seg){
     var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
     var mem=await getMembers(); var LM={age:'Umur',gender:'Jenis kelamin',occupation:'Pekerjaan'};
-    var match=mem.filter(function(m){ var v=(m[seg.field]||'').toString().trim()||'Tidak diisi'; return v===seg.value; });
+    var match=mem.filter(function(m){
+      if(seg.field==='occupation'){ return normOcc((m.occupation||'').toString().trim())===seg.value; }
+      var v=(m[seg.field]||'').toString().trim()||'Tidak diisi'; return v===seg.value;
+    });
     renderTable(box, match, match.length+' member · '+(LM[seg.field]||seg.field)+' = '+seg.value);
   }
   async function openMember(uid){
