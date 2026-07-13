@@ -13,7 +13,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, addDoc, onSnapshot, increment, serverTimestamp,
-  runTransaction, collection, getDocs, query, orderBy, where, limit, startAfter, documentId
+  runTransaction, collection, getDocs, getCountFromServer, query, orderBy, where, limit, startAfter, documentId
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -591,7 +591,7 @@ async function awardPoints(uid, nominal){
     if(!us.exists()) throw {message:'Member tidak ditemukan.'};
     const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||'';
     newTotal=cur+pts;
-    tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
+    tx.set(uref,{ points:newTotal, lastTxnAt:serverTimestamp(), updatedAt:serverTimestamp() },{merge:true});
     tx.set(doc(db,'leaderboard',uid), { name:mname, points:newTotal, updatedAt:serverTimestamp() }, {merge:true});
     const tref=doc(collection(db,'transactions'));
     tx.set(tref,{ uid:uid, name:mname, nominal:nominal, points:pts, outlet:outlet, staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
@@ -632,7 +632,9 @@ async function creditMember(uid, delta, info){
       const us=await tx.get(uref); if(!us.exists()) return;
       const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||'';
       newTotal=Math.max(0, cur+delta);
-      tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
+      const patch={ points:newTotal, updatedAt:serverTimestamp() };
+      if(kind==='order') patch.lastTxnAt=serverTimestamp(); // hanya transaksi belanja asli yang hitung "aktif"
+      tx.set(uref, patch, {merge:true});
       tx.set(doc(db,'leaderboard',uid), { name:mname, points:newTotal, updatedAt:serverTimestamp() },{merge:true});
       const tref=doc(collection(db,'transactions'));
       tx.set(tref,{ uid:uid, name:mname, nominal:nom, points:delta, outlet:out, kind:kind, staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
@@ -693,6 +695,33 @@ async function avgTransactionStats(fromMs, toMs){
   rows.sort((a,b)=>b.total-a.total);
   const totalCount=txs.length, totalNominal=txs.reduce((s,t)=>s+t.nominal,0);
   return { overall:{ avg: totalCount?Math.round(totalNominal/totalCount):0, count:totalCount, total:totalNominal }, byOutlet:rows };
+}
+async function memberOutletSummary(outletNames){
+  const cutoff=new Date(Date.now()-30*86400000);
+  const names=(outletNames||[]).slice(0,30);
+  try{
+    let total=0, active=0;
+    if(!names.length){
+      total=(await getCountFromServer(collection(db,'users'))).data().count;
+      active=(await getCountFromServer(query(collection(db,'users'), where('lastTxnAt','>=',cutoff)))).data().count;
+    } else {
+      total=(await getCountFromServer(query(collection(db,'users'), where('homeOutlet','in',names)))).data().count;
+      active=(await getCountFromServer(query(collection(db,'users'), where('homeOutlet','in',names), where('lastTxnAt','>=',cutoff)))).data().count;
+    }
+    return { total:total, active:active, ok:true };
+  }catch(e){ return { total:0, active:0, ok:false, error:(e&&e.message)||String(e) }; }
+}
+async function backfillLastTxnAt(){
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
+  let txs=[];
+  try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); if(x.kind!=='order' && x.kind) return; if(!x.uid) return; const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({uid:x.uid, ts:ts}); }); }catch(e){}
+  const last={}; txs.forEach(t=>{ if(!last[t.uid]||t.ts>last[t.uid]) last[t.uid]=t.ts; });
+  let n=0;
+  for(const uid of Object.keys(last)){
+    try{ await setDoc(doc(db,'users',uid), { lastTxnAt:new Date(last[uid]) }, {merge:true}); n++; }catch(e){}
+  }
+  logAudit('backfill_lasttxn', 'Migrasi lastTxnAt dari riwayat transaksi ('+n+' member terupdate).');
+  return { count:n };
 }
 async function repeatRateByOutlet(months){
   months = Math.max(1, Number(months)||1);
@@ -1572,7 +1601,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, backfillLastTxnAt, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,

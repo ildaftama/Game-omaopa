@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=113"></script>
+<script type="module" src="core-omaopa.js?v=114"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -209,6 +209,7 @@
   async function renderPengaturan(){
     if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
     tabEl.innerHTML='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
+      +(masterEdit?('<div class="card"><div class="nm">🔄 Migrasi status "aktif" member</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: hitung tanggal transaksi terakhir tiap member dari riwayat lama, biar filter "Member aktif (30 hari)" di tab Member langsung akurat (bukan nunggu transaksi baru). Aman dijalankan berkali-kali.</div><button class="btn sec" id="bfBtn">Jalankan migrasi</button><div id="bfMsg"></div></div>'):'')
       +'<div class="card"><div class="nm">📜 Rekap Audit (riwayat tindakan)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Catatan semua tindakan penting admin/master: adjust poin, hapus data, ubah promo/banner/pesan, ubah peran staff, dll — lengkap siapa & kapan.</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="auPer"><button class="btn sm sec aup" data-m="1">1 bulan</button><button class="btn sm sec aup" data-m="2">2 bulan</button><button class="btn sm sec aup" data-m="3">3 bulan</button><button class="btn sm sec aup" data-m="6">6 bulan</button><button class="btn sm sec aup" data-m="12">12 bulan</button></div>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:.8rem"><input type="date" id="auFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="auTo" style="flex:1;min-width:0"><button class="btn sm" id="auGo">OK</button></div>'
@@ -237,6 +238,13 @@
         +'<div id="dvList" class="muted" style="margin-top:10px"></div></div>')
       :'<div class="card"><div class="muted" style="font-size:.82rem">🔒 Zona berbahaya (hapus data) khusus <b>Master</b>. Admin Utama tidak bisa menghapus data — biar rekap aman.</div></div>');
     loadMessages();
+    var bf=document.getElementById('bfBtn'); if(bf) bf.onclick=async function(){
+      if(busy) return; if(!confirm('Jalankan migrasi status aktif? Ini membaca seluruh riwayat transaksi lama (sekali proses, aman).')) return;
+      busy=true; this.disabled=true; var m=document.getElementById('bfMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Memproses… (jangan tutup halaman, bisa makan waktu)</div>';
+      try{ var r=await O.backfillLastTxnAt(); m.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' member ter-update.</div>'; }
+      catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      busy=false; this.disabled=false;
+    };
     var _dts=document.getElementById('dtSearch'); if(_dts) _dts.onclick=loadDetailTx;
     async function loadDetailTx(){
       var box=document.getElementById('dtList'); if(!box) return; box.innerHTML='<div class="muted">Mencari…</div>';
@@ -483,7 +491,8 @@
       +'<option value="__area1">\ud83d\uddfa\ufe0f Area 1 \u00b7 Jogja\u00b7Klaten\u00b7Magelang</option>'
       +'<option value="__area2">\ud83d\uddfa\ufe0f Area 2 \u00b7 Solo Raya</option>'
       +'<option value="__area3">\ud83d\uddfa\ufe0f Area 3 \u00b7 Semarang</option>'
-      +'<option value="__kronggahan">\ud83c\udfe2 Kronggahan</option>';
+      +'<option value="__kronggahan">\ud83c\udfe2 Kronggahan</option>'
+      +'<optgroup label="\u2014 per outlet \u2014">'+(window.OMA_OUTLETS||[]).map(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,''); return '<option>'+esc(n)+'</option>'; }).join('')+'</optgroup>';
     var chip = seg ? '<div class="card"><div class="row" style="border:none;padding:0"><div class="grow"><span class="muted">Filter aktif:</span> <b>'+esc(LM[seg.field]||seg.field)+' = '+esc(seg.value)+'</b></div><button class="btn sm sec" id="segClr">\u2715 Hapus</button></div></div>' : '';
     tabEl.innerHTML=chip
       +'<div class="card"><div class="nm">Cari / lihat member</div>'
@@ -503,7 +512,7 @@
     tabEl.querySelectorAll('[data-inact]').forEach(function(b){ b.onclick=function(){ loadInactive(parseInt(b.getAttribute('data-inact'),10)); }; });
     var ab=document.getElementById('auditBtn'); if(ab) ab.onclick=loadAudit;
     document.getElementById('mfind').onclick=function(){ memSearch(document.getElementById('mq').value); };
-    var mo=document.getElementById('mOutlet'); if(mo) mo.onchange=function(){ var v=mo.value; if(v){ memByOutlet(v); } else { document.getElementById('mq').value=''; memReset(); loadMemberPage(); } };
+    var mo=document.getElementById('mOutlet'); if(mo) mo.onchange=function(){ var v=mo.value; if(v){ showOutletSummary(v); } else { document.getElementById('mq').value=''; memReset(); loadMemberPage(); } };
     document.getElementById('mq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ memSearch(e.target.value); } });
     document.getElementById('vfind').onclick=function(){ doVoucher(document.getElementById('vq').value.trim()); };
     if(seg){ var clr=document.getElementById('segClr'); if(clr) clr.onclick=function(){ segFilter=null; render(); }; showSegment(seg); }
@@ -514,6 +523,27 @@
   var _oam=null;
   async function ensureOam(){ if(_oam) return; _oam={}; var list=[]; try{ list=await O.listOutlets(); }catch(e){} if(!list||!list.length){ list=(window.OMA_OUTLETS||[]).slice(); } else { var seen={}; list.forEach(function(o){ seen[(o.name||'').toLowerCase().trim()]=1; }); (window.OMA_OUTLETS||[]).forEach(function(o){ if(!seen[(o.name||'').toLowerCase().trim()]) list.push(o); }); } list.forEach(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(n) _oam[n]=(o.area||'').toLowerCase(); }); }
   function outletGroup(homeOutlet){ var key=(homeOutlet||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(!key) return ''; var area=(_oam&&_oam[key])||''; var isYogya=area.indexOf('yogya')>=0; var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}) && key.indexOf('kyai mojo')<0; if(isYogya && !is5) return 'kronggahan'; if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1'; if(area.indexOf('solo')>=0) return 'area2'; if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3'; return ''; }
+  function outletNamesForSelection(sel){
+    var all=(window.OMA_OUTLETS||[]).map(function(o){ return (o.name||'').replace(/^Oma Opa Cakery\s*/i,''); }).filter(Boolean);
+    if(sel==='__metavest'){ return all.filter(function(n){ var g=outletGroup(n); return g==='area1'||g==='area2'||g==='area3'; }); }
+    if(sel==='__kronggahan'||sel==='__area1'||sel==='__area2'||sel==='__area3'){ var grp=sel.replace('__',''); return all.filter(function(n){ return outletGroup(n)===grp; }); }
+    return [sel];
+  }
+  async function showOutletSummary(sel){
+    var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='<div class="muted">Menghitung…</div>';
+    await ensureOam();
+    var names=outletNamesForSelection(sel);
+    var r={total:0,active:0,ok:false}; try{ r=await O.memberOutletSummary(names); }catch(e){}
+    var label = {__metavest:'Metavest (Area 1+2+3)', __kronggahan:'Kronggahan', __area1:'Area 1', __area2:'Area 2', __area3:'Area 3'}[sel] || sel;
+    if(!r.ok){
+      box.innerHTML='<div class="res bad">Gagal menghitung ('+esc(r.error||'')+'). Kalau ada pesan link "create index" di error, klik link itu untuk buat index Firestore sekali saja (auto), lalu coba lagi setelah 1-2 menit.</div>';
+      return;
+    }
+    box.innerHTML='<div class="kpis"><div class="kpi"><div class="v">'+num(r.total)+'</div><div class="l">Member — '+esc(label)+'</div></div><div class="kpi"><div class="v">'+num(r.active)+'</div><div class="l">Aktif (transaksi 30 hari terakhir)</div></div></div>'
+      +'<div class="muted" style="font-size:.75rem;margin:6px 0 8px">"Aktif" dihitung dari transaksi belanja asli (scan kasir/order web), bukan poin bonus/referral/penyesuaian.</div>'
+      +'<button class="btn sec" id="mShowList">Lihat daftar member →</button>';
+    var sb=document.getElementById('mShowList'); if(sb) sb.onclick=function(){ memByOutlet(sel); };
+  }
   async function memByOutlet(sel){
     segFilter=null; var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
     await ensureOam();
@@ -852,21 +882,9 @@
     tabEl.innerHTML='<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Pesanan via web</div><a class="btn sm sec" href="rekap.html" target="_blank" rel="noopener" style="width:auto;margin:0;text-decoration:none;display:inline-block">📊 Rekap</a> <button class="btn sm sec" id="oRl" style="width:auto;margin:0">↻</button></div>'
       +'<div class="muted" style="font-size:.76rem;margin-bottom:8px">Pesanan dari keranjang web masuk sebagai <b>BARU</b>. Cek & sesuaikan kalau perlu, lalu <b>Approve</b> supaya masuk hitungan analitik.</div>'
       +'<div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm sec" data-of="baru">Perlu dicek</button><button class="btn sm sec" data-of="approved">Disetujui</button><button class="btn sm sec" data-of="all">Semua</button></div>'
-      +'<div id="oList"><div class="muted">Memuat…</div></div></div>'
-      +(canEdit ? ('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Bersihkan riwayat</div>'
-        +'<div class="muted" style="font-size:.76rem;margin:4px 0 8px">Hapus <b>SEMUA</b> pesanan web (BARU, DEAL, DITOLAK) — berguna setelah uji coba. Tidak bisa dibatalkan.</div>'
-        +'<button class="btn red" id="oClearAll">🗑️ Hapus semua riwayat pesanan</button></div>') : '');
+      +'<div id="oList"><div class="muted">Memuat…</div></div></div>';
     document.getElementById('oRl').onclick=function(){ loadOrders(curOf); };
     try{ O.listOutlets().then(function(a){ OUTLETS_CACHE=a||[]; }).catch(function(){}); }catch(e){}
-    var oca=document.getElementById('oClearAll');
-    if(oca) oca.onclick=function(){
-      if(!confirm('Hapus SEMUA riwayat pesanan web? Tindakan ini tidak bisa dibatalkan.')) return;
-      if(prompt('Ketik HAPUS untuk konfirmasi:')!=='HAPUS') return;
-      oca.disabled=true; oca.textContent='Menghapus…';
-      Promise.resolve().then(function(){ return O.adminClearOrders(); }).then(function(r){
-        alert((r&&r.count||0)+' pesanan dihapus.'); loadOrders(curOf);
-      }).catch(function(e){ alert((e&&e.message)||'Gagal'); }).then(function(){ oca.disabled=false; oca.textContent='🗑️ Hapus semua riwayat pesanan'; });
-    };
     tabEl.querySelectorAll('[data-of]').forEach(function(b){ b.onclick=function(){ curOf=b.getAttribute('data-of'); loadOrders(curOf); }; });
     loadOrders(curOf);
   }
