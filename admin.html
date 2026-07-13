@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=114"></script>
+<script type="module" src="core-omaopa.js?v=115"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -512,11 +512,11 @@
     tabEl.querySelectorAll('[data-inact]').forEach(function(b){ b.onclick=function(){ loadInactive(parseInt(b.getAttribute('data-inact'),10)); }; });
     var ab=document.getElementById('auditBtn'); if(ab) ab.onclick=loadAudit;
     document.getElementById('mfind').onclick=function(){ memSearch(document.getElementById('mq').value); };
-    var mo=document.getElementById('mOutlet'); if(mo) mo.onchange=function(){ var v=mo.value; if(v){ showOutletSummary(v); } else { document.getElementById('mq').value=''; memReset(); loadMemberPage(); } };
+    var mo=document.getElementById('mOutlet'); if(mo) mo.onchange=function(){ var v=mo.value; if(v){ showOutletSummary(v); } else { document.getElementById('mq').value=''; segFilter=null; showAllSummary(); } };
     document.getElementById('mq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ memSearch(e.target.value); } });
     document.getElementById('vfind').onclick=function(){ doVoucher(document.getElementById('vq').value.trim()); };
     if(seg){ var clr=document.getElementById('segClr'); if(clr) clr.onclick=function(){ segFilter=null; render(); }; showSegment(seg); }
-    else { memReset(); loadMemberPage(); }
+    else { showAllSummary(); }
   }
   function memReset(){ memStack=[null]; memPage=0; }
   var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal uii']; // Jogja -> Area 1/Metavest; "jakal uii" spesifik (Jakal Bawah TETAP Kronggahan); kecuali nama mengandung "kyai mojo" (Kronggahan meski mirip Godean)
@@ -544,6 +544,18 @@
       +'<button class="btn sec" id="mShowList">Lihat daftar member →</button>';
     var sb=document.getElementById('mShowList'); if(sb) sb.onclick=function(){ memByOutlet(sel); };
   }
+  async function showAllSummary(){
+    var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='<div class="muted">Menghitung…</div>';
+    var r={total:0,active:0,ok:false}; try{ r=await O.memberOutletSummary([]); }catch(e){}
+    if(!r.ok){
+      box.innerHTML='<div class="res bad">Gagal menghitung ('+esc(r.error||'')+'). Kalau ada pesan link "create index", klik link itu sekali, tunggu 1-2 menit, lalu coba lagi.</div>';
+      return;
+    }
+    box.innerHTML='<div class="kpis"><div class="kpi"><div class="v">'+num(r.total)+'</div><div class="l">Total member</div></div><div class="kpi"><div class="v">'+num(r.active)+'</div><div class="l">Aktif (transaksi 30 hari terakhir)</div></div></div>'
+      +'<div class="muted" style="font-size:.75rem;margin:6px 0 8px">"Aktif" dihitung dari transaksi belanja asli (scan kasir/order web), bukan poin bonus/referral/penyesuaian.</div>'
+      +'<button class="btn sec" id="mShowAllList">Lihat daftar member →</button>';
+    var sb=document.getElementById('mShowAllList'); if(sb) sb.onclick=function(){ memReset(); loadMemberPage(); };
+  }
   async function memByOutlet(sel){
     segFilter=null; var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
     await ensureOam();
@@ -562,7 +574,7 @@
     }
     renderTable(box, f, f.length+' member — '+label);
   }
-  function memSearch(q){ segFilter=null; q=(q||'').trim(); if(q){ doFind(q); } else { memReset(); loadMemberPage(); } }
+  function memSearch(q){ segFilter=null; q=(q||'').trim(); if(q){ doFind(q); } else { showAllSummary(); } }
   async function loadMemberPage(){
     var box=document.getElementById('mlist'); if(!box) return; box.innerHTML='Memuat…';
     var after=memStack[memPage]||null;
