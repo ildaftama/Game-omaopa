@@ -1039,7 +1039,7 @@
       document.getElementById('oAdd').onclick=async function(){ if(busy) return; busy=true; var msg=document.getElementById('oMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       var lat=parseFloat(document.getElementById('oLat').value), lng=parseFloat(document.getElementById('oLng').value);
       var payload={ name:document.getElementById('oNm').value, area:document.getElementById('oAr').value, maps:document.getElementById('oMp').value };
-      if(!isNaN(lat) && !isNaN(lng)){ payload.lat=lat; payload.lng=lng; try{ payload.maps=(typeof O.buildMapsLink==='function')?O.buildMapsLink(lat,lng):payload.maps; }catch(e){} }
+      if(!isNaN(lat) && !isNaN(lng)){ payload.lat=lat; payload.lng=lng; if(!payload.maps){ try{ payload.maps=(typeof O.buildMapsLink==='function')?O.buildMapsLink(lat,lng):''; }catch(e){} } }
       try{ await O.addOutlet(payload);
         msg.innerHTML='<div class="res ok">✓ Outlet ditambahkan.</div>'; document.getElementById('oNm').value=''; document.getElementById('oMp').value=''; document.getElementById('oLat').value=''; document.getElementById('oLng').value=''; document.getElementById('oParseMsg').innerHTML=''; document.getElementById('oManualWrap').style.display='none'; loadOutlets();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
@@ -1100,9 +1100,10 @@
     bk.querySelector('#oeSaveBtn').onclick=async function(){ if(busy) return;
       var nm=(bk.querySelector('#oeNm').value||'').trim(); var ar=(bk.querySelector('#oeAr').value||'').trim();
       if(!nm){ alert('Nama outlet wajib diisi.'); return; }
+      var origLink=(mpI.value||'').trim();
       var lat=parseFloat(latI.value), lng=parseFloat(lngI.value);
       var patch={ name:nm, area:ar||'Lainnya' };
-      if(!isNaN(lat) && !isNaN(lng)){ patch.lat=lat; patch.lng=lng; try{ patch.maps=(typeof O.buildMapsLink==='function')?O.buildMapsLink(lat,lng):(mpI.value||'').trim(); }catch(e){ patch.maps=(mpI.value||'').trim(); } } else { patch.maps=(mpI.value||'').trim(); }
+      if(!isNaN(lat) && !isNaN(lng)){ patch.lat=lat; patch.lng=lng; if(origLink){ patch.maps=origLink; } else { try{ patch.maps=(typeof O.buildMapsLink==='function')?O.buildMapsLink(lat,lng):''; }catch(e){ patch.maps=''; } } } else { patch.maps=origLink; }
       busy=true; this.disabled=true; this.textContent='Menyimpan…';
       try{ await O.updateOutlet(o.id, patch); shut(); loadOutlets(); }
       catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
