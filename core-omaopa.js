@@ -1337,8 +1337,8 @@ function parseMapsLatLng(input){
   const patterns=[
     /[?&]query=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
     /[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
-    /@(-?\d+\.\d+),(-?\d+\.\d+)/,
     /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,
     /^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/
   ];
   for(const c of candidates){ for(const p of patterns){ const m=c.match(p); if(m){ const lat=parseFloat(m[1]), lng=parseFloat(m[2]); if(!isNaN(lat)&&!isNaN(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180) return {lat, lng}; } } }

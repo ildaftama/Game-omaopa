@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=116"></script>
+<script type="module" src="core-omaopa.js?v=117"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -1057,8 +1057,9 @@
     var outletById={}; arr.forEach(function(o){ outletById[o.id]=o; });
     var html=''; areas.forEach(function(a){ html+='<div class="area-h">'+esc(a)+'</div>';
       arr.filter(function(o){return o.area===a;}).forEach(function(o){ var label=o.name.replace(/^Oma Opa Cakery\s*/i,'');
-        html+='<div class="row"><div class="grow"><div class="nm">'+esc(label)+'</div><div class="sub">'+(o.maps?'<a class="link" href="'+esc(o.maps)+'" target="_blank">Maps</a>':'(tanpa maps)')+(typeof o.lat==='number'?' · 📍 koordinat OK':' · ⚠️ belum ada koordinat')+'</div></div>'
+        html+='<div class="row"><div class="grow"><div class="nm">'+esc(label)+'</div><div class="sub">'+(typeof o.lat==='number'?'📍 koordinat OK':'⚠️ belum ada koordinat')+'</div></div>'
           +'<span class="tag '+(o.active?'on':'off')+'">'+(o.active?'AKTIF':'OFF')+'</span>'
+          +(o.maps ? ('<a class="btn sm sec" href="'+esc(o.maps)+'" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">📍</a>') : '')
           +(canEdit ? ('<button class="btn sm sec" data-edit="'+esc(o.id)+'">⚙️</button>'
             +'<button class="btn sm sec" data-tog="'+esc(o.id)+'" data-act="'+(o.active?'1':'0')+'">'+(o.active?'Off':'On')+'</button>'
             +'<button class="btn sm red" data-del="'+esc(o.id)+'" data-nm="'+esc(label)+'">Hapus</button>') : '')+'</div>'; }); });
