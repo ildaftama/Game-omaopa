@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=115"></script>
+<script type="module" src="core-omaopa.js?v=116"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -1022,12 +1022,25 @@
     tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah outlet baru</div>'
       +'<label>Nama outlet</label><input id="oNm" placeholder="cth: Oma Opa Cakery Gajah Raya Semarang">'
       +'<label>Area</label><input id="oAr" placeholder="cth: Semarang">'
-      +'<label>Link Google Maps (opsional)</label><input id="oMp" placeholder="https://maps.app.goo.gl/...">'
+      +'<label>Link Google Maps</label><input id="oMp" placeholder="https://maps.app.goo.gl/...">'
+      +'<div id="oParseMsg" style="margin:6px 0 2px;font-size:.8rem"></div>'
+      +'<div id="oManualWrap" style="display:none"><label>Latitude</label><input id="oLat" placeholder="-7.xxxxxx"><label>Longitude</label><input id="oLng" placeholder="110.xxxxxx"></div>'
       +'<button class="btn" id="oAdd">＋ Tambah outlet</button><div id="oMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola outlet.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar outlet</div><button class="btn sm sec" id="oReload">↻</button></div><div id="oList"><div class="muted">Memuat…</div></div></div>';
-    if(canEdit){ document.getElementById('oAdd').onclick=async function(){ if(busy) return; busy=true; var msg=document.getElementById('oMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
-      try{ await O.addOutlet({ name:document.getElementById('oNm').value, area:document.getElementById('oAr').value, maps:document.getElementById('oMp').value });
-        msg.innerHTML='<div class="res ok">✓ Outlet ditambahkan.</div>'; document.getElementById('oNm').value=''; document.getElementById('oMp').value=''; loadOutlets();
+    if(canEdit){
+      var oMpEl=document.getElementById('oMp');
+      function tryParseAdd(){ var link=(oMpEl.value||'').trim(); var msgEl=document.getElementById('oParseMsg'); var manualWrap=document.getElementById('oManualWrap');
+        if(!link){ msgEl.innerHTML=''; return; }
+        var ll=O.parseMapsLatLng(link);
+        if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Koordinat kebaca: '+ll.lat.toFixed(6)+', '+ll.lng.toFixed(6)+'</span>'; document.getElementById('oLat').value=ll.lat; document.getElementById('oLng').value=ll.lng; manualWrap.style.display='block'; }
+        else { msgEl.innerHTML='<span style="color:#C0392B">⚠️ Koordinat gak kebaca dari link ini (biasanya link pendek). Isi manual di bawah, atau ganti ke link versi panjang.</span>'; manualWrap.style.display='block'; } }
+      oMpEl.oninput=tryParseAdd; oMpEl.onblur=tryParseAdd;
+      document.getElementById('oAdd').onclick=async function(){ if(busy) return; busy=true; var msg=document.getElementById('oMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+      var lat=parseFloat(document.getElementById('oLat').value), lng=parseFloat(document.getElementById('oLng').value);
+      var payload={ name:document.getElementById('oNm').value, area:document.getElementById('oAr').value, maps:document.getElementById('oMp').value };
+      if(!isNaN(lat) && !isNaN(lng)){ payload.lat=lat; payload.lng=lng; payload.maps=O.buildMapsLink(lat,lng); }
+      try{ await O.addOutlet(payload);
+        msg.innerHTML='<div class="res ok">✓ Outlet ditambahkan.</div>'; document.getElementById('oNm').value=''; document.getElementById('oMp').value=''; document.getElementById('oLat').value=''; document.getElementById('oLng').value=''; document.getElementById('oParseMsg').innerHTML=''; document.getElementById('oManualWrap').style.display='none'; loadOutlets();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
       var sFind=document.getElementById('sFind'); if(sFind) sFind.onclick=async function(){ var q=(document.getElementById('sSearch').value||'').trim(); var pick=document.getElementById('sPick'); if(!q){ pick.innerHTML='<div class="muted">Ketik nama / No. HP dulu.</div>'; return; } pick.innerHTML='<div class="muted">Mencari…</div>'; var arr=[]; try{ if(/^[0-9+]/.test(q)){ var one=await O.getMemberByPhone(q); arr=one?[one]:[]; } if(!arr.length) arr=await O.listMembers(q,50); }catch(e){} if(!arr.length){ pick.innerHTML='<div class="muted">Member tidak ditemukan.</div>'; return; } pick.innerHTML=arr.slice(0,30).map(function(m){ return '<div class="row sPickRow" data-uid="'+esc(m.uid)+'" data-nm="'+esc(m.name||'')+'" data-ph="'+esc(m.phone||'')+'" data-ho="'+esc(m.homeOutlet||'')+'" style="cursor:pointer"><div class="grow"><div class="nm" style="font-size:.86rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+esc(m.phone||'-')+(m.homeOutlet?(' · 📍 '+esc(m.homeOutlet)):'')+'</div></div><div class="btn sm">Pilih</div></div>'; }).join(''); pick.querySelectorAll('.sPickRow').forEach(function(r){ r.onclick=function(){ document.getElementById('sUid').value=r.getAttribute('data-uid'); var ho=r.getAttribute('data-ho'); if(ho && !document.getElementById('sOut').value) document.getElementById('sOut').value=ho; pick.innerHTML='<div class="res ok">✓ Terpilih: <b>'+esc(r.getAttribute('data-nm')||'(tanpa nama)')+'</b> ('+esc(r.getAttribute('data-ph')||'-')+')</div>'; }; }); }; }
     document.getElementById('oReload').onclick=loadOutlets; loadOutlets();
@@ -1040,16 +1053,57 @@
         try{ var r=await O.seedOutlets(window.OMA_OUTLETS||[]); box.innerHTML='<div class="res ok">✓ '+r.count+' outlet diimpor.</div>'; loadOutlets(); }catch(e){ box.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; return; }
     var areas=[]; arr.forEach(function(o){ if(areas.indexOf(o.area)<0) areas.push(o.area); });
     var PRIO=['Yogya','Solo Raya','Semarang']; areas.sort(function(a,b){ var ia=PRIO.indexOf(a),ib=PRIO.indexOf(b); if(ia<0)ia=99; if(ib<0)ib=99; return ia!==ib?ia-ib:a.localeCompare(b); });
+    var outletById={}; arr.forEach(function(o){ outletById[o.id]=o; });
     var html=''; areas.forEach(function(a){ html+='<div class="area-h">'+esc(a)+'</div>';
       arr.filter(function(o){return o.area===a;}).forEach(function(o){ var label=o.name.replace(/^Oma Opa Cakery\s*/i,'');
-        html+='<div class="row"><div class="grow"><div class="nm">'+esc(label)+'</div><div class="sub">'+(o.maps?'<a class="link" href="'+esc(o.maps)+'" target="_blank">Maps</a>':'(tanpa maps)')+'</div></div>'
+        html+='<div class="row"><div class="grow"><div class="nm">'+esc(label)+'</div><div class="sub">'+(o.maps?'<a class="link" href="'+esc(o.maps)+'" target="_blank">Maps</a>':'(tanpa maps)')+(typeof o.lat==='number'?' · 📍 koordinat OK':' · ⚠️ belum ada koordinat')+'</div></div>'
           +'<span class="tag '+(o.active?'on':'off')+'">'+(o.active?'AKTIF':'OFF')+'</span>'
-          +(canEdit ? ('<button class="btn sm sec" data-tog="'+esc(o.id)+'" data-act="'+(o.active?'1':'0')+'">'+(o.active?'Off':'On')+'</button>'
+          +(canEdit ? ('<button class="btn sm sec" data-edit="'+esc(o.id)+'">⚙️</button>'
+            +'<button class="btn sm sec" data-tog="'+esc(o.id)+'" data-act="'+(o.active?'1':'0')+'">'+(o.active?'Off':'On')+'</button>'
             +'<button class="btn sm red" data-del="'+esc(o.id)+'" data-nm="'+esc(label)+'">Hapus</button>') : '')+'</div>'; }); });
     box.innerHTML=html;
     if(!canEdit) return;
+    box.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ var o=outletById[b.getAttribute('data-edit')]; if(o) openOutletEdit(o); }; });
     box.querySelectorAll('[data-tog]').forEach(function(b){ b.onclick=async function(){ if(busy)return; busy=true; b.disabled=true; try{ await O.updateOutlet(b.getAttribute('data-tog'),{active:b.getAttribute('data-act')!=='1'}); loadOutlets(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     box.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=async function(){ if(busy)return; if(!confirm('Hapus outlet "'+b.getAttribute('data-nm')+'"?')) return; busy=true; b.disabled=true; try{ await O.deleteOutlet(b.getAttribute('data-del')); loadOutlets(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+  }
+  function openOutletEdit(o){
+    var bk=document.createElement('div');
+    bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:380px;width:100%;max-height:90vh;overflow:auto">'
+      +'<div style="font-weight:800;color:var(--coklat);margin-bottom:10px">⚙️ Setting Outlet</div>'
+      +'<label>Nama outlet</label><input id="oeNm" value="'+esc(o.name||'')+'">'
+      +'<label>Area</label><input id="oeAr" value="'+esc(o.area||'')+'">'
+      +'<label>Link Google Maps</label><input id="oeMp" placeholder="https://maps.app.goo.gl/..." value="'+esc(o.maps||'')+'">'
+      +'<div id="oeParseMsg" style="margin:6px 0 2px;font-size:.8rem"></div>'
+      +'<div id="oeManualWrap" style="display:none"><label>Latitude</label><input id="oeLat" placeholder="-7.xxxxxx"><label>Longitude</label><input id="oeLng" placeholder="110.xxxxxx"></div>'
+      +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="oeSaveBtn" style="flex:1">💾 Simpan</button><button class="btn sec" id="oeCancelBtn" style="flex:1">Batal</button></div>'
+      +'<button class="btn sm red" id="oeDelBtn" style="width:100%;margin-top:8px">🗑️ Hapus outlet</button>'
+      +'</div>';
+    document.body.appendChild(bk);
+    var latI=bk.querySelector('#oeLat'), lngI=bk.querySelector('#oeLng'), msgEl=bk.querySelector('#oeParseMsg'), manualWrap=bk.querySelector('#oeManualWrap'), mpI=bk.querySelector('#oeMp');
+    if(typeof o.lat==='number' && typeof o.lng==='number'){ latI.value=o.lat; lngI.value=o.lng; }
+    function tryParse(){ var link=(mpI.value||'').trim();
+      if(!link){ msgEl.innerHTML=''; return; }
+      var ll=O.parseMapsLatLng(link);
+      if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Koordinat kebaca: '+ll.lat.toFixed(6)+', '+ll.lng.toFixed(6)+'</span>'; latI.value=ll.lat; lngI.value=ll.lng; manualWrap.style.display='block'; }
+      else { msgEl.innerHTML='<span style="color:#C0392B">⚠️ Koordinat gak kebaca dari link ini (biasanya link pendek). Isi manual di bawah, atau ganti ke link versi panjang.</span>'; manualWrap.style.display='block'; } }
+    mpI.oninput=tryParse; mpI.onblur=tryParse; tryParse();
+    function shut(){ bk.remove(); }
+    bk.querySelector('#oeCancelBtn').onclick=shut;
+    bk.onclick=function(e){ if(e.target===bk) shut(); };
+    bk.querySelector('#oeDelBtn').onclick=async function(){ if(busy) return; if(!confirm('Hapus outlet "'+(o.name||'')+'"?')) return; busy=true; this.disabled=true;
+      try{ await O.deleteOutlet(o.id); shut(); loadOutlets(); }catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; } busy=false; };
+    bk.querySelector('#oeSaveBtn').onclick=async function(){ if(busy) return;
+      var nm=(bk.querySelector('#oeNm').value||'').trim(); var ar=(bk.querySelector('#oeAr').value||'').trim();
+      if(!nm){ alert('Nama outlet wajib diisi.'); return; }
+      var lat=parseFloat(latI.value), lng=parseFloat(lngI.value);
+      var patch={ name:nm, area:ar||'Lainnya' };
+      if(!isNaN(lat) && !isNaN(lng)){ patch.lat=lat; patch.lng=lng; patch.maps=O.buildMapsLink(lat,lng); } else { patch.maps=(mpI.value||'').trim(); }
+      busy=true; this.disabled=true; this.textContent='Menyimpan…';
+      try{ await O.updateOutlet(o.id, patch); shut(); loadOutlets(); }
+      catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
+      busy=false; };
   }
 
   /* ---------- STAFF ---------- */
