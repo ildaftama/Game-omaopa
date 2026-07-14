@@ -60,7 +60,7 @@
   <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=114"></script>
+<script type="module" src="core-omaopa.js?v=119"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), roleBadge=document.getElementById('roleBadge');
@@ -152,11 +152,10 @@
     try{ allVou = await window.OmaOpa.listUsedVouchers(oArg); }catch(e){ allVou=[]; }
     try{ var ords = await window.OmaOpa.listOrders(2000); allOrd=(ords||[]).filter(function(o){ return (o.status||'baru')==='approved'; }); }catch(e){ allOrd=[]; }
     if(!info.admin){ allOrd=allOrd.filter(function(o){ return (o.outlet||'')===(info.outlet||''); }); }
-    if(!Object.keys(OUTLET_AREA).length){ try{ var outs=await window.OmaOpa.listOutlets(); (outs||[]).forEach(function(o){ if(o&&o.name) OUTLET_AREA[o.name]=o.area||''; }); }catch(e){} }
+    if(!Object.keys(OUTLET_AREA).length){ (window.OMA_OUTLETS||[]).forEach(function(o){ if(o&&o.name) OUTLET_AREA[o.name]=o.area||''; }); }
     if(info.admin){
       var os=document.getElementById('outSel'); if(os){
-        var set={}; allTxn.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allVou.forEach(function(r){ if(r.outlet) set[r.outlet]=1; }); allOrd.forEach(function(r){ if(r.outlet) set[r.outlet]=1; });
-        var keys=Object.keys(set).sort(); var cur=os.value;
+        var keys=(window.OMA_OUTLETS||[]).map(function(o){ return o&&o.name; }).filter(Boolean).sort(); var cur=os.value;
         var kron=keys.filter(isKronggahan), meta=keys.filter(function(k){return !isKronggahan(k);});
         function opt(k){ return '<option value="'+esc(k)+'">'+esc(k)+'</option>'; }
         os.innerHTML='<option value="">🟡 Semua outlet (All)</option>'
