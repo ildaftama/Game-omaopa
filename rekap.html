@@ -196,11 +196,12 @@
     var outlet = info.admin ? (document.getElementById('outSel')?document.getElementById('outSel').value:'') : (info.outlet||'');
     return {from:from,to:to,outlet:outlet};
   }
+  function normOutletName(s){ return (s||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); }
   function outletOk(rowOutlet, sel){
     if(!sel) return true;
     if(sel==='__metavest'){ var g=outletGroup(rowOutlet); return g==='area1'||g==='area2'||g==='area3'; }
     if(sel==='__kronggahan'||sel==='__area1'||sel==='__area2'||sel==='__area3'){ return outletGroup(rowOutlet)===sel.replace('__',''); }
-    return rowOutlet===sel;
+    return normOutletName(rowOutlet)===normOutletName(sel);
   }
   function filterRows(rows){
     var r=curRange();
