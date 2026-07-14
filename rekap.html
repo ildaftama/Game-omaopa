@@ -136,13 +136,20 @@
       + '</div>'
       + '<div class="tabs" style="margin-top:12px;flex-wrap:wrap"><div class="tab on" data-t="txn">Transaksi Poin</div><div class="tab" data-t="vou">Voucher Terpakai</div><div class="tab" data-t="ord">Pesanan Web</div></div>'
       + '<div id="body"></div>'
-      + '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="reload">↻ Muat ulang</button><button class="btn sec" id="csv">⬇ Export CSV</button></div>';
+      + '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="reload">↻ Muat ulang</button><button class="btn sec" id="csv">⬇ Export CSV</button></div>'
+      + (info.admin?'<div style="margin-top:8px"><button class="btn sm sec" id="dbgBtn">🔍 Cek nama outlet mentah di data</button><div id="dbgOut"></div></div>':'');
     document.getElementById('from').addEventListener('change',render);
     document.getElementById('to').addEventListener('change',render);
     var os=document.getElementById('outSel'); if(os) os.addEventListener('change',render);
     panel.querySelectorAll('.tab').forEach(function(t){ t.onclick=function(){ tab=t.dataset.t; panel.querySelectorAll('.tab').forEach(function(x){x.classList.toggle('on',x.dataset.t===tab);}); render(); }; });
     document.getElementById('reload').onclick=async function(){ var b=this; b.disabled=true; b.textContent='Memuat…'; await loadData(); render(); b.disabled=false; b.textContent='↻ Muat ulang'; };
     document.getElementById('csv').onclick=exportCSV;
+    var dbg=document.getElementById('dbgBtn'); if(dbg) dbg.onclick=function(){
+      var set={}; allTxn.forEach(function(r){ if(r.outlet) set[r.outlet]=(set[r.outlet]||0)+1; }); allVou.forEach(function(r){ if(r.outlet) set[r.outlet]=(set[r.outlet]||0)+1; }); allOrd.forEach(function(r){ if(r.outlet) set[r.outlet]=(set[r.outlet]||0)+1; });
+      var resmi={}; (window.OMA_OUTLETS||[]).forEach(function(o){ if(o&&o.name) resmi[normOutletName(o.name)]=o.name; });
+      var rows=Object.keys(set).sort().map(function(k){ var cocok=!!resmi[normOutletName(k)]; return '<div style="padding:5px 0;border-bottom:1px solid #F2E4C6;font-size:.82rem">'+(cocok?'✅':'⚠️')+' "'+esc(k)+'" — '+set[k]+' data'+(cocok?'':' <b>(gak cocok sama outlet resmi manapun)</b>')+'</div>'; }).join('');
+      document.getElementById('dbgOut').innerHTML='<div class="muted" style="margin-top:8px">Nama outlet yang kepake di data (transaksi/voucher/pesanan), dicek apakah cocok sama daftar outlet resmi:</div>'+rows;
+    };
   }
 
   async function loadData(){
