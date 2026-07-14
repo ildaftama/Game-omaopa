@@ -1031,14 +1031,15 @@
       var oMpEl=document.getElementById('oMp');
       function tryParseAdd(){ var link=(oMpEl.value||'').trim(); var msgEl=document.getElementById('oParseMsg'); var manualWrap=document.getElementById('oManualWrap');
         if(!link){ msgEl.innerHTML=''; return; }
-        var ll=O.parseMapsLatLng(link);
-        if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Koordinat kebaca: '+ll.lat.toFixed(6)+', '+ll.lng.toFixed(6)+'</span>'; document.getElementById('oLat').value=ll.lat; document.getElementById('oLng').value=ll.lng; manualWrap.style.display='block'; }
-        else { msgEl.innerHTML='<span style="color:#C0392B">⚠️ Koordinat gak kebaca dari link ini (biasanya link pendek). Isi manual di bawah, atau ganti ke link versi panjang.</span>'; manualWrap.style.display='block'; } }
+        if(typeof O.parseMapsLatLng!=='function'){ msgEl.innerHTML='<span style="color:#C0392B">⚠️ Fitur baca-koordinat belum aktif (core-omaopa.js kayaknya belum ter-update). Isi manual di bawah dulu.</span>'; manualWrap.style.display='block'; return; }
+        var ll=null; try{ ll=O.parseMapsLatLng(link); }catch(e){ ll=null; }
+        if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Lokasi berhasil terbaca dari link.</span>'; document.getElementById('oLat').value=ll.lat; document.getElementById('oLng').value=ll.lng; manualWrap.style.display='none'; }
+        else { msgEl.innerHTML='<span style="color:#C0392B">⚠️ Link ini gak bisa dibaca otomatis (biasanya link pendek/shortlink dari tombol \"Bagikan\"). Isi koordinat manual di bawah, atau ganti dengan link Maps versi panjang.</span>'; manualWrap.style.display='block'; } }
       oMpEl.oninput=tryParseAdd; oMpEl.onblur=tryParseAdd;
       document.getElementById('oAdd').onclick=async function(){ if(busy) return; busy=true; var msg=document.getElementById('oMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       var lat=parseFloat(document.getElementById('oLat').value), lng=parseFloat(document.getElementById('oLng').value);
       var payload={ name:document.getElementById('oNm').value, area:document.getElementById('oAr').value, maps:document.getElementById('oMp').value };
-      if(!isNaN(lat) && !isNaN(lng)){ payload.lat=lat; payload.lng=lng; payload.maps=O.buildMapsLink(lat,lng); }
+      if(!isNaN(lat) && !isNaN(lng)){ payload.lat=lat; payload.lng=lng; try{ payload.maps=(typeof O.buildMapsLink==='function')?O.buildMapsLink(lat,lng):payload.maps; }catch(e){} }
       try{ await O.addOutlet(payload);
         msg.innerHTML='<div class="res ok">✓ Outlet ditambahkan.</div>'; document.getElementById('oNm').value=''; document.getElementById('oMp').value=''; document.getElementById('oLat').value=''; document.getElementById('oLng').value=''; document.getElementById('oParseMsg').innerHTML=''; document.getElementById('oManualWrap').style.display='none'; loadOutlets();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
@@ -1085,9 +1086,10 @@
     if(typeof o.lat==='number' && typeof o.lng==='number'){ latI.value=o.lat; lngI.value=o.lng; }
     function tryParse(){ var link=(mpI.value||'').trim();
       if(!link){ msgEl.innerHTML=''; return; }
-      var ll=O.parseMapsLatLng(link);
-      if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Koordinat kebaca: '+ll.lat.toFixed(6)+', '+ll.lng.toFixed(6)+'</span>'; latI.value=ll.lat; lngI.value=ll.lng; manualWrap.style.display='block'; }
-      else { msgEl.innerHTML='<span style="color:#C0392B">⚠️ Koordinat gak kebaca dari link ini (biasanya link pendek). Isi manual di bawah, atau ganti ke link versi panjang.</span>'; manualWrap.style.display='block'; } }
+      if(typeof O.parseMapsLatLng!=='function'){ msgEl.innerHTML='<span style="color:#C0392B">⚠️ Fitur baca-koordinat belum aktif (core-omaopa.js kayaknya belum ter-update). Isi manual di bawah dulu, atau upload ulang core-omaopa.js lalu refresh.</span>'; manualWrap.style.display='block'; return; }
+      var ll=null; try{ ll=O.parseMapsLatLng(link); }catch(e){ ll=null; }
+      if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Lokasi berhasil terbaca dari link.</span>'; latI.value=ll.lat; lngI.value=ll.lng; manualWrap.style.display='none'; }
+      else { msgEl.innerHTML='<span style="color:#C0392B">⚠️ Link ini gak bisa dibaca otomatis (biasanya link pendek/shortlink dari tombol \"Bagikan\"). Isi koordinat manual di bawah, atau ganti dengan link Maps versi panjang.</span>'; manualWrap.style.display='block'; } }
     mpI.oninput=tryParse; mpI.onblur=tryParse; tryParse();
     function shut(){ bk.remove(); }
     bk.querySelector('#oeCancelBtn').onclick=shut;
@@ -1099,7 +1101,7 @@
       if(!nm){ alert('Nama outlet wajib diisi.'); return; }
       var lat=parseFloat(latI.value), lng=parseFloat(lngI.value);
       var patch={ name:nm, area:ar||'Lainnya' };
-      if(!isNaN(lat) && !isNaN(lng)){ patch.lat=lat; patch.lng=lng; patch.maps=O.buildMapsLink(lat,lng); } else { patch.maps=(mpI.value||'').trim(); }
+      if(!isNaN(lat) && !isNaN(lng)){ patch.lat=lat; patch.lng=lng; try{ patch.maps=(typeof O.buildMapsLink==='function')?O.buildMapsLink(lat,lng):(mpI.value||'').trim(); }catch(e){ patch.maps=(mpI.value||'').trim(); } } else { patch.maps=(mpI.value||'').trim(); }
       busy=true; this.disabled=true; this.textContent='Menyimpan…';
       try{ await O.updateOutlet(o.id, patch); shut(); loadOutlets(); }
       catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
