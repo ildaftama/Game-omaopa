@@ -152,20 +152,41 @@
     try{ allVou = await window.OmaOpa.listUsedVouchers(oArg); }catch(e){ allVou=[]; }
     try{ var ords = await window.OmaOpa.listOrders(2000); allOrd=(ords||[]).filter(function(o){ return (o.status||'baru')==='approved'; }); }catch(e){ allOrd=[]; }
     if(!info.admin){ allOrd=allOrd.filter(function(o){ return (o.outlet||'')===(info.outlet||''); }); }
-    if(!Object.keys(OUTLET_AREA).length){ (window.OMA_OUTLETS||[]).forEach(function(o){ if(o&&o.name) OUTLET_AREA[o.name]=o.area||''; }); }
+    if(!Object.keys(OUTLET_AREA).length){ (window.OMA_OUTLETS||[]).forEach(function(o){ var n=((o&&o.name)||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(n) OUTLET_AREA[n]=(o.area||'').toLowerCase(); }); }
     if(info.admin){
       var os=document.getElementById('outSel'); if(os){
         var keys=(window.OMA_OUTLETS||[]).map(function(o){ return o&&o.name; }).filter(Boolean).sort(); var cur=os.value;
-        var kron=keys.filter(isKronggahan), meta=keys.filter(function(k){return !isKronggahan(k);});
+        var groups={area1:[],area2:[],area3:[],kronggahan:[],lain:[]};
+        keys.forEach(function(k){ var g=outletGroup(k)||'lain'; groups[g].push(k); });
         function opt(k){ return '<option value="'+esc(k)+'">'+esc(k)+'</option>'; }
         os.innerHTML='<option value="">🟡 Semua outlet (All)</option>'
-          +'<option value="__metavest">🏢 All Metavest</option>'
-          +'<option value="__kronggahan">🏢 All Kronggahan</option>'
-          +(meta.length?('<optgroup label="— Metavest —">'+meta.map(opt).join('')+'</optgroup>'):'')
-          +(kron.length?('<optgroup label="— Kronggahan —">'+kron.map(opt).join('')+'</optgroup>'):'');
+          +'<option value="__metavest">🏢 Metavest (Area 1+2+3)</option>'
+          +'<option value="__area1">🗺️ Area 1 · Jogja·Klaten·Magelang</option>'
+          +'<option value="__area2">🗺️ Area 2 · Solo Raya</option>'
+          +'<option value="__area3">🗺️ Area 3 · Semarang</option>'
+          +'<option value="__kronggahan">🏢 Kronggahan</option>'
+          +(groups.area1.length?('<optgroup label="— Area 1 —">'+groups.area1.map(opt).join('')+'</optgroup>'):'')
+          +(groups.area2.length?('<optgroup label="— Area 2 —">'+groups.area2.map(opt).join('')+'</optgroup>'):'')
+          +(groups.area3.length?('<optgroup label="— Area 3 —">'+groups.area3.map(opt).join('')+'</optgroup>'):'')
+          +(groups.kronggahan.length?('<optgroup label="— Kronggahan —">'+groups.kronggahan.map(opt).join('')+'</optgroup>'):'')
+          +(groups.lain.length?('<optgroup label="— Lainnya —">'+groups.lain.map(opt).join('')+'</optgroup>'):'');
         os.value=cur;
       }
     }
+  }
+
+  var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal uii']; // Jogja -> Area 1/Metavest; "jakal uii" spesifik (Jakal Bawah TETAP Kronggahan); kecuali nama mengandung "kyai mojo"
+  function outletGroup(name){
+    var key=(name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim();
+    if(!key) return '';
+    var area=OUTLET_AREA[key]||'';
+    var isYogya=area.indexOf('yogya')>=0;
+    var is5=KRON_EXCEPT.some(function(k){return key.indexOf(k)>=0;}) && key.indexOf('kyai mojo')<0;
+    if(isYogya && !is5) return 'kronggahan';
+    if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1';
+    if(area.indexOf('solo')>=0) return 'area2';
+    if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3';
+    return '';
   }
 
   function curRange(){
@@ -175,15 +196,10 @@
     var outlet = info.admin ? (document.getElementById('outSel')?document.getElementById('outSel').value:'') : (info.outlet||'');
     return {from:from,to:to,outlet:outlet};
   }
-  var KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal','uii']; // 5 outlet Yogya yang TETAP Metavest
-  function isYogya(name){ return String(OUTLET_AREA[name]||'').toLowerCase().indexOf('yogya')>=0; }
-  function is5(name){ name=(name||'').toLowerCase(); return KRON_EXCEPT.some(function(k){return name.indexOf(k)>=0;}); }
-  function isKronggahan(name){ return isYogya(name) && !is5(name); } // outlet Yogya selain 5
-  function isMetavest(name){ return !isKronggahan(name); }            // semua selain Kronggahan
   function outletOk(rowOutlet, sel){
     if(!sel) return true;
-    if(sel==='__metavest') return isMetavest(rowOutlet);
-    if(sel==='__kronggahan') return isKronggahan(rowOutlet);
+    if(sel==='__metavest'){ var g=outletGroup(rowOutlet); return g==='area1'||g==='area2'||g==='area3'; }
+    if(sel==='__kronggahan'||sel==='__area1'||sel==='__area2'||sel==='__area3'){ return outletGroup(rowOutlet)===sel.replace('__',''); }
     return rowOutlet===sel;
   }
   function filterRows(rows){
