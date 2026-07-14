@@ -1329,15 +1329,31 @@ async function adminDeleteTransactions(ids){
 }
 async function deleteTransaction(id){ if(!(await isMaster())) throw {message:'Khusus Master.'}; id=(id||'').trim(); if(!id) throw {message:'ID kosong.'}; let info=''; try{ const s=await getDoc(doc(db,'transactions',id)); if(s.exists()){ const x=s.data(); info=(x.name||'?')+' · '+(x.outlet||'-')+' · '+(x.nominal||0)+' · '+(x.points||0)+' poin'; } }catch(e){} await deleteDoc(doc(db,'transactions',id)); logAudit('hapus_transaksi', 'Hapus 1 transaksi: '+info+' (id:'+id+')'); }
 function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60) || ('o'+Date.now()); }
+function parseMapsLatLng(input){
+  if(!input) return null;
+  const raw=String(input).trim();
+  let decoded=raw; try{ decoded=decodeURIComponent(raw); }catch(e){}
+  const candidates=[decoded, raw];
+  const patterns=[
+    /[?&]query=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
+    /[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+    /^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/
+  ];
+  for(const c of candidates){ for(const p of patterns){ const m=c.match(p); if(m){ const lat=parseFloat(m[1]), lng=parseFloat(m[2]); if(!isNaN(lat)&&!isNaN(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180) return {lat, lng}; } } }
+  return null;
+}
+function buildMapsLink(lat,lng){ return 'https://www.google.com/maps/search/?api=1&query='+lat+'%2C'+lng; }
 async function listOutlets(){
   try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', active:x.active!==false }); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', lat:(typeof x.lat==='number'?x.lat:null), lng:(typeof x.lng==='number'?x.lng:null), active:x.active!==false }); });
     arr.sort((a,b)=>(a.area||'').localeCompare(b.area||'')||(a.name||'').localeCompare(b.name||'')); return arr;
   }catch(e){ return []; }
 }
 async function listPublicOutlets(){
   try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); if(x.active===false) return; arr.push({ name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'' }); });
+    snap.forEach(d=>{ const x=d.data(); if(x.active===false) return; arr.push({ name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', lat:(typeof x.lat==='number'?x.lat:null), lng:(typeof x.lng==='number'?x.lng:null) }); });
     return arr;
   }catch(e){ return []; }
 }
@@ -1345,7 +1361,9 @@ async function addOutlet(o){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   o=o||{}; if(!o.name||!o.name.trim()) throw {message:'Nama outlet wajib diisi.'};
   const id=slug(o.name);
-  await setDoc(doc(db,'outlets',id), { name:o.name.trim(), area:(o.area||'Lainnya').trim(), maps:(o.maps||'').trim(), active:true, updatedAt:serverTimestamp() },{merge:true});
+  const data={ name:o.name.trim(), area:(o.area||'Lainnya').trim(), maps:(o.maps||'').trim(), active:true, updatedAt:serverTimestamp() };
+  if(typeof o.lat==='number' && typeof o.lng==='number' && !isNaN(o.lat) && !isNaN(o.lng)){ data.lat=o.lat; data.lng=o.lng; }
+  await setDoc(doc(db,'outlets',id), data, {merge:true});
   return { id:id };
 }
 async function updateOutlet(id, patch){
@@ -1362,7 +1380,9 @@ async function seedOutlets(arr){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   arr=arr||[]; let n=0;
   for(const o of arr){ if(!o||!o.name) continue;
-    await setDoc(doc(db,'outlets',slug(o.name)), { name:o.name, area:o.area||'Lainnya', maps:o.maps||'', active:true, updatedAt:serverTimestamp() },{merge:true}); n++; }
+    const data={ name:o.name, area:o.area||'Lainnya', maps:o.maps||'', active:true, updatedAt:serverTimestamp() };
+    if(typeof o.lat==='number' && typeof o.lng==='number') { data.lat=o.lat; data.lng=o.lng; }
+    await setDoc(doc(db,'outlets',slug(o.name)), data, {merge:true}); n++; }
   return { count:n };
 }
 
@@ -1604,7 +1624,7 @@ window.OmaOpa = {
   getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, backfillLastTxnAt, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
-  listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets,
+  listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
@@ -1620,4 +1640,4 @@ window.OmaOpa = {
 emit();
 try{ window.dispatchEvent(new CustomEvent('omaopa:ready',{detail:snapshot()})); }catch(e){}
 // Gabungkan outlet dari database (termasuk yang ditambah via admin, mis. Kronggahan) ke daftar picker
-(async function(){ try{ const fs=await listOutlets(); if(fs && fs.length){ const byName={}; (window.OMA_OUTLETS||[]).forEach(o=>{ byName[(o.name||'').toLowerCase().trim()]=o; }); fs.forEach(o=>{ if(o && o.name && o.active!==false) byName[(o.name||'').toLowerCase().trim()]={ name:o.name, area:o.area, maps:o.maps }; }); window.OMA_OUTLETS=Object.keys(byName).map(k=>byName[k]); } }catch(e){} })();
+(async function(){ try{ const fs=await listOutlets(); if(fs && fs.length){ const byName={}; (window.OMA_OUTLETS||[]).forEach(o=>{ byName[(o.name||'').toLowerCase().trim()]=o; }); fs.forEach(o=>{ if(o && o.name && o.active!==false) byName[(o.name||'').toLowerCase().trim()]={ name:o.name, area:o.area, maps:o.maps, lat:o.lat, lng:o.lng }; }); window.OMA_OUTLETS=Object.keys(byName).map(k=>byName[k]); } }catch(e){} })();
