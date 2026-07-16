@@ -92,7 +92,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=117"></script>
+<script type="module" src="core-omaopa.js?v=120"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -1123,7 +1123,10 @@
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar staff</div><button class="btn sm sec" id="sReload">↻</button></div>'
       +'<select id="sFilter" style="margin-bottom:8px"><option value="">— semua peran —</option><option value="master">👑 Master</option><option value="super">⭐ Admin Utama</option><option value="admin">🛠️ Admin</option><option value="kronggahan">🏢 Kasir Kronggahan</option><option value="area1">🗺️ Kasir Area 1</option><option value="area2">🗺️ Kasir Area 2</option><option value="area3">🗺️ Kasir Area 3</option><option value="lain">📌 Kasir Lainnya</option></select>'
       +'<select id="sOutFilter" style="margin-bottom:8px"><option value="">— cek outlet spesifik (deteksi dobel) —</option>'+sOutletOpts.replace('<option value="">— pilih outlet —</option>','')+'</select>'
-      +'<div id="sList"><div class="muted">Memuat…</div></div></div>';
+      +'<div id="sList"><div class="muted">Memuat…</div></div></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🧍 Kasir Individual (Absensi)</div><button class="btn sm sec" id="kiReload">↻</button></div>'
+      +'<select id="kiFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved">✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua —</option></select>'
+      +'<div id="kiList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){
       document.getElementById('sFind').onclick=async function(){
         var q=(document.getElementById('sSearch').value||'').trim(); var pick=document.getElementById('sPick');
@@ -1144,6 +1147,52 @@
         msg.innerHTML='<div class="res ok">✓ Ditambahkan sebagai '+(_role==='master'?'Master':(_role==='super'?'Admin Utama':(_role==='admin'?'Admin':'Kasir')))+'.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sRole').value='kasir'; loadStaff();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     document.getElementById('sReload').onclick=function(){ sPage=0; loadStaff(); }; var _sf=document.getElementById('sFilter'); if(_sf) _sf.onchange=function(){ sPage=0; var of=document.getElementById('sOutFilter'); if(of) of.value=''; loadStaff(); }; var _sof2=document.getElementById('sOutFilter'); if(_sof2) _sof2.onchange=function(){ if(_sof2.value){ document.getElementById('sFilter').value=''; } loadStaff(); }; loadStaff();
+    document.getElementById('kiReload').onclick=function(){ loadKasirIndividual(); }; document.getElementById('kiFilter').onchange=function(){ loadKasirIndividual(); }; loadKasirIndividual();
+  }
+  async function loadKasirIndividual(){
+    var box=document.getElementById('kiList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listKasirIndividual(); }catch(e){}
+    var f=(document.getElementById('kiFilter')||{}).value||'';
+    if(f) arr=arr.filter(function(k){ return k.approvalStatus===f; });
+    if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada kasir individual'+(f?' dengan status ini':'')+'.</div>'; return; }
+    function badge(k){ if(k.approvalStatus==='approved') return '<span class="tag on">DISETUJUI</span>'; if(k.approvalStatus==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
+    box.innerHTML = arr.map(function(k){
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(k.namaLengkap||'(tanpa nama)')+' '+badge(k)+(k.active===false?' <span class="tag off">NONAKTIF</span>':'')+'</div>'
+        +'<div class="sub">'+esc(k.outlet||'-')+(k.shift?' · '+esc(k.shift):'')+(k.status?' · '+esc(k.status):'')+' · '+esc(k.phone||'')+'</div></div>'
+        +'<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
+        + (k.approvalStatus!=='approved' ? ('<button class="btn sm sec" data-appr="'+esc(k.id)+'">✓ Setujui</button>') : '')
+        + (k.approvalStatus==='pending' ? ('<button class="btn sm red" data-rej="'+esc(k.id)+'">✕ Tolak</button>') : '')
+        + (k.approvalStatus==='approved' ? ('<button class="btn sm sec" data-editki="'+esc(k.id)+'">⚙️ Edit</button><button class="btn sm sec" data-toggleki="'+esc(k.id)+'" data-on="'+(k.active!==false?'1':'0')+'">'+(k.active!==false?'Nonaktifkan':'Aktifkan')+'</button>') : '')
+        +'</div></div>';
+    }).join('');
+    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKasir(b.getAttribute('data-appr')); loadKasirIndividual(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran kasir ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKasir(b.getAttribute('data-rej')); loadKasirIndividual(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-toggleki]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.updateKasirProfile(b.getAttribute('data-toggleki'), {active:b.getAttribute('data-on')!=='1'}); loadKasirIndividual(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-editki]').forEach(function(b){ b.onclick=function(){ var k=arr.find(function(x){ return x.id===b.getAttribute('data-editki'); }); if(k) openKasirEdit(k); }; });
+  }
+  function openKasirEdit(k){
+    var bk=document.createElement('div');
+    bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;max-height:90vh;overflow:auto">'
+      +'<div style="font-weight:800;color:var(--coklat);margin-bottom:10px">⚙️ Edit Kasir Individual</div>'
+      +'<label>Nama lengkap</label><input id="keNm" value="'+esc(k.namaLengkap||'')+'">'
+      +'<label>Outlet</label><select id="keOut">'+buildOutletOpts()+'</select>'
+      +'<label>Shift</label><select id="keShift"><option value="">— pilih shift —</option><option>Pagi</option><option>Siang</option><option>Malam</option><option>Fleksibel</option></select>'
+      +'<label>Status</label><input id="keStatus" value="'+esc(k.status||'')+'" placeholder="Training / Junior / Senior / Tetap">'
+      +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="keSave" style="flex:1">💾 Simpan</button><button class="btn sec" id="keCancel" style="flex:1">Batal</button></div>'
+      +'</div>';
+    document.body.appendChild(bk);
+    var outSel=bk.querySelector('#keOut'); if(k.outlet) outSel.value=k.outlet;
+    var shiftSel=bk.querySelector('#keShift'); if(k.shift) shiftSel.value=k.shift;
+    bk.querySelector('#keCancel').onclick=function(){ bk.remove(); };
+    bk.onclick=function(e){ if(e.target===bk) bk.remove(); };
+    bk.querySelector('#keSave').onclick=async function(){ if(busy) return;
+      var nm=(bk.querySelector('#keNm').value||'').trim(); if(!nm){ alert('Nama wajib diisi.'); return; }
+      var patch={ namaLengkap:nm, outlet:outSel.value, shift:shiftSel.value, status:(bk.querySelector('#keStatus').value||'').trim() };
+      busy=true; this.disabled=true; this.textContent='Menyimpan…';
+      try{ await O.updateKasirProfile(k.id, patch); bk.remove(); loadKasirIndividual(); }
+      catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
+      busy=false; };
   }
   async function loadStaff(){
     var box=document.getElementById('sList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';

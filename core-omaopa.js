@@ -15,6 +15,9 @@ import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, addDoc, onSnapshot, increment, serverTimestamp,
   runTransaction, collection, getDocs, getCountFromServer, query, orderBy, where, limit, startAfter, documentId
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import {
+  getStorage, ref as storageRef, uploadBytes
+} from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg",
@@ -29,6 +32,7 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+const storage = getStorage(app);
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
 
 const LS_PTS = 'omaopa_points';        // cermin dompet (dipakai game utk tampilan)
@@ -142,6 +146,7 @@ onAuthStateChanged(auth, async (u)=>{
       if(si && (user.email||'').split('@')[0]===normPhone(BOOTSTRAP_MASTER_PHONE)){ masterFlag=true; superFlag=true; if(!si.master){ try{ setDoc(doc(db,'staff',user.uid),{master:true,super:true,admin:true},{merge:true}); }catch(_e){} } }
       if(staffFlag){ try{ setDoc(doc(db,'leaderboard',user.uid),{staff:true},{merge:true}); }catch(e){} try{ setDoc(doc(db,'scores',user.uid),{staff:true},{merge:true}); }catch(e){} }
     }catch(e){ staffFlag=false; }
+    if(!staffFlag){ try{ const kd=await getDoc(doc(db,'kasirIndividual',user.uid)); if(kd.exists()) staffFlag=true; }catch(e){} }
     const ref = doc(db,'users',user.uid);
     unsubDoc = onSnapshot(ref,(d)=>{
       const data = d.exists()? d.data() : {};
@@ -689,8 +694,9 @@ async function avgTransactionStats(fromMs, toMs){
   let txs=[];
   try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ outlet:(x.outlet||'').trim(), nominal:x.nominal||0, ts:ts }); }); }catch(e){ return { overall:{avg:0,count:0,total:0}, byOutlet:[] }; }
   txs=txs.filter(t=> t.nominal>0 && (!fromMs || t.ts>=fromMs) && (!toMs || t.ts<=toMs));
+  const validKeys={}; (window.OMA_OUTLETS||[]).forEach(o=>{ if(o&&o.name){ const k=o.name.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim(); if(k) validKeys[k]=o.name; } });
   const byOutlet={};
-  txs.forEach(t=>{ const key=t.outlet.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim(); if(!key) return; if(!byOutlet[key]) byOutlet[key]={name:t.outlet,count:0,total:0}; byOutlet[key].count++; byOutlet[key].total+=t.nominal; });
+  txs.forEach(t=>{ const key=t.outlet.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim(); if(!key || !validKeys[key]) return; if(!byOutlet[key]) byOutlet[key]={name:validKeys[key],count:0,total:0}; byOutlet[key].count++; byOutlet[key].total+=t.nominal; });
   const rows=Object.keys(byOutlet).map(k=>{ const o=byOutlet[k]; return { outlet:o.name, count:o.count, total:o.total, avg: o.count?Math.round(o.total/o.count):0 }; });
   rows.sort((a,b)=>b.total-a.total);
   const totalCount=txs.length, totalNominal=txs.reduce((s,t)=>s+t.nominal,0);
@@ -726,10 +732,14 @@ async function backfillLastTxnAt(){
 async function repeatRateByOutlet(months){
   months = Math.max(1, Number(months)||1);
   const cutoff=(function(){ const d=new Date(); d.setMonth(d.getMonth()-months); return d.getTime(); })();
+  const validKeys={}; (window.OMA_OUTLETS||[]).forEach(o=>{ if(o&&o.name){ const k=o.name.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim(); if(k) validKeys[k]=o.name; } });
   let txs=[];
   try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ uid:x.uid||'', outlet:(x.outlet||'').trim(), kind:x.kind||'', ts:ts }); }); }catch(e){ return []; }
   const byOutlet={};
-  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral' || t.kind==='bonus') return; const o=t.outlet; if(!o || /^referral/i.test(o) || /penyesuaian/i.test(o) || /^bonus/i.test(o)) return; const key=o.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim(); if(!byOutlet[key]) byOutlet[key]={ name:o, m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1; });
+  txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral' || t.kind==='bonus') return; const o=t.outlet; if(!o) return;
+    const key=o.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim();
+    if(!validKeys[key]) return;
+    if(!byOutlet[key]) byOutlet[key]={ name:validKeys[key], m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1; });
   const rows=[];
   Object.keys(byOutlet).forEach(k=>{ const g=byOutlet[k]; const m=g.m; const uids=Object.keys(m); const total=uids.length; const repeat=uids.filter(u=>m[u]>=2).length; const visits=uids.reduce((s,u)=>s+m[u],0); rows.push({ outlet:g.name, totalMembers:total, repeatMembers:repeat, visits:visits, rate:(total?(repeat/total):0) }); });
   rows.sort((a,b)=>b.totalMembers-a.totalMembers);
@@ -1386,6 +1396,103 @@ async function seedOutlets(arr){
   return { count:n };
 }
 
+// ---- kasir individual (absensi) ----
+function haversineMeters(lat1, lng1, lat2, lng2){
+  if([lat1,lng1,lat2,lng2].some(v=>typeof v!=='number'||isNaN(v))) return null;
+  const R=6371000; const toRad=d=>d*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
+  return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+async function registerKasirIndividual(data){
+  const { phone, pin, name, outlet, shift } = data||{};
+  if(!name || name.trim().length<2) throw {message:'Isi nama lengkap dulu ya.'};
+  if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
+  if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
+  if(!outlet) throw {message:'Pilih outlet dulu ya.'};
+  const res = await createUserWithEmailAndPassword(auth, phoneEmail(phone), pin);
+  const u = res.user;
+  try{ await updateProfile(u,{displayName:name.trim()}); }catch(e){}
+  await setDoc(doc(db,'kasirIndividual',u.uid), {
+    namaLengkap:name.trim(), phone:normPhone(phone), outlet:outlet,
+    shift:(shift||'').trim(), status:'training', fotoProfil:'',
+    approvalStatus:'pending', active:true,
+    registeredAt:serverTimestamp(), updatedAt:serverTimestamp()
+  });
+  return { uid:u.uid };
+}
+async function loginKasirIndividual(phone, pin){
+  if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
+  if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
+  await signInWithEmailAndPassword(auth, phoneEmail(phone), pin);
+}
+async function getKasirProfile(){
+  if(!auth.currentUser) return null;
+  try{ const snap=await getDoc(doc(db,'kasirIndividual',auth.currentUser.uid));
+    return snap.exists() ? Object.assign({id:snap.id}, snap.data()) : null;
+  }catch(e){ return null; }
+}
+async function listKasirIndividual(){
+  if(!(await isAdmin())) return [];
+  try{ const snap=await getDocs(collection(db,'kasirIndividual')); const arr=[];
+    snap.forEach(d=>{ const x=d.data()||{}; arr.push({ id:d.id, namaLengkap:x.namaLengkap||'', phone:x.phone||'', outlet:x.outlet||'', shift:x.shift||'', status:x.status||'', approvalStatus:x.approvalStatus||'pending', active:x.active!==false, fotoProfil:x.fotoProfil||'' }); });
+    arr.sort((a,b)=>(a.outlet||'').localeCompare(b.outlet||'')||(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
+    return arr;
+  }catch(e){ return []; }
+}
+async function approveKasir(uid){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!uid) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'kasirIndividual',uid), { approvalStatus:'approved', approvedBy:(auth.currentUser&&auth.currentUser.uid)||'', approvedAt:serverTimestamp(), updatedAt:serverTimestamp() }, {merge:true});
+}
+async function rejectKasir(uid){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!uid) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'kasirIndividual',uid), { approvalStatus:'ditolak', updatedAt:serverTimestamp() }, {merge:true});
+}
+async function updateKasirProfile(uid, patch){
+  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!uid) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'kasirIndividual',uid), Object.assign({updatedAt:serverTimestamp()}, patch||{}), {merge:true});
+}
+async function deleteKasirIndividual(uid){
+  if(!(await isMaster())) throw {message:'Khusus master.'};
+  if(!uid) throw {message:'ID kosong.'};
+  await deleteDoc(doc(db,'kasirIndividual',uid));
+}
+async function uploadAttendancePhoto(blob){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!blob) throw {message:'Foto kosong.'};
+  const path = 'attendance-photos/'+auth.currentUser.uid+'/'+Date.now()+'.jpg';
+  const sref = storageRef(storage, path);
+  await uploadBytes(sref, blob, {contentType:'image/jpeg'});
+  return path;
+}
+async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPath){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(type!=='masuk' && type!=='keluar') throw {message:'Tipe absen tidak valid.'};
+  if(!outlet) throw {message:'Outlet kosong.'};
+  await addDoc(collection(db,'attendance'), {
+    kasirUid: auth.currentUser.uid,
+    outlet: outlet,
+    type: type,
+    lokasi: { lat:lat, lng:lng, akurasi:(typeof akurasi==='number'?akurasi:null) },
+    jarak: (typeof jarak==='number'?jarak:null),
+    photoPath: photoPath||'',
+    createdAt: serverTimestamp()
+  });
+}
+async function getLastAttendance(){
+  if(!auth.currentUser) return null;
+  try{
+    const q = query(collection(db,'attendance'), where('kasirUid','==',auth.currentUser.uid), orderBy('createdAt','desc'), limit(1));
+    const snap = await getDocs(q);
+    let result=null;
+    snap.forEach(d=>{ const x=d.data(); result={ type:x.type||'', outlet:x.outlet||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }; });
+    return result;
+  }catch(e){ return null; }
+}
+
 // ---- staff / kasir ----
 async function listStaff(){
   if(!(await isAdmin())) return [];
@@ -1625,6 +1732,8 @@ window.OmaOpa = {
   isAdmin, isSuper, isMaster, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
+  registerKasirIndividual, loginKasirIndividual, getKasirProfile, listKasirIndividual, approveKasir, rejectKasir, updateKasirProfile, deleteKasirIndividual, haversineMeters,
+  recordAttendance, getLastAttendance, uploadAttendancePhoto,
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
