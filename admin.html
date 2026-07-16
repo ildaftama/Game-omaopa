@@ -804,7 +804,7 @@
       rows.forEach(function(r){ var pct=Math.round(r.rate*100); h+='<tr style="border-top:1px solid #EFE2C4"><td style="padding:6px 6px">'+esc(r.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</td><td style="padding:6px 6px;text-align:right">'+r.totalMembers+'</td><td style="padding:6px 6px;text-align:right">'+r.repeatMembers+'</td><td style="padding:6px 6px;text-align:right"><b>'+pct+'%</b></td></tr>'; });
       h+='</table>'; body.innerHTML=h;
       var sorted=rows.slice().sort(function(a,b){return b.rate-a.rate;});
-      function rankRow(r,i){ var pct=Math.round(r.rate*100); return '<div class="row" style="padding:6px 0"><div class="grow"><b>#'+(i+1)+'</b> '+esc(r.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</div><div><b>'+pct+'%</b> <span class="sub">('+r.totalMembers+' member)</span></div></div>'; }
+      function rankRow(r,i){ var pct=Math.round(r.rate*100); return '<div class="row" style="padding:6px 0"><div class="grow"><b>#'+(i+1)+'</b> '+esc(r.outlet.replace(/^Oma Opa Cakery\s*/i,''))+'</div><div><b>'+pct+'%</b> <span class="sub">('+r.repeatMembers+'/'+r.totalMembers+' member)</span></div></div>'; }
       if(topEl) topEl.innerHTML = sorted.slice(0,5).map(rankRow).join('') || '-';
       if(botEl) botEl.innerHTML = sorted.slice().reverse().slice(0,5).map(rankRow).join('') || '-';
     }
@@ -853,12 +853,26 @@
       for(var i=0;i<12;i++){ h+='<button class="btn sm sec bdm" data-mo="'+i+'" style="flex:0 0 auto">'+MO[i].slice(0,3)+' ('+by[i].length+')</button>'; }
       h+='</div><div id="bdList" class="muted" style="margin-top:10px">Klik bulan di atas untuk lihat daftar member.'+(noDob?(' <br><span style="font-size:.76rem">'+noDob+' member belum isi tanggal lahir.</span>'):'')+'</div>';
       box.innerHTML=h;
+      var _bdPage=0, _bdList=[], _bdMonthLabel='';
+      function renderBdPage(){
+        var el=document.getElementById('bdList'); if(!el) return;
+        var pageSize=10, total=_bdList.length, totalPages=Math.max(1,Math.ceil(total/pageSize));
+        if(_bdPage>=totalPages) _bdPage=totalPages-1; if(_bdPage<0) _bdPage=0;
+        var start=_bdPage*pageSize, slice=_bdList.slice(start,start+pageSize);
+        var hh='<div class="muted" style="margin-bottom:6px">'+total+' member lahir di '+_bdMonthLabel+' (halaman '+(_bdPage+1)+'/'+totalPages+'):</div>';
+        hh+=slice.map(function(m){ var d=new Date(m.dob); var dd=d.getDate(); var ph=(m.phone||'').replace(/^0/,'62'); return '<div class="row"><div class="grow"><div class="nm" style="font-size:.85rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+dd+' '+_bdMonthLabel+' · '+esc(m.phone||'-')+'</div></div>'+(ph?('<a class="btn sm sec" style="text-decoration:none" href="https://wa.me/'+ph+'" target="_blank" rel="noopener">WA</a>'):'')+'</div>'; }).join('');
+        if(totalPages>1){ hh+='<div style="display:flex;gap:8px;margin-top:10px"><button class="btn sm sec" id="bdPrev" '+(_bdPage<=0?'disabled':'')+'>‹ Sebelumnya</button><button class="btn sm sec" id="bdNext" '+(_bdPage>=totalPages-1?'disabled':'')+'>Berikutnya ›</button></div>'; }
+        el.innerHTML=hh;
+        var pv=document.getElementById('bdPrev'); if(pv) pv.onclick=function(){ _bdPage--; renderBdPage(); };
+        var nx=document.getElementById('bdNext'); if(nx) nx.onclick=function(){ _bdPage++; renderBdPage(); };
+      }
       box.querySelectorAll('.bdm').forEach(function(b){ b.onclick=function(){
         box.querySelectorAll('.bdm').forEach(function(x){ x.className='btn sm sec bdm'; }); b.className='btn sm bdm';
-        var i=Number(b.dataset.mo); var list=by[i].slice().sort(function(a,c){ return new Date(a.dob).getDate()-new Date(c.dob).getDate(); });
+        var i=Number(b.dataset.mo); _bdList=by[i].slice().sort(function(a,c){ return new Date(a.dob).getDate()-new Date(c.dob).getDate(); });
+        _bdMonthLabel=MO[i]; _bdPage=0;
         var el=document.getElementById('bdList');
-        if(!list.length){ el.innerHTML='<div class="muted">Belum ada member yang lahir di '+MO[i]+'.</div>'; return; }
-        el.innerHTML='<div class="muted" style="margin-bottom:6px">'+list.length+' member lahir di '+MO[i]+':</div>'+list.map(function(m){ var d=new Date(m.dob); var dd=d.getDate(); var ph=(m.phone||'').replace(/^0/,'62'); return '<div class="row"><div class="grow"><div class="nm" style="font-size:.85rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+dd+' '+MO[i]+' · '+esc(m.phone||'-')+'</div></div>'+(ph?('<a class="btn sm sec" style="text-decoration:none" href="https://wa.me/'+ph+'" target="_blank" rel="noopener">WA</a>'):'')+'</div>'; }).join('');
+        if(!_bdList.length){ el.innerHTML='<div class="muted">Belum ada member yang lahir di '+MO[i]+'.</div>'; return; }
+        renderBdPage();
       }; });
     }
     loadBirthdays();
