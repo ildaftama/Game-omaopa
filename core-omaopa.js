@@ -13,7 +13,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, addDoc, onSnapshot, increment, serverTimestamp,
-  runTransaction, collection, getDocs, getCountFromServer, query, orderBy, where, limit, startAfter, documentId
+  runTransaction, collection, getDocs, getCountFromServer, query, orderBy, where, limit, startAfter, documentId, arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import {
   getStorage, ref as storageRef, uploadBytes
@@ -1460,6 +1460,87 @@ async function deleteKasirIndividual(uid){
   if(!uid) throw {message:'ID kosong.'};
   await deleteDoc(doc(db,'kasirIndividual',uid));
 }
+// ---- pengelompokan area outlet (terpusat, dipakai admin/rekap/broadcast) ----
+const KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal uii']; // Jogja -> Area 1/Metavest; "jakal uii" spesifik; kecuali nama mengandung "kyai mojo"
+function outletGroup(name){
+  const key=(name||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim();
+  if(!key) return '';
+  let area='';
+  (window.OMA_OUTLETS||[]).some(o=>{ const k=((o&&o.name)||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); if(k===key){ area=(o.area||'').toLowerCase(); return true; } return false; });
+  const isYogya=area.indexOf('yogya')>=0;
+  const is5=KRON_EXCEPT.some(k=>key.indexOf(k)>=0) && key.indexOf('kyai mojo')<0;
+  if(isYogya && !is5) return 'kronggahan';
+  if(area.indexOf('klaten')>=0 || area.indexOf('magelang')>=0 || (isYogya && is5)) return 'area1';
+  if(area.indexOf('solo')>=0) return 'area2';
+  if(area.indexOf('semarang')>=0 || area.indexOf('salatiga')>=0) return 'area3';
+  return '';
+}
+function matchOutletKey(memberOutlet, targetKey){
+  if(!targetKey) return false;
+  if(targetKey==='__metavest'){ const g=outletGroup(memberOutlet); return g==='area1'||g==='area2'||g==='area3'; }
+  if(targetKey==='__kronggahan'||targetKey==='__area1'||targetKey==='__area2'||targetKey==='__area3'){ return outletGroup(memberOutlet)===targetKey.replace('__',''); }
+  const a=(memberOutlet||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const b=(targetKey||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim();
+  return !!a && a===b;
+}
+
+// ---- blast pesan (broadcast) ----
+async function sendBroadcast(data){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  const d=data||{}; const body=(d.body||'').trim();
+  if(!body) throw {message:'Isi pesan wajib diisi.'};
+  if(!d.targetType) throw {message:'Target wajib dipilih.'};
+  await addDoc(collection(db,'broadcasts'), {
+    title:(d.title||'').trim(), body:body, targetType:d.targetType, targetParams:d.targetParams||{},
+    active:true, createdBy:(auth.currentUser?auth.currentUser.uid:''), createdAt:serverTimestamp()
+  });
+}
+async function listBroadcasts(n){
+  if(!(await isAdmin())) return [];
+  try{
+    const q=query(collection(db,'broadcasts'), orderBy('createdAt','desc'), limit(n||50));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, title:x.title||'', body:x.body||'', targetType:x.targetType||'', targetParams:x.targetParams||{}, active:x.active!==false, createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function deactivateBroadcast(id){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  if(!id) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'broadcasts',id), { active:false }, {merge:true});
+}
+async function deleteBroadcast(id){
+  if(!(await isMaster())) throw {message:'Khusus master.'};
+  if(!id) throw {message:'ID kosong.'};
+  await deleteDoc(doc(db,'broadcasts',id));
+}
+async function getMemberBroadcasts(){
+  if(!user) return [];
+  try{
+    const q=query(collection(db,'broadcasts'), where('active','==',true), orderBy('createdAt','desc'), limit(50));
+    const snap=await getDocs(q);
+    const read=(profile&&profile.readBroadcasts)||[];
+    const dob=(profile&&profile.dob)?new Date(profile.dob):null;
+    const regTs=(profile&&profile.createdAt&&profile.createdAt.seconds)?profile.createdAt.seconds*1000:0;
+    const outlet=(profile&&profile.homeOutlet)||'';
+    const arr=[];
+    snap.forEach(d=>{
+      const x=d.data(); const tp=x.targetParams||{}; let match=false;
+      if(x.targetType==='all') match=true;
+      else if(x.targetType==='birthday' && dob) match=((dob.getMonth()+1)===tp.month && dob.getDate()===tp.day);
+      else if(x.targetType==='daterange') match=(!tp.fromMs||regTs>=tp.fromMs)&&(!tp.toMs||regTs<=tp.toMs);
+      else if(x.targetType==='outlet') match=(tp.keys||[]).some(k=>matchOutletKey(outlet,k));
+      else if(x.targetType==='specific') match=(tp.uids||[]).indexOf(user.uid)>=0;
+      if(match) arr.push({ id:d.id, title:x.title||'', body:x.body||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0, isRead: read.indexOf(d.id)>=0 });
+    });
+    return arr;
+  }catch(e){ return []; }
+}
+async function markBroadcastRead(id){
+  if(!user || !id) return;
+  try{ await setDoc(doc(db,'users',user.uid), { readBroadcasts: arrayUnion(id) }, {merge:true}); }catch(e){}
+}
+
 async function uploadAttendancePhoto(blob){
   if(!auth.currentUser) throw {message:'Belum login.'};
   if(!blob) throw {message:'Foto kosong.'};
@@ -1734,6 +1815,8 @@ window.OmaOpa = {
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
   registerKasirIndividual, loginKasirIndividual, getKasirProfile, listKasirIndividual, approveKasir, rejectKasir, updateKasirProfile, deleteKasirIndividual, haversineMeters,
   recordAttendance, getLastAttendance, uploadAttendancePhoto,
+  outletGroup, matchOutletKey,
+  sendBroadcast, listBroadcasts, deactivateBroadcast, deleteBroadcast, getMemberBroadcasts, markBroadcastRead,
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,

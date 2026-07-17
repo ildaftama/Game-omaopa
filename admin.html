@@ -83,6 +83,7 @@
       <button data-tab="promo">📣 Promo</button>
       <button data-tab="analitik">📈 Analitik</button>
       <button data-tab="pesanan">🧾 Pesanan</button>
+      <button data-tab="blast">📢 Blast</button>
       <button data-tab="pengaturan">⚙️ Pengaturan</button>
     </div>
     <div id="tab"></div>
@@ -92,7 +93,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=120"></script>
+<script type="module" src="core-omaopa.js?v=121"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -124,7 +125,7 @@
   document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
     tab=b.getAttribute('data-tab'); document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on'); render();
   }; });
-  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, pengaturan:renderPengaturan}[tab]||renderHome)(); }
+  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, pengaturan:renderPengaturan}[tab]||renderHome)(); }
   function setActiveTab(name){ tab=name; document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-tab')===name); }); }
   function applySegment(field,val){ segFilter={field:field, value:val}; setActiveTab('member'); render(); }
 
@@ -206,6 +207,129 @@
       +'<div class="card" id="promoBonusCard"><div class="nm">🎁 Bonus poin pendaftaran</div><div id="pbWrap" class="muted" style="margin-top:6px">Memuat…</div></div>';
     loadBanner(); loadPromoBonus();
   }
+  async function renderBlast(){
+    var canSend=false; try{ canSend=await O.isSuper(); }catch(e){}
+    var html='<div class="card"><div class="nm">📢 Kirim Pesan Blast</div>'
+      +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Kirim pesan ke member — nanti muncul di kotak pesan mereka.</div>'
+      +(canSend ? (
+        '<label>Judul (catatan admin doang, member gak lihat ini)</label><input id="bTitle" placeholder="misal: Promo HUT Agustus">'
+        +'<label>Isi pesan</label><textarea id="bBody" rows="4" style="width:100%;border:2px solid #E7D8BE;border-radius:12px;padding:12px;font-family:inherit;font-size:1rem;font-weight:700;color:var(--coklat);box-sizing:border-box" placeholder="Tulis pesan buat member di sini..."></textarea>'
+        +'<label>Kirim ke</label><select id="bTarget">'
+          +'<option value="all">🟡 Semua member</option>'
+          +'<option value="birthday">🎂 Ulang tahun HARI INI</option>'
+          +'<option value="daterange">📅 Daftar di rentang tanggal</option>'
+          +'<option value="outlet">🏪 Outlet/Area tertentu</option>'
+          +'<option value="specific">🔍 Pilih member manual</option>'
+        +'</select>'
+        +'<div id="bTargetExtra" style="margin-top:8px"></div>'
+        +'<button class="btn" id="bSend" style="margin-top:14px">📤 Kirim Blast</button><div id="bMsg"></div>'
+      ) : '<div class="res warn">👁️ Cuma Admin Utama yang bisa kirim blast.</div>')
+      +'</div>'
+      +'<div class="card"><div class="nm">🕑 Riwayat Blast</div><div id="bHist" class="muted" style="margin-top:8px">Memuat…</div></div>';
+    tabEl.innerHTML=html;
+
+    if(canSend){
+      var selectedMembers={};
+      var targetSel=document.getElementById('bTarget');
+      function renderSelectedList(){
+        var el=document.getElementById('bSelected'); if(!el) return;
+        var uids=Object.keys(selectedMembers);
+        if(!uids.length){ el.innerHTML='(belum ada)'; return; }
+        el.innerHTML=uids.map(function(u){ return '<span class="tag on" style="display:inline-flex;align-items:center;gap:5px;margin:2px 4px 2px 0">'+esc(selectedMembers[u])+' <b data-rm="'+esc(u)+'" style="cursor:pointer">✕</b></span>'; }).join('');
+        el.querySelectorAll('[data-rm]').forEach(function(b){ b.onclick=function(){ delete selectedMembers[b.getAttribute('data-rm')]; renderSelectedList(); }; });
+      }
+      function renderTargetExtra(){
+        var t=targetSel.value; var box=document.getElementById('bTargetExtra');
+        if(t==='daterange'){
+          box.innerHTML='<label>Dari tanggal</label><input type="date" id="bFrom"><label>Sampai tanggal</label><input type="date" id="bTo">';
+        } else if(t==='outlet'){
+          var opts=(window.OMA_OUTLETS||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(o){ return '<option value="'+esc(o.name)+'">'+esc((o.name||'').replace(/^Oma Opa Cakery\s*/i,''))+'</option>'; }).join('');
+          box.innerHTML='<label>Pilih outlet/area (bisa lebih dari satu)</label>'
+            +'<select id="bOutletMulti" multiple size="8" style="width:100%;border:2px solid #E7D8BE;border-radius:12px;padding:8px;font-family:inherit;box-sizing:border-box">'
+            +'<option value="__metavest">🏢 Semua Metavest</option>'
+            +'<option value="__area1">🗺️ Area 1</option>'
+            +'<option value="__area2">🗺️ Area 2</option>'
+            +'<option value="__area3">🗺️ Area 3</option>'
+            +'<option value="__kronggahan">🏢 Kronggahan</option>'
+            +opts+'</select><div class="muted" style="font-size:.72rem;margin-top:4px">Tahan Ctrl/Cmd (atau tap-tahan di HP) buat pilih lebih dari satu.</div>';
+        } else if(t==='specific'){
+          selectedMembers={};
+          box.innerHTML='<label>Cari member (nama/No. HP)</label><div style="display:flex;gap:6px"><input id="bSearchQ" style="flex:1" placeholder="cth: Budi / 0812..."><button class="btn sm sec" id="bSearchGo">Cari</button></div>'
+            +'<div id="bSearchRes" style="margin-top:6px"></div>'
+            +'<div class="muted" style="margin-top:8px;font-size:.8rem">Member terpilih:</div><div id="bSelected" style="margin-top:4px"></div>';
+          renderSelectedList();
+          document.getElementById('bSearchGo').onclick=async function(){
+            var q=(document.getElementById('bSearchQ').value||'').trim(); var res=document.getElementById('bSearchRes');
+            if(!q){ res.innerHTML='<div class="muted">Ketik nama / No. HP dulu.</div>'; return; }
+            res.innerHTML='<div class="muted">Mencari…</div>';
+            var arr=[]; try{ if(/^[0-9+]/.test(q)){ var one=await O.getMemberByPhone(q); arr=one?[one]:[]; } if(!arr.length) arr=await O.listMembers(q,30); }catch(e){}
+            if(!arr.length){ res.innerHTML='<div class="muted">Member tidak ketemu.</div>'; return; }
+            res.innerHTML=arr.slice(0,20).map(function(m){ return '<div class="row" data-uid="'+esc(m.uid)+'" data-nm="'+esc(m.name||'')+'" style="cursor:pointer"><div class="grow"><div class="nm" style="font-size:.85rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+esc(m.phone||'-')+'</div></div><div class="btn sm">+ Tambah</div></div>'; }).join('');
+            res.querySelectorAll('[data-uid]').forEach(function(r){ r.onclick=function(){ selectedMembers[r.getAttribute('data-uid')]=r.getAttribute('data-nm')||'(tanpa nama)'; renderSelectedList(); }; });
+          };
+        } else { box.innerHTML=''; }
+      }
+      targetSel.onchange=renderTargetExtra; renderTargetExtra();
+
+      document.getElementById('bSend').onclick=async function(){
+        if(busy) return;
+        var body=(document.getElementById('bBody').value||'').trim();
+        var msg=document.getElementById('bMsg');
+        if(!body){ msg.innerHTML='<div class="res bad">Isi pesan wajib diisi.</div>'; return; }
+        var t=targetSel.value; var params={};
+        if(t==='birthday'){ var now=new Date(); params={month:now.getMonth()+1, day:now.getDate()}; }
+        else if(t==='daterange'){
+          var f=document.getElementById('bFrom').value, to=document.getElementById('bTo').value;
+          if(!f && !to){ msg.innerHTML='<div class="res bad">Isi minimal salah satu tanggal.</div>'; return; }
+          params={ fromMs: f? new Date(f+'T00:00:00').getTime(): 0, toMs: to? new Date(to+'T23:59:59').getTime(): 0 };
+        } else if(t==='outlet'){
+          var sel=document.getElementById('bOutletMulti'); var keys=Array.prototype.filter.call(sel.options,function(o){return o.selected;}).map(function(o){return o.value;});
+          if(!keys.length){ msg.innerHTML='<div class="res bad">Pilih minimal 1 outlet/area.</div>'; return; }
+          params={ keys:keys };
+        } else if(t==='specific'){
+          var uids=Object.keys(selectedMembers);
+          if(!uids.length){ msg.innerHTML='<div class="res bad">Pilih minimal 1 member.</div>'; return; }
+          params={ uids:uids };
+        }
+        busy=true; this.disabled=true; this.textContent='Mengirim…';
+        try{
+          await O.sendBroadcast({ title:document.getElementById('bTitle').value, body:body, targetType:t, targetParams:params });
+          msg.innerHTML='<div class="res ok">✓ Blast terkirim.</div>';
+          document.getElementById('bTitle').value=''; document.getElementById('bBody').value=''; targetSel.value='all'; renderTargetExtra();
+          loadBlastHistory();
+        }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+        this.disabled=false; this.textContent='📤 Kirim Blast'; busy=false;
+      };
+    }
+
+    function targetLabel(x){
+      var tp=x.targetParams||{};
+      if(x.targetType==='all') return 'Semua member';
+      if(x.targetType==='birthday') return 'Ulang tahun '+(tp.day||'?')+'/'+(tp.month||'?');
+      if(x.targetType==='daterange') return 'Daftar '+(tp.fromMs?new Date(tp.fromMs).toLocaleDateString('id-ID'):'-')+' s/d '+(tp.toMs?new Date(tp.toMs).toLocaleDateString('id-ID'):'-');
+      if(x.targetType==='outlet') return 'Outlet: '+(tp.keys||[]).map(function(k){ return k.indexOf('__')===0? k.replace('__','').toUpperCase() : k.replace(/^Oma Opa Cakery\s*/i,''); }).join(', ');
+      if(x.targetType==='specific') return (tp.uids||[]).length+' member terpilih';
+      return '-';
+    }
+    async function loadBlastHistory(){
+      var box=document.getElementById('bHist'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+      var arr=[]; try{ arr=await O.listBroadcasts(50); }catch(e){}
+      if(!arr.length){ box.innerHTML='<div class="muted">Belum ada blast yang dikirim.</div>'; return; }
+      box.innerHTML=arr.map(function(x){
+        return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm" style="font-size:.88rem">'+esc(x.title||'(tanpa judul)')+(x.active?'':' <span class="tag off">NONAKTIF</span>')+'</div>'
+          +'<div class="sub">'+esc(x.body.length>80?x.body.slice(0,80)+'…':x.body)+'</div>'
+          +'<div class="sub" style="margin-top:2px">🎯 '+esc(targetLabel(x))+' · '+(x.createdAt?new Date(x.createdAt).toLocaleString('id-ID'):'-')+'</div></div>'
+          +((canSend||masterEdit) ? ('<div style="display:flex;gap:5px;margin-top:6px">'
+            +(x.active&&canSend?('<button class="btn sm sec" data-off="'+esc(x.id)+'">Nonaktifkan</button>'):'')
+            +(masterEdit?('<button class="btn sm red" data-delb="'+esc(x.id)+'">Hapus</button>'):'')+'</div>') : '')
+          +'</div>';
+      }).join('');
+      box.querySelectorAll('[data-off]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.deactivateBroadcast(b.getAttribute('data-off')); loadBlastHistory(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+      box.querySelectorAll('[data-delb]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Hapus blast ini permanen?')) return; busy=true; b.disabled=true; try{ await O.deleteBroadcast(b.getAttribute('data-delb')); loadBlastHistory(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    }
+    loadBlastHistory();
+  }
+
   async function renderPengaturan(){
     if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
     tabEl.innerHTML='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
