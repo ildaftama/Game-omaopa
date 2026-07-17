@@ -1485,6 +1485,13 @@ function matchOutletKey(memberOutlet, targetKey){
 }
 
 // ---- blast pesan (broadcast) ----
+function inBirthdayRange(dob, tp){
+  const dobKey=(dob.getMonth()+1)*100+dob.getDate();
+  const from=(tp.fromMonth||1)*100+(tp.fromDay||1);
+  const to=(tp.toMonth||12)*100+(tp.toDay||31);
+  if(from<=to) return dobKey>=from && dobKey<=to;
+  return dobKey>=from || dobKey<=to; // rentang muter tahun, misal Des -> Jan
+}
 async function sendBroadcast(data){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   const d=data||{}; const body=(d.body||'').trim();
@@ -1527,7 +1534,7 @@ async function getMemberBroadcasts(){
     snap.forEach(d=>{
       const x=d.data(); const tp=x.targetParams||{}; let match=false;
       if(x.targetType==='all') match=true;
-      else if(x.targetType==='birthday' && dob) match=((dob.getMonth()+1)===tp.month && dob.getDate()===tp.day);
+      else if(x.targetType==='birthday' && dob) match=inBirthdayRange(dob, tp);
       else if(x.targetType==='daterange') match=(!tp.fromMs||regTs>=tp.fromMs)&&(!tp.toMs||regTs<=tp.toMs);
       else if(x.targetType==='outlet') match=(tp.keys||[]).some(k=>matchOutletKey(outlet,k));
       else if(x.targetType==='specific') match=(tp.uids||[]).indexOf(user.uid)>=0;
