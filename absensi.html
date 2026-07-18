@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Absensi — Oma Opa Cakery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --kuning:#FACC1A; --kuning-d:#E0B100; --coklat:#613925; --cream:#FFF8EC; }
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
+    background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream);
+    min-height:100vh; padding:18px 14px 40px; }
+  .wrap{ max-width:440px; margin:0 auto; }
+  .head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .head h1{ font-family:'Fredoka'; font-size:1.2rem; margin:0; color:var(--coklat); }
+  .head .badge{ font-size:.66rem; font-weight:900; background:var(--kuning); color:#5A3A05; padding:2px 9px; border-radius:999px; }
+  .card{ background:#fff; border:2px solid #EFE2C4; border-radius:18px; padding:16px; margin-bottom:14px; }
+  .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  label{ font-size:.78rem; font-weight:800; color:#8a6a3a; display:block; margin:10px 0 5px; }
+  label:first-child{ margin-top:0; }
+  input, select{ width:100%; border:2px solid #E7D8BE; border-radius:12px; padding:13px; font-size:1rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
+  input:focus, select:focus{ outline:none; border-color:var(--kuning); }
+  input[data-pin]{ font-family:monospace; letter-spacing:2px; font-weight:800; }
+  .btn{ width:100%; border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:1rem; border-radius:13px; padding:13px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; margin-top:14px; }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--kuning-d); }
+  .btn[disabled]{ opacity:.55; }
+  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #E7D8BE; box-shadow:none; }
+  .tabs{ display:flex; gap:7px; margin-bottom:14px; }
+  .tabs button{ flex:1; border:2px solid #E7D8BE; background:#fff; color:var(--coklat); font-weight:800; font-size:.85rem; border-radius:11px; padding:10px 4px; cursor:pointer; font-family:inherit; }
+  .tabs button.active{ background:var(--kuning); border-color:var(--kuning-d); color:#5A3A05; }
+  .res{ border-radius:14px; padding:14px; margin-top:14px; }
+  .res .t{ font-weight:900; font-size:1.05rem; }
+  .res .row{ font-size:.85rem; margin-top:6px; }
+  .ok{ background:#E7F6E7; border:2px solid #B7E0B7; }
+  .warn{ background:#FFF3D6; border:2px solid #F2D98A; }
+  .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; }
+  a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>Absensi</h1><span class="badge">KARYAWAN</span>
+  </div>
+  <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
+  <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
+</div>
+
+<script type="module" src="core-omaopa.js?v=124"></script>
+<script>
+(function(){
+  var panel = document.getElementById('panel');
+  var busy = false;
+  var mode = 'login'; // 'login' | 'daftar'
+  var currentProfile = null;
+  var pendingType = null;
+  var RADIUS_METERS = 75;
+  var faceDetectorPromise = null;
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+  function outletOptionsHtml(){
+    var outs=(window.OMA_OUTLETS||[]); var byArea={};
+    outs.forEach(function(o){ var a=o.area||'Lainnya'; (byArea[a]=byArea[a]||[]).push((o.name||'').replace(/^Oma Opa Cakery\s*/i,'')); });
+    var h='<option value="">— pilih lokasi absen —</option>';
+    Object.keys(byArea).sort().forEach(function(a){ h+='<optgroup label="'+esc(a)+'">'; byArea[a].forEach(function(n){ h+='<option>'+esc(n)+'</option>'; }); h+='</optgroup>'; });
+    return h;
+  }
+  async function jabatanOptionsHtml(){
+    var list=[]; try{ list=await window.OmaOpa.listJabatan(); }catch(e){}
+    if(!list.length) return '<option value="">— pilih jabatan —</option><option>Lainnya</option>';
+    return '<option value="">— pilih jabatan —</option>'+list.map(function(j){ return '<option>'+esc(j)+'</option>'; }).join('');
+  }
+
+  async function refresh(){
+    if(!window.OmaOpa){ panel.innerHTML = '<div class="muted">Menyiapkan…</div>'; return; }
+    var u = window.OmaOpa.getUser();
+    if(!u){ renderAuthForms(); return; }
+
+    panel.innerHTML = '<div class="muted">Memeriksa akun…</div>';
+    var profile = null;
+    try{ profile = await window.OmaOpa.getKaryawanProfile(); }catch(e){ profile=null; }
+
+    if(!profile){
+      panel.innerHTML = '<div class="res warn"><div class="t">Akun ini bukan akun karyawan</div>'
+        + '<div class="row">Akun yang lagi login bukan akun karyawan (mungkin akun member/staff lain). Keluar dulu, lalu daftar/masuk pakai akun karyawan.</div></div>'
+        + '<button class="btn sec" id="outBtn">Keluar</button>';
+      document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
+      return;
+    }
+
+    if(profile.active === false){
+      panel.innerHTML = '<div class="res bad"><div class="t">Akun dinonaktifkan</div>'
+        + '<div class="row">Akun karyawan kamu ('+esc(profile.namaLengkap||'')+') sudah dinonaktifkan. Hubungi admin kalau ini keliru.</div></div>'
+        + '<button class="btn sec" id="outBtn">Keluar</button>';
+      document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
+      return;
+    }
+
+    if(profile.approvalStatus === 'pending'){
+      panel.innerHTML = '<div class="res warn"><div class="t">⏳ Menunggu persetujuan admin</div>'
+        + '<div class="row">Halo, <b>'+esc(profile.namaLengkap||'')+'</b>! Pendaftaran kamu di <b>'+esc(profile.outlet||'')+'</b> masih menunggu di-acc admin. Coba cek lagi nanti ya.</div></div>'
+        + '<button class="btn sec" id="outBtn">Keluar</button>';
+      document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
+      return;
+    }
+
+    if(profile.approvalStatus === 'ditolak'){
+      panel.innerHTML = '<div class="res bad"><div class="t">Pendaftaran ditolak</div>'
+        + '<div class="row">Pendaftaran karyawan atas nama <b>'+esc(profile.namaLengkap||'')+'</b> ditolak admin. Silakan hubungi admin untuk info lebih lanjut.</div></div>'
+        + '<button class="btn sec" id="outBtn">Keluar</button>';
+      document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
+      return;
+    }
+
+    // approved & active
+    currentProfile = profile;
+    panel.innerHTML = '<div class="res ok"><div class="t">✓ Halo, '+esc(profile.namaLengkap||'')+'!</div>'
+      + '<div class="row">Lokasi: <b>'+esc(profile.outlet||'-')+'</b></div>'
+      + (profile.jabatan?'<div class="row">Jabatan: <b>'+esc(profile.jabatan)+'</b></div>':'')
+      + (profile.shift?'<div class="row">Shift: <b>'+esc(profile.shift)+'</b></div>':'')
+      + (profile.status?'<div class="row">Status: <b>'+esc(profile.status)+'</b></div>':'')
+      + '</div>'
+      + '<div id="lastKi" class="muted" style="margin-top:10px">Memeriksa absen terakhir…</div>'
+      + '<button class="btn" id="absenMasuk">✓ Absen Masuk</button>'
+      + '<button class="btn sec" id="absenKeluar">◻ Absen Keluar</button>'
+      + '<input type="file" id="selfieInput" accept="image/*" capture="user" style="display:none">'
+      + '<div id="absenOut"></div>'
+      + '<a class="link" href="karyawan.html" style="display:block;text-align:center;margin-top:14px">📋 Lihat/lengkapi profil saya</a>'
+      + '<button class="btn sec" id="outBtn" style="margin-top:10px">Keluar</button>';
+    document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
+    document.getElementById('absenMasuk').onclick = function(){ pendingType='masuk'; document.getElementById('selfieInput').click(); };
+    document.getElementById('absenKeluar').onclick = function(){ pendingType='keluar'; document.getElementById('selfieInput').click(); };
+    document.getElementById('selfieInput').onchange = function(ev){
+      var file = ev.target.files && ev.target.files[0]; ev.target.value='';
+      if(file && pendingType) doAbsen(pendingType, file);
+    };
+    try{
+      var last = await window.OmaOpa.getLastAttendance();
+      var lk = document.getElementById('lastKi');
+      if(lk) lk.textContent = last ? ('Terakhir: '+(last.type==='masuk'?'Masuk':'Keluar')+' · '+new Date(last.ts).toLocaleString('id-ID')) : 'Belum ada riwayat absen.';
+    }catch(e){}
+  }
+
+  function getGPS(){
+    return new Promise(function(resolve, reject){
+      if(!navigator.geolocation){ reject({message:'HP/browser ini tidak mendukung GPS.'}); return; }
+      navigator.geolocation.getCurrentPosition(
+        function(pos){ resolve({ lat:pos.coords.latitude, lng:pos.coords.longitude, akurasi:pos.coords.accuracy }); },
+        function(err){ reject({message:'Gagal ambil lokasi: '+(err.message||'izin ditolak.')}); },
+        { enableHighAccuracy:true, timeout:15000, maximumAge:0 }
+      );
+    });
+  }
+
+  function compressImage(file, maxWidth){
+    return new Promise(function(resolve, reject){
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function(){
+        var scale = Math.min(1, maxWidth/img.width);
+        var w = Math.max(1, Math.round(img.width*scale)), h = Math.max(1, Math.round(img.height*scale));
+        var canvas = document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function(blob){ if(blob) resolve({blob:blob, canvas:canvas}); else reject({message:'Gagal memproses foto.'}); }, 'image/jpeg', 0.72);
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject({message:'Gagal memuat foto.'}); };
+      img.src = url;
+    });
+  }
+
+  function loadFaceDetector(){
+    if(!faceDetectorPromise){
+      faceDetectorPromise = import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm').then(function(vision){
+        return vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm').then(function(fileset){
+          return vision.FaceDetector.createFromOptions(fileset, {
+            baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite' },
+            runningMode: 'IMAGE'
+          });
+        });
+      });
+    }
+    return faceDetectorPromise;
+  }
+  async function checkFacePresent(canvas){
+    try{
+      var detector = await loadFaceDetector();
+      var result = detector.detect(canvas);
+      return !!(result && result.detections && result.detections.length>0);
+    }catch(e){ return true; } // gagal load library -> jangan blokir absen gara-gara itu
+  }
+
+  async function doAbsen(type, file){
+    if(busy) return; busy=true;
+    var bm=document.getElementById('absenMasuk'), bk=document.getElementById('absenKeluar');
+    if(bm) bm.disabled=true; if(bk) bk.disabled=true;
+    var out=document.getElementById('absenOut'); out.innerHTML='<div class="muted" style="margin-top:12px">📸 Memproses foto…</div>';
+    try{
+      var outletData=(window.OMA_OUTLETS||[]).find(function(o){ return (o.name||'')===currentProfile.outlet; });
+      if(!outletData || typeof outletData.lat!=='number' || typeof outletData.lng!=='number'){
+        out.innerHTML='<div class="res bad">Lokasi <b>'+esc(currentProfile.outlet)+'</b> belum diatur admin. Absen belum bisa dilakukan — hubungi admin untuk melengkapi koordinat lokasi dulu.</div>';
+      } else {
+        var comp = await compressImage(file, 480);
+        out.innerHTML='<div class="muted" style="margin-top:12px">🔍 Memeriksa wajah di foto…</div>';
+        var faceOk = await checkFacePresent(comp.canvas);
+        if(!faceOk){
+          out.innerHTML='<div class="res bad">Wajah tidak terdeteksi jelas di foto. Pastikan wajah menghadap kamera dengan pencahayaan cukup, lalu coba lagi.</div>';
+        } else {
+          out.innerHTML='<div class="muted" style="margin-top:12px">📍 Mengambil lokasi GPS…</div>';
+          var gps = await getGPS();
+          var jarak = window.OmaOpa.haversineMeters(gps.lat, gps.lng, outletData.lat, outletData.lng);
+          if(jarak==null || jarak > RADIUS_METERS){
+            out.innerHTML='<div class="res bad">Kamu berada sekitar <b>'+Math.round(jarak)+' meter</b> dari lokasi (maksimal '+RADIUS_METERS+'m). Absen ditolak — pastikan kamu sedang di lokasinya.</div>';
+          } else {
+            out.innerHTML='<div class="muted" style="margin-top:12px">⬆️ Mengunggah foto…</div>';
+            var photoPath = await window.OmaOpa.uploadAttendancePhoto(comp.blob);
+            out.innerHTML='<div class="muted" style="margin-top:12px">Menyimpan absen…</div>';
+            await window.OmaOpa.recordAttendance(currentProfile.outlet, type, gps.lat, gps.lng, gps.akurasi, jarak, photoPath);
+            out.innerHTML='<div class="res ok"><div class="t">✓ Absen '+(type==='masuk'?'Masuk':'Keluar')+' berhasil</div><div class="row">Jarak dari lokasi: '+Math.round(jarak)+'m</div></div>';
+          }
+        }
+      }
+    }catch(e){
+      out.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal absen, coba lagi.')+'</div>';
+    }
+    if(bm) bm.disabled=false; if(bk) bk.disabled=false;
+    busy=false;
+  }
+
+  function renderAuthForms(){
+    panel.innerHTML = '<div class="tabs">'
+      + '<button id="tabLogin" class="'+(mode==='login'?'active':'')+'">Masuk</button>'
+      + '<button id="tabDaftar" class="'+(mode==='daftar'?'active':'')+'">Daftar Akun Baru</button>'
+      + '</div>'
+      + '<div id="formArea"></div>';
+    document.getElementById('tabLogin').onclick = function(){ mode='login'; renderAuthForms(); };
+    document.getElementById('tabDaftar').onclick = function(){ mode='daftar'; renderAuthForms(); };
+    if(mode==='login') renderLoginForm(); else renderDaftarForm();
+  }
+
+  function renderLoginForm(){
+    var a = document.getElementById('formArea');
+    a.innerHTML = '<label>Nomor HP</label><input id="lPhone" type="tel" inputmode="numeric" placeholder="08xxxxxxxxxx" autocomplete="off">'
+      + '<label>PIN (6 angka)</label><input id="lPin" data-pin type="password" inputmode="numeric" maxlength="6" placeholder="••••••">'
+      + '<button class="btn" id="lBtn">Masuk</button><div id="lMsg"></div>';
+    document.getElementById('lBtn').onclick = async function(){
+      if(busy) return; busy=true; var b=this; b.disabled=true; b.textContent='Memproses…';
+      var msg=document.getElementById('lMsg'); msg.innerHTML='';
+      try{
+        await window.OmaOpa.loginKaryawan(document.getElementById('lPhone').value, document.getElementById('lPin').value);
+        refresh();
+      }catch(e){
+        msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Nomor HP atau PIN salah.')+'</div>';
+        b.disabled=false; b.textContent='Masuk';
+      }
+      busy=false;
+    };
+  }
+
+  async function renderDaftarForm(){
+    var a = document.getElementById('formArea');
+    a.innerHTML = '<label>Nama lengkap</label><input id="dNama" placeholder="Nama sesuai KTP">'
+      + '<label>Nomor HP</label><input id="dPhone" type="tel" inputmode="numeric" placeholder="08xxxxxxxxxx" autocomplete="off">'
+      + '<label>PIN (6 angka)</label><input id="dPin" data-pin type="password" inputmode="numeric" maxlength="6" placeholder="••••••">'
+      + '<label>Ulangi PIN</label><input id="dPin2" data-pin type="password" inputmode="numeric" maxlength="6" placeholder="••••••">'
+      + '<label>Jabatan</label><select id="dJabatan"><option value="">Memuat…</option></select>'
+      + '<label>Lokasi absen (outlet/kantor/pabrik)</label><select id="dOutlet">'+outletOptionsHtml()+'</select>'
+      + '<label>Shift</label><select id="dShift"><option value="">— pilih shift —</option><option>Pagi</option><option>Siang</option><option>Malam</option><option>Fleksibel</option></select>'
+      + '<button class="btn" id="dBtn">Daftar</button><div id="dMsg"></div>'
+      + '<div class="muted" style="margin-top:10px">Pendaftaran perlu di-acc admin dulu sebelum bisa dipakai.</div>';
+    jabatanOptionsHtml().then(function(h){ var sel=document.getElementById('dJabatan'); if(sel) sel.innerHTML=h; });
+    document.getElementById('dBtn').onclick = async function(){
+      if(busy) return;
+      var pin=document.getElementById('dPin').value, pin2=document.getElementById('dPin2').value;
+      var msg=document.getElementById('dMsg'); msg.innerHTML='';
+      if(pin!==pin2){ msg.innerHTML='<div class="res bad">PIN dan ulangi PIN gak sama.</div>'; return; }
+      busy=true; var b=this; b.disabled=true; b.textContent='Memproses…';
+      try{
+        await window.OmaOpa.registerKaryawan({
+          name: document.getElementById('dNama').value,
+          phone: document.getElementById('dPhone').value,
+          pin: pin,
+          jabatan: document.getElementById('dJabatan').value,
+          outlet: document.getElementById('dOutlet').value,
+          shift: document.getElementById('dShift').value
+        });
+        refresh();
+      }catch(e){
+        msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal daftar, coba lagi.')+'</div>';
+        b.disabled=false; b.textContent='Daftar';
+      }
+      busy=false;
+    };
+  }
+
+  window.addEventListener('omaopa:ready', refresh);
+  window.addEventListener('omaopa:change', refresh);
+  setTimeout(refresh, 800);
+})();
+</script>
+</body>
+</html>
