@@ -16,7 +16,7 @@ import {
   runTransaction, collection, getDocs, getCountFromServer, query, orderBy, where, limit, startAfter, documentId, arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import {
-  getStorage, ref as storageRef, uploadBytes
+  getStorage, ref as storageRef, uploadBytes, getBytes
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -146,7 +146,7 @@ onAuthStateChanged(auth, async (u)=>{
       if(si && (user.email||'').split('@')[0]===normPhone(BOOTSTRAP_MASTER_PHONE)){ masterFlag=true; superFlag=true; if(!si.master){ try{ setDoc(doc(db,'staff',user.uid),{master:true,super:true,admin:true},{merge:true}); }catch(_e){} } }
       if(staffFlag){ try{ setDoc(doc(db,'leaderboard',user.uid),{staff:true},{merge:true}); }catch(e){} try{ setDoc(doc(db,'scores',user.uid),{staff:true},{merge:true}); }catch(e){} }
     }catch(e){ staffFlag=false; }
-    if(!staffFlag){ try{ const kd=await getDoc(doc(db,'kasirIndividual',user.uid)); if(kd.exists()) staffFlag=true; }catch(e){} }
+    if(!staffFlag){ try{ const kw=await getDoc(doc(db,'karyawan',user.uid)); if(kw.exists()) staffFlag=true; }catch(e){} }
     const ref = doc(db,'users',user.uid);
     unsubDoc = onSnapshot(ref,(d)=>{
       const data = d.exists()? d.data() : {};
@@ -1357,13 +1357,13 @@ function parseMapsLatLng(input){
 function buildMapsLink(lat,lng){ return 'https://www.google.com/maps/search/?api=1&query='+lat+'%2C'+lng; }
 async function listOutlets(){
   try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', lat:(typeof x.lat==='number'?x.lat:null), lng:(typeof x.lng==='number'?x.lng:null), active:x.active!==false }); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', lat:(typeof x.lat==='number'?x.lat:null), lng:(typeof x.lng==='number'?x.lng:null), internalOnly:x.internalOnly===true, active:x.active!==false }); });
     arr.sort((a,b)=>(a.area||'').localeCompare(b.area||'')||(a.name||'').localeCompare(b.name||'')); return arr;
   }catch(e){ return []; }
 }
 async function listPublicOutlets(){
   try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); if(x.active===false) return; arr.push({ name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', lat:(typeof x.lat==='number'?x.lat:null), lng:(typeof x.lng==='number'?x.lng:null) }); });
+    snap.forEach(d=>{ const x=d.data(); if(x.active===false || x.internalOnly===true) return; arr.push({ name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', lat:(typeof x.lat==='number'?x.lat:null), lng:(typeof x.lng==='number'?x.lng:null) }); });
     return arr;
   }catch(e){ return []; }
 }
@@ -1371,7 +1371,7 @@ async function addOutlet(o){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   o=o||{}; if(!o.name||!o.name.trim()) throw {message:'Nama outlet wajib diisi.'};
   const id=slug(o.name);
-  const data={ name:o.name.trim(), area:(o.area||'Lainnya').trim(), maps:(o.maps||'').trim(), active:true, updatedAt:serverTimestamp() };
+  const data={ name:o.name.trim(), area:(o.area||'Lainnya').trim(), maps:(o.maps||'').trim(), internalOnly:o.internalOnly===true, active:true, updatedAt:serverTimestamp() };
   if(typeof o.lat==='number' && typeof o.lng==='number' && !isNaN(o.lat) && !isNaN(o.lng)){ data.lat=o.lat; data.lng=o.lng; }
   await setDoc(doc(db,'outlets',id), data, {merge:true});
   return { id:id };
@@ -1404,61 +1404,85 @@ function haversineMeters(lat1, lng1, lat2, lng2){
   const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
   return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-async function registerKasirIndividual(data){
-  const { phone, pin, name, outlet, shift } = data||{};
+async function registerKaryawan(data){
+  const { phone, pin, name, outlet, shift, jabatan } = data||{};
   if(!name || name.trim().length<2) throw {message:'Isi nama lengkap dulu ya.'};
   if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
   if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
-  if(!outlet) throw {message:'Pilih outlet dulu ya.'};
+  if(!outlet) throw {message:'Pilih lokasi absen dulu ya.'};
   const res = await createUserWithEmailAndPassword(auth, phoneEmail(phone), pin);
   const u = res.user;
   try{ await updateProfile(u,{displayName:name.trim()}); }catch(e){}
-  await setDoc(doc(db,'kasirIndividual',u.uid), {
+  await setDoc(doc(db,'karyawan',u.uid), {
     namaLengkap:name.trim(), phone:normPhone(phone), outlet:outlet,
-    shift:(shift||'').trim(), status:'training', fotoProfil:'',
+    jabatan:(jabatan||'').trim(), shift:(shift||'').trim(), status:'training', fotoProfil:'',
     approvalStatus:'pending', active:true,
     registeredAt:serverTimestamp(), updatedAt:serverTimestamp()
   });
   return { uid:u.uid };
 }
-async function loginKasirIndividual(phone, pin){
+async function loginKaryawan(phone, pin){
   if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
   if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
   await signInWithEmailAndPassword(auth, phoneEmail(phone), pin);
 }
-async function getKasirProfile(){
+async function getKaryawanProfile(){
   if(!auth.currentUser) return null;
-  try{ const snap=await getDoc(doc(db,'kasirIndividual',auth.currentUser.uid));
+  try{ const snap=await getDoc(doc(db,'karyawan',auth.currentUser.uid));
     return snap.exists() ? Object.assign({id:snap.id}, snap.data()) : null;
   }catch(e){ return null; }
 }
-async function listKasirIndividual(){
+async function listKaryawan(){
   if(!(await isAdmin())) return [];
-  try{ const snap=await getDocs(collection(db,'kasirIndividual')); const arr=[];
-    snap.forEach(d=>{ const x=d.data()||{}; arr.push({ id:d.id, namaLengkap:x.namaLengkap||'', phone:x.phone||'', outlet:x.outlet||'', shift:x.shift||'', status:x.status||'', approvalStatus:x.approvalStatus||'pending', active:x.active!==false, fotoProfil:x.fotoProfil||'' }); });
+  try{ const snap=await getDocs(collection(db,'karyawan')); const arr=[];
+    snap.forEach(d=>{ const x=d.data()||{}; arr.push({ id:d.id, namaLengkap:x.namaLengkap||'', phone:x.phone||'', outlet:x.outlet||'', jabatan:x.jabatan||'', shift:x.shift||'', status:x.status||'', approvalStatus:x.approvalStatus||'pending', active:x.active!==false, fotoProfil:x.fotoProfil||'',
+      nomorPegawai:x.nomorPegawai||'', kontrakJenis:x.kontrakJenis||'', kontrakMulai:x.kontrakMulai||'', kontrakSelesai:x.kontrakSelesai||'',
+      dob:x.dob||'', alamat:x.alamat||'', noKtp:x.noKtp||'', kontakDaruratNama:x.kontakDaruratNama||'', kontakDaruratHp:x.kontakDaruratHp||'', customFields:x.customFields||{} }); });
     arr.sort((a,b)=>(a.outlet||'').localeCompare(b.outlet||'')||(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
     return arr;
   }catch(e){ return []; }
 }
-async function approveKasir(uid){
+async function approveKaryawan(uid){
   if(!(await isAdmin())) throw {message:'Khusus admin.'};
   if(!uid) throw {message:'ID kosong.'};
-  await setDoc(doc(db,'kasirIndividual',uid), { approvalStatus:'approved', approvedBy:(auth.currentUser&&auth.currentUser.uid)||'', approvedAt:serverTimestamp(), updatedAt:serverTimestamp() }, {merge:true});
+  await setDoc(doc(db,'karyawan',uid), { approvalStatus:'approved', approvedBy:(auth.currentUser&&auth.currentUser.uid)||'', approvedAt:serverTimestamp(), updatedAt:serverTimestamp() }, {merge:true});
 }
-async function rejectKasir(uid){
+async function rejectKaryawan(uid){
   if(!(await isAdmin())) throw {message:'Khusus admin.'};
   if(!uid) throw {message:'ID kosong.'};
-  await setDoc(doc(db,'kasirIndividual',uid), { approvalStatus:'ditolak', updatedAt:serverTimestamp() }, {merge:true});
+  await setDoc(doc(db,'karyawan',uid), { approvalStatus:'ditolak', updatedAt:serverTimestamp() }, {merge:true});
 }
-async function updateKasirProfile(uid, patch){
+async function updateKaryawanProfile(uid, patch){
   if(!(await isAdmin())) throw {message:'Khusus admin.'};
   if(!uid) throw {message:'ID kosong.'};
-  await setDoc(doc(db,'kasirIndividual',uid), Object.assign({updatedAt:serverTimestamp()}, patch||{}), {merge:true});
+  await setDoc(doc(db,'karyawan',uid), Object.assign({updatedAt:serverTimestamp()}, patch||{}), {merge:true});
 }
-async function deleteKasirIndividual(uid){
+async function deleteKaryawan(uid){
   if(!(await isMaster())) throw {message:'Khusus master.'};
   if(!uid) throw {message:'ID kosong.'};
-  await deleteDoc(doc(db,'kasirIndividual',uid));
+  await deleteDoc(doc(db,'karyawan',uid));
+}
+async function listJabatan(){
+  try{ const snap=await getDoc(doc(db,'settings','jabatanList')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
+}
+async function saveJabatanList(list){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  await setDoc(doc(db,'settings','jabatanList'), { list: (list||[]).filter(Boolean), updatedAt:serverTimestamp() }, {merge:true});
+}
+async function listKaryawanFields(){
+  try{ const snap=await getDoc(doc(db,'settings','karyawanFields')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
+}
+async function saveKaryawanFields(list){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  const clean=(list||[]).filter(f=>f && f.key && f.label).map(f=>({key:String(f.key), label:String(f.label), type:(f.type==='date'?'date':'text')}));
+  await setDoc(doc(db,'settings','karyawanFields'), { list: clean, updatedAt:serverTimestamp() }, {merge:true});
+}
+async function updateKaryawanOwnProfile(patch){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  const allowed=['dob','alamat','noKtp','kontakDaruratNama','kontakDaruratHp','fotoProfil','customFields'];
+  const clean={}; Object.keys(patch||{}).forEach(k=>{ if(allowed.indexOf(k)>=0) clean[k]=patch[k]; });
+  clean.updatedAt=serverTimestamp();
+  await setDoc(doc(db,'karyawan',auth.currentUser.uid), clean, {merge:true});
 }
 // ---- pengelompokan area outlet (terpusat, dipakai admin/rekap/broadcast) ----
 const KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal uii']; // Jogja -> Area 1/Metavest; "jakal uii" spesifik; kecuali nama mengandung "kyai mojo"
@@ -1556,12 +1580,26 @@ async function uploadAttendancePhoto(blob){
   await uploadBytes(sref, blob, {contentType:'image/jpeg'});
   return path;
 }
+async function uploadKaryawanProfilePhoto(blob){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!blob) throw {message:'Foto kosong.'};
+  const path = 'karyawan-profile/'+auth.currentUser.uid+'/foto.jpg';
+  const sref = storageRef(storage, path);
+  await uploadBytes(sref, blob, {contentType:'image/jpeg'});
+  await setDoc(doc(db,'karyawan',auth.currentUser.uid), { fotoProfil:path, updatedAt:serverTimestamp() }, {merge:true});
+  return path;
+}
+async function getKaryawanProfilePhotoUrl(path){
+  if(!path) return '';
+  try{ const bytes = await getBytes(storageRef(storage, path)); return URL.createObjectURL(new Blob([bytes], {type:'image/jpeg'})); }
+  catch(e){ return ''; }
+}
 async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPath){
   if(!auth.currentUser) throw {message:'Belum login.'};
   if(type!=='masuk' && type!=='keluar') throw {message:'Tipe absen tidak valid.'};
   if(!outlet) throw {message:'Outlet kosong.'};
   await addDoc(collection(db,'attendance'), {
-    kasirUid: auth.currentUser.uid,
+    karyawanUid: auth.currentUser.uid,
     outlet: outlet,
     type: type,
     lokasi: { lat:lat, lng:lng, akurasi:(typeof akurasi==='number'?akurasi:null) },
@@ -1573,12 +1611,24 @@ async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPat
 async function getLastAttendance(){
   if(!auth.currentUser) return null;
   try{
-    const q = query(collection(db,'attendance'), where('kasirUid','==',auth.currentUser.uid), orderBy('createdAt','desc'), limit(1));
+    const q = query(collection(db,'attendance'), where('karyawanUid','==',auth.currentUser.uid), orderBy('createdAt','desc'), limit(1));
     const snap = await getDocs(q);
     let result=null;
     snap.forEach(d=>{ const x=d.data(); result={ type:x.type||'', outlet:x.outlet||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }; });
     return result;
   }catch(e){ return null; }
+}
+async function listAttendance(){
+  if(!(await isAdmin())) return [];
+  try{
+    const snap=await getDocs(collection(db,'attendance')); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', outlet:x.outlet||'', type:x.type||'', jarak:(typeof x.jarak==='number'?x.jarak:null), ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
+    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
+    arr.forEach(a=>{ a.namaKaryawan=names[a.karyawanUid]||''; });
+    arr.sort((a,b)=>b.ts-a.ts);
+    return arr;
+  }catch(e){ return []; }
 }
 
 // ---- staff / kasir ----
@@ -1820,8 +1870,9 @@ window.OmaOpa = {
   isAdmin, isSuper, isMaster, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
-  registerKasirIndividual, loginKasirIndividual, getKasirProfile, listKasirIndividual, approveKasir, rejectKasir, updateKasirProfile, deleteKasirIndividual, haversineMeters,
-  recordAttendance, getLastAttendance, uploadAttendancePhoto,
+  registerKaryawan, loginKaryawan, getKaryawanProfile, listKaryawan, approveKaryawan, rejectKaryawan, updateKaryawanProfile, deleteKaryawan, haversineMeters,
+  listJabatan, saveJabatanList, listKaryawanFields, saveKaryawanFields, updateKaryawanOwnProfile,
+  recordAttendance, getLastAttendance, uploadAttendancePhoto, uploadKaryawanProfilePhoto, getKaryawanProfilePhotoUrl, listAttendance,
   outletGroup, matchOutletKey,
   sendBroadcast, listBroadcasts, deactivateBroadcast, deleteBroadcast, getMemberBroadcasts, markBroadcastRead,
   listStaff, addStaff, updateStaff, removeStaff,
@@ -1839,4 +1890,4 @@ window.OmaOpa = {
 emit();
 try{ window.dispatchEvent(new CustomEvent('omaopa:ready',{detail:snapshot()})); }catch(e){}
 // Gabungkan outlet dari database (termasuk yang ditambah via admin, mis. Kronggahan) ke daftar picker
-(async function(){ try{ const fs=await listOutlets(); if(fs && fs.length){ const byName={}; (window.OMA_OUTLETS||[]).forEach(o=>{ byName[(o.name||'').toLowerCase().trim()]=o; }); fs.forEach(o=>{ if(o && o.name && o.active!==false) byName[(o.name||'').toLowerCase().trim()]={ name:o.name, area:o.area, maps:o.maps, lat:o.lat, lng:o.lng }; }); window.OMA_OUTLETS=Object.keys(byName).map(k=>byName[k]); } }catch(e){} })();
+(async function(){ try{ const fs=await listOutlets(); if(fs && fs.length){ const byName={}; (window.OMA_OUTLETS||[]).forEach(o=>{ byName[(o.name||'').toLowerCase().trim()]=o; }); fs.forEach(o=>{ if(o && o.name && o.active!==false) byName[(o.name||'').toLowerCase().trim()]={ name:o.name, area:o.area, maps:o.maps, lat:o.lat, lng:o.lng, internalOnly:o.internalOnly }; }); window.OMA_OUTLETS=Object.keys(byName).map(k=>byName[k]); } }catch(e){} })();
