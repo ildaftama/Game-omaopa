@@ -47,7 +47,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=135"></script>
+<script type="module" src="core-omaopa.js?v=136"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -99,19 +99,23 @@
       +'<div id="etList">Memuat…</div></div>'
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🏖️ Pengajuan Cuti</div><button class="btn sm sec" id="cutiReload">↻</button></div>'
       +'<select id="cutiFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved">✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua —</option></select>'
-      +'<div id="cutiList" class="muted">Memuat…</div></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="cutiFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="cutiTo" style="flex:1;min-width:0"></div>'
+      +'<div id="cutiList" class="muted">Memuat…</div><button class="btn sec" id="cutiMore" style="display:none">Muat 10 lagi</button></div>'
       +'<div class="card"><div class="nm">📝 Format Laporan WFA</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Kolom yang wajib diisi karyawan di file laporan (jadi header kolom XLS). Tambah/hapus sesuka hati.</div>'
       +'<div id="wfaFmtList" class="muted">Memuat…</div>'
       +'<div style="display:flex;gap:6px;margin-top:8px"><input id="wfaFmtNew" placeholder="Nama kolom baru" style="flex:1"><button class="btn sm" id="wfaFmtAdd">＋ Tambah</button></div><div id="wfaFmtMsg"></div></div>'
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📝 Laporan WFA Masuk</div><button class="btn sm sec" id="wfaLapReload">↻</button></div>'
-      +'<div id="wfaLapList" class="muted">Memuat…</div></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="wfaFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="wfaTo" style="flex:1;min-width:0"></div>'
+      +'<div id="wfaLapList" class="muted">Memuat…</div><button class="btn sec" id="wfaMore" style="display:none">Muat 10 lagi</button></div>'
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">⏰ Data Lembur</div><button class="btn sm sec" id="lemburReload">↻</button></div>'
       +'<div class="muted" style="font-size:.74rem;margin:0 0 8px">HRD cuma terima data — yang approve/tolak SPV/Manajer/GM terkait lewat halaman Profil Karyawan mereka.</div>'
-      +'<div id="lemburHRList" class="muted">Memuat…</div></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="lemburFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="lemburTo" style="flex:1;min-width:0"></div>'
+      +'<div id="lemburHRList" class="muted">Memuat…</div><button class="btn sec" id="lemburMore" style="display:none">Muat 10 lagi</button></div>'
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🗂️ Daftar Karyawan (Lengkap)</div><button class="btn sm sec" id="hrExport">⬇ CSV</button><button class="btn sm sec" id="hrReload">↻</button></div>'
       +'<select id="hrStatusFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved" selected>✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua status —</option></select>'
       +'<select id="hrDivFilter" style="margin-bottom:8px"><option value="">— semua divisi —</option></select>'
-      +'<div id="hrList" class="muted">Memuat…</div></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="hrFrom" style="flex:1;min-width:0" title="Tanggal daftar dari"><span>—</span><input type="date" id="hrTo" style="flex:1;min-width:0" title="Tanggal daftar sampai"></div>'
+      +'<div id="hrList" class="muted">Memuat…</div><button class="btn sec" id="hrMore" style="display:none">Muat 10 lagi</button></div>'
       +'<div class="card"><div class="nm">⬇️ Export Riwayat Absensi (CSV)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan kedua tanggal buat export semua riwayat.</div>'
       +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="atExFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="atExTo" style="flex:1;min-width:0"></div>'
       +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div>';
@@ -121,22 +125,34 @@
     loadJenisCutiList();
     loadEmailTemplates();
     loadWfaFormat();
-    document.getElementById('wfaLapReload').onclick=function(){ loadWfaLaporanList(); };
-    loadWfaLaporanList();
-    document.getElementById('lemburReload').onclick=function(){ loadLemburHRList(); };
-    loadLemburHRList();
-    document.getElementById('cutiReload').onclick=function(){ loadCutiList(); };
-    document.getElementById('cutiFilter').onchange=function(){ loadCutiList(); };
-    loadCutiList();
-    document.getElementById('hrReload').onclick=function(){ loadHRList(); };
-    document.getElementById('hrStatusFilter').onchange=function(){ loadHRList(); };
-    document.getElementById('hrDivFilter').onchange=function(){ loadHRList(); };
+    document.getElementById('wfaLapReload').onclick=function(){ loadWfaLaporanList(false); };
+    document.getElementById('wfaFrom').onchange=function(){ loadWfaLaporanList(false); };
+    document.getElementById('wfaTo').onchange=function(){ loadWfaLaporanList(false); };
+    document.getElementById('wfaMore').onclick=function(){ loadWfaLaporanList(true); };
+    loadWfaLaporanList(false);
+    document.getElementById('lemburReload').onclick=function(){ loadLemburHRList(false); };
+    document.getElementById('lemburFrom').onchange=function(){ loadLemburHRList(false); };
+    document.getElementById('lemburTo').onchange=function(){ loadLemburHRList(false); };
+    document.getElementById('lemburMore').onclick=function(){ loadLemburHRList(true); };
+    loadLemburHRList(false);
+    document.getElementById('cutiReload').onclick=function(){ loadCutiList(false); };
+    document.getElementById('cutiFilter').onchange=function(){ loadCutiList(false); };
+    document.getElementById('cutiFrom').onchange=function(){ loadCutiList(false); };
+    document.getElementById('cutiTo').onchange=function(){ loadCutiList(false); };
+    document.getElementById('cutiMore').onclick=function(){ loadCutiList(true); };
+    loadCutiList(false);
+    document.getElementById('hrReload').onclick=function(){ loadHRList(false); };
+    document.getElementById('hrStatusFilter').onchange=function(){ loadHRList(false); };
+    document.getElementById('hrDivFilter').onchange=function(){ loadHRList(false); };
+    document.getElementById('hrFrom').onchange=function(){ loadHRList(false); };
+    document.getElementById('hrTo').onchange=function(){ loadHRList(false); };
+    document.getElementById('hrMore').onclick=function(){ loadHRList(true); };
     document.getElementById('hrExport').onclick=async function(){
       if(busy) return; busy=true; this.disabled=true; this.textContent='…';
       try{
-        var arr=await O.listKaryawanHR();
-        var lines=[['Nomor Pegawai','Nama','No HP','Posisi (Lengkap)','Divisi','Sub-Divisi','Posisi','Grade','Lokasi','Shift','Jenis Kontrak','Mulai Kontrak','Selesai Kontrak','Approval','Aktif'].map(csvCell).join(',')];
-        arr.forEach(function(k){ lines.push([k.nomorPegawai||'',k.namaLengkap||'',k.phone||'',k.orgLabel||'',k.divisi||'',k.subDivisi||'',k.posisi||'',k.grade||'',k.outlet||'',k.shift||'',k.kontrakJenis||'',k.kontrakMulai||'',k.kontrakSelesai||'',k.approvalStatus||'',k.active!==false?'Ya':'Tidak'].map(csvCell).join(',')); });
+        var arr=await O.fetchAllPages(O.listKaryawanHR, {});
+        var lines=[['Nomor Pegawai','Nama','No HP','Email','Posisi (Lengkap)','Divisi','Sub-Divisi','Posisi','Grade','Lokasi','Shift','Jenis Kontrak','Mulai Kontrak','Selesai Kontrak','Approval','Aktif'].map(csvCell).join(',')];
+        arr.forEach(function(k){ lines.push([k.nomorPegawai||'',k.namaLengkap||'',k.phone||'',k.email||'',k.orgLabel||'',k.divisi||'',k.subDivisi||'',k.posisi||'',k.grade||'',k.outlet||'',k.shift||'',k.kontrakJenis||'',k.kontrakMulai||'',k.kontrakSelesai||'',k.approvalStatus||'',k.active!==false?'Ya':'Tidak'].map(csvCell).join(',')); });
         downloadCSV(lines, 'karyawan-lengkap.csv');
       }catch(e){ alert((e&&e.message)||'Gagal export'); }
       this.disabled=false; this.textContent='⬇ CSV'; busy=false;
@@ -312,11 +328,16 @@
     };
   }
 
-  async function loadWfaLaporanList(){
-    var box=document.getElementById('wfaLapList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var arr=[]; try{ arr=await O.listWfaLaporanHRD(); }catch(e){}
-    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada laporan WFA.</div>'; return; }
-    box.innerHTML = arr.map(function(r){
+  var _wfaCursor=null, _wfaAccum=[];
+  async function loadWfaLaporanList(loadMore){
+    var box=document.getElementById('wfaLapList'); var moreBtn=document.getElementById('wfaMore'); if(!box) return;
+    if(!loadMore){ _wfaCursor=null; _wfaAccum=[]; box.innerHTML='<div class="muted">Memuat…</div>'; }
+    var opts={ fromDate:document.getElementById('wfaFrom').value||undefined, toDate:document.getElementById('wfaTo').value||undefined, cursor:_wfaCursor };
+    var res={items:[],hasMore:false,cursor:null}; try{ res=await O.listWfaLaporanHRD(opts); }catch(e){}
+    _wfaAccum = _wfaAccum.concat(res.items||[]); _wfaCursor = res.cursor;
+    moreBtn.style.display = res.hasMore ? 'block' : 'none';
+    if(!_wfaAccum.length){ box.innerHTML='<div class="muted">Belum ada laporan WFA.</div>'; return; }
+    box.innerHTML = _wfaAccum.map(function(r){
       var st = r.status==='submitted' ? '<span class="tag on">SUDAH LAPOR</span>' : '<span class="tag adm">PERLU LAPOR</span>';
       return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(r.namaKaryawan||'')+' '+st+'</div>'
         +'<div class="sub">Tanggal WFA: '+esc(r.tanggalWfa||'-')+(r.managerEmail?(' · Manajer: '+esc(r.managerEmail)):'')+'</div></div>'
@@ -325,28 +346,37 @@
     }).join('');
   }
 
-  async function loadLemburHRList(){
-    var box=document.getElementById('lemburHRList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var arr=[]; try{ arr=await O.listLemburHRD(); }catch(e){}
-    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada data lembur.</div>'; return; }
+  var _lemburCursor=null, _lemburAccum=[];
+  async function loadLemburHRList(loadMore){
+    var box=document.getElementById('lemburHRList'); var moreBtn=document.getElementById('lemburMore'); if(!box) return;
+    if(!loadMore){ _lemburCursor=null; _lemburAccum=[]; box.innerHTML='<div class="muted">Memuat…</div>'; }
+    var opts={ fromDate:document.getElementById('lemburFrom').value||undefined, toDate:document.getElementById('lemburTo').value||undefined, cursor:_lemburCursor };
+    var res={items:[],hasMore:false,cursor:null}; try{ res=await O.listLemburHRD(opts); }catch(e){}
+    _lemburAccum = _lemburAccum.concat(res.items||[]); _lemburCursor = res.cursor;
+    moreBtn.style.display = res.hasMore ? 'block' : 'none';
+    if(!_lemburAccum.length){ box.innerHTML='<div class="muted">Belum ada data lembur.</div>'; return; }
     function badge(s){ if(s==='approved') return '<span class="tag on">DISETUJUI SPV</span>'; if(s==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
-    box.innerHTML = arr.map(function(l){
+    box.innerHTML = _lemburAccum.map(function(l){
       return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(l.namaKaryawan||'(tidak ditemukan)')+' '+badge(l.status)+(l.validatedByHRD?' <span class="tag on">✓ TERVALIDASI</span>':'')+'</div>'
         +'<div class="sub">'+esc(l.tanggal)+' · Keluar '+esc(l.jamKeluarAktual)+' (jadwal s/d '+esc(l.jamSelesaiJadwal)+') · +'+l.durasiLemburMenit+' menit</div></div>'
         +(l.status==='approved' && !l.validatedByHRD ? ('<button class="btn sm sec" data-vallembur="'+esc(l.id)+'" style="width:auto">☑ Validasi</button>') : '')
         +'</div>';
     }).join('');
-    box.querySelectorAll('[data-vallembur]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.validateLemburHRD(b.getAttribute('data-vallembur')); loadLemburHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-vallembur]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.validateLemburHRD(b.getAttribute('data-vallembur')); loadLemburHRList(false); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
 
-  async function loadCutiList(){
-    var box=document.getElementById('cutiList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var arr=[]; try{ arr=await O.listCutiHRD(); }catch(e){}
+  var _cutiCursor=null, _cutiAccum=[];
+  async function loadCutiList(loadMore){
+    var box=document.getElementById('cutiList'); var moreBtn=document.getElementById('cutiMore'); if(!box) return;
+    if(!loadMore){ _cutiCursor=null; _cutiAccum=[]; box.innerHTML='<div class="muted">Memuat…</div>'; }
     var f=(document.getElementById('cutiFilter')||{}).value; if(f===undefined) f='pending';
-    if(f) arr=arr.filter(function(c){ return c.status===f; });
-    if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada pengajuan cuti'+(f?' dengan status ini':'')+'.</div>'; return; }
+    var opts={ status:f||undefined, fromDate:document.getElementById('cutiFrom').value||undefined, toDate:document.getElementById('cutiTo').value||undefined, cursor:_cutiCursor };
+    var res={items:[],hasMore:false,cursor:null}; try{ res=await O.listCutiHRD(opts); }catch(e){}
+    _cutiAccum = _cutiAccum.concat(res.items||[]); _cutiCursor = res.cursor;
+    moreBtn.style.display = res.hasMore ? 'block' : 'none';
+    if(!_cutiAccum.length){ box.innerHTML='<div class="muted">Tidak ada pengajuan cuti'+(f?' dengan status ini':'')+'.</div>'; return; }
     function badge(c){ if(c.status==='approved') return '<span class="tag on">DISETUJUI SPV</span>'; if(c.status==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
-    box.innerHTML = arr.map(function(c){
+    box.innerHTML = _cutiAccum.map(function(c){
       return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(c.namaKaryawan||'(tidak ditemukan)')+' '+badge(c)+(c.validatedByHRD?' <span class="tag on">✓ TERVALIDASI</span>':'')+'</div>'
         +'<div class="sub">'+esc(c.jenisCuti||'-')+' · '+esc(c.tanggalMulai||'-')+' s/d '+esc(c.tanggalSelesai||'-')+(c.alasan?' · "'+esc(c.alasan)+'"':'')+'</div>'
         +(c.catatanHRD?('<div class="sub">Catatan: '+esc(c.catatanHRD)+'</div>'):'')
@@ -354,24 +384,27 @@
         +(c.status==='approved' && !c.validatedByHRD ? ('<button class="btn sm sec" data-valcuti="'+esc(c.id)+'" style="width:auto">☑ Validasi</button>') : '')
         +'</div>';
     }).join('');
-    box.querySelectorAll('[data-valcuti]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.validateCutiHRD(b.getAttribute('data-valcuti')); loadCutiList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-valcuti]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.validateCutiHRD(b.getAttribute('data-valcuti')); loadCutiList(false); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
 
-  async function loadHRList(){
-    var box=document.getElementById('hrList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var arr=[]; try{ arr=await O.listKaryawanHR(); }catch(e){}
+  var _hrCursor=null, _hrAccum=[];
+  async function loadHRList(loadMore){
+    var box=document.getElementById('hrList'); var moreBtn=document.getElementById('hrMore'); if(!box) return;
+    if(!loadMore){ _hrCursor=null; _hrAccum=[]; box.innerHTML='<div class="muted">Memuat…</div>'; }
     var sf=(document.getElementById('hrStatusFilter')||{}).value; if(sf===undefined) sf='approved';
-    if(sf) arr=arr.filter(function(k){ return k.approvalStatus===sf; });
     var f=(document.getElementById('hrDivFilter')||{}).value||'';
-    if(f) arr=arr.filter(function(k){ return k.divisi===f; });
-    if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada karyawan yang cocok filter ini.</div>'; return; }
+    var opts={ approvalStatus:sf||undefined, divisi:f||undefined, fromDate:document.getElementById('hrFrom').value||undefined, toDate:document.getElementById('hrTo').value||undefined, cursor:_hrCursor };
+    var res={items:[],hasMore:false,cursor:null}; try{ res=await O.listKaryawanHR(opts); }catch(e){}
+    _hrAccum = _hrAccum.concat(res.items||[]); _hrCursor = res.cursor;
+    moreBtn.style.display = res.hasMore ? 'block' : 'none';
+    if(!_hrAccum.length){ box.innerHTML='<div class="muted">Tidak ada karyawan yang cocok filter ini.</div>'; return; }
     function badge(k){ if(k.approvalStatus==='approved') return '<span class="tag on">DISETUJUI</span>'; if(k.approvalStatus==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
-    box.innerHTML = arr.map(function(k){
+    box.innerHTML = _hrAccum.map(function(k){
       var subInfo = k.approvalStatus==='approved'
         ? esc(k.orgLabel||'-')
         : ('Klaim: '+esc(k.claimDivisi||'-')+(k.claimSubDivisi?' / '+esc(k.claimSubDivisi):'')+(k.claimPosisi?' / '+esc(k.claimPosisi):(k.claimStrukturalLevel&&k.claimStrukturalLevel!=='staff'?' / '+esc(k.claimStrukturalLevel.toUpperCase()):'')));
       return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(k.namaLengkap||'(tanpa nama)')+(k.nomorPegawai?' <span class="muted" style="font-weight:700">#'+esc(k.nomorPegawai)+'</span>':'')+' '+badge(k)+(k.active===false?' <span class="tag off">NONAKTIF</span>':'')+'</div>'
-        +'<div class="sub">'+subInfo+' · '+esc(k.outlet||'-')+(k.shift?' · '+esc(k.shift):'')+(k.kontrakJenis?' · Kontrak: '+esc(k.kontrakJenis):'')+' · '+esc(k.phone||'')+'</div></div>'
+        +'<div class="sub">'+subInfo+' · '+esc(k.outlet||'-')+(k.shift?' · '+esc(k.shift):'')+(k.kontrakJenis?' · Kontrak: '+esc(k.kontrakJenis):'')+' · '+esc(k.phone||'')+(k.email?(' · ✉️ '+esc(k.email)):'')+'</div></div>'
         +'<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
         + '<button class="btn sm sec" data-edithr="'+esc(k.id)+'">⚙️ '+(k.approvalStatus==='approved'?'Edit':'Isi & Setujui')+'</button>'
         + (k.approvalStatus!=='approved' ? ('<button class="btn sm sec" data-appr="'+esc(k.id)+'">✓ Setujui langsung</button>') : '')
@@ -379,10 +412,10 @@
         + (k.approvalStatus==='approved' ? ('<button class="btn sm sec" data-togglehr="'+esc(k.id)+'" data-on="'+(k.active!==false?'1':'0')+'">'+(k.active!==false?'Nonaktifkan':'Aktifkan')+'</button><button class="btn sm sec" data-privy="'+esc(k.id)+'">📄 Kontrak siap Privy</button>') : '')
         +'</div></div>';
     }).join('');
-    box.querySelectorAll('[data-edithr]').forEach(function(b){ b.onclick=function(){ var k=arr.find(function(x){ return x.id===b.getAttribute('data-edithr'); }); if(k) openKaryawanHREdit(k); }; });
-    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKaryawan(b.getAttribute('data-appr')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKaryawan(b.getAttribute('data-rej')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-privy]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var k=arr.find(function(x){ return x.id===b.getAttribute('data-privy'); }); if(!k) return;
+    box.querySelectorAll('[data-edithr]').forEach(function(b){ b.onclick=function(){ var k=_hrAccum.find(function(x){ return x.id===b.getAttribute('data-edithr'); }); if(k) openKaryawanHREdit(k); }; });
+    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKaryawan(b.getAttribute('data-appr')); loadHRList(false); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKaryawan(b.getAttribute('data-rej')); loadHRList(false); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-privy]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var k=_hrAccum.find(function(x){ return x.id===b.getAttribute('data-privy'); }); if(!k) return;
       if(!confirm('Kirim notif "Kontrak siap di Privy" ke '+k.namaLengkap+'?')) return;
       busy=true; b.disabled=true;
       try{
@@ -392,7 +425,7 @@
       }
       catch(e){ alert((e&&e.message)||'Gagal'); }
       b.disabled=false; busy=false; }; });
-    box.querySelectorAll('[data-togglehr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.updateKaryawanProfile(b.getAttribute('data-togglehr'), {active:b.getAttribute('data-on')!=='1'}); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-togglehr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.updateKaryawanProfile(b.getAttribute('data-togglehr'), {active:b.getAttribute('data-on')!=='1'}); loadHRList(false); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
 
   async function openKaryawanHREdit(k){

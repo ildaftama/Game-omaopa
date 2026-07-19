@@ -52,7 +52,7 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=135"></script>
+<script type="module" src="core-omaopa.js?v=137"></script>
 <script>
 (function(){
   var panel = document.getElementById('panel');
@@ -350,6 +350,7 @@
     var a = document.getElementById('formArea');
     a.innerHTML = '<label>Nama lengkap</label><input id="dNama" placeholder="Nama sesuai KTP">'
       + '<label>Nomor HP</label><input id="dPhone" type="tel" inputmode="numeric" placeholder="08xxxxxxxxxx" autocomplete="off">'
+      + '<label>Email</label><input id="dEmail" type="email" placeholder="nama@email.com" autocomplete="off">'
       + '<label>PIN (6 angka)</label><input id="dPin" data-pin type="password" inputmode="numeric" maxlength="6" placeholder="••••••">'
       + '<label>Ulangi PIN</label><input id="dPin2" data-pin type="password" inputmode="numeric" maxlength="6" placeholder="••••••">'
       + orgPickerHtml()
@@ -370,6 +371,7 @@
         await window.OmaOpa.registerKaryawan(Object.assign({
           name: document.getElementById('dNama').value,
           phone: document.getElementById('dPhone').value,
+          email: document.getElementById('dEmail').value,
           pin: pin,
           outlet: document.getElementById('dOutlet').value,
           shift: document.getElementById('dShift').value
