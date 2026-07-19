@@ -84,6 +84,7 @@
       <button data-tab="analitik">📈 Analitik</button>
       <button data-tab="pesanan">🧾 Pesanan</button>
       <button data-tab="blast">📢 Blast</button>
+      <button data-tab="hrd">HRD</button>
       <button data-tab="pengaturan">⚙️ Pengaturan</button>
     </div>
     <div id="tab"></div>
@@ -93,7 +94,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=124"></script>
+<script type="module" src="core-omaopa.js?v=127"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -112,6 +113,7 @@
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
   function num(n){ try{ return Number(n||0).toLocaleString('id-ID'); }catch(e){ return ''+n; } }
 
+  var hrdOnly=false;
   async function boot(){
     O=window.OmaOpa; if(!O){ gate.innerHTML='<div class="muted">Menyiapkan…</div>'; return; }
     var u=O.getUser();
@@ -119,10 +121,18 @@
       document.getElementById('lg').onclick=function(){ O.openLogin(); }; app.style.display='none'; return; }
     gate.innerHTML='<div class="muted">Memeriksa akses admin…</div>';
     var adm=false; try{ adm=await O.isAdmin(); }catch(e){}
-    if(!adm){ gate.innerHTML='<div style="font-weight:900;color:#C0392B">Akun ini bukan admin.</div>'
-        +'<div class="muted" style="margin-top:8px">Minta admin menandai akun (UID) ini dengan <b>admin: true</b> di koleksi <b>staff</b>:</div>'
-        +'<div class="uid">'+esc(u.uid)+'</div><button class="btn sec" id="out">Keluar / ganti akun</button>';
-      document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} }; app.style.display='none'; return; }
+    if(!adm){
+      var hrdChk=false; try{ hrdChk=await O.isHRD(); }catch(e){}
+      if(!hrdChk){ gate.innerHTML='<div style="font-weight:900;color:#C0392B">Akun ini bukan admin.</div>'
+          +'<div class="muted" style="margin-top:8px">Minta admin menandai akun (UID) ini dengan <b>admin: true</b> di koleksi <b>staff</b>:</div>'
+          +'<div class="uid">'+esc(u.uid)+'</div><button class="btn sec" id="out">Keluar / ganti akun</button>';
+        document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} }; app.style.display='none'; return; }
+      hrdOnly=true;
+      document.querySelectorAll('.tabs button').forEach(function(x){ if(x.getAttribute('data-tab')!=='hrd') x.style.display='none'; });
+      tab='hrd';
+      var rbg2=document.getElementById('roleBadge'); if(rbg2){ rbg2.textContent='HRD'; rbg2.style.background='#5A3017'; }
+      gate.style.display='none'; app.style.display=''; render(); return;
+    }
     try{ canEdit=await O.isSuper(); }catch(e){ canEdit=false; }
     try{ masterEdit=await O.isMaster(); }catch(e){ masterEdit=false; }
     var rbg=document.getElementById('roleBadge'); if(rbg){ rbg.textContent=canEdit?'ADMIN UTAMA':'LIHAT-SAJA'; rbg.style.background=canEdit?'#5A3017':'#9a8b78'; }
@@ -131,7 +141,7 @@
   document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
     tab=b.getAttribute('data-tab'); document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on'); render();
   }; });
-  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, pengaturan:renderPengaturan}[tab]||renderHome)(); }
+  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, hrd:renderHRD, pengaturan:renderPengaturan}[tab]||renderHome)(); }
   function setActiveTab(name){ tab=name; document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-tab')===name); }); }
   function applySegment(field,val){ segFilter={field:field, value:val}; setActiveTab('member'); render(); }
 
@@ -1359,19 +1369,13 @@
     var sOutletOpts=buildOutletOpts();
     tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah staff / kasir</div>'
       +'<label>Cari member untuk dijadikan staff</label><div style="display:flex;gap:6px"><input id="sSearch" placeholder="nama / No. HP member"><button class="btn sec" id="sFind" style="width:auto;margin:0">Cari</button></div><div id="sPick" style="margin-top:7px"></div><input type="hidden" id="sUid">'
-      +'<label>Peran</label><select id="sRole"><option value="kasir">🧾 Kasir (akun outlet)</option><option value="admin">🛠️ Admin (buka dashboard)</option><option value="super">⭐ Admin Utama (kelola semua, tak bisa hapus)</option>'+(masterEdit?'<option value="master">👑 Master (akses penuh + hapus data)</option>':'')+'</select>'
+      +'<label>Peran</label><select id="sRole"><option value="kasir">🧾 Kasir (akun outlet)</option><option value="admin">🛠️ Admin (buka dashboard)</option><option value="super">⭐ Admin Utama (kelola semua, tak bisa hapus)</option><option value="hrd">🗂️ HRD (cuma kelola data karyawan)</option>'+(masterEdit?'<option value="master">👑 Master (akses penuh + hapus data)</option>':'')+'</select>'
       +'<label>Outlet <span style="color:#C0392B;font-size:.78rem">(wajib untuk Kasir)</span></label><select id="sOut">'+sOutletOpts+'</select>'
       +'<button class="btn" id="sAdd">＋ Tambah staff</button><div id="sMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola staff.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar staff</div><button class="btn sm sec" id="sExport">⬇ CSV</button><button class="btn sm sec" id="sReload">↻</button></div>'
-      +'<select id="sFilter" style="margin-bottom:8px"><option value="">— semua peran —</option><option value="master">👑 Master</option><option value="super">⭐ Admin Utama</option><option value="admin">🛠️ Admin</option><option value="kronggahan">🏢 Kasir Kronggahan</option><option value="area1">🗺️ Kasir Area 1</option><option value="area2">🗺️ Kasir Area 2</option><option value="area3">🗺️ Kasir Area 3</option><option value="lain">📌 Kasir Lainnya</option></select>'
+      +'<select id="sFilter" style="margin-bottom:8px"><option value="">— semua peran —</option><option value="master">👑 Master</option><option value="super">⭐ Admin Utama</option><option value="admin">🛠️ Admin</option><option value="hrd">🗂️ HRD</option><option value="kronggahan">🏢 Kasir Kronggahan</option><option value="area1">🗺️ Kasir Area 1</option><option value="area2">🗺️ Kasir Area 2</option><option value="area3">🗺️ Kasir Area 3</option><option value="lain">📌 Kasir Lainnya</option></select>'
       +'<select id="sOutFilter" style="margin-bottom:8px"><option value="">— cek outlet spesifik (deteksi dobel) —</option>'+sOutletOpts.replace('<option value="">— pilih outlet —</option>','')+'</select>'
-      +'<div id="sList"><div class="muted">Memuat…</div></div></div>'
-      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🧍 Karyawan (Absensi)</div><button class="btn sm sec" id="kiExport">⬇ CSV</button><button class="btn sm sec" id="kiReload">↻</button></div>'
-      +'<select id="kiFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved">✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua —</option></select>'
-      +'<div id="kiList"><div class="muted">Memuat…</div></div></div>'
-      +'<div class="card"><div class="nm">⬇️ Export Riwayat Absensi (CSV)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan kedua tanggal buat export semua riwayat.</div>'
-      +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="atExFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="atExTo" style="flex:1;min-width:0"></div>'
-      +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div>';
+      +'<div id="sList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){
       document.getElementById('sFind').onclick=async function(){
         var q=(document.getElementById('sSearch').value||'').trim(); var pick=document.getElementById('sPick');
@@ -1387,12 +1391,11 @@
       var _u=(document.getElementById('sUid').value||'').trim(); if(!_u){ msg.innerHTML='<div class="res bad">Pilih member dulu lewat pencarian di atas.</div>'; busy=false; return; }
       var _role=document.getElementById('sRole').value; var _out=(document.getElementById('sOut').value||'').trim();
       if(_role==='kasir' && !_out){ msg.innerHTML='<div class="res bad">Outlet wajib diisi untuk Kasir.</div>'; busy=false; return; }
-      try{ await O.addStaff(_u, _out, _role!=='kasir');
-        await O.updateStaff(_u, { super:(_role==='super'||_role==='master'), admin:_role!=='kasir', master:_role==='master' });
-        msg.innerHTML='<div class="res ok">✓ Ditambahkan sebagai '+(_role==='master'?'Master':(_role==='super'?'Admin Utama':(_role==='admin'?'Admin':'Kasir')))+'.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sRole').value='kasir'; loadStaff();
+      try{ await O.addStaff(_u, _out, _role!=='kasir' && _role!=='hrd');
+        await O.updateStaff(_u, { super:(_role==='super'||_role==='master'), admin:(_role!=='kasir' && _role!=='hrd'), master:_role==='master', hrd:_role==='hrd' });
+        msg.innerHTML='<div class="res ok">✓ Ditambahkan sebagai '+(_role==='master'?'Master':(_role==='super'?'Admin Utama':(_role==='hrd'?'HRD':(_role==='admin'?'Admin':'Kasir'))))+'.</div>'; document.getElementById('sUid').value=''; document.getElementById('sOut').value=''; document.getElementById('sSearch').value=''; document.getElementById('sPick').innerHTML=''; document.getElementById('sRole').value='kasir'; loadStaff();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
     document.getElementById('sReload').onclick=function(){ sPage=0; loadStaff(); }; var _sf=document.getElementById('sFilter'); if(_sf) _sf.onchange=function(){ sPage=0; var of=document.getElementById('sOutFilter'); if(of) of.value=''; loadStaff(); }; var _sof2=document.getElementById('sOutFilter'); if(_sof2) _sof2.onchange=function(){ if(_sof2.value){ document.getElementById('sFilter').value=''; } loadStaff(); }; loadStaff();
-    document.getElementById('kiReload').onclick=function(){ loadKaryawan(); }; document.getElementById('kiFilter').onchange=function(){ loadKaryawan(); }; loadKaryawan();
     document.getElementById('sExport').onclick=async function(){
       if(busy) return; busy=true; this.disabled=true; this.textContent='…';
       try{
@@ -1403,13 +1406,40 @@
       }catch(e){ alert((e&&e.message)||'Gagal export'); }
       this.disabled=false; this.textContent='⬇ CSV'; busy=false;
     };
-    document.getElementById('kiExport').onclick=async function(){
+  }
+  function hitungDurasi(mulai, selesai){
+    if(!mulai || !selesai) return '';
+    var a=new Date(mulai), b=new Date(selesai); if(isNaN(a)||isNaN(b)||b<a) return '';
+    var bulan=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());
+    var thn=Math.floor(bulan/12), sisaBulan=bulan%12;
+    var parts=[]; if(thn>0) parts.push(thn+' tahun'); if(sisaBulan>0) parts.push(sisaBulan+' bulan');
+    return parts.length?parts.join(' '):'kurang dari 1 bulan';
+  }
+  async function renderHRD(){
+    var canHRD=false; try{ canHRD=await O.isHRD(); }catch(e){}
+    if(!canHRD){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Tab HRD khusus peran HRD / Master.</div></div>'; return; }
+    tabEl.innerHTML='<div class="card"><div class="nm">🏢 Daftar Divisi</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Kelompok besar karyawan (misal Operasional, Produksi, Admin). Tambah/hapus sesuka hati.</div>'
+      +'<div id="divList" class="muted">Memuat…</div>'
+      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="divNew" placeholder="Nama divisi baru" style="flex:1"><button class="btn sm" id="divAdd">＋ Tambah</button></div><div id="divMsg"></div></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🗂️ Daftar Karyawan (Lengkap)</div><button class="btn sm sec" id="hrExport">⬇ CSV</button><button class="btn sm sec" id="hrReload">↻</button></div>'
+      +'<select id="hrStatusFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved" selected>✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua status —</option></select>'
+      +'<select id="hrDivFilter" style="margin-bottom:8px"><option value="">— semua divisi —</option></select>'
+      +'<div id="hrList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">⬇️ Export Riwayat Absensi (CSV)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan kedua tanggal buat export semua riwayat.</div>'
+      +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="atExFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="atExTo" style="flex:1;min-width:0"></div>'
+      +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div>';
+
+    loadDivisi();
+    document.getElementById('hrReload').onclick=function(){ loadHRList(); };
+    document.getElementById('hrStatusFilter').onchange=function(){ loadHRList(); };
+    document.getElementById('hrDivFilter').onchange=function(){ loadHRList(); };
+    document.getElementById('hrExport').onclick=async function(){
       if(busy) return; busy=true; this.disabled=true; this.textContent='…';
       try{
-        var arr=await O.listKaryawan();
-        var lines=[['Nomor Pegawai','Nama','No HP','Jabatan','Lokasi','Shift','Status','Jenis Kontrak','Mulai Kontrak','Selesai Kontrak','Approval','Aktif'].map(csvCell).join(',')];
-        arr.forEach(function(k){ lines.push([k.nomorPegawai||'',k.namaLengkap||'',k.phone||'',k.jabatan||'',k.outlet||'',k.shift||'',k.status||'',k.kontrakJenis||'',k.kontrakMulai||'',k.kontrakSelesai||'',k.approvalStatus||'',k.active!==false?'Ya':'Tidak'].map(csvCell).join(',')); });
-        downloadCSV(lines, 'karyawan.csv');
+        var arr=await O.listKaryawanHR();
+        var lines=[['Nomor Pegawai','Nama','No HP','Divisi','Jabatan','Lokasi','Shift','Status','Jenis Kontrak','Mulai Kontrak','Selesai Kontrak','Approval','Aktif'].map(csvCell).join(',')];
+        arr.forEach(function(k){ lines.push([k.nomorPegawai||'',k.namaLengkap||'',k.phone||'',k.divisi||'',k.jabatan||'',k.outlet||'',k.shift||'',k.status||'',k.kontrakJenis||'',k.kontrakMulai||'',k.kontrakSelesai||'',k.approvalStatus||'',k.active!==false?'Ya':'Tidak'].map(csvCell).join(',')); });
+        downloadCSV(lines, 'karyawan-lengkap.csv');
       }catch(e){ alert((e&&e.message)||'Gagal export'); }
       this.disabled=false; this.textContent='⬇ CSV'; busy=false;
     };
@@ -1422,52 +1452,68 @@
         var fromMs = f? new Date(f+'T00:00:00').getTime() : 0;
         var toMs = t? new Date(t+'T23:59:59').getTime() : Infinity;
         var rows=all.filter(function(a){ return a.ts>=fromMs && a.ts<=toMs; });
-        var lines=[['Nama Karyawan','Lokasi','Tipe','Jarak (m)','Waktu'].map(csvCell).join(',')];
-        rows.forEach(function(a){ lines.push([a.namaKaryawan||'(tidak ditemukan)',a.outlet||'',a.type==='masuk'?'Masuk':'Keluar',a.jarak!=null?Math.round(a.jarak):'',a.ts?new Date(a.ts).toLocaleString('id-ID'):''].map(csvCell).join(',')); });
+        var lines=[['Nama Karyawan','Lokasi','Tipe','Jarak (m)','Cek Wajah','Waktu'].map(csvCell).join(',')];
+        rows.forEach(function(a){ lines.push([a.namaKaryawan||'(tidak ditemukan)',a.outlet||'',a.type==='masuk'?'Masuk':'Keluar',a.jarak!=null?Math.round(a.jarak):'',a.faceCheckFailed?'GAGAL DICEK - perlu direview':'OK',a.ts?new Date(a.ts).toLocaleString('id-ID'):''].map(csvCell).join(',')); });
         downloadCSV(lines, 'absensi-'+(f||'awal')+'_'+(t||'sekarang')+'.csv');
-        msg.innerHTML='<div class="res ok">✓ '+rows.length+' catatan absen di-export.</div>';
+        var gagalCount=rows.filter(function(a){return a.faceCheckFailed;}).length;
+        msg.innerHTML='<div class="res ok">✓ '+rows.length+' catatan absen di-export.'+(gagalCount?(' <b>'+gagalCount+' di antaranya perlu direview</b> (cek wajah gagal jalan).'):'')+'</div>';
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
       this.disabled=false; this.textContent='⬇ Export CSV'; busy=false;
     };
+    loadHRList();
   }
-  async function loadKaryawan(){
-    var box=document.getElementById('kiList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var arr=[]; try{ arr=await O.listKaryawan(); }catch(e){}
-    var f=(document.getElementById('kiFilter')||{}).value||'';
-    if(f) arr=arr.filter(function(k){ return k.approvalStatus===f; });
-    if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada karyawan'+(f?' dengan status ini':'')+'.</div>'; return; }
+  async function loadDivisi(){
+    var box=document.getElementById('divList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var list=[]; try{ list=await O.listDivisi(); }catch(e){}
+    if(!list.length){ box.innerHTML='<div class="muted">Belum ada divisi. Tambah dulu di bawah.</div>'; }
+    else { box.innerHTML=list.map(function(d,i){ return '<span class="tag on" style="display:inline-flex;align-items:center;gap:5px;margin:2px 4px 2px 0">'+esc(d)+' <b data-rmdiv="'+i+'" style="cursor:pointer">✕</b></span>'; }).join(''); }
+    box.querySelectorAll('[data-rmdiv]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var idx=parseInt(b.getAttribute('data-rmdiv'),10); var cur=list.slice(); cur.splice(idx,1); busy=true; try{ await O.saveDivisiList(cur); loadDivisi(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    var addBtn=document.getElementById('divAdd'); if(addBtn) addBtn.onclick=async function(){
+      if(busy) return; var inp=document.getElementById('divNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('divMsg');
+      if(!v){ msg.innerHTML='<div class="res bad">Isi nama divisi dulu.</div>'; return; }
+      if(list.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Divisi itu udah ada.</div>'; return; }
+      busy=true; this.disabled=true;
+      try{ await O.saveDivisiList(list.concat([v])); inp.value=''; msg.innerHTML=''; loadDivisi(); }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; busy=false;
+    };
+    var filterSel=document.getElementById('hrDivFilter'); if(filterSel){ var cur=filterSel.value; filterSel.innerHTML='<option value="">— semua divisi —</option>'+list.map(function(d){ return '<option>'+esc(d)+'</option>'; }).join(''); filterSel.value=cur; }
+  }
+  async function loadHRList(){
+    var box=document.getElementById('hrList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listKaryawanHR(); }catch(e){}
+    var sf=(document.getElementById('hrStatusFilter')||{}).value; if(sf===undefined) sf='approved';
+    if(sf) arr=arr.filter(function(k){ return k.approvalStatus===sf; });
+    var f=(document.getElementById('hrDivFilter')||{}).value||'';
+    if(f) arr=arr.filter(function(k){ return k.divisi===f; });
+    if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada karyawan yang cocok filter ini.</div>'; return; }
     function badge(k){ if(k.approvalStatus==='approved') return '<span class="tag on">DISETUJUI</span>'; if(k.approvalStatus==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
     box.innerHTML = arr.map(function(k){
       return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(k.namaLengkap||'(tanpa nama)')+(k.nomorPegawai?' <span class="muted" style="font-weight:700">#'+esc(k.nomorPegawai)+'</span>':'')+' '+badge(k)+(k.active===false?' <span class="tag off">NONAKTIF</span>':'')+'</div>'
-        +'<div class="sub">'+esc(k.outlet||'-')+(k.jabatan?' · '+esc(k.jabatan):'')+(k.shift?' · '+esc(k.shift):'')+(k.status?' · '+esc(k.status):'')+(k.kontrakJenis?' · Kontrak: '+esc(k.kontrakJenis):'')+' · '+esc(k.phone||'')+'</div></div>'
+        +'<div class="sub">'+esc(k.divisi||'-')+' · '+esc(k.jabatan||'-')+' · '+esc(k.outlet||'-')+(k.shift?' · '+esc(k.shift):'')+(k.kontrakJenis?' · Kontrak: '+esc(k.kontrakJenis):'')+' · '+esc(k.phone||'')+'</div></div>'
         +'<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
         + (k.approvalStatus!=='approved' ? ('<button class="btn sm sec" data-appr="'+esc(k.id)+'">✓ Setujui</button>') : '')
         + (k.approvalStatus==='pending' ? ('<button class="btn sm red" data-rej="'+esc(k.id)+'">✕ Tolak</button>') : '')
-        + (k.approvalStatus==='approved' ? ('<button class="btn sm sec" data-editki="'+esc(k.id)+'">⚙️ Edit</button><button class="btn sm sec" data-toggleki="'+esc(k.id)+'" data-on="'+(k.active!==false?'1':'0')+'">'+(k.active!==false?'Nonaktifkan':'Aktifkan')+'</button>') : '')
+        + (k.approvalStatus==='approved' ? ('<button class="btn sm sec" data-edithr="'+esc(k.id)+'">⚙️ Edit</button><button class="btn sm sec" data-togglehr="'+esc(k.id)+'" data-on="'+(k.active!==false?'1':'0')+'">'+(k.active!==false?'Nonaktifkan':'Aktifkan')+'</button>') : '')
         +'</div></div>';
     }).join('');
-    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKaryawan(b.getAttribute('data-appr')); loadKaryawan(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKaryawan(b.getAttribute('data-rej')); loadKaryawan(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-toggleki]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.updateKaryawanProfile(b.getAttribute('data-toggleki'), {active:b.getAttribute('data-on')!=='1'}); loadKaryawan(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-editki]').forEach(function(b){ b.onclick=function(){ var k=arr.find(function(x){ return x.id===b.getAttribute('data-editki'); }); if(k) openKaryawanEdit(k); }; });
+    box.querySelectorAll('[data-edithr]').forEach(function(b){ b.onclick=function(){ var k=arr.find(function(x){ return x.id===b.getAttribute('data-edithr'); }); if(k) openKaryawanHREdit(k); }; });
+    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKaryawan(b.getAttribute('data-appr')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKaryawan(b.getAttribute('data-rej')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-togglehr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.updateKaryawanProfile(b.getAttribute('data-togglehr'), {active:b.getAttribute('data-on')!=='1'}); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
-  function hitungDurasi(mulai, selesai){
-    if(!mulai || !selesai) return '';
-    var a=new Date(mulai), b=new Date(selesai); if(isNaN(a)||isNaN(b)||b<a) return '';
-    var bulan=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());
-    var thn=Math.floor(bulan/12), sisaBulan=bulan%12;
-    var parts=[]; if(thn>0) parts.push(thn+' tahun'); if(sisaBulan>0) parts.push(sisaBulan+' bulan');
-    return parts.length?parts.join(' '):'kurang dari 1 bulan';
-  }
-  async function openKaryawanEdit(k){
+  async function openKaryawanHREdit(k){
     var bk=document.createElement('div');
     bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
     var jabList=[]; try{ jabList=await O.listJabatan(); }catch(e){}
     var jabOpts='<option value="">— pilih jabatan —</option>'+jabList.map(function(j){ return '<option>'+esc(j)+'</option>'; }).join('')+(k.jabatan&&jabList.indexOf(k.jabatan)<0?('<option>'+esc(k.jabatan)+'</option>'):'');
+    var divList=[]; try{ divList=await O.listDivisi(); }catch(e){}
+    var divOpts='<option value="">— pilih divisi —</option>'+divList.map(function(d){ return '<option>'+esc(d)+'</option>'; }).join('')+(k.divisi&&divList.indexOf(k.divisi)<0?('<option>'+esc(k.divisi)+'</option>'):'');
     bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;max-height:90vh;overflow:auto">'
       +'<div style="font-weight:800;color:var(--coklat);margin-bottom:10px">⚙️ Edit Karyawan</div>'
       +'<label>Nama lengkap</label><input id="keNm" value="'+esc(k.namaLengkap||'')+'">'
       +'<label>Nomor Pegawai</label><input id="keNoPeg" value="'+esc(k.nomorPegawai||'')+'" placeholder="cth: EMP-2026-001">'
+      +'<label>Divisi</label><select id="keDivisi">'+divOpts+'</select>'
       +'<label>Jabatan</label><select id="keJabatan">'+jabOpts+'</select>'
       +'<label>Lokasi absen</label><select id="keOut">'+buildOutletOpts()+'</select>'
       +'<label>Shift</label><select id="keShift"><option value="">— pilih shift —</option><option>Pagi</option><option>Siang</option><option>Malam</option><option>Fleksibel</option></select>'
@@ -1483,6 +1529,7 @@
     var outSel=bk.querySelector('#keOut'); if(k.outlet) outSel.value=k.outlet;
     var shiftSel=bk.querySelector('#keShift'); if(k.shift) shiftSel.value=k.shift;
     var jabSel=bk.querySelector('#keJabatan'); if(k.jabatan) jabSel.value=k.jabatan;
+    var divSel=bk.querySelector('#keDivisi'); if(k.divisi) divSel.value=k.divisi;
     var kjSel=bk.querySelector('#keKontrakJenis'); if(k.kontrakJenis) kjSel.value=k.kontrakJenis;
     var kmI=bk.querySelector('#keKontrakMulai'), ksI=bk.querySelector('#keKontrakSelesai'), durEl=bk.querySelector('#keDurasi');
     function refreshDurasi(){ var d=hitungDurasi(kmI.value,ksI.value); durEl.textContent=d?('Durasi: '+d):''; }
@@ -1491,10 +1538,10 @@
     bk.onclick=function(e){ if(e.target===bk) bk.remove(); };
     bk.querySelector('#keSave').onclick=async function(){ if(busy) return;
       var nm=(bk.querySelector('#keNm').value||'').trim(); if(!nm){ alert('Nama wajib diisi.'); return; }
-      var patch={ namaLengkap:nm, nomorPegawai:(bk.querySelector('#keNoPeg').value||'').trim(), jabatan:jabSel.value, outlet:outSel.value, shift:shiftSel.value, status:(bk.querySelector('#keStatus').value||'').trim(),
-        kontrakJenis:kjSel.value, kontrakMulai:kmI.value, kontrakSelesai:ksI.value };
+      var basicPatch={ namaLengkap:nm, nomorPegawai:(bk.querySelector('#keNoPeg').value||'').trim(), jabatan:jabSel.value, outlet:outSel.value, shift:shiftSel.value, status:(bk.querySelector('#keStatus').value||'').trim() };
+      var hrPatch={ divisi:divSel.value, kontrakJenis:kjSel.value, kontrakMulai:kmI.value, kontrakSelesai:ksI.value };
       busy=true; this.disabled=true; this.textContent='Menyimpan…';
-      try{ await O.updateKaryawanProfile(k.id, patch); bk.remove(); loadKaryawan(); }
+      try{ await O.updateKaryawanProfile(k.id, basicPatch); await O.updateKaryawanHR(k.id, hrPatch); bk.remove(); loadHRList(); }
       catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
       busy=false; };
   }
@@ -1503,7 +1550,7 @@
     var arr=[]; try{ arr=await O.listStaff(); }catch(e){}
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada staff.</div>'; return; }
     await ensureOam();
-    function _sRow(s){ return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.master?' <span class="tag adm">MASTER</span>':(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':' <span class="tag off">KASIR</span>')))+'</div>'
+    function _sRow(s){ return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(s.name||'(nama belum ada)')+(s.master?' <span class="tag adm">MASTER</span>':(s.super?' <span class="tag adm">UTAMA</span>':(s.admin?' <span class="tag adm">ADMIN</span>':(s.hrd?' <span class="tag adm">HRD</span>':' <span class="tag off">KASIR</span>'))))+'</div>'
       +'<div class="sub">'+esc(s.outlet||'(outlet kosong)')+' · '+esc(s.phone||'')+'</div></div>'
       +(canEdit ? ('<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
         +'<button class="btn sm sec" data-edit="'+esc(s.uid)+'" data-out="'+esc(s.outlet||'')+'">Outlet</button>'
@@ -1526,9 +1573,9 @@
       box.querySelectorAll('[data-rem]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus akses staff ini?')) return; busy=true; b.disabled=true; try{ await O.removeStaff(b.getAttribute('data-rem')); loadStaff(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
       return;
     }
-    var _bk={master:[],super:[],admin:[],kronggahan:[],area1:[],area2:[],area3:[],lain:[]};
-    arr.forEach(function(s){ var g; if(s.master) g='master'; else if(s.super) g='super'; else if(s.admin) g='admin'; else { g=outletGroup(s.outlet); if(!_bk[g]) g='lain'; } _bk[g].push(s); });
-    var _grp=[['master','👑 Master'],['super','⭐ Admin Utama'],['admin','🛠️ Admin'],['kronggahan','🏢 Kasir · Kronggahan'],['area1','🗺️ Kasir · Area 1'],['area2','🗺️ Kasir · Area 2'],['area3','🗺️ Kasir · Area 3'],['lain','📌 Kasir · Lainnya']];
+    var _bk={master:[],super:[],admin:[],hrd:[],kronggahan:[],area1:[],area2:[],area3:[],lain:[]};
+    arr.forEach(function(s){ var g; if(s.master) g='master'; else if(s.super) g='super'; else if(s.admin) g='admin'; else if(s.hrd) g='hrd'; else { g=outletGroup(s.outlet); if(!_bk[g]) g='lain'; } _bk[g].push(s); });
+    var _grp=[['master','👑 Master'],['super','⭐ Admin Utama'],['admin','🛠️ Admin'],['hrd','🗂️ HRD'],['kronggahan','🏢 Kasir · Kronggahan'],['area1','🗺️ Kasir · Area 1'],['area2','🗺️ Kasir · Area 2'],['area3','🗺️ Kasir · Area 3'],['lain','📌 Kasir · Lainnya']];
     var _f=(document.getElementById('sFilter')||{}).value||'';
     var flat=[]; _grp.forEach(function(g){ if(_f && g[0]!==_f) return; var list=_bk[g[0]]; list.forEach(function(s){ flat.push({s:s, gk:g[0], gl:g[1], gt:list.length}); }); });
     var PAGE=10, totalPages=Math.max(1,Math.ceil(flat.length/PAGE));

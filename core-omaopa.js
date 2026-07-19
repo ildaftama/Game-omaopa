@@ -680,7 +680,7 @@ async function awardOrderPoints(id, d){
 }
 async function getStaffInfo(){
   if(!user) return null;
-  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true, super: d.super===true, master: d.master===true }; }catch(e){ return null; }
+  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true, super: d.super===true, master: d.master===true, hrd: d.hrd===true }; }catch(e){ return null; }
 }
 async function listTransactions(outlet){
   try{
@@ -1189,6 +1189,7 @@ async function openHistory(){
 // ============================================================
 async function isAdmin(){ const s=await getStaffInfo(); return !!(s&&(s.admin||s.super)); }
 async function isSuper(){ const s=await getStaffInfo(); return !!(s&&s.super); }
+async function isHRD(){ const s=await getStaffInfo(); return !!(s&&(s.hrd||s.master)); }
 async function isMaster(){ if(masterFlag) return true; const s=await getStaffInfo(); if(s&&s.master) return true; if(s && user && user.email && user.email.split('@')[0]===normPhone(BOOTSTRAP_MASTER_PHONE)) return true; return false; }
 async function getMemberByPhone(phone){
   const p=normPhone(phone); if(!p) return null;
@@ -1433,27 +1434,25 @@ async function getKaryawanProfile(){
   }catch(e){ return null; }
 }
 async function listKaryawan(){
-  if(!(await isAdmin())) return [];
+  if(!(await isHRD())) return [];
   try{ const snap=await getDocs(collection(db,'karyawan')); const arr=[];
-    snap.forEach(d=>{ const x=d.data()||{}; arr.push({ id:d.id, namaLengkap:x.namaLengkap||'', phone:x.phone||'', outlet:x.outlet||'', jabatan:x.jabatan||'', shift:x.shift||'', status:x.status||'', approvalStatus:x.approvalStatus||'pending', active:x.active!==false, fotoProfil:x.fotoProfil||'',
-      nomorPegawai:x.nomorPegawai||'', kontrakJenis:x.kontrakJenis||'', kontrakMulai:x.kontrakMulai||'', kontrakSelesai:x.kontrakSelesai||'',
-      dob:x.dob||'', alamat:x.alamat||'', noKtp:x.noKtp||'', kontakDaruratNama:x.kontakDaruratNama||'', kontakDaruratHp:x.kontakDaruratHp||'', customFields:x.customFields||{} }); });
+    snap.forEach(d=>{ const x=d.data()||{}; arr.push({ id:d.id, namaLengkap:x.namaLengkap||'', phone:x.phone||'', outlet:x.outlet||'', jabatan:x.jabatan||'', shift:x.shift||'', status:x.status||'', approvalStatus:x.approvalStatus||'pending', active:x.active!==false, fotoProfil:x.fotoProfil||'', nomorPegawai:x.nomorPegawai||'' }); });
     arr.sort((a,b)=>(a.outlet||'').localeCompare(b.outlet||'')||(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
     return arr;
   }catch(e){ return []; }
 }
 async function approveKaryawan(uid){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isHRD())) throw {message:'Khusus HRD/admin utama.'};
   if(!uid) throw {message:'ID kosong.'};
   await setDoc(doc(db,'karyawan',uid), { approvalStatus:'approved', approvedBy:(auth.currentUser&&auth.currentUser.uid)||'', approvedAt:serverTimestamp(), updatedAt:serverTimestamp() }, {merge:true});
 }
 async function rejectKaryawan(uid){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isHRD())) throw {message:'Khusus HRD/admin utama.'};
   if(!uid) throw {message:'ID kosong.'};
   await setDoc(doc(db,'karyawan',uid), { approvalStatus:'ditolak', updatedAt:serverTimestamp() }, {merge:true});
 }
 async function updateKaryawanProfile(uid, patch){
-  if(!(await isAdmin())) throw {message:'Khusus admin.'};
+  if(!(await isHRD())) throw {message:'Khusus HRD/admin utama.'};
   if(!uid) throw {message:'ID kosong.'};
   await setDoc(doc(db,'karyawan',uid), Object.assign({updatedAt:serverTimestamp()}, patch||{}), {merge:true});
 }
@@ -1461,6 +1460,42 @@ async function deleteKaryawan(uid){
   if(!(await isMaster())) throw {message:'Khusus master.'};
   if(!uid) throw {message:'ID kosong.'};
   await deleteDoc(doc(db,'karyawan',uid));
+  try{ await deleteDoc(doc(db,'karyawanHR',uid)); }catch(e){}
+}
+// ---- data HR sensitif karyawan (divisi, kontrak, data pribadi) — cuma Admin Utama ----
+async function getKaryawanHRProfile(){
+  if(!auth.currentUser) return null;
+  try{ const snap=await getDoc(doc(db,'karyawanHR',auth.currentUser.uid));
+    return snap.exists() ? snap.data() : {};
+  }catch(e){ return {}; }
+}
+async function listKaryawanHR(){
+  if(!(await isHRD())) return [];
+  try{
+    const basicSnap=await getDocs(collection(db,'karyawan')); const basic={};
+    basicSnap.forEach(d=>{ basic[d.id]=d.data()||{}; });
+    const hrSnap=await getDocs(collection(db,'karyawanHR')); const arr=[];
+    Object.keys(basic).forEach(uid=>{
+      const b=basic[uid]; const h=(function(){ let found=null; hrSnap.forEach(d=>{ if(d.id===uid) found=d.data(); }); return found||{}; })();
+      arr.push({ id:uid, namaLengkap:b.namaLengkap||'', phone:b.phone||'', outlet:b.outlet||'', jabatan:b.jabatan||'', shift:b.shift||'', status:b.status||'', approvalStatus:b.approvalStatus||'pending', active:b.active!==false, nomorPegawai:b.nomorPegawai||'',
+        divisi:h.divisi||'', kontrakJenis:h.kontrakJenis||'', kontrakMulai:h.kontrakMulai||'', kontrakSelesai:h.kontrakSelesai||'',
+        dob:h.dob||'', alamat:h.alamat||'', noKtp:h.noKtp||'', kontakDaruratNama:h.kontakDaruratNama||'', kontakDaruratHp:h.kontakDaruratHp||'', customFields:h.customFields||{} });
+    });
+    arr.sort((a,b)=>(a.divisi||'').localeCompare(b.divisi||'')||(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
+    return arr;
+  }catch(e){ return []; }
+}
+async function updateKaryawanHR(uid, patch){
+  if(!(await isHRD())) throw {message:'Khusus HRD/admin utama.'};
+  if(!uid) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'karyawanHR',uid), Object.assign({updatedAt:serverTimestamp()}, patch||{}), {merge:true});
+}
+async function listDivisi(){
+  try{ const snap=await getDoc(doc(db,'settings','divisiList')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
+}
+async function saveDivisiList(list){
+  if(!(await isHRD())) throw {message:'Khusus HRD/admin utama.'};
+  await setDoc(doc(db,'settings','divisiList'), { list: (list||[]).filter(Boolean), updatedAt:serverTimestamp() }, {merge:true});
 }
 async function listJabatan(){
   try{ const snap=await getDoc(doc(db,'settings','jabatanList')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
@@ -1479,10 +1514,10 @@ async function saveKaryawanFields(list){
 }
 async function updateKaryawanOwnProfile(patch){
   if(!auth.currentUser) throw {message:'Belum login.'};
-  const allowed=['dob','alamat','noKtp','kontakDaruratNama','kontakDaruratHp','fotoProfil','customFields'];
+  const allowed=['dob','alamat','noKtp','kontakDaruratNama','kontakDaruratHp','customFields'];
   const clean={}; Object.keys(patch||{}).forEach(k=>{ if(allowed.indexOf(k)>=0) clean[k]=patch[k]; });
   clean.updatedAt=serverTimestamp();
-  await setDoc(doc(db,'karyawan',auth.currentUser.uid), clean, {merge:true});
+  await setDoc(doc(db,'karyawanHR',auth.currentUser.uid), clean, {merge:true});
 }
 // ---- pengelompokan area outlet (terpusat, dipakai admin/rekap/broadcast) ----
 const KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal uii']; // Jogja -> Area 1/Metavest; "jakal uii" spesifik; kecuali nama mengandung "kyai mojo"
@@ -1594,7 +1629,7 @@ async function getKaryawanProfilePhotoUrl(path){
   try{ const bytes = await getBytes(storageRef(storage, path)); return URL.createObjectURL(new Blob([bytes], {type:'image/jpeg'})); }
   catch(e){ return ''; }
 }
-async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPath){
+async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPath, faceCheckFailed){
   if(!auth.currentUser) throw {message:'Belum login.'};
   if(type!=='masuk' && type!=='keluar') throw {message:'Tipe absen tidak valid.'};
   if(!outlet) throw {message:'Outlet kosong.'};
@@ -1605,6 +1640,7 @@ async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPat
     lokasi: { lat:lat, lng:lng, akurasi:(typeof akurasi==='number'?akurasi:null) },
     jarak: (typeof jarak==='number'?jarak:null),
     photoPath: photoPath||'',
+    faceCheckFailed: !!faceCheckFailed,
     createdAt: serverTimestamp()
   });
 }
@@ -1619,10 +1655,10 @@ async function getLastAttendance(){
   }catch(e){ return null; }
 }
 async function listAttendance(){
-  if(!(await isAdmin())) return [];
+  if(!(await isHRD())) return [];
   try{
     const snap=await getDocs(collection(db,'attendance')); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', outlet:x.outlet||'', type:x.type||'', jarak:(typeof x.jarak==='number'?x.jarak:null), ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', outlet:x.outlet||'', type:x.type||'', jarak:(typeof x.jarak==='number'?x.jarak:null), faceCheckFailed:x.faceCheckFailed===true, ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
     const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
     kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
     arr.forEach(a=>{ a.namaKaryawan=names[a.karyawanUid]||''; });
@@ -1635,7 +1671,7 @@ async function listAttendance(){
 async function listStaff(){
   if(!(await isAdmin())) return [];
   try{ const snap=await getDocs(collection(db,'staff')); const base=[];
-    snap.forEach(d=>{ const x=d.data()||{}; base.push({ uid:d.id, outlet:x.outlet||x.name||'', admin:x.admin===true, super:x.super===true, master:x.master===true }); });
+    snap.forEach(d=>{ const x=d.data()||{}; base.push({ uid:d.id, outlet:x.outlet||x.name||'', admin:x.admin===true, super:x.super===true, master:x.master===true, hrd:x.hrd===true }); });
     for(const s of base){ try{ const u=await getDoc(doc(db,'users',s.uid)); if(u.exists()){ const d=u.data(); s.name=d.name||''; s.phone=d.phone||''; } }catch(e){} }
     base.sort((a,b)=>(a.outlet||'').localeCompare(b.outlet||'')); return base;
   }catch(e){ return []; }
@@ -1867,11 +1903,12 @@ window.OmaOpa = {
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, backfillLastTxnAt, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
-  isAdmin, isSuper, isMaster, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
+  isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
   registerKaryawan, loginKaryawan, getKaryawanProfile, listKaryawan, approveKaryawan, rejectKaryawan, updateKaryawanProfile, deleteKaryawan, haversineMeters,
   listJabatan, saveJabatanList, listKaryawanFields, saveKaryawanFields, updateKaryawanOwnProfile,
+  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, listDivisi, saveDivisiList,
   recordAttendance, getLastAttendance, uploadAttendancePhoto, uploadKaryawanProfilePhoto, getKaryawanProfilePhotoUrl, listAttendance,
   outletGroup, matchOutletKey,
   sendBroadcast, listBroadcasts, deactivateBroadcast, deleteBroadcast, getMemberBroadcasts, markBroadcastRead,

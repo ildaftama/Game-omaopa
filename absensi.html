@@ -52,7 +52,7 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=124"></script>
+<script type="module" src="core-omaopa.js?v=127"></script>
 <script>
 (function(){
   var panel = document.getElementById('panel');
@@ -194,8 +194,8 @@
     try{
       var detector = await loadFaceDetector();
       var result = detector.detect(canvas);
-      return !!(result && result.detections && result.detections.length>0);
-    }catch(e){ return true; } // gagal load library -> jangan blokir absen gara-gara itu
+      return { ok: !!(result && result.detections && result.detections.length>0), checkFailed:false };
+    }catch(e){ return { ok:true, checkFailed:true }; } // gagal jalan -> tetep boleh absen, tapi ditandain
   }
 
   async function doAbsen(type, file){
@@ -204,14 +204,15 @@
     if(bm) bm.disabled=true; if(bk) bk.disabled=true;
     var out=document.getElementById('absenOut'); out.innerHTML='<div class="muted" style="margin-top:12px">📸 Memproses foto…</div>';
     try{
-      var outletData=(window.OMA_OUTLETS||[]).find(function(o){ return (o.name||'')===currentProfile.outlet; });
+      var _normOut=function(s){ return (s||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); };
+      var outletData=(window.OMA_OUTLETS||[]).find(function(o){ return _normOut(o.name)===_normOut(currentProfile.outlet); });
       if(!outletData || typeof outletData.lat!=='number' || typeof outletData.lng!=='number'){
         out.innerHTML='<div class="res bad">Lokasi <b>'+esc(currentProfile.outlet)+'</b> belum diatur admin. Absen belum bisa dilakukan — hubungi admin untuk melengkapi koordinat lokasi dulu.</div>';
       } else {
         var comp = await compressImage(file, 480);
         out.innerHTML='<div class="muted" style="margin-top:12px">🔍 Memeriksa wajah di foto…</div>';
-        var faceOk = await checkFacePresent(comp.canvas);
-        if(!faceOk){
+        var faceCheck = await checkFacePresent(comp.canvas);
+        if(!faceCheck.ok){
           out.innerHTML='<div class="res bad">Wajah tidak terdeteksi jelas di foto. Pastikan wajah menghadap kamera dengan pencahayaan cukup, lalu coba lagi.</div>';
         } else {
           out.innerHTML='<div class="muted" style="margin-top:12px">📍 Mengambil lokasi GPS…</div>';
@@ -223,7 +224,7 @@
             out.innerHTML='<div class="muted" style="margin-top:12px">⬆️ Mengunggah foto…</div>';
             var photoPath = await window.OmaOpa.uploadAttendancePhoto(comp.blob);
             out.innerHTML='<div class="muted" style="margin-top:12px">Menyimpan absen…</div>';
-            await window.OmaOpa.recordAttendance(currentProfile.outlet, type, gps.lat, gps.lng, gps.akurasi, jarak, photoPath);
+            await window.OmaOpa.recordAttendance(currentProfile.outlet, type, gps.lat, gps.lng, gps.akurasi, jarak, photoPath, faceCheck.checkFailed);
             out.innerHTML='<div class="res ok"><div class="t">✓ Absen '+(type==='masuk'?'Masuk':'Keluar')+' berhasil</div><div class="row">Jarak dari lokasi: '+Math.round(jarak)+'m</div></div>';
           }
         }
