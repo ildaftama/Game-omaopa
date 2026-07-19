@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Tim Pabrik — Oma Opa Cakery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --kuning:#FACC1A; --kuning-d:#E0B100; --coklat:#613925; --cream:#FFF8EC; }
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
+    background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream);
+    min-height:100vh; padding:18px 14px 40px; }
+  .wrap{ max-width:460px; margin:0 auto; }
+  .head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .head h1{ font-family:'Fredoka'; font-size:1.2rem; margin:0; color:var(--coklat); }
+  .head .badge{ font-size:.66rem; font-weight:900; background:var(--kuning); color:#5A3A05; padding:2px 9px; border-radius:999px; }
+  .card{ background:#fff; border:2px solid #EFE2C4; border-radius:18px; padding:16px; margin-bottom:14px; }
+  .card .nm{ font-weight:800; color:var(--coklat); margin-bottom:4px; }
+  .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  label{ font-size:.78rem; font-weight:800; color:#8a6a3a; display:block; margin:10px 0 5px; }
+  label:first-child{ margin-top:0; }
+  input, select{ width:100%; border:2px solid #E7D8BE; border-radius:12px; padding:13px; font-size:1rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
+  input:focus, select:focus{ outline:none; border-color:var(--kuning); }
+  input[data-pin]{ font-family:monospace; letter-spacing:2px; font-weight:800; }
+  .btn{ width:100%; border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:1rem; border-radius:13px; padding:13px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; margin-top:14px; }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--kuning-d); }
+  .btn[disabled]{ opacity:.55; }
+  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #E7D8BE; box-shadow:none; }
+  .btn.sm{ width:auto; padding:9px 12px; font-size:.85rem; margin-top:8px; }
+  .btn.red{ background:#C0392B; color:#fff; box-shadow:0 3px 0 #922B21; }
+  .row{ display:flex; align-items:center; gap:9px; padding:9px 0; border-top:1px solid #F2E4C6; }
+  .row:first-child{ border-top:none; }
+  .grow{ flex:1; min-width:0; }
+  .nm{ font-weight:900; } .sub{ font-size:.78rem; color:#9a7a5e; font-weight:700; }
+  .res{ border-radius:14px; padding:14px; margin-top:14px; }
+  .ok{ background:#E7F6E7; border:2px solid #B7E0B7; }
+  .warn{ background:#FFF3D6; border:2px solid #F2D98A; }
+  .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; }
+  a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>Tim Pabrik</h1><span class="badge" id="roleBadge">…</span></div>
+  <div id="panel"><div class="card"><div class="muted">Menyiapkan…</div></div></div>
+  <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
+</div>
+
+<script type="module" src="core-omaopa.js?v=135"></script>
+<script>
+(function(){
+  var panel=document.getElementById('panel'), busy=false;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+  var DIVISI_HALAMAN = 'Pabrik';
+  async function refresh(){
+    if(!window.OmaOpa){ panel.innerHTML='<div class="card"><div class="muted">Menyiapkan…</div></div>'; return; }
+    var u=window.OmaOpa.getUser();
+    if(!u){ renderLogin(); return; }
+    panel.innerHTML='<div class="card"><div class="muted">Memeriksa akses…</div></div>';
+    var scope=null; try{ scope=await window.OmaOpa.getMyOrgScope(); }catch(e){}
+    if(!scope || scope.strukturalLevel==='staff'){
+      panel.innerHTML='<div class="card"><div class="res warn">👁️ Halaman ini khusus SPV/Manajer/GM. Akun kamu belum punya wewenang ini — hubungi HRD kalau ini keliru.</div>'
+        + '<button class="btn sec" id="outBtn">Keluar</button></div>';
+      document.getElementById('outBtn').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
+      return;
+    }
+    if(scope.strukturalLevel!=='gm' && scope.divisi!==DIVISI_HALAMAN){
+      panel.innerHTML='<div class="card"><div class="res warn">👁️ Halaman ini khusus divisi '+DIVISI_HALAMAN+'. Akun kamu ada di divisi '+esc(scope.divisi||'lain')+' — hubungi HRD buat halaman tim divisimu.</div>'
+        + '<button class="btn sec" id="outBtn">Keluar</button></div>';
+      document.getElementById('outBtn').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
+      return;
+    }
+    var rbg=document.getElementById('roleBadge'); if(rbg) rbg.textContent=scope.strukturalLevel.toUpperCase();
+    renderApp(scope);
+  }
+
+  function renderApp(scope){
+    panel.innerHTML =
+      '<div class="card"><div class="nm">🗓️ Jadwal Tim</div><div class="muted" style="font-size:.78rem;margin-bottom:8px">Susun jadwal kerja per anggota tim, otomatis kelihatan di halaman Profil mereka.</div>'
+      +'<div id="timList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">⏰ Approval Lembur</div><div id="lemburApprovalList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">🌴 Approval Cuti</div><div id="cutiApprovalList" class="muted">Memuat…</div></div>'
+      +'<button class="btn sec" id="outBtn">Keluar</button>';
+    document.getElementById('outBtn').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
+    loadTim();
+    loadLemburApproval();
+    loadCutiApproval();
+  }
+
+  async function loadTim(){
+    var box=document.getElementById('timList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var team=[]; try{ team=await window.OmaOpa.listTeamKaryawan(); }catch(e){}
+    if(!team.length){ box.innerHTML='<div class="muted">Belum ada anggota tim.</div>'; return; }
+    box.innerHTML = team.map(function(t){
+      return '<div style="border-top:1px dashed #E7D8BE;padding-top:10px;margin-top:10px" data-timrow="'+esc(t.uid)+'">'
+        + '<b style="font-size:.9rem">'+esc(t.namaLengkap)+'</b>'
+        + '<label>Tanggal</label><input type="date" data-jdtgl="'+esc(t.uid)+'">'
+        + '<div style="display:flex;gap:8px"><div style="flex:1"><label>Jam Mulai</label><input type="time" data-jdmulai="'+esc(t.uid)+'"></div><div style="flex:1"><label>Jam Selesai</label><input type="time" data-jdselesai="'+esc(t.uid)+'"></div></div>'
+        + '<button class="btn sec sm" data-jdsave="'+esc(t.uid)+'">💾 Simpan Jadwal</button><div data-jdmsg="'+esc(t.uid)+'"></div>'
+        + '</div>';
+    }).join('');
+    box.querySelectorAll('[data-jdsave]').forEach(function(b){ b.onclick=async function(){
+      if(busy) return; var uid=b.getAttribute('data-jdsave');
+      var tgl=box.querySelector('[data-jdtgl="'+uid+'"]').value;
+      var jm=box.querySelector('[data-jdmulai="'+uid+'"]').value;
+      var js=box.querySelector('[data-jdselesai="'+uid+'"]').value;
+      var msgEl=box.querySelector('[data-jdmsg="'+uid+'"]');
+      if(!tgl||!jm||!js){ msgEl.innerHTML='<div class="res bad">Lengkapi tanggal & jam dulu.</div>'; return; }
+      busy=true; b.disabled=true;
+      try{ await window.OmaOpa.saveJadwal(uid, tgl, jm, js); msgEl.innerHTML='<div class="res ok">✓ Jadwal tersimpan.</div>'; }
+      catch(e){ msgEl.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal.')+'</div>'; }
+      b.disabled=false; busy=false;
+    }; });
+  }
+
+  async function loadLemburApproval(){
+    var box=document.getElementById('lemburApprovalList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var pending=[]; try{ pending=await window.OmaOpa.listLemburToApprove(); }catch(e){}
+    if(!pending.length){ box.innerHTML='<div class="muted">Gak ada lembur yang perlu di-approve.</div>'; return; }
+    box.innerHTML = pending.map(function(l){
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(l.namaKaryawan)+'</div>'
+        + '<div class="sub">'+esc(l.tanggal)+' · Keluar '+esc(l.jamKeluarAktual)+' (jadwal s/d '+esc(l.jamSelesaiJadwal)+') · +'+l.durasiLemburMenit+' menit</div></div>'
+        + '<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px"><button class="btn sm sec" data-lemburacc="'+esc(l.id)+'">✓ Setujui</button><button class="btn sm red" data-lemburrej="'+esc(l.id)+'">✕ Tolak</button></div>'
+        + '</div>';
+    }).join('');
+    box.querySelectorAll('[data-lemburacc]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await window.OmaOpa.approveLembur(b.getAttribute('data-lemburacc'),''); loadLemburApproval(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-lemburrej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var catatan=prompt('Alasan tolak (opsional):')||''; busy=true; b.disabled=true; try{ await window.OmaOpa.rejectLembur(b.getAttribute('data-lemburrej'),catatan); loadLemburApproval(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+  }
+
+  async function loadCutiApproval(){
+    var box=document.getElementById('cutiApprovalList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var pending=[]; try{ pending=await window.OmaOpa.listCutiToApprove(); }catch(e){}
+    if(!pending.length){ box.innerHTML='<div class="muted">Gak ada pengajuan cuti yang perlu di-approve.</div>'; return; }
+    box.innerHTML = pending.map(function(c){
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(c.namaKaryawan)+'</div>'
+        + '<div class="sub">'+esc(c.jenisCuti||'-')+' · '+esc(c.tanggalMulai||'-')+' s/d '+esc(c.tanggalSelesai||'-')+(c.alasan?(' · "'+esc(c.alasan)+'"'):'')+'</div></div>'
+        + '<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px"><button class="btn sm sec" data-cutiacc="'+esc(c.id)+'">✓ Setujui</button><button class="btn sm red" data-cutirej="'+esc(c.id)+'">✕ Tolak</button></div>'
+        + '</div>';
+    }).join('');
+    box.querySelectorAll('[data-cutiacc]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await window.OmaOpa.approveCuti(b.getAttribute('data-cutiacc'),''); loadCutiApproval(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-cutirej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var catatan=prompt('Alasan tolak (opsional):')||''; busy=true; b.disabled=true; try{ await window.OmaOpa.rejectCuti(b.getAttribute('data-cutirej'),catatan); loadCutiApproval(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+  }
+
+  function renderLogin(){
+    panel.innerHTML = '<div class="card"><div class="nm">Masuk sebagai Karyawan</div>'
+      + '<div class="muted" style="margin-bottom:8px">Pakai akun karyawan yang sama seperti di halaman Absensi/Profil.</div>'
+      + '<label>Nomor HP</label><input id="lPhone" type="tel" inputmode="numeric" placeholder="08xxxxxxxxxx" autocomplete="off">'
+      + '<label>PIN (6 angka)</label><input id="lPin" data-pin type="password" inputmode="numeric" maxlength="6" placeholder="••••••">'
+      + '<button class="btn" id="lBtn">Masuk</button><div id="lMsg"></div></div>';
+    document.getElementById('lBtn').onclick = async function(){
+      if(busy) return; busy=true; var b=this; b.disabled=true; b.textContent='Memproses…';
+      var msg=document.getElementById('lMsg'); msg.innerHTML='';
+      try{
+        await window.OmaOpa.loginKaryawan(document.getElementById('lPhone').value, document.getElementById('lPin').value);
+        refresh();
+      }catch(e){
+        msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Nomor HP atau PIN salah.')+'</div>';
+        b.disabled=false; b.textContent='Masuk';
+      }
+      busy=false;
+    };
+  }
+
+  window.addEventListener('omaopa:ready', refresh);
+  window.addEventListener('omaopa:change', refresh);
+  setTimeout(refresh, 800);
+})();
+</script>
+</body>
+</html>

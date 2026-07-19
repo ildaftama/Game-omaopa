@@ -71,7 +71,7 @@
     <a href="rekap.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E5A100;background:#FFF6E6;color:#5A3017">📊 Rekap</a>
     <a href="staff.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E5A100;background:#FFF6E6;color:#5A3017">🧾 Kasir</a>
   </div>
-  <div class="head"><h1>Admin Oma Opa</h1><span class="badge" id="roleBadge">ADMIN</span></div>
+  <div class="head"><h1>Admin Oma Opa</h1><span class="badge" id="roleBadge">ADMIN</span><a href="hrd.html" style="margin-left:auto;font-size:.76rem;font-weight:800;color:#8a6a3a;text-decoration:none">🗂️ HRD ›</a></div>
   <div id="gate" class="card"><div class="muted">Menyiapkan…</div></div>
   <div id="app" style="display:none">
     <div class="tabs">
@@ -84,17 +84,16 @@
       <button data-tab="analitik">📈 Analitik</button>
       <button data-tab="pesanan">🧾 Pesanan</button>
       <button data-tab="blast">📢 Blast</button>
-      <button data-tab="hrd">HRD</button>
       <button data-tab="pengaturan">⚙️ Pengaturan</button>
     </div>
     <div id="tab"></div>
   </div>
-  <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
+  <div style="text-align:center;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="index.html">‹ Ke beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=127"></script>
+<script type="module" src="core-omaopa.js?v=135"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -113,7 +112,6 @@
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
   function num(n){ try{ return Number(n||0).toLocaleString('id-ID'); }catch(e){ return ''+n; } }
 
-  var hrdOnly=false;
   async function boot(){
     O=window.OmaOpa; if(!O){ gate.innerHTML='<div class="muted">Menyiapkan…</div>'; return; }
     var u=O.getUser();
@@ -123,15 +121,11 @@
     var adm=false; try{ adm=await O.isAdmin(); }catch(e){}
     if(!adm){
       var hrdChk=false; try{ hrdChk=await O.isHRD(); }catch(e){}
-      if(!hrdChk){ gate.innerHTML='<div style="font-weight:900;color:#C0392B">Akun ini bukan admin.</div>'
+      if(hrdChk){ gate.innerHTML='<div class="muted">Akun ini peran HRD — datanya ada di halaman khusus HRD.</div><a class="btn" href="hrd.html" style="display:block;text-align:center;text-decoration:none;box-sizing:border-box">Buka Halaman HRD</a>'; app.style.display='none'; return; }
+      gate.innerHTML='<div style="font-weight:900;color:#C0392B">Akun ini bukan admin.</div>'
           +'<div class="muted" style="margin-top:8px">Minta admin menandai akun (UID) ini dengan <b>admin: true</b> di koleksi <b>staff</b>:</div>'
           +'<div class="uid">'+esc(u.uid)+'</div><button class="btn sec" id="out">Keluar / ganti akun</button>';
-        document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} }; app.style.display='none'; return; }
-      hrdOnly=true;
-      document.querySelectorAll('.tabs button').forEach(function(x){ if(x.getAttribute('data-tab')!=='hrd') x.style.display='none'; });
-      tab='hrd';
-      var rbg2=document.getElementById('roleBadge'); if(rbg2){ rbg2.textContent='HRD'; rbg2.style.background='#5A3017'; }
-      gate.style.display='none'; app.style.display=''; render(); return;
+      document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} }; app.style.display='none'; return;
     }
     try{ canEdit=await O.isSuper(); }catch(e){ canEdit=false; }
     try{ masterEdit=await O.isMaster(); }catch(e){ masterEdit=false; }
@@ -141,7 +135,7 @@
   document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
     tab=b.getAttribute('data-tab'); document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on'); render();
   }; });
-  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, hrd:renderHRD, pengaturan:renderPengaturan}[tab]||renderHome)(); }
+  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, pengaturan:renderPengaturan}[tab]||renderHome)(); }
   function setActiveTab(name){ tab=name; document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-tab')===name); }); }
   function applySegment(field,val){ segFilter={field:field, value:val}; setActiveTab('member'); render(); }
 
@@ -378,22 +372,6 @@
     loadBlastHistory();
   }
 
-  async function loadJabatan(){
-    var box=document.getElementById('jabList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var list=[]; try{ list=await O.listJabatan(); }catch(e){}
-    if(!list.length){ box.innerHTML='<div class="muted">Belum ada jabatan. Tambah dulu di bawah.</div>'; }
-    else { box.innerHTML=list.map(function(j,i){ return '<span class="tag on" style="display:inline-flex;align-items:center;gap:5px;margin:2px 4px 2px 0">'+esc(j)+' <b data-rmjab="'+i+'" style="cursor:pointer">✕</b></span>'; }).join(''); }
-    box.querySelectorAll('[data-rmjab]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var idx=parseInt(b.getAttribute('data-rmjab'),10); var cur=list.slice(); cur.splice(idx,1); busy=true; try{ await O.saveJabatanList(cur); loadJabatan(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    var addBtn=document.getElementById('jabAdd'); if(addBtn) addBtn.onclick=async function(){
-      if(busy) return; var inp=document.getElementById('jabNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('jabMsg');
-      if(!v){ msg.innerHTML='<div class="res bad">Isi nama jabatan dulu.</div>'; return; }
-      if(list.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Jabatan itu udah ada.</div>'; return; }
-      busy=true; this.disabled=true;
-      try{ await O.saveJabatanList(list.concat([v])); inp.value=''; msg.innerHTML=''; loadJabatan(); }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-      this.disabled=false; busy=false;
-    };
-  }
   function slugKey(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40) || ('f'+Date.now()); }
   async function loadCustomFields(){
     var box=document.getElementById('cfList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
@@ -414,9 +392,6 @@
   async function renderPengaturan(){
     if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
     tabEl.innerHTML='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">🧑‍🍳 Daftar Jabatan Karyawan</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Dipakai pas karyawan daftar akun di absensi.html. Tambah/hapus sesuka hati.</div>'
-      +'<div id="jabList" class="muted">Memuat…</div>'
-      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="jabNew" placeholder="Nama jabatan baru" style="flex:1"><button class="btn sm" id="jabAdd">＋ Tambah</button></div><div id="jabMsg"></div></div>'
       +'<div class="card"><div class="nm">📋 Field Kustom Profil Karyawan</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Kolom tambahan buat data diri karyawan (diisi karyawan sendiri di halaman profilnya). Bebas nambah sesuka hati, misal "Golongan Darah", "Ukuran Seragam", dll.</div>'
       +'<div id="cfList" class="muted">Memuat…</div>'
       +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><input id="cfNew" placeholder="Nama field baru" style="flex:1;min-width:140px"><select id="cfType" style="width:auto"><option value="text">Teks</option><option value="date">Tanggal</option></select><button class="btn sm" id="cfAdd">＋ Tambah</button></div><div id="cfMsg"></div></div>'
@@ -449,7 +424,6 @@
         +'<div id="dvList" class="muted" style="margin-top:10px"></div></div>')
       :'<div class="card"><div class="muted" style="font-size:.82rem">🔒 Zona berbahaya (hapus data) khusus <b>Master</b>. Admin Utama tidak bisa menghapus data — biar rekap aman.</div></div>');
     loadMessages();
-    loadJabatan();
     loadCustomFields();
     var bf=document.getElementById('bfBtn'); if(bf) bf.onclick=async function(){
       if(busy) return; if(!confirm('Jalankan migrasi status aktif? Ini membaca seluruh riwayat transaksi lama (sekali proses, aman).')) return;
@@ -1407,144 +1381,6 @@
       this.disabled=false; this.textContent='⬇ CSV'; busy=false;
     };
   }
-  function hitungDurasi(mulai, selesai){
-    if(!mulai || !selesai) return '';
-    var a=new Date(mulai), b=new Date(selesai); if(isNaN(a)||isNaN(b)||b<a) return '';
-    var bulan=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());
-    var thn=Math.floor(bulan/12), sisaBulan=bulan%12;
-    var parts=[]; if(thn>0) parts.push(thn+' tahun'); if(sisaBulan>0) parts.push(sisaBulan+' bulan');
-    return parts.length?parts.join(' '):'kurang dari 1 bulan';
-  }
-  async function renderHRD(){
-    var canHRD=false; try{ canHRD=await O.isHRD(); }catch(e){}
-    if(!canHRD){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Tab HRD khusus peran HRD / Master.</div></div>'; return; }
-    tabEl.innerHTML='<div class="card"><div class="nm">🏢 Daftar Divisi</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Kelompok besar karyawan (misal Operasional, Produksi, Admin). Tambah/hapus sesuka hati.</div>'
-      +'<div id="divList" class="muted">Memuat…</div>'
-      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="divNew" placeholder="Nama divisi baru" style="flex:1"><button class="btn sm" id="divAdd">＋ Tambah</button></div><div id="divMsg"></div></div>'
-      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🗂️ Daftar Karyawan (Lengkap)</div><button class="btn sm sec" id="hrExport">⬇ CSV</button><button class="btn sm sec" id="hrReload">↻</button></div>'
-      +'<select id="hrStatusFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved" selected>✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua status —</option></select>'
-      +'<select id="hrDivFilter" style="margin-bottom:8px"><option value="">— semua divisi —</option></select>'
-      +'<div id="hrList" class="muted">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">⬇️ Export Riwayat Absensi (CSV)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan kedua tanggal buat export semua riwayat.</div>'
-      +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="atExFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="atExTo" style="flex:1;min-width:0"></div>'
-      +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div>';
-
-    loadDivisi();
-    document.getElementById('hrReload').onclick=function(){ loadHRList(); };
-    document.getElementById('hrStatusFilter').onchange=function(){ loadHRList(); };
-    document.getElementById('hrDivFilter').onchange=function(){ loadHRList(); };
-    document.getElementById('hrExport').onclick=async function(){
-      if(busy) return; busy=true; this.disabled=true; this.textContent='…';
-      try{
-        var arr=await O.listKaryawanHR();
-        var lines=[['Nomor Pegawai','Nama','No HP','Divisi','Jabatan','Lokasi','Shift','Status','Jenis Kontrak','Mulai Kontrak','Selesai Kontrak','Approval','Aktif'].map(csvCell).join(',')];
-        arr.forEach(function(k){ lines.push([k.nomorPegawai||'',k.namaLengkap||'',k.phone||'',k.divisi||'',k.jabatan||'',k.outlet||'',k.shift||'',k.status||'',k.kontrakJenis||'',k.kontrakMulai||'',k.kontrakSelesai||'',k.approvalStatus||'',k.active!==false?'Ya':'Tidak'].map(csvCell).join(',')); });
-        downloadCSV(lines, 'karyawan-lengkap.csv');
-      }catch(e){ alert((e&&e.message)||'Gagal export'); }
-      this.disabled=false; this.textContent='⬇ CSV'; busy=false;
-    };
-    var atBtn=document.getElementById('atExportBtn'); if(atBtn) atBtn.onclick=async function(){
-      if(busy) return; busy=true; this.disabled=true; this.textContent='Menyiapkan…';
-      var msg=document.getElementById('atExportMsg'); msg.innerHTML='';
-      try{
-        var all=await O.listAttendance();
-        var f=document.getElementById('atExFrom').value, t=document.getElementById('atExTo').value;
-        var fromMs = f? new Date(f+'T00:00:00').getTime() : 0;
-        var toMs = t? new Date(t+'T23:59:59').getTime() : Infinity;
-        var rows=all.filter(function(a){ return a.ts>=fromMs && a.ts<=toMs; });
-        var lines=[['Nama Karyawan','Lokasi','Tipe','Jarak (m)','Cek Wajah','Waktu'].map(csvCell).join(',')];
-        rows.forEach(function(a){ lines.push([a.namaKaryawan||'(tidak ditemukan)',a.outlet||'',a.type==='masuk'?'Masuk':'Keluar',a.jarak!=null?Math.round(a.jarak):'',a.faceCheckFailed?'GAGAL DICEK - perlu direview':'OK',a.ts?new Date(a.ts).toLocaleString('id-ID'):''].map(csvCell).join(',')); });
-        downloadCSV(lines, 'absensi-'+(f||'awal')+'_'+(t||'sekarang')+'.csv');
-        var gagalCount=rows.filter(function(a){return a.faceCheckFailed;}).length;
-        msg.innerHTML='<div class="res ok">✓ '+rows.length+' catatan absen di-export.'+(gagalCount?(' <b>'+gagalCount+' di antaranya perlu direview</b> (cek wajah gagal jalan).'):'')+'</div>';
-      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-      this.disabled=false; this.textContent='⬇ Export CSV'; busy=false;
-    };
-    loadHRList();
-  }
-  async function loadDivisi(){
-    var box=document.getElementById('divList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var list=[]; try{ list=await O.listDivisi(); }catch(e){}
-    if(!list.length){ box.innerHTML='<div class="muted">Belum ada divisi. Tambah dulu di bawah.</div>'; }
-    else { box.innerHTML=list.map(function(d,i){ return '<span class="tag on" style="display:inline-flex;align-items:center;gap:5px;margin:2px 4px 2px 0">'+esc(d)+' <b data-rmdiv="'+i+'" style="cursor:pointer">✕</b></span>'; }).join(''); }
-    box.querySelectorAll('[data-rmdiv]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var idx=parseInt(b.getAttribute('data-rmdiv'),10); var cur=list.slice(); cur.splice(idx,1); busy=true; try{ await O.saveDivisiList(cur); loadDivisi(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    var addBtn=document.getElementById('divAdd'); if(addBtn) addBtn.onclick=async function(){
-      if(busy) return; var inp=document.getElementById('divNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('divMsg');
-      if(!v){ msg.innerHTML='<div class="res bad">Isi nama divisi dulu.</div>'; return; }
-      if(list.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Divisi itu udah ada.</div>'; return; }
-      busy=true; this.disabled=true;
-      try{ await O.saveDivisiList(list.concat([v])); inp.value=''; msg.innerHTML=''; loadDivisi(); }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-      this.disabled=false; busy=false;
-    };
-    var filterSel=document.getElementById('hrDivFilter'); if(filterSel){ var cur=filterSel.value; filterSel.innerHTML='<option value="">— semua divisi —</option>'+list.map(function(d){ return '<option>'+esc(d)+'</option>'; }).join(''); filterSel.value=cur; }
-  }
-  async function loadHRList(){
-    var box=document.getElementById('hrList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var arr=[]; try{ arr=await O.listKaryawanHR(); }catch(e){}
-    var sf=(document.getElementById('hrStatusFilter')||{}).value; if(sf===undefined) sf='approved';
-    if(sf) arr=arr.filter(function(k){ return k.approvalStatus===sf; });
-    var f=(document.getElementById('hrDivFilter')||{}).value||'';
-    if(f) arr=arr.filter(function(k){ return k.divisi===f; });
-    if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada karyawan yang cocok filter ini.</div>'; return; }
-    function badge(k){ if(k.approvalStatus==='approved') return '<span class="tag on">DISETUJUI</span>'; if(k.approvalStatus==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
-    box.innerHTML = arr.map(function(k){
-      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(k.namaLengkap||'(tanpa nama)')+(k.nomorPegawai?' <span class="muted" style="font-weight:700">#'+esc(k.nomorPegawai)+'</span>':'')+' '+badge(k)+(k.active===false?' <span class="tag off">NONAKTIF</span>':'')+'</div>'
-        +'<div class="sub">'+esc(k.divisi||'-')+' · '+esc(k.jabatan||'-')+' · '+esc(k.outlet||'-')+(k.shift?' · '+esc(k.shift):'')+(k.kontrakJenis?' · Kontrak: '+esc(k.kontrakJenis):'')+' · '+esc(k.phone||'')+'</div></div>'
-        +'<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
-        + (k.approvalStatus!=='approved' ? ('<button class="btn sm sec" data-appr="'+esc(k.id)+'">✓ Setujui</button>') : '')
-        + (k.approvalStatus==='pending' ? ('<button class="btn sm red" data-rej="'+esc(k.id)+'">✕ Tolak</button>') : '')
-        + (k.approvalStatus==='approved' ? ('<button class="btn sm sec" data-edithr="'+esc(k.id)+'">⚙️ Edit</button><button class="btn sm sec" data-togglehr="'+esc(k.id)+'" data-on="'+(k.active!==false?'1':'0')+'">'+(k.active!==false?'Nonaktifkan':'Aktifkan')+'</button>') : '')
-        +'</div></div>';
-    }).join('');
-    box.querySelectorAll('[data-edithr]').forEach(function(b){ b.onclick=function(){ var k=arr.find(function(x){ return x.id===b.getAttribute('data-edithr'); }); if(k) openKaryawanHREdit(k); }; });
-    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKaryawan(b.getAttribute('data-appr')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKaryawan(b.getAttribute('data-rej')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-togglehr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.updateKaryawanProfile(b.getAttribute('data-togglehr'), {active:b.getAttribute('data-on')!=='1'}); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-  }
-  async function openKaryawanHREdit(k){
-    var bk=document.createElement('div');
-    bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
-    var jabList=[]; try{ jabList=await O.listJabatan(); }catch(e){}
-    var jabOpts='<option value="">— pilih jabatan —</option>'+jabList.map(function(j){ return '<option>'+esc(j)+'</option>'; }).join('')+(k.jabatan&&jabList.indexOf(k.jabatan)<0?('<option>'+esc(k.jabatan)+'</option>'):'');
-    var divList=[]; try{ divList=await O.listDivisi(); }catch(e){}
-    var divOpts='<option value="">— pilih divisi —</option>'+divList.map(function(d){ return '<option>'+esc(d)+'</option>'; }).join('')+(k.divisi&&divList.indexOf(k.divisi)<0?('<option>'+esc(k.divisi)+'</option>'):'');
-    bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;max-height:90vh;overflow:auto">'
-      +'<div style="font-weight:800;color:var(--coklat);margin-bottom:10px">⚙️ Edit Karyawan</div>'
-      +'<label>Nama lengkap</label><input id="keNm" value="'+esc(k.namaLengkap||'')+'">'
-      +'<label>Nomor Pegawai</label><input id="keNoPeg" value="'+esc(k.nomorPegawai||'')+'" placeholder="cth: EMP-2026-001">'
-      +'<label>Divisi</label><select id="keDivisi">'+divOpts+'</select>'
-      +'<label>Jabatan</label><select id="keJabatan">'+jabOpts+'</select>'
-      +'<label>Lokasi absen</label><select id="keOut">'+buildOutletOpts()+'</select>'
-      +'<label>Shift</label><select id="keShift"><option value="">— pilih shift —</option><option>Pagi</option><option>Siang</option><option>Malam</option><option>Fleksibel</option></select>'
-      +'<label>Status</label><input id="keStatus" value="'+esc(k.status||'')+'" placeholder="Training / Junior / Senior / Tetap">'
-      +'<div style="border-top:1px dashed #E7D8BE;margin:14px 0 4px"></div>'
-      +'<label>Jenis Kontrak</label><select id="keKontrakJenis"><option value="">— pilih jenis —</option><option>Training</option><option>Kontrak</option><option>Tetap</option></select>'
-      +'<label>Tanggal Mulai</label><input type="date" id="keKontrakMulai" value="'+esc(k.kontrakMulai||'')+'">'
-      +'<label>Tanggal Berakhir</label><input type="date" id="keKontrakSelesai" value="'+esc(k.kontrakSelesai||'')+'">'
-      +'<div id="keDurasi" class="muted" style="font-size:.78rem;margin-top:4px">'+(hitungDurasi(k.kontrakMulai,k.kontrakSelesai)?('Durasi: '+hitungDurasi(k.kontrakMulai,k.kontrakSelesai)):'')+'</div>'
-      +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="keSave" style="flex:1">💾 Simpan</button><button class="btn sec" id="keCancel" style="flex:1">Batal</button></div>'
-      +'</div>';
-    document.body.appendChild(bk);
-    var outSel=bk.querySelector('#keOut'); if(k.outlet) outSel.value=k.outlet;
-    var shiftSel=bk.querySelector('#keShift'); if(k.shift) shiftSel.value=k.shift;
-    var jabSel=bk.querySelector('#keJabatan'); if(k.jabatan) jabSel.value=k.jabatan;
-    var divSel=bk.querySelector('#keDivisi'); if(k.divisi) divSel.value=k.divisi;
-    var kjSel=bk.querySelector('#keKontrakJenis'); if(k.kontrakJenis) kjSel.value=k.kontrakJenis;
-    var kmI=bk.querySelector('#keKontrakMulai'), ksI=bk.querySelector('#keKontrakSelesai'), durEl=bk.querySelector('#keDurasi');
-    function refreshDurasi(){ var d=hitungDurasi(kmI.value,ksI.value); durEl.textContent=d?('Durasi: '+d):''; }
-    kmI.onchange=refreshDurasi; ksI.onchange=refreshDurasi;
-    bk.querySelector('#keCancel').onclick=function(){ bk.remove(); };
-    bk.onclick=function(e){ if(e.target===bk) bk.remove(); };
-    bk.querySelector('#keSave').onclick=async function(){ if(busy) return;
-      var nm=(bk.querySelector('#keNm').value||'').trim(); if(!nm){ alert('Nama wajib diisi.'); return; }
-      var basicPatch={ namaLengkap:nm, nomorPegawai:(bk.querySelector('#keNoPeg').value||'').trim(), jabatan:jabSel.value, outlet:outSel.value, shift:shiftSel.value, status:(bk.querySelector('#keStatus').value||'').trim() };
-      var hrPatch={ divisi:divSel.value, kontrakJenis:kjSel.value, kontrakMulai:kmI.value, kontrakSelesai:ksI.value };
-      busy=true; this.disabled=true; this.textContent='Menyimpan…';
-      try{ await O.updateKaryawanProfile(k.id, basicPatch); await O.updateKaryawanHR(k.id, hrPatch); bk.remove(); loadHRList(); }
-      catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
-      busy=false; };
-  }
   async function loadStaff(){
     var box=document.getElementById('sList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     var arr=[]; try{ arr=await O.listStaff(); }catch(e){}
@@ -1667,6 +1503,7 @@
     try{ document.getElementById('rT').scrollIntoView({block:'center'}); }catch(e){}
   }
 
+  var _logoutLink=document.getElementById('logoutLink'); if(_logoutLink) _logoutLink.onclick=async function(){ try{ if(window.OmaOpa) await window.OmaOpa.signOut(); }catch(e){} location.reload(); };
   window.addEventListener('omaopa:ready', boot);
   window.addEventListener('omaopa:change', function(){ if(app.style.display==='none') boot(); });
   setTimeout(boot, 800);

@@ -51,12 +51,13 @@
 <div class="wrap">
   <div class="head">
     <h1>Profil Karyawan</h1><span class="badge">DATA DIRI</span>
+    <button id="inboxBtn" style="display:none;margin-left:auto;position:relative;background:none;border:none;cursor:pointer;font-size:1.3rem">✉️<span id="inboxCount" style="display:none;position:absolute;top:-4px;right:-8px;background:#C0392B;color:#fff;font-size:.62rem;font-weight:900;border-radius:999px;padding:1px 5px">0</span></button>
   </div>
   <div id="panel"><div class="card"><div class="muted">Menyiapkan…</div></div></div>
   <div style="text-align:center"><a class="link" href="absensi.html">‹ Ke halaman Absensi</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=124"></script>
+<script type="module" src="core-omaopa.js?v=135"></script>
 <script>
 (function(){
   var panel = document.getElementById('panel');
@@ -91,7 +92,8 @@
       return;
     }
 
-    currentProfile = profile;
+    var hrProfile = {}; try{ hrProfile = await window.OmaOpa.getKaryawanHRProfile(); }catch(e){ hrProfile={}; }
+    currentProfile = Object.assign({}, profile, hrProfile||{});
     try{ customFieldDefs = await window.OmaOpa.listKaryawanFields(); }catch(e){ customFieldDefs=[]; }
     if(profile.fotoProfil){ try{ currentProfile._fotoUrl = await window.OmaOpa.getKaryawanProfilePhotoUrl(profile.fotoProfil); }catch(e){} }
     renderProfile();
@@ -110,23 +112,27 @@
     var p = currentProfile;
     var cf = p.customFields||{};
     var fotoUrl = p._fotoUrl || '';
-    var html = '<div class="card">'
-      + '<div class="nm">👋 Halo, '+esc(p.namaLengkap||'')+'</div>'
+    var orgLabel = (window.OmaOpa.computeOrgLabel ? window.OmaOpa.computeOrgLabel(p) : (p.posisi||'-'));
+    var html = '<div class="card" style="text-align:center">'
+      + '<img class="foto-preview" style="width:96px;height:96px;margin:0 auto 10px;display:block" id="fotoPreviewBig" src="'+esc(fotoUrl)+'" onerror="this.style.opacity=0">'
+      + '<div class="nm" style="font-size:1.05rem">'+esc(p.namaLengkap||'')+'</div>'
+      + '<div class="muted" style="font-size:.92rem;margin-top:2px">'+esc(orgLabel)+'</div>'
+      + '</div>'
+      + '<div class="card">'
       + '<div class="info-row"><span>Nomor Pegawai</span><b>'+esc(p.nomorPegawai||'-')+'</b></div>'
-      + '<div class="info-row"><span>Jabatan</span><b>'+esc(p.jabatan||'-')+'</b></div>'
       + '<div class="info-row"><span>Lokasi</span><b>'+esc(p.outlet||'-')+'</b></div>'
       + '<div class="info-row"><span>Shift</span><b>'+esc(p.shift||'-')+'</b></div>'
-      + '<div class="info-row"><span>Status</span><b>'+esc(p.status||'-')+'</b></div>'
       + (p.kontrakJenis ? ('<div class="info-row"><span>Jenis Kontrak</span><b>'+esc(p.kontrakJenis)+'</b></div>'
         + '<div class="info-row"><span>Periode</span><b>'+(p.kontrakMulai?esc(p.kontrakMulai):'-')+' s/d '+(p.kontrakSelesai?esc(p.kontrakSelesai):'-')+'</b></div>'
         + (durasiKontrak(p.kontrakMulai,p.kontrakSelesai)?('<div class="info-row"><span>Durasi</span><b>'+esc(durasiKontrak(p.kontrakMulai,p.kontrakSelesai))+'</b></div>'):'')
         ) : '')
-      + '<div class="muted" style="margin-top:8px;font-size:.72rem">Data di atas cuma bisa diubah admin.</div>'
+      + '<div class="muted" style="margin-top:8px;font-size:.72rem">Data di atas cuma bisa diubah admin/HRD.</div>'
       + '</div>'
       + '<div class="card"><div class="nm">📸 Foto Profil</div>'
       + '<div class="foto-wrap"><img class="foto-preview" id="fotoPreview" src="'+esc(fotoUrl)+'" onerror="this.style.opacity=0"><input type="file" id="fotoInput" accept="image/*" capture="user" style="display:none"><button class="btn sec" id="fotoBtn" style="margin-top:0;width:auto;flex:1">Ganti Foto</button></div>'
       + '<div id="fotoMsg"></div></div>'
       + '<div class="card"><div class="nm">🪪 Data Diri</div>'
+      + '<label>Email</label><input type="email" id="pEmail" value="'+esc(p.email||'')+'" placeholder="nama@email.com">'
       + '<label>Tanggal Lahir</label><input type="date" id="pDob" value="'+esc(p.dob||'')+'">'
       + '<label>Alamat</label><input id="pAlamat" value="'+esc(p.alamat||'')+'" placeholder="Alamat lengkap">'
       + '<label>No. KTP</label><input id="pKtp" value="'+esc(p.noKtp||'')+'" placeholder="16 digit NIK" inputmode="numeric">'
@@ -137,6 +143,19 @@
           return '<label>'+esc(f.label)+'</label><input '+(f.type==='date'?'type="date"':'type="text"')+' data-cf="'+esc(f.key)+'" value="'+esc(v)+'">';
         }).join('')
       + '<button class="btn" id="pSave">💾 Simpan Data Diri</button><div id="pMsg"></div></div>'
+      + '<div class="card"><div class="nm">🌴 Ajukan Cuti</div>'
+      + '<label>Jenis Cuti</label><select id="cuJenis"><option value="">Memuat…</option></select>'
+      + '<label>Tanggal Mulai</label><input type="date" id="cuMulai">'
+      + '<label>Tanggal Selesai</label><input type="date" id="cuSelesai">'
+      + '<label>Alasan</label><input id="cuAlasan" placeholder="Alasan singkat">'
+      + '<button class="btn" id="cuSubmit">📤 Ajukan</button><div id="cuMsg"></div>'
+      + '<div class="muted" style="margin-top:12px;font-size:.78rem">Riwayat pengajuan:</div>'
+      + '<div id="cuRiwayat" class="muted" style="margin-top:6px">Memuat…</div></div>'
+      + '<div class="card" id="wfaCard" style="display:none"><div class="nm">📝 Laporan Kerja WFA</div>'
+      + '<div id="wfaList" class="muted">Memuat…</div></div>'
+      + '<div class="card"><div class="nm">🗓️ Jadwal Saya</div><div id="jadwalList" class="muted">Memuat…</div></div>'
+      + '<div class="card"><div class="nm">⏰ Riwayat Lembur</div><div id="lemburList" class="muted">Memuat…</div></div>'
+      + '<div id="timLinkWrap" style="display:none"></div>'
       + '<button class="btn sec" id="outBtn">Keluar</button>';
     panel.innerHTML = html;
 
@@ -164,6 +183,7 @@
       customFieldDefs.forEach(function(f){ var el=document.querySelector('[data-cf="'+f.key+'"]'); if(el) customFields[f.key]=el.value; });
       try{
         await window.OmaOpa.updateKaryawanOwnProfile({
+          email: document.getElementById('pEmail').value,
           dob: document.getElementById('pDob').value,
           alamat: document.getElementById('pAlamat').value,
           noKtp: document.getElementById('pKtp').value,
@@ -175,6 +195,142 @@
       }catch(e){ msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal menyimpan.')+'</div>'; }
       this.disabled=false; this.textContent='💾 Simpan Data Diri'; busy=false;
     };
+
+    window.OmaOpa.listJenisCuti().then(function(list){
+      var sel=document.getElementById('cuJenis'); if(!sel) return;
+      sel.innerHTML = list.length ? ('<option value="">— pilih jenis —</option>'+list.map(function(j){ return '<option>'+esc(j)+'</option>'; }).join('')) : '<option value="">(belum ada jenis cuti diatur HRD)</option>';
+    }).catch(function(){});
+
+    function renderRiwayatCuti(list){
+      var el=document.getElementById('cuRiwayat'); if(!el) return;
+      if(!list.length){ el.innerHTML='<div class="muted">Belum ada pengajuan.</div>'; return; }
+      function badge(s){ if(s==='approved') return '<span style="color:#2E7D32;font-weight:800">✓ Disetujui</span>'; if(s==='ditolak') return '<span style="color:#C0392B;font-weight:800">✕ Ditolak</span>'; return '<span style="color:#a9861c;font-weight:800">⏳ Menunggu</span>'; }
+      el.innerHTML = list.map(function(c){
+        return '<div class="info-row" style="display:block;padding:8px 0"><div><b>'+esc(c.jenisCuti)+'</b> · '+badge(c.status)+'</div>'
+          + '<div style="font-size:.8rem;margin-top:2px">'+esc(c.tanggalMulai)+' s/d '+esc(c.tanggalSelesai)+'</div>'
+          + (c.catatanHRD?('<div style="font-size:.78rem;color:#9a7a5e;margin-top:2px">Catatan HRD: '+esc(c.catatanHRD)+'</div>'):'')
+          + '</div>';
+      }).join('');
+    }
+    window.OmaOpa.listMyCuti().then(renderRiwayatCuti).catch(function(){ renderRiwayatCuti([]); });
+
+    document.getElementById('cuSubmit').onclick = async function(){
+      if(busy) return; busy=true; this.disabled=true; this.textContent='Mengajukan…';
+      var msg=document.getElementById('cuMsg'); msg.innerHTML='';
+      try{
+        await window.OmaOpa.submitCuti({
+          jenisCuti: document.getElementById('cuJenis').value,
+          tanggalMulai: document.getElementById('cuMulai').value,
+          tanggalSelesai: document.getElementById('cuSelesai').value,
+          alasan: document.getElementById('cuAlasan').value
+        });
+        msg.innerHTML='<div class="res ok">✓ Pengajuan cuti terkirim, menunggu HRD.</div>';
+        document.getElementById('cuAlasan').value='';
+        var list=await window.OmaOpa.listMyCuti(); renderRiwayatCuti(list);
+      }catch(e){ msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal mengajukan.')+'</div>'; }
+      this.disabled=false; this.textContent='📤 Ajukan'; busy=false;
+    };
+
+    loadWfaList();
+    loadJadwalSaya();
+    loadLemburSaya();
+    toggleTimLink();
+  }
+
+  function loadXLSXLib(){
+    if(window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise(function(resolve, reject){
+      var s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=function(){ resolve(window.XLSX); };
+      s.onerror=reject;
+      document.head.appendChild(s);
+    });
+  }
+  async function downloadWfaTemplate(fields){
+    try{
+      var XLSX = await loadXLSXLib();
+      var headers = fields && fields.length ? fields : ['Uraian Pekerjaan','Progress','Kendala'];
+      var ws = XLSX.utils.aoa_to_sheet([headers, []]);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Laporan WFA');
+      XLSX.writeFile(wb, 'template-laporan-wfa.xlsx');
+    }catch(e){ alert('Gagal bikin file template. Cek koneksi internet.'); }
+  }
+  async function loadWfaList(){
+    var card=document.getElementById('wfaCard'), box=document.getElementById('wfaList');
+    if(!card || !box) return;
+    var list=[]; try{ list=await window.OmaOpa.listMyWfaLaporan(); }catch(e){}
+    if(!list.length){ card.style.display='none'; return; }
+    card.style.display='';
+    var fields=[]; try{ fields=await window.OmaOpa.listWfaReportFormat(); }catch(e){}
+    box.innerHTML = list.map(function(r){
+      if(r.status==='submitted'){
+        return '<div class="info-row" style="display:block;padding:8px 0"><div><b>'+esc(r.tanggalWfa)+'</b> · <span style="color:#2E7D32;font-weight:800">✓ Sudah disubmit</span></div></div>';
+      }
+      return '<div style="border-top:1px dashed #E7D8BE;padding-top:10px;margin-top:10px" data-wfarow="'+esc(r.id)+'">'
+        + '<div><b>'+esc(r.tanggalWfa)+'</b> · <span style="color:#a9861c;font-weight:800">⏳ Perlu lapor</span></div>'
+        + '<button class="btn sec" data-wfatemplate="'+esc(r.id)+'" style="margin-top:8px">⬇ Download Template</button>'
+        + '<label>Upload Laporan (.xlsx yang udah diisi)</label><input type="file" accept=".xlsx" data-wfafile="'+esc(r.id)+'">'
+        + '<label>Email Manajer/Atasan</label><input type="email" placeholder="manajer@email.com" data-wfaemail="'+esc(r.id)+'">'
+        + '<button class="btn" data-wfasubmit="'+esc(r.id)+'" style="margin-top:8px">📤 Submit Laporan</button>'
+        + '<div data-wfamsg="'+esc(r.id)+'"></div>'
+        + '</div>';
+    }).join('');
+    box.querySelectorAll('[data-wfatemplate]').forEach(function(b){ b.onclick=function(){ downloadWfaTemplate(fields); }; });
+    box.querySelectorAll('[data-wfasubmit]').forEach(function(b){ b.onclick=async function(){
+      if(busy) return; var id=b.getAttribute('data-wfasubmit');
+      var fileInp=box.querySelector('[data-wfafile="'+id+'"]'); var emailInp=box.querySelector('[data-wfaemail="'+id+'"]'); var msgEl=box.querySelector('[data-wfamsg="'+id+'"]');
+      var file=fileInp.files && fileInp.files[0];
+      if(!file){ msgEl.innerHTML='<div class="res bad">Pilih file laporan dulu.</div>'; return; }
+      if(!emailInp.value){ msgEl.innerHTML='<div class="res bad">Isi email manajer dulu.</div>'; return; }
+      busy=true; b.disabled=true; b.textContent='Mengirim…';
+      try{
+        await window.OmaOpa.submitWfaLaporan(id, file, emailInp.value);
+        msgEl.innerHTML='<div class="res ok">✓ Laporan terkirim.</div>';
+        loadWfaList();
+      }catch(e){ msgEl.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal submit.')+'</div>'; b.disabled=false; b.textContent='📤 Submit Laporan'; }
+      busy=false;
+    }; });
+  }
+
+  async function loadJadwalSaya(){
+    var box=document.getElementById('jadwalList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var list=[]; try{ list=await window.OmaOpa.listMyJadwal(); }catch(e){}
+    if(!list.length){ box.innerHTML='<div class="muted">Belum ada jadwal yang diatur.</div>'; return; }
+    box.innerHTML = list.map(function(j){
+      return '<div class="info-row"><span>'+esc(j.tanggal)+'</span><b>'+esc(j.jamMulai)+' – '+esc(j.jamSelesai)+'</b></div>';
+    }).join('');
+  }
+
+  async function loadLemburSaya(){
+    var box=document.getElementById('lemburList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var list=[]; try{ list=await window.OmaOpa.listMyLembur(); }catch(e){}
+    if(!list.length){ box.innerHTML='<div class="muted">Belum ada riwayat lembur.</div>'; return; }
+    function badge(s){ if(s==='approved') return '<span style="color:#2E7D32;font-weight:800">✓ Disetujui</span>'; if(s==='ditolak') return '<span style="color:#C0392B;font-weight:800">✕ Ditolak</span>'; return '<span style="color:#a9861c;font-weight:800">⏳ Menunggu</span>'; }
+    box.innerHTML = list.map(function(l){
+      return '<div class="info-row" style="display:block;padding:8px 0"><div><b>'+esc(l.tanggal)+'</b> · '+badge(l.status)+'</div>'
+        + '<div style="font-size:.8rem;margin-top:2px">Keluar '+esc(l.jamKeluarAktual)+' (jadwal s/d '+esc(l.jamSelesaiJadwal)+') · +'+l.durasiLemburMenit+' menit</div></div>';
+    }).join('');
+  }
+
+  var DIVISI_PAGE_MAP = { 'Pabrik':'pabrik.html' };
+  async function toggleTimLink(){
+    var wrap=document.getElementById('timLinkWrap'); if(!wrap) return;
+    var scope=null; try{ scope=await window.OmaOpa.getMyOrgScope(); }catch(e){}
+    if(!scope || scope.strukturalLevel==='staff'){ wrap.style.display='none'; return; }
+    var LINK_STYLE='text-align:center;text-decoration:none;box-sizing:border-box;display:block;margin-top:8px';
+    if(scope.strukturalLevel==='gm'){
+      var divisiList=Object.keys(DIVISI_PAGE_MAP);
+      if(!divisiList.length){ wrap.style.display='none'; return; }
+      wrap.innerHTML = divisiList.map(function(d){ return '<a class="btn sec" href="'+DIVISI_PAGE_MAP[d]+'" style="'+LINK_STYLE+'">👥 Kelola Tim '+esc(d)+'</a>'; }).join('');
+      wrap.style.display='block';
+    } else if(DIVISI_PAGE_MAP[scope.divisi]){
+      wrap.innerHTML = '<a class="btn sec" href="'+DIVISI_PAGE_MAP[scope.divisi]+'" style="'+LINK_STYLE+'">👥 Kelola Tim Saya (jadwal, lembur, cuti)</a>';
+      wrap.style.display='block';
+    } else {
+      wrap.style.display='none';
+    }
   }
 
   function compressImage(file, maxWidth){
@@ -216,9 +372,58 @@
     };
   }
 
-  window.addEventListener('omaopa:ready', refresh);
-  window.addEventListener('omaopa:change', refresh);
-  setTimeout(refresh, 800);
+  var _inboxMsgs=null;
+  function refreshInbox(){
+    var ib=document.getElementById('inboxBtn'); if(!ib) return;
+    var u=window.OmaOpa&&window.OmaOpa.getUser&&window.OmaOpa.getUser();
+    if(!u){ ib.style.display='none'; return; }
+    ib.style.display='';
+    if(window.OmaOpa.listMyKaryawanNotif){ window.OmaOpa.listMyKaryawanNotif().then(function(list){
+      _inboxMsgs=list||[];
+      var n=_inboxMsgs.filter(function(m){return !m.isRead;}).length;
+      var c=document.getElementById('inboxCount');
+      if(c){ if(n>0){ c.textContent=n>9?'9+':String(n); c.style.display=''; } else c.style.display='none'; }
+    }).catch(function(){}); }
+  }
+  function openInbox(){
+    var bk=document.createElement('div');
+    bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:flex-end;justify-content:center';
+    bk.innerHTML='<div style="background:#FFF8EC;border-radius:20px 20px 0 0;padding:18px;max-width:460px;width:100%;max-height:78vh;overflow:auto">'
+      +'<div style="font-weight:800;color:#613925;margin-bottom:10px;font-size:1.05rem">✉️ Kotak Pesan</div>'
+      +'<div id="ibList">Memuat…</div>'
+      +'<button style="width:100%;margin-top:12px;border:2px solid #E7D8BE;background:#fff;border-radius:12px;padding:11px;font-weight:800;color:#613925" id="ibClose">Tutup</button>'
+      +'</div>';
+    document.body.appendChild(bk);
+    bk.onclick=function(e){ if(e.target===bk) bk.remove(); };
+    bk.querySelector('#ibClose').onclick=function(){ bk.remove(); };
+    var listEl=bk.querySelector('#ibList');
+    function render(){
+      if(!_inboxMsgs || !_inboxMsgs.length){ listEl.innerHTML='<div style="color:#9a7a5e;font-weight:700;padding:10px 0">Belum ada pesan.</div>'; return; }
+      var sorted=_inboxMsgs.slice().sort(function(a,b){return b.ts-a.ts;});
+      listEl.innerHTML=sorted.map(function(m){
+        var tgl=m.ts?new Date(m.ts).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'';
+        return '<div class="ibRow" data-id="'+esc(m.id)+'" style="padding:11px 0;border-bottom:1px solid #EFE2C4;cursor:pointer">'
+          +'<div style="display:flex;align-items:center;gap:6px">'+(m.isRead?'':'<span style="width:8px;height:8px;border-radius:99px;background:#f60909;display:inline-block;flex:0 0 auto"></span>')
+          +'<b style="color:#613925;font-size:.92rem">'+esc(m.title||'Pesan')+'</b></div>'
+          +'<div style="color:#7A5A3A;font-size:.85rem;margin-top:4px;white-space:pre-wrap">'+esc(m.body)+'</div>'
+          +'<div style="color:#B49A7D;font-size:.7rem;margin-top:4px">'+tgl+'</div></div>';
+      }).join('');
+      listEl.querySelectorAll('.ibRow').forEach(function(row){
+        row.onclick=function(){
+          var id=row.getAttribute('data-id');
+          var m=_inboxMsgs.find(function(x){return x.id===id;});
+          if(m && !m.isRead){ m.isRead=true; if(window.OmaOpa.markKaryawanNotifRead) window.OmaOpa.markKaryawanNotifRead(id); render(); refreshInbox(); }
+        };
+      });
+    }
+    render();
+  }
+  var _inboxBtnEl=document.getElementById('inboxBtn');
+  if(_inboxBtnEl) _inboxBtnEl.onclick=openInbox;
+
+  window.addEventListener('omaopa:ready', function(){ refresh(); refreshInbox(); });
+  window.addEventListener('omaopa:change', function(){ refresh(); refreshInbox(); });
+  setTimeout(function(){ refresh(); refreshInbox(); }, 800);
 })();
 </script>
 </body>

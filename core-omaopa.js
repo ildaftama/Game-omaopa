@@ -16,7 +16,7 @@ import {
   runTransaction, collection, getDocs, getCountFromServer, query, orderBy, where, limit, startAfter, documentId, arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 import {
-  getStorage, ref as storageRef, uploadBytes, getBytes
+  getStorage, ref as storageRef, uploadBytes, getBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -1406,7 +1406,7 @@ function haversineMeters(lat1, lng1, lat2, lng2){
   return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 async function registerKaryawan(data){
-  const { phone, pin, name, outlet, shift, jabatan } = data||{};
+  const { phone, pin, name, outlet, shift, claimDivisi, claimSubDivisi, claimPosisi, claimStrukturalLevel } = data||{};
   if(!name || name.trim().length<2) throw {message:'Isi nama lengkap dulu ya.'};
   if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
   if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
@@ -1416,7 +1416,8 @@ async function registerKaryawan(data){
   try{ await updateProfile(u,{displayName:name.trim()}); }catch(e){}
   await setDoc(doc(db,'karyawan',u.uid), {
     namaLengkap:name.trim(), phone:normPhone(phone), outlet:outlet,
-    jabatan:(jabatan||'').trim(), shift:(shift||'').trim(), status:'training', fotoProfil:'',
+    shift:(shift||'').trim(), fotoProfil:'',
+    claimDivisi:(claimDivisi||'').trim(), claimSubDivisi:(claimSubDivisi||'').trim(), claimPosisi:(claimPosisi||'').trim(), claimStrukturalLevel:(claimStrukturalLevel||'staff').trim(),
     approvalStatus:'pending', active:true,
     registeredAt:serverTimestamp(), updatedAt:serverTimestamp()
   });
@@ -1469,6 +1470,15 @@ async function getKaryawanHRProfile(){
     return snap.exists() ? snap.data() : {};
   }catch(e){ return {}; }
 }
+function computeOrgLabel(h){
+  h=h||{}; const lvl=h.strukturalLevel||'staff';
+  if(lvl==='gm') return 'General Manager';
+  if(lvl==='manajer') return 'Manajer'+(h.divisi?(' '+h.divisi):'');
+  if(lvl==='spv') return 'SPV'+(h.subDivisi?(' '+h.subDivisi):'');
+  var base=h.posisi||'';
+  if(h.grade) base = base + (base?' - ':'') + h.grade;
+  return base || '-';
+}
 async function listKaryawanHR(){
   if(!(await isHRD())) return [];
   try{
@@ -1477,9 +1487,13 @@ async function listKaryawanHR(){
     const hrSnap=await getDocs(collection(db,'karyawanHR')); const arr=[];
     Object.keys(basic).forEach(uid=>{
       const b=basic[uid]; const h=(function(){ let found=null; hrSnap.forEach(d=>{ if(d.id===uid) found=d.data(); }); return found||{}; })();
-      arr.push({ id:uid, namaLengkap:b.namaLengkap||'', phone:b.phone||'', outlet:b.outlet||'', jabatan:b.jabatan||'', shift:b.shift||'', status:b.status||'', approvalStatus:b.approvalStatus||'pending', active:b.active!==false, nomorPegawai:b.nomorPegawai||'',
-        divisi:h.divisi||'', kontrakJenis:h.kontrakJenis||'', kontrakMulai:h.kontrakMulai||'', kontrakSelesai:h.kontrakSelesai||'',
-        dob:h.dob||'', alamat:h.alamat||'', noKtp:h.noKtp||'', kontakDaruratNama:h.kontakDaruratNama||'', kontakDaruratHp:h.kontakDaruratHp||'', customFields:h.customFields||{} });
+      const item={ id:uid, namaLengkap:b.namaLengkap||'', phone:b.phone||'', outlet:b.outlet||'', shift:b.shift||'', approvalStatus:b.approvalStatus||'pending', active:b.active!==false, nomorPegawai:b.nomorPegawai||'',
+        claimDivisi:b.claimDivisi||'', claimSubDivisi:b.claimSubDivisi||'', claimPosisi:b.claimPosisi||'', claimStrukturalLevel:b.claimStrukturalLevel||'',
+        posisi:h.posisi||'', divisi:h.divisi||'', subDivisi:h.subDivisi||'', strukturalLevel:h.strukturalLevel||'', grade:h.grade||'',
+        kontrakJenis:h.kontrakJenis||'', kontrakMulai:h.kontrakMulai||'', kontrakSelesai:h.kontrakSelesai||'',
+        dob:h.dob||'', alamat:h.alamat||'', noKtp:h.noKtp||'', kontakDaruratNama:h.kontakDaruratNama||'', kontakDaruratHp:h.kontakDaruratHp||'', email:h.email||'', customFields:h.customFields||{} };
+      item.orgLabel = computeOrgLabel(h);
+      arr.push(item);
     });
     arr.sort((a,b)=>(a.divisi||'').localeCompare(b.divisi||'')||(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
     return arr;
@@ -1489,13 +1503,27 @@ async function updateKaryawanHR(uid, patch){
   if(!(await isHRD())) throw {message:'Khusus HRD/admin utama.'};
   if(!uid) throw {message:'ID kosong.'};
   await setDoc(doc(db,'karyawanHR',uid), Object.assign({updatedAt:serverTimestamp()}, patch||{}), {merge:true});
+  // salin divisi/subDivisi/strukturalLevel ke koleksi karyawan basic (dipakai buat cari tim SPV/Manajer,
+  // tanpa perlu buka akses ke data HR sensitif lain kayak KTP/alamat)
+  const p=patch||{};
+  if('divisi' in p || 'subDivisi' in p || 'strukturalLevel' in p){
+    const denorm={}; if('divisi' in p) denorm.divisi=p.divisi; if('subDivisi' in p) denorm.subDivisi=p.subDivisi; if('strukturalLevel' in p) denorm.strukturalLevel=p.strukturalLevel;
+    try{ await setDoc(doc(db,'karyawan',uid), denorm, {merge:true}); }catch(e){}
+  }
 }
-async function listDivisi(){
-  try{ const snap=await getDoc(doc(db,'settings','divisiList')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
+async function getOrgStructure(){
+  try{ const snap=await getDoc(doc(db,'settings','orgStructure')); return snap.exists() ? Object.assign({divisi:[],subDivisi:{},posisi:{}}, snap.data()) : {divisi:[],subDivisi:{},posisi:{}}; }catch(e){ return {divisi:[],subDivisi:{},posisi:{}}; }
 }
-async function saveDivisiList(list){
-  if(!(await isHRD())) throw {message:'Khusus HRD/admin utama.'};
-  await setDoc(doc(db,'settings','divisiList'), { list: (list||[]).filter(Boolean), updatedAt:serverTimestamp() }, {merge:true});
+async function saveOrgStructure(data){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  await setDoc(doc(db,'settings','orgStructure'), { divisi:data.divisi||[], subDivisi:data.subDivisi||{}, posisi:data.posisi||{}, updatedAt:serverTimestamp() });
+}
+async function listGrade(){
+  try{ const snap=await getDoc(doc(db,'settings','gradeList')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
+}
+async function saveGradeList(list){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  await setDoc(doc(db,'settings','gradeList'), { list: (list||[]).filter(Boolean), updatedAt:serverTimestamp() }, {merge:true});
 }
 async function listJabatan(){
   try{ const snap=await getDoc(doc(db,'settings','jabatanList')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
@@ -1514,10 +1542,144 @@ async function saveKaryawanFields(list){
 }
 async function updateKaryawanOwnProfile(patch){
   if(!auth.currentUser) throw {message:'Belum login.'};
-  const allowed=['dob','alamat','noKtp','kontakDaruratNama','kontakDaruratHp','customFields'];
+  const allowed=['dob','alamat','noKtp','kontakDaruratNama','kontakDaruratHp','email','customFields'];
   const clean={}; Object.keys(patch||{}).forEach(k=>{ if(allowed.indexOf(k)>=0) clean[k]=patch[k]; });
   clean.updatedAt=serverTimestamp();
   await setDoc(doc(db,'karyawanHR',auth.currentUser.uid), clean, {merge:true});
+  if('email' in clean){ try{ await setDoc(doc(db,'karyawan',auth.currentUser.uid), { email:clean.email }, {merge:true}); }catch(e){} }
+}
+// ---- cuti ----
+async function listJenisCuti(){
+  try{ const snap=await getDoc(doc(db,'settings','jenisCutiList')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
+}
+async function saveJenisCutiList(list){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  await setDoc(doc(db,'settings','jenisCutiList'), { list: (list||[]).filter(Boolean), updatedAt:serverTimestamp() }, {merge:true});
+}
+async function submitCuti(data){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  const { jenisCuti, tanggalMulai, tanggalSelesai, alasan } = data||{};
+  if(!jenisCuti) throw {message:'Pilih jenis cuti dulu.'};
+  if(!tanggalMulai || !tanggalSelesai) throw {message:'Isi tanggal mulai & selesai.'};
+  const hrSnap = await getDoc(doc(db,'karyawanHR',auth.currentUser.uid));
+  const hr = hrSnap.exists() ? hrSnap.data() : {};
+  await addDoc(collection(db,'cuti'), {
+    karyawanUid: auth.currentUser.uid,
+    jenisCuti: jenisCuti, tanggalMulai: tanggalMulai, tanggalSelesai: tanggalSelesai, alasan:(alasan||'').trim(),
+    divisi: hr.divisi||'', subDivisi: hr.subDivisi||'',
+    status:'pending', createdAt: serverTimestamp()
+  });
+}
+async function listMyCuti(){
+  if(!auth.currentUser) return [];
+  try{
+    const q=query(collection(db,'cuti'), where('karyawanUid','==',auth.currentUser.uid), orderBy('createdAt','desc'));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, jenisCuti:x.jenisCuti||'', tanggalMulai:x.tanggalMulai||'', tanggalSelesai:x.tanggalSelesai||'', alasan:x.alasan||'', status:x.status||'pending', catatanHRD:x.catatanHRD||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function listCutiHRD(){
+  if(!(await isHRD())) return [];
+  try{
+    const snap=await getDocs(collection(db,'cuti')); const arr=[];
+    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
+    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:names[x.karyawanUid]||'(tidak ditemukan)', jenisCuti:x.jenisCuti||'', tanggalMulai:x.tanggalMulai||'', tanggalSelesai:x.tanggalSelesai||'', alasan:x.alasan||'', status:x.status||'pending', catatanHRD:x.catatanHRD||'', validatedByHRD:x.validatedByHRD===true, ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    arr.sort((a,b)=>b.ts-a.ts);
+    return arr;
+  }catch(e){ return []; }
+}
+async function listCutiToApprove(){
+  const scope=await getMyOrgScope();
+  if(!scope || scope.strukturalLevel==='staff') return [];
+  try{
+    let q;
+    if(scope.strukturalLevel==='gm') q=collection(db,'cuti');
+    else if(scope.strukturalLevel==='manajer') q=query(collection(db,'cuti'), where('divisi','==',scope.divisi));
+    else q=query(collection(db,'cuti'), where('divisi','==',scope.divisi), where('subDivisi','==',scope.subDivisi));
+    const snap=await getDocs(q); const arr=[];
+    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
+    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
+    snap.forEach(d=>{ const x=d.data(); if(x.status==='pending') arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:names[x.karyawanUid]||'', jenisCuti:x.jenisCuti||'', tanggalMulai:x.tanggalMulai||'', tanggalSelesai:x.tanggalSelesai||'', alasan:x.alasan||'' }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function validateCutiHRD(id){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  if(!id) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'cuti',id), { validatedByHRD:true, validatedBy:(auth.currentUser&&auth.currentUser.uid)||'', validatedAt:serverTimestamp() }, {merge:true});
+}
+// ---- email (lewat Apps Script yang udah ada) ----
+async function getEmailTemplates(){
+  try{ const snap=await getDoc(doc(db,'settings','emailTemplates')); return snap.exists() ? snap.data() : {}; }catch(e){ return {}; }
+}
+async function saveEmailTemplates(templates){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  await setDoc(doc(db,'settings','emailTemplates'), Object.assign({updatedAt:serverTimestamp()}, templates||{}), {merge:true});
+}
+function fillTemplate(str, vars){
+  str = str||'';
+  Object.keys(vars||{}).forEach(k=>{ str = str.split('{'+k+'}').join(vars[k]==null?'':String(vars[k])); });
+  return str;
+}
+async function sendEmailNotif(to, subject, body){
+  if(!to) return;
+  try{
+    await fetch(SHEET_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ type:'sendemail', to:to, subject:subject||'', body:body||'' }) });
+  }catch(e){ /* best-effort, notif in-app tetap jadi jalur utama */ }
+}
+async function sendEventEmail(karyawanUid, templateKey, vars){
+  try{
+    const kwSnap = await getDoc(doc(db,'karyawan',karyawanUid));
+    const email = kwSnap.exists() ? (kwSnap.data().email||'') : '';
+    if(!email) return;
+    const tpls = await getEmailTemplates();
+    const t = tpls[templateKey];
+    if(!t || !t.subject) return;
+    await sendEmailNotif(email, fillTemplate(t.subject, vars), fillTemplate(t.body||'', vars));
+  }catch(e){}
+}
+async function approveCuti(id, catatan){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!id) throw {message:'ID kosong.'};
+  const snap=await getDoc(doc(db,'cuti',id));
+  await setDoc(doc(db,'cuti',id), { status:'approved', catatanHRD:(catatan||'').trim(), approvedBy:auth.currentUser.uid, approvedAt:serverTimestamp() }, {merge:true});
+  if(snap.exists()){ const c=snap.data();
+    try{ await sendKaryawanNotif(c.karyawanUid, 'Cuti Disetujui', 'Pengajuan '+(c.jenisCuti||'cuti')+' kamu ('+(c.tanggalMulai||'')+' s/d '+(c.tanggalSelesai||'')+') sudah disetujui.'+(catatan?(' Catatan: '+catatan):'')); }catch(e){}
+    try{ await sendEventEmail(c.karyawanUid, 'cuti_approved', { jenisCuti:c.jenisCuti, tanggalMulai:c.tanggalMulai, tanggalSelesai:c.tanggalSelesai, catatan:catatan||'' }); }catch(e){}
+  }
+}
+async function rejectCuti(id, catatan){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!id) throw {message:'ID kosong.'};
+  const snap=await getDoc(doc(db,'cuti',id));
+  await setDoc(doc(db,'cuti',id), { status:'ditolak', catatanHRD:(catatan||'').trim(), approvedBy:auth.currentUser.uid, approvedAt:serverTimestamp() }, {merge:true});
+  if(snap.exists()){ const c=snap.data();
+    try{ await sendKaryawanNotif(c.karyawanUid, 'Cuti Ditolak', 'Pengajuan '+(c.jenisCuti||'cuti')+' kamu ('+(c.tanggalMulai||'')+' s/d '+(c.tanggalSelesai||'')+') ditolak.'+(catatan?(' Alasan: '+catatan):'')); }catch(e){}
+    try{ await sendEventEmail(c.karyawanUid, 'cuti_rejected', { jenisCuti:c.jenisCuti, tanggalMulai:c.tanggalMulai, tanggalSelesai:c.tanggalSelesai, catatan:catatan||'' }); }catch(e){}
+  }
+}
+// ---- notifikasi personal karyawan (kotak pesan) ----
+async function sendKaryawanNotif(karyawanUid, title, body){
+  const scope=await getMyOrgScope();
+  const elevated = !!(scope && ['spv','manajer','gm'].indexOf(scope.strukturalLevel)>=0);
+  if(!(await isHRD()) && !elevated) throw {message:'Khusus HRD/SPV/Manajer/GM.'};
+  if(!karyawanUid) throw {message:'Karyawan kosong.'};
+  await addDoc(collection(db,'karyawanNotif'), { karyawanUid:karyawanUid, title:title||'', body:body||'', isRead:false, createdAt:serverTimestamp() });
+}
+async function listMyKaryawanNotif(){
+  if(!auth.currentUser) return [];
+  try{
+    const q=query(collection(db,'karyawanNotif'), where('karyawanUid','==',auth.currentUser.uid), orderBy('createdAt','desc'), limit(50));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, title:x.title||'', body:x.body||'', isRead:x.isRead===true, ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function markKaryawanNotifRead(id){
+  if(!auth.currentUser || !id) return;
+  try{ await setDoc(doc(db,'karyawanNotif',id), { isRead:true }, {merge:true}); }catch(e){}
 }
 // ---- pengelompokan area outlet (terpusat, dipakai admin/rekap/broadcast) ----
 const KRON_EXCEPT=['umy','nusa indah','godean','tajem','jakal uii']; // Jogja -> Area 1/Metavest; "jakal uii" spesifik; kecuali nama mengandung "kyai mojo"
@@ -1629,7 +1791,7 @@ async function getKaryawanProfilePhotoUrl(path){
   try{ const bytes = await getBytes(storageRef(storage, path)); return URL.createObjectURL(new Blob([bytes], {type:'image/jpeg'})); }
   catch(e){ return ''; }
 }
-async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPath, faceCheckFailed){
+async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPath, faceCheckFailed, mode){
   if(!auth.currentUser) throw {message:'Belum login.'};
   if(type!=='masuk' && type!=='keluar') throw {message:'Tipe absen tidak valid.'};
   if(!outlet) throw {message:'Outlet kosong.'};
@@ -1637,12 +1799,47 @@ async function recordAttendance(outlet, type, lat, lng, akurasi, jarak, photoPat
     karyawanUid: auth.currentUser.uid,
     outlet: outlet,
     type: type,
-    lokasi: { lat:lat, lng:lng, akurasi:(typeof akurasi==='number'?akurasi:null) },
+    mode: mode==='wfa' ? 'wfa' : 'normal',
+    lokasi: { lat:(typeof lat==='number'?lat:null), lng:(typeof lng==='number'?lng:null), akurasi:(typeof akurasi==='number'?akurasi:null) },
     jarak: (typeof jarak==='number'?jarak:null),
     photoPath: photoPath||'',
     faceCheckFailed: !!faceCheckFailed,
     createdAt: serverTimestamp()
   });
+  if(mode==='wfa' && type==='keluar'){
+    try{
+      const tglHariIni = new Date().toISOString().slice(0,10);
+      await addDoc(collection(db,'wfaLaporan'), { karyawanUid:auth.currentUser.uid, tanggalWfa:tglHariIni, status:'perlu_lapor', createdAt:serverTimestamp() });
+      await sendKaryawanNotif(auth.currentUser.uid, 'Wajib Lapor WFA', 'Kamu baru aja selesai WFA. Jangan lupa isi & submit laporan kerjanya ya, ada di halaman Profil Karyawan.');
+      await sendEventEmail(auth.currentUser.uid, 'wfa_wajib_lapor', { nama:'' });
+    }catch(e){}
+  }
+  if(mode!=='wfa' && type==='keluar'){
+    try{
+      const tglHariIni = new Date().toISOString().slice(0,10);
+      const jadwalId = auth.currentUser.uid+'_'+tglHariIni;
+      const jadwalSnap = await getDoc(doc(db,'jadwal',jadwalId));
+      if(jadwalSnap.exists()){
+        const jd=jadwalSnap.data();
+        const now=new Date();
+        const jamKeluarAktual = now.toTimeString().slice(0,5);
+        if(jd.jamSelesai && jamKeluarAktual > jd.jamSelesai){
+          const [h1,m1]=jd.jamSelesai.split(':').map(Number);
+          const [h2,m2]=jamKeluarAktual.split(':').map(Number);
+          const durasiMenit = (h2*60+m2) - (h1*60+m1);
+          if(durasiMenit > 0){
+            const hrSnap = await getDoc(doc(db,'karyawanHR',auth.currentUser.uid));
+            const hr = hrSnap.exists() ? hrSnap.data() : {};
+            await addDoc(collection(db,'lembur'), {
+              karyawanUid:auth.currentUser.uid, tanggal:tglHariIni, jamKeluarAktual:jamKeluarAktual, jamSelesaiJadwal:jd.jamSelesai,
+              durasiLemburMenit:durasiMenit, divisi:hr.divisi||'', subDivisi:hr.subDivisi||'',
+              status:'pending', createdAt:serverTimestamp()
+            });
+          }
+        }
+      }
+    }catch(e){}
+  }
 }
 async function getLastAttendance(){
   if(!auth.currentUser) return null;
@@ -1658,13 +1855,165 @@ async function listAttendance(){
   if(!(await isHRD())) return [];
   try{
     const snap=await getDocs(collection(db,'attendance')); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', outlet:x.outlet||'', type:x.type||'', jarak:(typeof x.jarak==='number'?x.jarak:null), faceCheckFailed:x.faceCheckFailed===true, ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', outlet:x.outlet||'', type:x.type||'', mode:x.mode||'normal', jarak:(typeof x.jarak==='number'?x.jarak:null), faceCheckFailed:x.faceCheckFailed===true, ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
     const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
     kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
     arr.forEach(a=>{ a.namaKaryawan=names[a.karyawanUid]||''; });
     arr.sort((a,b)=>b.ts-a.ts);
     return arr;
   }catch(e){ return []; }
+}
+
+// ---- laporan kerja WFA ----
+async function listWfaReportFormat(){
+  try{ const snap=await getDoc(doc(db,'settings','wfaReportFormat')); return snap.exists() ? (snap.data().fields||[]) : []; }catch(e){ return []; }
+}
+async function saveWfaReportFormat(fields){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  const clean=(fields||[]).filter(Boolean).map(f=>String(f));
+  await setDoc(doc(db,'settings','wfaReportFormat'), { fields: clean, updatedAt:serverTimestamp() }, {merge:true});
+}
+async function listMyWfaLaporan(){
+  if(!auth.currentUser) return [];
+  try{
+    const q=query(collection(db,'wfaLaporan'), where('karyawanUid','==',auth.currentUser.uid), orderBy('createdAt','desc'), limit(30));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, tanggalWfa:x.tanggalWfa||'', status:x.status||'perlu_lapor', fileUrl:x.fileUrl||'', managerEmail:x.managerEmail||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function uploadWfaLaporanFile(blob, reportId){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!blob) throw {message:'File kosong.'};
+  const path = 'wfa-laporan/'+auth.currentUser.uid+'/'+reportId+'.xlsx';
+  const sref = storageRef(storage, path);
+  await uploadBytes(sref, blob, {contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  return await getDownloadURL(sref);
+}
+async function submitWfaLaporan(reportId, fileBlob, managerEmail){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!reportId) throw {message:'Laporan tidak valid.'};
+  if(!fileBlob) throw {message:'Upload file laporan dulu.'};
+  const email=(managerEmail||'').trim();
+  if(!email) throw {message:'Isi email manajer dulu.'};
+  const fileUrl = await uploadWfaLaporanFile(fileBlob, reportId);
+  await setDoc(doc(db,'wfaLaporan',reportId), { status:'submitted', fileUrl:fileUrl, managerEmail:email, submittedAt:serverTimestamp() }, {merge:true});
+  try{
+    const kwSnap=await getDoc(doc(db,'karyawan',auth.currentUser.uid));
+    const nama=(kwSnap.exists()?kwSnap.data().namaLengkap:'')||'Karyawan';
+    await sendEmailNotif(email, 'Laporan Kerja WFA — '+nama, 'Laporan kerja WFA dari '+nama+' udah masuk. Cek/download di link berikut:\n'+fileUrl);
+  }catch(e){}
+}
+async function listWfaLaporanHRD(){
+  if(!(await isHRD())) return [];
+  try{
+    const snap=await getDocs(collection(db,'wfaLaporan')); const arr=[];
+    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
+    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:names[x.karyawanUid]||'(tidak ditemukan)', tanggalWfa:x.tanggalWfa||'', status:x.status||'perlu_lapor', fileUrl:x.fileUrl||'', managerEmail:x.managerEmail||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    arr.sort((a,b)=>b.ts-a.ts);
+    return arr;
+  }catch(e){ return []; }
+}
+
+// ---- jadwal & lembur (SPV/Manajer/GM) ----
+async function getMyOrgScope(){
+  if(!auth.currentUser) return null;
+  try{ const snap=await getDoc(doc(db,'karyawanHR',auth.currentUser.uid)); if(!snap.exists()) return null;
+    const x=snap.data(); return { strukturalLevel:x.strukturalLevel||'staff', divisi:x.divisi||'', subDivisi:x.subDivisi||'' };
+  }catch(e){ return null; }
+}
+async function listTeamKaryawan(){
+  const scope=await getMyOrgScope();
+  if(!scope || scope.strukturalLevel==='staff') return [];
+  try{
+    let q;
+    if(scope.strukturalLevel==='gm') q=collection(db,'karyawan');
+    else if(scope.strukturalLevel==='manajer') q=query(collection(db,'karyawan'), where('divisi','==',scope.divisi));
+    else q=query(collection(db,'karyawan'), where('divisi','==',scope.divisi), where('subDivisi','==',scope.subDivisi));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data()||{}; if(x.approvalStatus==='approved') arr.push({ uid:d.id, namaLengkap:x.namaLengkap||'', divisi:x.divisi||'', subDivisi:x.subDivisi||'', strukturalLevel:x.strukturalLevel||'staff' }); });
+    arr.sort((a,b)=>(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
+    return arr;
+  }catch(e){ return []; }
+}
+async function saveJadwal(karyawanUid, tanggal, jamMulai, jamSelesai){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!karyawanUid || !tanggal || !jamMulai || !jamSelesai) throw {message:'Lengkapi semua isian jadwal.'};
+  const kwSnap=await getDoc(doc(db,'karyawan',karyawanUid));
+  if(!kwSnap.exists()) throw {message:'Karyawan tidak ditemukan.'};
+  const kw=kwSnap.data();
+  const id=karyawanUid+'_'+tanggal;
+  await setDoc(doc(db,'jadwal',id), {
+    karyawanUid:karyawanUid, tanggal:tanggal, jamMulai:jamMulai, jamSelesai:jamSelesai,
+    divisi:kw.divisi||'', subDivisi:kw.subDivisi||'',
+    createdBy:auth.currentUser.uid, createdAt:serverTimestamp()
+  }, {merge:true});
+}
+async function listJadwalForKaryawan(karyawanUid, fromDate, toDate){
+  try{
+    let q=query(collection(db,'jadwal'), where('karyawanUid','==',karyawanUid));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); if((!fromDate||x.tanggal>=fromDate)&&(!toDate||x.tanggal<=toDate)) arr.push({ id:d.id, tanggal:x.tanggal||'', jamMulai:x.jamMulai||'', jamSelesai:x.jamSelesai||'' }); });
+    arr.sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+    return arr;
+  }catch(e){ return []; }
+}
+async function listMyJadwal(){
+  if(!auth.currentUser) return [];
+  const todayStr=new Date().toISOString().slice(0,10);
+  return listJadwalForKaryawan(auth.currentUser.uid, todayStr, null);
+}
+async function listLemburToApprove(){
+  const scope=await getMyOrgScope();
+  if(!scope || scope.strukturalLevel==='staff') return [];
+  try{
+    let q;
+    if(scope.strukturalLevel==='gm') q=collection(db,'lembur');
+    else if(scope.strukturalLevel==='manajer') q=query(collection(db,'lembur'), where('divisi','==',scope.divisi));
+    else q=query(collection(db,'lembur'), where('divisi','==',scope.divisi), where('subDivisi','==',scope.subDivisi));
+    const snap=await getDocs(q); const arr=[];
+    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
+    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
+    snap.forEach(d=>{ const x=d.data(); if(x.status==='pending') arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:names[x.karyawanUid]||'', tanggal:x.tanggal||'', jamKeluarAktual:x.jamKeluarAktual||'', jamSelesaiJadwal:x.jamSelesaiJadwal||'', durasiLemburMenit:x.durasiLemburMenit||0 }); });
+    arr.sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
+    return arr;
+  }catch(e){ return []; }
+}
+async function approveLembur(id, catatan){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!id) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'lembur',id), { status:'approved', catatan:(catatan||'').trim(), approvedBy:auth.currentUser.uid, approvedAt:serverTimestamp() }, {merge:true});
+}
+async function rejectLembur(id, catatan){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!id) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'lembur',id), { status:'ditolak', catatan:(catatan||'').trim(), approvedBy:auth.currentUser.uid, approvedAt:serverTimestamp() }, {merge:true});
+}
+async function listMyLembur(){
+  if(!auth.currentUser) return [];
+  try{
+    const q=query(collection(db,'lembur'), where('karyawanUid','==',auth.currentUser.uid), orderBy('createdAt','desc'), limit(30));
+    const snap=await getDocs(q); const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, tanggal:x.tanggal||'', jamKeluarAktual:x.jamKeluarAktual||'', jamSelesaiJadwal:x.jamSelesaiJadwal||'', durasiLemburMenit:x.durasiLemburMenit||0, status:x.status||'pending', catatan:x.catatan||'' }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function listLemburHRD(){
+  if(!(await isHRD())) return [];
+  try{
+    const snap=await getDocs(collection(db,'lembur')); const arr=[];
+    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
+    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:names[x.karyawanUid]||'', tanggal:x.tanggal||'', jamKeluarAktual:x.jamKeluarAktual||'', jamSelesaiJadwal:x.jamSelesaiJadwal||'', durasiLemburMenit:x.durasiLemburMenit||0, status:x.status||'pending', validatedByHRD:x.validatedByHRD===true }); });
+    arr.sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
+    return arr;
+  }catch(e){ return []; }
+}
+async function validateLemburHRD(id){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  if(!id) throw {message:'ID kosong.'};
+  await setDoc(doc(db,'lembur',id), { validatedByHRD:true, validatedBy:(auth.currentUser&&auth.currentUser.uid)||'', validatedAt:serverTimestamp() }, {merge:true});
 }
 
 // ---- staff / kasir ----
@@ -1908,8 +2257,14 @@ window.OmaOpa = {
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
   registerKaryawan, loginKaryawan, getKaryawanProfile, listKaryawan, approveKaryawan, rejectKaryawan, updateKaryawanProfile, deleteKaryawan, haversineMeters,
   listJabatan, saveJabatanList, listKaryawanFields, saveKaryawanFields, updateKaryawanOwnProfile,
-  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, listDivisi, saveDivisiList,
+  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, getOrgStructure, saveOrgStructure, listGrade, saveGradeList, computeOrgLabel,
+  listJenisCuti, saveJenisCutiList, submitCuti, listMyCuti, listCutiHRD, approveCuti, rejectCuti, listCutiToApprove, validateCutiHRD,
+  sendKaryawanNotif, listMyKaryawanNotif, markKaryawanNotifRead,
+  getEmailTemplates, saveEmailTemplates, sendEventEmail,
   recordAttendance, getLastAttendance, uploadAttendancePhoto, uploadKaryawanProfilePhoto, getKaryawanProfilePhotoUrl, listAttendance,
+  listWfaReportFormat, saveWfaReportFormat, listMyWfaLaporan, uploadWfaLaporanFile, submitWfaLaporan, listWfaLaporanHRD,
+  getMyOrgScope, listTeamKaryawan, saveJadwal, listJadwalForKaryawan, listMyJadwal,
+  listLemburToApprove, approveLembur, rejectLembur, listMyLembur, listLemburHRD, validateLemburHRD,
   outletGroup, matchOutletKey,
   sendBroadcast, listBroadcasts, deactivateBroadcast, deleteBroadcast, getMemberBroadcasts, markBroadcastRead,
   listStaff, addStaff, updateStaff, removeStaff,

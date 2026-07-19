@@ -52,7 +52,7 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=127"></script>
+<script type="module" src="core-omaopa.js?v=135"></script>
 <script>
 (function(){
   var panel = document.getElementById('panel');
@@ -71,11 +71,6 @@
     var h='<option value="">— pilih lokasi absen —</option>';
     Object.keys(byArea).sort().forEach(function(a){ h+='<optgroup label="'+esc(a)+'">'; byArea[a].forEach(function(n){ h+='<option>'+esc(n)+'</option>'; }); h+='</optgroup>'; });
     return h;
-  }
-  async function jabatanOptionsHtml(){
-    var list=[]; try{ list=await window.OmaOpa.listJabatan(); }catch(e){}
-    if(!list.length) return '<option value="">— pilih jabatan —</option><option>Lainnya</option>';
-    return '<option value="">— pilih jabatan —</option>'+list.map(function(j){ return '<option>'+esc(j)+'</option>'; }).join('');
   }
 
   async function refresh(){
@@ -127,19 +122,35 @@
       + (profile.shift?'<div class="row">Shift: <b>'+esc(profile.shift)+'</b></div>':'')
       + (profile.status?'<div class="row">Status: <b>'+esc(profile.status)+'</b></div>':'')
       + '</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;margin:6px 0 0"><input type="checkbox" id="wfaMode" style="width:auto"> 🌐 Mode WFA (kerja dari mana aja)</label>'
+      + '<div id="wfaHint" class="muted" style="font-size:.74rem;margin-top:4px;display:none">Absen Masuk: upload screenshot ACC WA dari atasan/manajer (dari galeri, bukan kamera). Absen Keluar: gak perlu foto.</div>'
       + '<div id="lastKi" class="muted" style="margin-top:10px">Memeriksa absen terakhir…</div>'
       + '<button class="btn" id="absenMasuk">✓ Absen Masuk</button>'
       + '<button class="btn sec" id="absenKeluar">◻ Absen Keluar</button>'
       + '<input type="file" id="selfieInput" accept="image/*" capture="user" style="display:none">'
+      + '<input type="file" id="wfaInput" accept="image/*" style="display:none">'
       + '<div id="absenOut"></div>'
       + '<a class="link" href="karyawan.html" style="display:block;text-align:center;margin-top:14px">📋 Lihat/lengkapi profil saya</a>'
       + '<button class="btn sec" id="outBtn" style="margin-top:10px">Keluar</button>';
     document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
-    document.getElementById('absenMasuk').onclick = function(){ pendingType='masuk'; document.getElementById('selfieInput').click(); };
-    document.getElementById('absenKeluar').onclick = function(){ pendingType='keluar'; document.getElementById('selfieInput').click(); };
+    document.getElementById('wfaMode').onchange = function(){ document.getElementById('wfaHint').style.display=this.checked?'block':'none'; };
+    document.getElementById('absenMasuk').onclick = function(){
+      pendingType='masuk';
+      if(document.getElementById('wfaMode').checked) document.getElementById('wfaInput').click();
+      else document.getElementById('selfieInput').click();
+    };
+    document.getElementById('absenKeluar').onclick = function(){
+      pendingType='keluar';
+      if(document.getElementById('wfaMode').checked) doAbsen('keluar', null, true);
+      else document.getElementById('selfieInput').click();
+    };
     document.getElementById('selfieInput').onchange = function(ev){
       var file = ev.target.files && ev.target.files[0]; ev.target.value='';
-      if(file && pendingType) doAbsen(pendingType, file);
+      if(file && pendingType) doAbsen(pendingType, file, false);
+    };
+    document.getElementById('wfaInput').onchange = function(ev){
+      var file = ev.target.files && ev.target.files[0]; ev.target.value='';
+      if(file && pendingType) doAbsen(pendingType, file, true);
     };
     try{
       var last = await window.OmaOpa.getLastAttendance();
@@ -198,34 +209,49 @@
     }catch(e){ return { ok:true, checkFailed:true }; } // gagal jalan -> tetep boleh absen, tapi ditandain
   }
 
-  async function doAbsen(type, file){
+  async function doAbsen(type, file, isWfa){
     if(busy) return; busy=true;
     var bm=document.getElementById('absenMasuk'), bk=document.getElementById('absenKeluar');
     if(bm) bm.disabled=true; if(bk) bk.disabled=true;
-    var out=document.getElementById('absenOut'); out.innerHTML='<div class="muted" style="margin-top:12px">📸 Memproses foto…</div>';
+    var out=document.getElementById('absenOut'); out.innerHTML='<div class="muted" style="margin-top:12px">Memproses…</div>';
     try{
-      var _normOut=function(s){ return (s||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); };
-      var outletData=(window.OMA_OUTLETS||[]).find(function(o){ return _normOut(o.name)===_normOut(currentProfile.outlet); });
-      if(!outletData || typeof outletData.lat!=='number' || typeof outletData.lng!=='number'){
-        out.innerHTML='<div class="res bad">Lokasi <b>'+esc(currentProfile.outlet)+'</b> belum diatur admin. Absen belum bisa dilakukan — hubungi admin untuk melengkapi koordinat lokasi dulu.</div>';
-      } else {
+      if(isWfa && type==='keluar'){
+        out.innerHTML='<div class="muted" style="margin-top:12px">Menyimpan absen…</div>';
+        await window.OmaOpa.recordAttendance(currentProfile.outlet, type, null, null, null, null, '', false, 'wfa');
+        out.innerHTML='<div class="res ok"><div class="t">✓ Absen Keluar (WFA) berhasil</div><div class="row">Cek halaman Profil Karyawan buat isi laporan kerjanya ya.</div></div>';
+      } else if(isWfa && type==='masuk'){
+        out.innerHTML='<div class="muted" style="margin-top:12px">📸 Memproses foto…</div>';
         var comp = await compressImage(file, 480);
-        out.innerHTML='<div class="muted" style="margin-top:12px">🔍 Memeriksa wajah di foto…</div>';
-        var faceCheck = await checkFacePresent(comp.canvas);
-        if(!faceCheck.ok){
-          out.innerHTML='<div class="res bad">Wajah tidak terdeteksi jelas di foto. Pastikan wajah menghadap kamera dengan pencahayaan cukup, lalu coba lagi.</div>';
+        out.innerHTML='<div class="muted" style="margin-top:12px">⬆️ Mengunggah screenshot…</div>';
+        var photoPath = await window.OmaOpa.uploadAttendancePhoto(comp.blob);
+        var gps=null; try{ gps=await getGPS(); }catch(e){}
+        out.innerHTML='<div class="muted" style="margin-top:12px">Menyimpan absen…</div>';
+        await window.OmaOpa.recordAttendance(currentProfile.outlet, type, gps?gps.lat:null, gps?gps.lng:null, gps?gps.akurasi:null, null, photoPath, false, 'wfa');
+        out.innerHTML='<div class="res ok"><div class="t">✓ Absen Masuk (WFA) berhasil</div></div>';
+      } else {
+        var _normOut=function(s){ return (s||'').replace(/^Oma Opa Cakery\s*/i,'').toLowerCase().replace(/\s+/g,' ').trim(); };
+        var outletData=(window.OMA_OUTLETS||[]).find(function(o){ return _normOut(o.name)===_normOut(currentProfile.outlet); });
+        if(!outletData || typeof outletData.lat!=='number' || typeof outletData.lng!=='number'){
+          out.innerHTML='<div class="res bad">Lokasi <b>'+esc(currentProfile.outlet)+'</b> belum diatur admin. Absen belum bisa dilakukan — hubungi admin untuk melengkapi koordinat lokasi dulu.</div>';
         } else {
-          out.innerHTML='<div class="muted" style="margin-top:12px">📍 Mengambil lokasi GPS…</div>';
-          var gps = await getGPS();
-          var jarak = window.OmaOpa.haversineMeters(gps.lat, gps.lng, outletData.lat, outletData.lng);
-          if(jarak==null || jarak > RADIUS_METERS){
-            out.innerHTML='<div class="res bad">Kamu berada sekitar <b>'+Math.round(jarak)+' meter</b> dari lokasi (maksimal '+RADIUS_METERS+'m). Absen ditolak — pastikan kamu sedang di lokasinya.</div>';
+          var comp2 = await compressImage(file, 480);
+          out.innerHTML='<div class="muted" style="margin-top:12px">🔍 Memeriksa wajah di foto…</div>';
+          var faceCheck = await checkFacePresent(comp2.canvas);
+          if(!faceCheck.ok){
+            out.innerHTML='<div class="res bad">Wajah tidak terdeteksi jelas di foto. Pastikan wajah menghadap kamera dengan pencahayaan cukup, lalu coba lagi.</div>';
           } else {
-            out.innerHTML='<div class="muted" style="margin-top:12px">⬆️ Mengunggah foto…</div>';
-            var photoPath = await window.OmaOpa.uploadAttendancePhoto(comp.blob);
-            out.innerHTML='<div class="muted" style="margin-top:12px">Menyimpan absen…</div>';
-            await window.OmaOpa.recordAttendance(currentProfile.outlet, type, gps.lat, gps.lng, gps.akurasi, jarak, photoPath, faceCheck.checkFailed);
-            out.innerHTML='<div class="res ok"><div class="t">✓ Absen '+(type==='masuk'?'Masuk':'Keluar')+' berhasil</div><div class="row">Jarak dari lokasi: '+Math.round(jarak)+'m</div></div>';
+            out.innerHTML='<div class="muted" style="margin-top:12px">📍 Mengambil lokasi GPS…</div>';
+            var gps2 = await getGPS();
+            var jarak = window.OmaOpa.haversineMeters(gps2.lat, gps2.lng, outletData.lat, outletData.lng);
+            if(jarak==null || jarak > RADIUS_METERS){
+              out.innerHTML='<div class="res bad">Kamu berada sekitar <b>'+Math.round(jarak)+' meter</b> dari lokasi (maksimal '+RADIUS_METERS+'m). Absen ditolak — pastikan kamu sedang di lokasinya.</div>';
+            } else {
+              out.innerHTML='<div class="muted" style="margin-top:12px">⬆️ Mengunggah foto…</div>';
+              var photoPath2 = await window.OmaOpa.uploadAttendancePhoto(comp2.blob);
+              out.innerHTML='<div class="muted" style="margin-top:12px">Menyimpan absen…</div>';
+              await window.OmaOpa.recordAttendance(currentProfile.outlet, type, gps2.lat, gps2.lng, gps2.akurasi, jarak, photoPath2, faceCheck.checkFailed, 'normal');
+              out.innerHTML='<div class="res ok"><div class="t">✓ Absen '+(type==='masuk'?'Masuk':'Keluar')+' berhasil</div><div class="row">Jarak dari lokasi: '+Math.round(jarak)+'m</div></div>';
+            }
           }
         }
       }
@@ -266,33 +292,88 @@
     };
   }
 
+  var _orgStruct={divisi:[],subDivisi:{},posisi:{}}, _gradeCache=[];
+  function _escJs(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function orgPickerHtml(){
+    return '<label>Divisi</label><select id="pickDivisi"><option value="">Memuat…</option></select>'
+      + '<div id="pickSubDivisiWrap" style="display:none"><label>Sub-Divisi</label><select id="pickSubDivisi"></select></div>'
+      + '<div id="pickPosisiWrap" style="display:none"><label>Posisi</label><select id="pickPosisi"></select></div>'
+      + '<div id="pickGradeWrap" style="display:none"><label>Grade (opsional)</label><select id="pickGrade"></select></div>';
+  }
+  async function initOrgPicker(){
+    try{ _orgStruct = await window.OmaOpa.getOrgStructure(); }catch(e){}
+    try{ _gradeCache = await window.OmaOpa.listGrade(); }catch(e){}
+    var dSel=document.getElementById('pickDivisi'); if(!dSel) return;
+    dSel.innerHTML='<option value="">— pilih divisi —</option>'+_orgStruct.divisi.map(function(d){return '<option>'+_escJs(d)+'</option>';}).join('')+'<option value="__GM__">General Manager</option>';
+    dSel.onchange=onDivisiChange;
+  }
+  function onDivisiChange(){
+    var d=document.getElementById('pickDivisi').value;
+    var subWrap=document.getElementById('pickSubDivisiWrap'), posWrap=document.getElementById('pickPosisiWrap'), gradeWrap=document.getElementById('pickGradeWrap');
+    if(!d || d==='__GM__'){ subWrap.style.display='none'; posWrap.style.display='none'; gradeWrap.style.display='none'; return; }
+    var subs=_orgStruct.subDivisi[d]||[];
+    var subSel=document.getElementById('pickSubDivisi');
+    subSel.innerHTML='<option value="">— pilih sub-divisi —</option>'+subs.map(function(s){return '<option>'+_escJs(s)+'</option>';}).join('')+'<option value="__MANAJER__">Manajer (semua Sub-Divisi)</option>';
+    subSel.onchange=onSubDivisiChange;
+    subWrap.style.display='block'; posWrap.style.display='none'; gradeWrap.style.display='none';
+  }
+  function onSubDivisiChange(){
+    var d=document.getElementById('pickDivisi').value;
+    var sd=document.getElementById('pickSubDivisi').value;
+    var posWrap=document.getElementById('pickPosisiWrap'), gradeWrap=document.getElementById('pickGradeWrap');
+    if(!sd || sd==='__MANAJER__'){ posWrap.style.display='none'; gradeWrap.style.display='none'; return; }
+    var poss=_orgStruct.posisi[d+'::'+sd]||[];
+    var posSel=document.getElementById('pickPosisi');
+    posSel.innerHTML='<option value="">— pilih posisi —</option>'+poss.map(function(p){return '<option>'+_escJs(p)+'</option>';}).join('')+'<option value="__SPV__">SPV</option>';
+    posSel.onchange=onPosisiChange;
+    posWrap.style.display='block'; gradeWrap.style.display='none';
+  }
+  function onPosisiChange(){
+    var p=document.getElementById('pickPosisi').value;
+    var gradeWrap=document.getElementById('pickGradeWrap');
+    if(!p || p==='__SPV__'){ gradeWrap.style.display='none'; return; }
+    var gSel=document.getElementById('pickGrade');
+    gSel.innerHTML='<option value="">— pilih grade (opsional) —</option>'+_gradeCache.map(function(g){return '<option>'+_escJs(g)+'</option>';}).join('');
+    gradeWrap.style.display='block';
+  }
+  function getOrgPickerResult(){
+    var d=(document.getElementById('pickDivisi')||{}).value||'';
+    if(d==='__GM__') return {claimStrukturalLevel:'gm', claimDivisi:'', claimSubDivisi:'', claimPosisi:''};
+    var sd=(document.getElementById('pickSubDivisi')||{}).value||'';
+    if(sd==='__MANAJER__') return {claimStrukturalLevel:'manajer', claimDivisi:d, claimSubDivisi:'', claimPosisi:''};
+    var p=(document.getElementById('pickPosisi')||{}).value||'';
+    if(p==='__SPV__') return {claimStrukturalLevel:'spv', claimDivisi:d, claimSubDivisi:sd, claimPosisi:''};
+    return {claimStrukturalLevel:'staff', claimDivisi:d, claimSubDivisi:sd, claimPosisi:p};
+  }
+
   async function renderDaftarForm(){
     var a = document.getElementById('formArea');
     a.innerHTML = '<label>Nama lengkap</label><input id="dNama" placeholder="Nama sesuai KTP">'
       + '<label>Nomor HP</label><input id="dPhone" type="tel" inputmode="numeric" placeholder="08xxxxxxxxxx" autocomplete="off">'
       + '<label>PIN (6 angka)</label><input id="dPin" data-pin type="password" inputmode="numeric" maxlength="6" placeholder="••••••">'
       + '<label>Ulangi PIN</label><input id="dPin2" data-pin type="password" inputmode="numeric" maxlength="6" placeholder="••••••">'
-      + '<label>Jabatan</label><select id="dJabatan"><option value="">Memuat…</option></select>'
+      + orgPickerHtml()
       + '<label>Lokasi absen (outlet/kantor/pabrik)</label><select id="dOutlet">'+outletOptionsHtml()+'</select>'
       + '<label>Shift</label><select id="dShift"><option value="">— pilih shift —</option><option>Pagi</option><option>Siang</option><option>Malam</option><option>Fleksibel</option></select>'
       + '<button class="btn" id="dBtn">Daftar</button><div id="dMsg"></div>'
-      + '<div class="muted" style="margin-top:10px">Pendaftaran perlu di-acc admin dulu sebelum bisa dipakai.</div>';
-    jabatanOptionsHtml().then(function(h){ var sel=document.getElementById('dJabatan'); if(sel) sel.innerHTML=h; });
+      + '<div class="muted" style="margin-top:10px">Pendaftaran perlu di-acc admin dulu sebelum bisa dipakai. Posisi yang kamu pilih di atas juga masih perlu diverifikasi admin.</div>';
+    initOrgPicker();
     document.getElementById('dBtn').onclick = async function(){
       if(busy) return;
       var pin=document.getElementById('dPin').value, pin2=document.getElementById('dPin2').value;
       var msg=document.getElementById('dMsg'); msg.innerHTML='';
       if(pin!==pin2){ msg.innerHTML='<div class="res bad">PIN dan ulangi PIN gak sama.</div>'; return; }
+      var orgPick=getOrgPickerResult();
+      if(!orgPick.claimDivisi && orgPick.claimStrukturalLevel!=='gm'){ msg.innerHTML='<div class="res bad">Pilih Divisi dulu ya.</div>'; return; }
       busy=true; var b=this; b.disabled=true; b.textContent='Memproses…';
       try{
-        await window.OmaOpa.registerKaryawan({
+        await window.OmaOpa.registerKaryawan(Object.assign({
           name: document.getElementById('dNama').value,
           phone: document.getElementById('dPhone').value,
           pin: pin,
-          jabatan: document.getElementById('dJabatan').value,
           outlet: document.getElementById('dOutlet').value,
           shift: document.getElementById('dShift').value
-        });
+        }, orgPick));
         refresh();
       }catch(e){
         msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal daftar, coba lagi.')+'</div>';

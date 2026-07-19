@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HRD — Oma Opa Cakery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --kuning:#FFC21A; --kuning-hi:#FFD64A; --kuning-d:#E5A100; --coklat:#5A3017; --cream:#FFF6E6; --cream2:#FFE9C2; --pop:#FF6A3D; --merah:#E2425A; }
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
+    background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream); min-height:100vh; padding:16px 12px 60px; }
+  label{ font-size:.74rem; font-weight:800; color:#8a6a3a; display:block; margin:9px 0 4px; }
+  input,select{ width:100%; border:2px solid #E7D8BE; border-radius:10px; padding:10px; font-size:.92rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
+  input:focus,select:focus{ outline:none; border-color:var(--kuning); }
+  .wrap{ max-width:560px; margin:0 auto; }
+  .head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .head h1{ font-family:'Fredoka'; font-size:1.2rem; margin:0; }
+  .badge{ font-size:.66rem; font-weight:900; background:var(--coklat); color:#fff; padding:2px 9px; border-radius:999px; }
+  .card{ background:#fff; border:2px solid #EFE2C4; border-radius:16px; padding:14px; margin-bottom:12px; }
+  .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  .btn{ width:100%; border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:.95rem; border-radius:11px; padding:11px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; margin-top:9px; }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--kuning-d); }
+  .btn[disabled]{ opacity:.55; }
+  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #E7D8BE; box-shadow:none; }
+  .btn.red{ background:#C0392B; color:#fff; box-shadow:0 3px 0 #922B21; }
+  .btn.sm{ width:auto; padding:6px 11px; font-size:.78rem; margin:0; }
+  .res{ border-radius:12px; padding:12px; margin-top:11px; }
+  .ok{ background:#E7F6E7; border:2px solid #B7E0B7; } .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; } .warn{ background:#FFF3D6; border:2px solid #F2D98A; }
+  .row{ display:flex; align-items:center; gap:9px; padding:9px 0; border-top:1px solid #F2E8D5; }
+  .row:first-child{ border-top:none; }
+  .grow{ flex:1; min-width:0; }
+  .nm{ font-weight:900; } .sub{ font-size:.74rem; color:#9a7a5e; font-weight:700; }
+  .tag{ font-size:.64rem; font-weight:900; border-radius:999px; padding:2px 8px; }
+  .tag.on{ background:#2E7D32; color:#fff; } .tag.off{ background:#bdae98; color:#fff; } .tag.adm{ background:var(--kuning); color:#5A3A05; }
+  a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>HRD</h1><span class="badge" id="roleBadge">…</span></div>
+  <div id="gate" class="card"><div class="muted">Menyiapkan…</div></div>
+  <div id="app" style="display:none"></div>
+  <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
+</div>
+
+<script type="module" src="core-omaopa.js?v=135"></script>
+<script>
+(function(){
+  var O=null, busy=false;
+  var gate=document.getElementById('gate'), app=document.getElementById('app');
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function csvCell(s){ s=String(s==null?'':s); return '"'+s.replace(/"/g,'""')+'"'; }
+  function downloadCSV(lines, fname){
+    var blob=new Blob(["\ufeff"+lines.join("\r\n")], {type:'text/csv;charset=utf-8;'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+  }
+  function buildOutletOpts(){ var by={}; (window.OMA_OUTLETS||[]).forEach(function(o){ var a=o.area||'Lainnya'; (by[a]=by[a]||[]).push((o.name||'').replace(/^Oma Opa Cakery\s*/i,'')); }); var h='<option value="">— pilih outlet —</option>'; Object.keys(by).sort().forEach(function(a){ h+='<optgroup label="'+esc(a)+'">'+by[a].sort().map(function(n){return '<option>'+esc(n)+'</option>';}).join('')+'</optgroup>'; }); return h; }
+  function hitungDurasi(mulai, selesai){
+    if(!mulai || !selesai) return '';
+    var a=new Date(mulai), b=new Date(selesai); if(isNaN(a)||isNaN(b)||b<a) return '';
+    var bulan=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());
+    var thn=Math.floor(bulan/12), sisaBulan=bulan%12;
+    var parts=[]; if(thn>0) parts.push(thn+' tahun'); if(sisaBulan>0) parts.push(sisaBulan+' bulan');
+    return parts.length?parts.join(' '):'kurang dari 1 bulan';
+  }
+
+  async function boot(){
+    O=window.OmaOpa; if(!O){ gate.innerHTML='<div class="muted">Menyiapkan…</div>'; return; }
+    var u=O.getUser();
+    if(!u){ gate.innerHTML='<div class="muted">Halaman khusus HRD/Master. Silakan masuk dulu.</div><button class="btn" id="lg">Masuk</button>';
+      document.getElementById('lg').onclick=function(){ O.openLogin(); }; app.style.display='none'; return; }
+    var canHRD=false; try{ canHRD=await O.isHRD(); }catch(e){}
+    if(!canHRD){ gate.innerHTML='<div style="font-weight:900;color:#C0392B">Akun ini bukan HRD/Master.</div>'
+        +'<div class="muted" style="margin-top:8px">Minta Master menandai akun ini dengan <b>hrd: true</b> di tab Staff (admin.html).</div>'
+        +'<button class="btn sec" id="out">Keluar / ganti akun</button>';
+      document.getElementById('out').onclick=async function(){ try{ await O.signOut(); }catch(e){} }; app.style.display='none'; return; }
+    var rbg=document.getElementById('roleBadge'); if(rbg) rbg.textContent='AKTIF';
+    gate.style.display='none'; app.style.display=''; render();
+  }
+
+  var _orgCache = {divisi:[], subDivisi:{}, posisi:{}};
+
+  function render(){
+    app.innerHTML='<div class="card"><div class="nm">🏢 Struktur Organisasi</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Divisi → Sub-Divisi → Posisi. Tambah/hapus sesuka hati, langsung kepake di form daftar karyawan & edit di sini.</div>'
+      +'<div id="orgTree" class="muted">Memuat…</div>'
+      +'<div style="display:flex;gap:6px;margin-top:10px"><input id="divNew" placeholder="Nama divisi baru" style="flex:1"><button class="btn sm" id="divAdd">＋ Tambah Divisi</button></div><div id="divMsg"></div></div>'
+      +'<div class="card"><div class="nm">🎓 Daftar Grade</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat karyawan level Staff (misal Training/Junior/Senior). Tambah/hapus sesuka hati.</div>'
+      +'<div id="gradeList" class="muted">Memuat…</div>'
+      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="gradeNew" placeholder="Nama grade baru" style="flex:1"><button class="btn sm" id="gradeAdd">＋ Tambah</button></div><div id="gradeMsg"></div></div>'
+      +'<div class="card"><div class="nm">🏖️ Jenis Cuti</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Dipilih karyawan pas ngajuin cuti. Tambah/hapus sesuka hati.</div>'
+      +'<div id="jcList" class="muted">Memuat…</div>'
+      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="jcNew" placeholder="Nama jenis cuti baru" style="flex:1"><button class="btn sm" id="jcAdd">＋ Tambah</button></div><div id="jcMsg"></div></div>'
+      +'<div class="card"><div class="nm">✉️ Template Email</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Isi {nama}/{jenisCuti}/{tanggalMulai}/{tanggalSelesai}/{catatan}/{grade} otomatis kesubstitusi. Kosongkan subjek buat nonaktifin email jenis itu (tetap ada notif Kotak Pesan).</div>'
+      +'<div id="etList">Memuat…</div></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🏖️ Pengajuan Cuti</div><button class="btn sm sec" id="cutiReload">↻</button></div>'
+      +'<select id="cutiFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved">✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua —</option></select>'
+      +'<div id="cutiList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">📝 Format Laporan WFA</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Kolom yang wajib diisi karyawan di file laporan (jadi header kolom XLS). Tambah/hapus sesuka hati.</div>'
+      +'<div id="wfaFmtList" class="muted">Memuat…</div>'
+      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="wfaFmtNew" placeholder="Nama kolom baru" style="flex:1"><button class="btn sm" id="wfaFmtAdd">＋ Tambah</button></div><div id="wfaFmtMsg"></div></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📝 Laporan WFA Masuk</div><button class="btn sm sec" id="wfaLapReload">↻</button></div>'
+      +'<div id="wfaLapList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">⏰ Data Lembur</div><button class="btn sm sec" id="lemburReload">↻</button></div>'
+      +'<div class="muted" style="font-size:.74rem;margin:0 0 8px">HRD cuma terima data — yang approve/tolak SPV/Manajer/GM terkait lewat halaman Profil Karyawan mereka.</div>'
+      +'<div id="lemburHRList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🗂️ Daftar Karyawan (Lengkap)</div><button class="btn sm sec" id="hrExport">⬇ CSV</button><button class="btn sm sec" id="hrReload">↻</button></div>'
+      +'<select id="hrStatusFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved" selected>✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua status —</option></select>'
+      +'<select id="hrDivFilter" style="margin-bottom:8px"><option value="">— semua divisi —</option></select>'
+      +'<div id="hrList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">⬇️ Export Riwayat Absensi (CSV)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan kedua tanggal buat export semua riwayat.</div>'
+      +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="atExFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="atExTo" style="flex:1;min-width:0"></div>'
+      +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div>';
+
+    loadOrgStructure();
+    loadGradeList();
+    loadJenisCutiList();
+    loadEmailTemplates();
+    loadWfaFormat();
+    document.getElementById('wfaLapReload').onclick=function(){ loadWfaLaporanList(); };
+    loadWfaLaporanList();
+    document.getElementById('lemburReload').onclick=function(){ loadLemburHRList(); };
+    loadLemburHRList();
+    document.getElementById('cutiReload').onclick=function(){ loadCutiList(); };
+    document.getElementById('cutiFilter').onchange=function(){ loadCutiList(); };
+    loadCutiList();
+    document.getElementById('hrReload').onclick=function(){ loadHRList(); };
+    document.getElementById('hrStatusFilter').onchange=function(){ loadHRList(); };
+    document.getElementById('hrDivFilter').onchange=function(){ loadHRList(); };
+    document.getElementById('hrExport').onclick=async function(){
+      if(busy) return; busy=true; this.disabled=true; this.textContent='…';
+      try{
+        var arr=await O.listKaryawanHR();
+        var lines=[['Nomor Pegawai','Nama','No HP','Posisi (Lengkap)','Divisi','Sub-Divisi','Posisi','Grade','Lokasi','Shift','Jenis Kontrak','Mulai Kontrak','Selesai Kontrak','Approval','Aktif'].map(csvCell).join(',')];
+        arr.forEach(function(k){ lines.push([k.nomorPegawai||'',k.namaLengkap||'',k.phone||'',k.orgLabel||'',k.divisi||'',k.subDivisi||'',k.posisi||'',k.grade||'',k.outlet||'',k.shift||'',k.kontrakJenis||'',k.kontrakMulai||'',k.kontrakSelesai||'',k.approvalStatus||'',k.active!==false?'Ya':'Tidak'].map(csvCell).join(',')); });
+        downloadCSV(lines, 'karyawan-lengkap.csv');
+      }catch(e){ alert((e&&e.message)||'Gagal export'); }
+      this.disabled=false; this.textContent='⬇ CSV'; busy=false;
+    };
+    var atBtn=document.getElementById('atExportBtn'); if(atBtn) atBtn.onclick=async function(){
+      if(busy) return; busy=true; this.disabled=true; this.textContent='Menyiapkan…';
+      var msg=document.getElementById('atExportMsg'); msg.innerHTML='';
+      try{
+        var all=await O.listAttendance();
+        var f=document.getElementById('atExFrom').value, t=document.getElementById('atExTo').value;
+        var fromMs = f? new Date(f+'T00:00:00').getTime() : 0;
+        var toMs = t? new Date(t+'T23:59:59').getTime() : Infinity;
+        var rows=all.filter(function(a){ return a.ts>=fromMs && a.ts<=toMs; });
+        var lines=[['Nama Karyawan','Lokasi','Tipe','Jarak (m)','Cek Wajah','Waktu'].map(csvCell).join(',')];
+        rows.forEach(function(a){ lines.push([a.namaKaryawan||'(tidak ditemukan)',a.outlet||'',a.type==='masuk'?'Masuk':'Keluar',a.jarak!=null?Math.round(a.jarak):'',a.faceCheckFailed?'GAGAL DICEK - perlu direview':'OK',a.ts?new Date(a.ts).toLocaleString('id-ID'):''].map(csvCell).join(',')); });
+        downloadCSV(lines, 'absensi-'+(f||'awal')+'_'+(t||'sekarang')+'.csv');
+        var gagalCount=rows.filter(function(a){return a.faceCheckFailed;}).length;
+        msg.innerHTML='<div class="res ok">✓ '+rows.length+' catatan absen di-export.'+(gagalCount?(' <b>'+gagalCount+' di antaranya perlu direview</b> (cek wajah gagal jalan).'):'')+'</div>';
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; this.textContent='⬇ Export CSV'; busy=false;
+    };
+    loadHRList();
+  }
+
+  async function loadOrgStructure(){
+    var box=document.getElementById('orgTree'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    try{ _orgCache = await O.getOrgStructure(); }catch(e){ _orgCache={divisi:[],subDivisi:{},posisi:{}}; }
+    renderOrgTree();
+    var addBtn=document.getElementById('divAdd'); if(addBtn) addBtn.onclick=async function(){
+      if(busy) return; var inp=document.getElementById('divNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('divMsg');
+      if(!v){ msg.innerHTML='<div class="res bad">Isi nama divisi dulu.</div>'; return; }
+      if(_orgCache.divisi.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Divisi itu udah ada.</div>'; return; }
+      busy=true; this.disabled=true;
+      var next={divisi:_orgCache.divisi.concat([v]), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      try{ await O.saveOrgStructure(next); inp.value=''; msg.innerHTML=''; loadOrgStructure(); }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; busy=false;
+    };
+  }
+  function renderOrgTree(){
+    var box=document.getElementById('orgTree'); if(!box) return;
+    if(!_orgCache.divisi.length){ box.innerHTML='<div class="muted">Belum ada divisi. Tambah dulu di bawah.</div>'; }
+    else {
+      box.innerHTML = _orgCache.divisi.map(function(d, di){
+        var subs = _orgCache.subDivisi[d]||[];
+        var subsHtml = subs.map(function(sd, si){
+          var pk=d+'::'+sd;
+          var poss = _orgCache.posisi[pk]||[];
+          var possHtml = poss.map(function(p, pi){
+            return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
+          }).join('') || '<span class="muted" style="font-size:.76rem">(belum ada posisi)</span>';
+          return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #EFE2C4">'
+            + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.85rem">'+esc(sd)+'</b><span class="muted" style="cursor:pointer;font-size:.72rem" data-rmsub="'+esc(d)+'|'+si+'">✕ hapus sub-divisi</span></div>'
+            + '<div style="margin-top:4px">'+possHtml+'</div>'
+            + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
+            + '</div>';
+        }).join('');
+        return '<div style="margin-top:10px;padding:10px;border:1.5px solid #EFE2C4;border-radius:12px">'
+          + '<div style="display:flex;align-items:center;gap:6px"><b>'+esc(d)+'</b><span class="muted" style="cursor:pointer;font-size:.78rem" data-rmdiv="'+di+'">✕ hapus divisi</span></div>'
+          + subsHtml
+          + '<div style="display:flex;gap:5px;margin-top:8px;margin-left:14px"><input data-subinput="'+esc(d)+'" placeholder="Sub-divisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-subadd="'+esc(d)+'" style="padding:7px 10px">＋</button></div>'
+          + '</div>';
+      }).join('');
+    }
+    var filterSel=document.getElementById('hrDivFilter'); if(filterSel){ var cur=filterSel.value; filterSel.innerHTML='<option value="">— semua divisi —</option>'+_orgCache.divisi.map(function(d){ return '<option>'+esc(d)+'</option>'; }).join(''); filterSel.value=cur; }
+
+    box.querySelectorAll('[data-rmdiv]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var di=parseInt(el.getAttribute('data-rmdiv'),10); var d=_orgCache.divisi[di];
+      if(!confirm('Hapus divisi "'+d+'"? Sub-divisi & posisi di dalamnya juga ikut hilang dari daftar (data karyawan yang udah kepasang gak berubah).')) return;
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      next.divisi.splice(di,1); delete next.subDivisi[d];
+      try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+
+    box.querySelectorAll('[data-subadd]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var d=el.getAttribute('data-subadd'); var inp=box.querySelector('[data-subinput="'+d+'"]'); var v=(inp.value||'').trim();
+      if(!v) return; var subs=(_orgCache.subDivisi[d]||[]); if(subs.indexOf(v)>=0){ alert('Sub-divisi itu udah ada.'); return; }
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      next.subDivisi[d]=subs.concat([v]);
+      try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+
+    box.querySelectorAll('[data-rmsub]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var parts=el.getAttribute('data-rmsub').split('|'); var d=parts[0], si=parseInt(parts[1],10); var subs=(_orgCache.subDivisi[d]||[]).slice(); var sd=subs[si];
+      if(!confirm('Hapus sub-divisi "'+sd+'"?')) return;
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      subs.splice(si,1); next.subDivisi[d]=subs; delete next.posisi[d+'::'+sd];
+      try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+
+    box.querySelectorAll('[data-posadd]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var pk=el.getAttribute('data-posadd'); var inp=box.querySelector('[data-posinput="'+pk+'"]'); var v=(inp.value||'').trim();
+      if(!v) return; var poss=(_orgCache.posisi[pk]||[]); if(poss.indexOf(v)>=0){ alert('Posisi itu udah ada.'); return; }
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      next.posisi[pk]=poss.concat([v]);
+      try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+
+    box.querySelectorAll('[data-rmpos]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var parts=el.getAttribute('data-rmpos').split('|'); var pk=parts[0], pi=parseInt(parts[1],10); var poss=(_orgCache.posisi[pk]||[]).slice();
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      poss.splice(pi,1); next.posisi[pk]=poss;
+      try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+  }
+
+  async function loadGradeList(){
+    var box=document.getElementById('gradeList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var list=[]; try{ list=await O.listGrade(); }catch(e){}
+    if(!list.length){ box.innerHTML='<div class="muted">Belum ada grade. Tambah dulu di bawah.</div>'; }
+    else { box.innerHTML=list.map(function(g,i){ return '<span class="tag on" style="display:inline-flex;align-items:center;gap:5px;margin:2px 4px 2px 0">'+esc(g)+' <b data-rmgrade="'+i+'" style="cursor:pointer">✕</b></span>'; }).join(''); }
+    box.querySelectorAll('[data-rmgrade]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var idx=parseInt(b.getAttribute('data-rmgrade'),10); var cur=list.slice(); cur.splice(idx,1); busy=true; try{ await O.saveGradeList(cur); loadGradeList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    var addBtn=document.getElementById('gradeAdd'); if(addBtn) addBtn.onclick=async function(){
+      if(busy) return; var inp=document.getElementById('gradeNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('gradeMsg');
+      if(!v){ msg.innerHTML='<div class="res bad">Isi nama grade dulu.</div>'; return; }
+      if(list.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Grade itu udah ada.</div>'; return; }
+      busy=true; this.disabled=true;
+      try{ await O.saveGradeList(list.concat([v])); inp.value=''; msg.innerHTML=''; loadGradeList(); }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; busy=false;
+    };
+  }
+
+  async function loadJenisCutiList(){
+    var box=document.getElementById('jcList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var list=[]; try{ list=await O.listJenisCuti(); }catch(e){}
+    if(!list.length){ box.innerHTML='<div class="muted">Belum ada jenis cuti. Tambah dulu di bawah.</div>'; }
+    else { box.innerHTML=list.map(function(j,i){ return '<span class="tag on" style="display:inline-flex;align-items:center;gap:5px;margin:2px 4px 2px 0">'+esc(j)+' <b data-rmjc="'+i+'" style="cursor:pointer">✕</b></span>'; }).join(''); }
+    box.querySelectorAll('[data-rmjc]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var idx=parseInt(b.getAttribute('data-rmjc'),10); var cur=list.slice(); cur.splice(idx,1); busy=true; try{ await O.saveJenisCutiList(cur); loadJenisCutiList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    var addBtn=document.getElementById('jcAdd'); if(addBtn) addBtn.onclick=async function(){
+      if(busy) return; var inp=document.getElementById('jcNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('jcMsg');
+      if(!v){ msg.innerHTML='<div class="res bad">Isi nama jenis cuti dulu.</div>'; return; }
+      if(list.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Jenis cuti itu udah ada.</div>'; return; }
+      busy=true; this.disabled=true;
+      try{ await O.saveJenisCutiList(list.concat([v])); inp.value=''; msg.innerHTML=''; loadJenisCutiList(); }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; busy=false;
+    };
+  }
+
+  var EMAIL_TPL_DEFS = [
+    {key:'cuti_approved', label:'Cuti Disetujui'},
+    {key:'cuti_rejected', label:'Cuti Ditolak'},
+    {key:'kontrak_privy', label:'Kontrak Siap di Privy'},
+    {key:'grade_changed', label:'Grade Berubah'}
+  ];
+  async function loadEmailTemplates(){
+    var box=document.getElementById('etList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var tpls={}; try{ tpls=await O.getEmailTemplates(); }catch(e){}
+    box.innerHTML = EMAIL_TPL_DEFS.map(function(d){
+      var t=tpls[d.key]||{};
+      return '<div style="border-top:1px dashed #E7D8BE;padding-top:10px;margin-top:10px"><b style="font-size:.86rem">'+esc(d.label)+'</b>'
+        + '<label>Subjek</label><input data-et-subj="'+d.key+'" value="'+esc(t.subject||'')+'" placeholder="Kosongkan buat nonaktifin email jenis ini">'
+        + '<label>Isi</label><textarea data-et-body="'+d.key+'" rows="3" style="width:100%;border:2px solid #E7D8BE;border-radius:10px;padding:10px;font-family:inherit;font-size:.88rem;font-weight:700;color:var(--coklat);box-sizing:border-box">'+esc(t.body||'')+'</textarea>'
+        + '<button class="btn sm sec" data-et-save="'+d.key+'" style="margin-top:6px">💾 Simpan</button><span data-et-msg="'+d.key+'" style="margin-left:8px;font-size:.78rem"></span></div>';
+    }).join('');
+    box.querySelectorAll('[data-et-save]').forEach(function(b){ b.onclick=async function(){
+      if(busy) return; var key=b.getAttribute('data-et-save');
+      var subj=box.querySelector('[data-et-subj="'+key+'"]').value;
+      var body=box.querySelector('[data-et-body="'+key+'"]').value;
+      var msgEl=box.querySelector('[data-et-msg="'+key+'"]');
+      busy=true; b.disabled=true;
+      try{ var cur={}; try{ cur=await O.getEmailTemplates(); }catch(e){} cur[key]={subject:subj, body:body}; await O.saveEmailTemplates(cur); msgEl.textContent='✓ Tersimpan'; msgEl.style.color='#2E7D32'; }
+      catch(e){ msgEl.textContent='Gagal: '+((e&&e.message)||''); msgEl.style.color='#C0392B'; }
+      b.disabled=false; busy=false;
+    }; });
+  }
+
+  async function loadWfaFormat(){
+    var box=document.getElementById('wfaFmtList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var list=[]; try{ list=await O.listWfaReportFormat(); }catch(e){}
+    if(!list.length){ box.innerHTML='<div class="muted">Belum ada kolom. Tambah dulu di bawah.</div>'; }
+    else { box.innerHTML=list.map(function(f,i){ return '<span class="tag on" style="display:inline-flex;align-items:center;gap:5px;margin:2px 4px 2px 0">'+esc(f)+' <b data-rmwf="'+i+'" style="cursor:pointer">✕</b></span>'; }).join(''); }
+    box.querySelectorAll('[data-rmwf]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var idx=parseInt(b.getAttribute('data-rmwf'),10); var cur=list.slice(); cur.splice(idx,1); busy=true; try{ await O.saveWfaReportFormat(cur); loadWfaFormat(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    var addBtn=document.getElementById('wfaFmtAdd'); if(addBtn) addBtn.onclick=async function(){
+      if(busy) return; var inp=document.getElementById('wfaFmtNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('wfaFmtMsg');
+      if(!v){ msg.innerHTML='<div class="res bad">Isi nama kolom dulu.</div>'; return; }
+      if(list.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Kolom itu udah ada.</div>'; return; }
+      busy=true; this.disabled=true;
+      try{ await O.saveWfaReportFormat(list.concat([v])); inp.value=''; msg.innerHTML=''; loadWfaFormat(); }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; busy=false;
+    };
+  }
+
+  async function loadWfaLaporanList(){
+    var box=document.getElementById('wfaLapList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listWfaLaporanHRD(); }catch(e){}
+    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada laporan WFA.</div>'; return; }
+    box.innerHTML = arr.map(function(r){
+      var st = r.status==='submitted' ? '<span class="tag on">SUDAH LAPOR</span>' : '<span class="tag adm">PERLU LAPOR</span>';
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(r.namaKaryawan||'')+' '+st+'</div>'
+        +'<div class="sub">Tanggal WFA: '+esc(r.tanggalWfa||'-')+(r.managerEmail?(' · Manajer: '+esc(r.managerEmail)):'')+'</div></div>'
+        +(r.fileUrl?('<a class="btn sm sec" href="'+esc(r.fileUrl)+'" target="_blank" style="text-decoration:none">📄 Lihat File</a>'):'')
+        +'</div>';
+    }).join('');
+  }
+
+  async function loadLemburHRList(){
+    var box=document.getElementById('lemburHRList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listLemburHRD(); }catch(e){}
+    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada data lembur.</div>'; return; }
+    function badge(s){ if(s==='approved') return '<span class="tag on">DISETUJUI SPV</span>'; if(s==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
+    box.innerHTML = arr.map(function(l){
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(l.namaKaryawan||'(tidak ditemukan)')+' '+badge(l.status)+(l.validatedByHRD?' <span class="tag on">✓ TERVALIDASI</span>':'')+'</div>'
+        +'<div class="sub">'+esc(l.tanggal)+' · Keluar '+esc(l.jamKeluarAktual)+' (jadwal s/d '+esc(l.jamSelesaiJadwal)+') · +'+l.durasiLemburMenit+' menit</div></div>'
+        +(l.status==='approved' && !l.validatedByHRD ? ('<button class="btn sm sec" data-vallembur="'+esc(l.id)+'" style="width:auto">☑ Validasi</button>') : '')
+        +'</div>';
+    }).join('');
+    box.querySelectorAll('[data-vallembur]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.validateLemburHRD(b.getAttribute('data-vallembur')); loadLemburHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+  }
+
+  async function loadCutiList(){
+    var box=document.getElementById('cutiList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listCutiHRD(); }catch(e){}
+    var f=(document.getElementById('cutiFilter')||{}).value; if(f===undefined) f='pending';
+    if(f) arr=arr.filter(function(c){ return c.status===f; });
+    if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada pengajuan cuti'+(f?' dengan status ini':'')+'.</div>'; return; }
+    function badge(c){ if(c.status==='approved') return '<span class="tag on">DISETUJUI SPV</span>'; if(c.status==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
+    box.innerHTML = arr.map(function(c){
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(c.namaKaryawan||'(tidak ditemukan)')+' '+badge(c)+(c.validatedByHRD?' <span class="tag on">✓ TERVALIDASI</span>':'')+'</div>'
+        +'<div class="sub">'+esc(c.jenisCuti||'-')+' · '+esc(c.tanggalMulai||'-')+' s/d '+esc(c.tanggalSelesai||'-')+(c.alasan?' · "'+esc(c.alasan)+'"':'')+'</div>'
+        +(c.catatanHRD?('<div class="sub">Catatan: '+esc(c.catatanHRD)+'</div>'):'')
+        +'</div>'
+        +(c.status==='approved' && !c.validatedByHRD ? ('<button class="btn sm sec" data-valcuti="'+esc(c.id)+'" style="width:auto">☑ Validasi</button>') : '')
+        +'</div>';
+    }).join('');
+    box.querySelectorAll('[data-valcuti]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.validateCutiHRD(b.getAttribute('data-valcuti')); loadCutiList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+  }
+
+  async function loadHRList(){
+    var box=document.getElementById('hrList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listKaryawanHR(); }catch(e){}
+    var sf=(document.getElementById('hrStatusFilter')||{}).value; if(sf===undefined) sf='approved';
+    if(sf) arr=arr.filter(function(k){ return k.approvalStatus===sf; });
+    var f=(document.getElementById('hrDivFilter')||{}).value||'';
+    if(f) arr=arr.filter(function(k){ return k.divisi===f; });
+    if(!arr.length){ box.innerHTML='<div class="muted">Tidak ada karyawan yang cocok filter ini.</div>'; return; }
+    function badge(k){ if(k.approvalStatus==='approved') return '<span class="tag on">DISETUJUI</span>'; if(k.approvalStatus==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
+    box.innerHTML = arr.map(function(k){
+      var subInfo = k.approvalStatus==='approved'
+        ? esc(k.orgLabel||'-')
+        : ('Klaim: '+esc(k.claimDivisi||'-')+(k.claimSubDivisi?' / '+esc(k.claimSubDivisi):'')+(k.claimPosisi?' / '+esc(k.claimPosisi):(k.claimStrukturalLevel&&k.claimStrukturalLevel!=='staff'?' / '+esc(k.claimStrukturalLevel.toUpperCase()):'')));
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(k.namaLengkap||'(tanpa nama)')+(k.nomorPegawai?' <span class="muted" style="font-weight:700">#'+esc(k.nomorPegawai)+'</span>':'')+' '+badge(k)+(k.active===false?' <span class="tag off">NONAKTIF</span>':'')+'</div>'
+        +'<div class="sub">'+subInfo+' · '+esc(k.outlet||'-')+(k.shift?' · '+esc(k.shift):'')+(k.kontrakJenis?' · Kontrak: '+esc(k.kontrakJenis):'')+' · '+esc(k.phone||'')+'</div></div>'
+        +'<div style="display:flex;gap:5px;flex-wrap:wrap;width:100%;margin-top:7px">'
+        + '<button class="btn sm sec" data-edithr="'+esc(k.id)+'">⚙️ '+(k.approvalStatus==='approved'?'Edit':'Isi & Setujui')+'</button>'
+        + (k.approvalStatus!=='approved' ? ('<button class="btn sm sec" data-appr="'+esc(k.id)+'">✓ Setujui langsung</button>') : '')
+        + (k.approvalStatus==='pending' ? ('<button class="btn sm red" data-rej="'+esc(k.id)+'">✕ Tolak</button>') : '')
+        + (k.approvalStatus==='approved' ? ('<button class="btn sm sec" data-togglehr="'+esc(k.id)+'" data-on="'+(k.active!==false?'1':'0')+'">'+(k.active!==false?'Nonaktifkan':'Aktifkan')+'</button><button class="btn sm sec" data-privy="'+esc(k.id)+'">📄 Kontrak siap Privy</button>') : '')
+        +'</div></div>';
+    }).join('');
+    box.querySelectorAll('[data-edithr]').forEach(function(b){ b.onclick=function(){ var k=arr.find(function(x){ return x.id===b.getAttribute('data-edithr'); }); if(k) openKaryawanHREdit(k); }; });
+    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKaryawan(b.getAttribute('data-appr')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKaryawan(b.getAttribute('data-rej')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-privy]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var k=arr.find(function(x){ return x.id===b.getAttribute('data-privy'); }); if(!k) return;
+      if(!confirm('Kirim notif "Kontrak siap di Privy" ke '+k.namaLengkap+'?')) return;
+      busy=true; b.disabled=true;
+      try{
+        await O.sendKaryawanNotif(k.id, 'Kontrak Siap di Privy', 'Kontrak kerja kamu udah tersedia di Privy, silakan cek & tanda-tangan ya.');
+        await O.sendEventEmail(k.id, 'kontrak_privy', { nama:k.namaLengkap });
+        alert('Notif terkirim.');
+      }
+      catch(e){ alert((e&&e.message)||'Gagal'); }
+      b.disabled=false; busy=false; }; });
+    box.querySelectorAll('[data-togglehr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.updateKaryawanProfile(b.getAttribute('data-togglehr'), {active:b.getAttribute('data-on')!=='1'}); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+  }
+
+  async function openKaryawanHREdit(k){
+    var bk=document.createElement('div');
+    bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    var gradeCache=[]; try{ gradeCache=await O.listGrade(); }catch(e){}
+    var isPending = k.approvalStatus!=='approved';
+    var refDivisi = k.divisi || k.claimDivisi || '';
+    var refSub = k.subDivisi || k.claimSubDivisi || '';
+    var refPosisi = k.posisi || k.claimPosisi || '';
+    var refLevel = k.strukturalLevel || k.claimStrukturalLevel || 'staff';
+    bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;max-height:90vh;overflow:auto">'
+      +'<div style="font-weight:800;color:var(--coklat);margin-bottom:10px">⚙️ '+(isPending?'Isi & Setujui':'Edit')+' Karyawan</div>'
+      +(isPending?('<div class="res warn" style="margin-bottom:10px;font-size:.8rem">Ini masih pendaftaran mandiri, statusnya PENDING. Cek dulu klaim posisinya di bawah (udah keisi otomatis dari klaim dia), betulin kalau ada yang salah, baru Simpan & Setujui.</div>'):'')
+      +'<label>Nama lengkap</label><input id="keNm" value="'+esc(k.namaLengkap||'')+'">'
+      +'<label>Nomor Pegawai</label><input id="keNoPeg" value="'+esc(k.nomorPegawai||'')+'" placeholder="cth: EMP-2026-001">'
+      +'<label>Divisi</label><select id="keDivisi"></select>'
+      +'<div id="keSubWrap" style="display:none"><label>Sub-Divisi</label><select id="keSubDivisi"></select></div>'
+      +'<div id="kePosWrap" style="display:none"><label>Posisi</label><select id="kePosisi"></select></div>'
+      +'<div id="keGradeWrap" style="display:none"><label>Grade (opsional)</label><select id="keGrade"></select></div>'
+      +'<label>Lokasi absen</label><select id="keOut">'+buildOutletOpts()+'</select>'
+      +'<label>Shift</label><select id="keShift"><option value="">— pilih shift —</option><option>Pagi</option><option>Siang</option><option>Malam</option><option>Fleksibel</option></select>'
+      +'<div style="border-top:1px dashed #E7D8BE;margin:14px 0 4px"></div>'
+      +'<label>Jenis Kontrak</label><select id="keKontrakJenis"><option value="">— pilih jenis —</option><option>Training</option><option>Kontrak</option><option>Tetap</option></select>'
+      +'<label>Tanggal Mulai</label><input type="date" id="keKontrakMulai" value="'+esc(k.kontrakMulai||'')+'">'
+      +'<label>Tanggal Berakhir</label><input type="date" id="keKontrakSelesai" value="'+esc(k.kontrakSelesai||'')+'">'
+      +'<div id="keDurasi" class="muted" style="font-size:.78rem;margin-top:4px">'+(hitungDurasi(k.kontrakMulai,k.kontrakSelesai)?('Durasi: '+hitungDurasi(k.kontrakMulai,k.kontrakSelesai)):'')+'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="keSave" style="flex:1">💾 '+(isPending?'Simpan & Setujui':'Simpan')+'</button><button class="btn sec" id="keCancel" style="flex:1">Batal</button></div>'
+      +(isPending?('<button class="btn sm red" id="keRej" style="width:100%;margin-top:8px">✕ Tolak Pendaftaran</button>'):'')
+      +'</div>';
+    document.body.appendChild(bk);
+    var outSel=bk.querySelector('#keOut'); if(k.outlet) outSel.value=k.outlet;
+    var shiftSel=bk.querySelector('#keShift'); if(k.shift) shiftSel.value=k.shift;
+    var kjSel=bk.querySelector('#keKontrakJenis'); if(k.kontrakJenis) kjSel.value=k.kontrakJenis;
+    var kmI=bk.querySelector('#keKontrakMulai'), ksI=bk.querySelector('#keKontrakSelesai'), durEl=bk.querySelector('#keDurasi');
+    function refreshDurasi(){ var d=hitungDurasi(kmI.value,ksI.value); durEl.textContent=d?('Durasi: '+d):''; }
+    kmI.onchange=refreshDurasi; ksI.onchange=refreshDurasi;
+
+    var dSel=bk.querySelector('#keDivisi'), subWrap=bk.querySelector('#keSubWrap'), subSel=bk.querySelector('#keSubDivisi'),
+        posWrap=bk.querySelector('#kePosWrap'), posSel=bk.querySelector('#kePosisi'), gradeWrap=bk.querySelector('#keGradeWrap'), gradeSel=bk.querySelector('#keGrade');
+    dSel.innerHTML='<option value="">— pilih divisi —</option>'+_orgCache.divisi.map(function(d){ return '<option>'+esc(d)+'</option>'; }).join('')+'<option value="__GM__">General Manager</option>';
+    function fillSub(divisiVal, preselectSub){
+      if(!divisiVal || divisiVal==='__GM__'){ subWrap.style.display='none'; posWrap.style.display='none'; gradeWrap.style.display='none'; return; }
+      var subs=_orgCache.subDivisi[divisiVal]||[];
+      subSel.innerHTML='<option value="">— pilih sub-divisi —</option>'+subs.map(function(s){ return '<option>'+esc(s)+'</option>'; }).join('')+'<option value="__MANAJER__">Manajer (semua Sub-Divisi)</option>';
+      if(preselectSub) subSel.value=preselectSub;
+      subWrap.style.display='block';
+      fillPos(divisiVal, subSel.value, refLevel==='spv'?refPosisi:'');
+    }
+    function fillPos(divisiVal, subVal, preselectPos){
+      if(!subVal || subVal==='__MANAJER__'){ posWrap.style.display='none'; gradeWrap.style.display='none'; return; }
+      var pk=divisiVal+'::'+subVal;
+      var poss=_orgCache.posisi[pk]||[];
+      posSel.innerHTML='<option value="">— pilih posisi —</option>'+poss.map(function(p){ return '<option>'+esc(p)+'</option>'; }).join('')+'<option value="__SPV__">SPV</option>';
+      if(preselectPos) posSel.value=preselectPos;
+      posWrap.style.display='block';
+      fillGrade(posSel.value, refLevel==='staff'?k.grade:'');
+    }
+    function fillGrade(posVal, preselectGrade){
+      if(!posVal || posVal==='__SPV__'){ gradeWrap.style.display='none'; return; }
+      gradeSel.innerHTML='<option value="">— pilih grade (opsional) —</option>'+gradeCache.map(function(g){ return '<option>'+esc(g)+'</option>'; }).join('');
+      if(preselectGrade) gradeSel.value=preselectGrade;
+      gradeWrap.style.display='block';
+    }
+    dSel.onchange=function(){ fillSub(dSel.value, ''); };
+    subSel.onchange=function(){ fillPos(dSel.value, subSel.value, ''); };
+    posSel.onchange=function(){ fillGrade(posSel.value, ''); };
+    if(refLevel==='gm'){ dSel.value='__GM__'; }
+    else if(refDivisi){ dSel.value=refDivisi; fillSub(refDivisi, refLevel==='manajer'?'__MANAJER__':refSub); }
+
+    bk.querySelector('#keCancel').onclick=function(){ bk.remove(); };
+    bk.onclick=function(e){ if(e.target===bk) bk.remove(); };
+    if(isPending){ bk.querySelector('#keRej').onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; this.disabled=true; try{ await O.rejectKaryawan(k.id); bk.remove(); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; } busy=false; }; }
+    bk.querySelector('#keSave').onclick=async function(){ if(busy) return;
+      var nm=(bk.querySelector('#keNm').value||'').trim(); if(!nm){ alert('Nama wajib diisi.'); return; }
+      var dV=dSel.value;
+      var orgPatch;
+      if(dV==='__GM__') orgPatch={ strukturalLevel:'gm', divisi:'', subDivisi:'', posisi:'', grade:'' };
+      else if(subSel.value==='__MANAJER__') orgPatch={ strukturalLevel:'manajer', divisi:dV, subDivisi:'', posisi:'', grade:'' };
+      else if(posSel.value==='__SPV__') orgPatch={ strukturalLevel:'spv', divisi:dV, subDivisi:subSel.value, posisi:'', grade:'' };
+      else orgPatch={ strukturalLevel:'staff', divisi:dV, subDivisi:subSel.value, posisi:posSel.value, grade:gradeSel.value };
+      var basicPatch={ namaLengkap:nm, nomorPegawai:(bk.querySelector('#keNoPeg').value||'').trim(), outlet:outSel.value, shift:shiftSel.value };
+      var hrPatch=Object.assign({ kontrakJenis:kjSel.value, kontrakMulai:kmI.value, kontrakSelesai:ksI.value }, orgPatch);
+      var gradeBerubah = !isPending && orgPatch.strukturalLevel==='staff' && (orgPatch.grade||'')!==(k.grade||'');
+      busy=true; this.disabled=true; this.textContent='Menyimpan…';
+      try{
+        await O.updateKaryawanProfile(k.id, basicPatch);
+        await O.updateKaryawanHR(k.id, hrPatch);
+        if(isPending) await O.approveKaryawan(k.id);
+        if(gradeBerubah){ try{ await O.sendKaryawanNotif(k.id, 'Grade Diperbarui', 'Grade posisi kamu diperbarui jadi: '+(orgPatch.grade||'(kosong)')+'.'); await O.sendEventEmail(k.id, 'grade_changed', { nama:k.namaLengkap, grade:orgPatch.grade||'(kosong)' }); }catch(e){} }
+        bk.remove(); loadHRList();
+      }
+      catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
+      busy=false; };
+  }
+
+  var _logoutLink=document.getElementById('logoutLink'); if(_logoutLink) _logoutLink.onclick=async function(){ try{ if(window.OmaOpa) await window.OmaOpa.signOut(); }catch(e){} location.reload(); };
+  window.addEventListener('omaopa:ready', boot);
+  window.addEventListener('omaopa:change', boot);
+  setTimeout(boot, 900);
+})();
+</script>
+</body>
+</html>
