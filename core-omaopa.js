@@ -190,6 +190,24 @@ async function changeMyPin(currentPin, newPin){
   try{ await setDoc(doc(db,'users',user.uid), { mustChangePin:false }, {merge:true}); }catch(e){}
   return true;
 }
+async function createOrReuseAuthAccount(phone, pin, displayName){
+  try{
+    const res = await createUserWithEmailAndPassword(auth, phoneEmail(phone), pin);
+    const u = res.user;
+    try{ if(displayName) await updateProfile(u,{displayName:displayName}); }catch(e){}
+    return { uid:u.uid, isNew:true, user:u };
+  }catch(err){
+    if(err && err.code==='auth/email-already-in-use'){
+      try{
+        const res2 = await signInWithEmailAndPassword(auth, phoneEmail(phone), pin);
+        return { uid:res2.user.uid, isNew:false, user:res2.user };
+      }catch(err2){
+        throw {message:'Nomor HP ini sudah terdaftar. Kalau ini nomor kamu, masukkan PIN yang sama seperti akun kamu sebelumnya buat lanjut.'};
+      }
+    }
+    throw err;
+  }
+}
 async function registerPhonePin(data){
   const { phone, pin, name, gender, age, dob, occupation, homeOutlet, consent, ref } = data;
   if(!name || name.trim().length<2) throw {message:'Isi nama dulu ya.'};
@@ -201,9 +219,8 @@ async function registerPhonePin(data){
   if(!occupation) throw {message:'Isi/pilih pekerjaan dulu ya.'};
   if(!homeOutlet) throw {message:'Pilih outlet terdekat dulu ya.'};
   if(!consent) throw {message:'Centang persetujuan dulu ya.'};
-  const res = await createUserWithEmailAndPassword(auth, phoneEmail(phone), pin);
-  user = res.user;
-  try{ await updateProfile(user,{displayName:name.trim()}); }catch(e){}
+  const acc = await createOrReuseAuthAccount(phone, pin, name.trim());
+  user = acc.user;
   // cek kode referral (opsional) -> uid pemberi
   let referredBy='';
   const rc=(ref||'').trim().toUpperCase();
@@ -1406,14 +1423,19 @@ function haversineMeters(lat1, lng1, lat2, lng2){
   return R * 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 async function registerKaryawan(data){
-  const { phone, pin, name, outlet, shift, claimDivisi, claimSubDivisi, claimPosisi, claimStrukturalLevel } = data||{};
+  const { phone, pin, name, outlet, shift, email, claimDivisi, claimSubDivisi, claimPosisi, claimStrukturalLevel } = data||{};
   if(!name || name.trim().length<2) throw {message:'Isi nama lengkap dulu ya.'};
   if(!normPhone(phone)) throw {message:'Nomor HP belum benar.'};
   if(!validPin(pin)) throw {message:'PIN harus 6 angka.'};
   if(!outlet) throw {message:'Pilih lokasi absen dulu ya.'};
-  const res = await createUserWithEmailAndPassword(auth, phoneEmail(phone), pin);
-  const u = res.user;
-  try{ await updateProfile(u,{displayName:name.trim()}); }catch(e){}
+  const emailTrim=(email||'').trim();
+  if(!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) throw {message:'Isi email yang valid dulu ya.'};
+  const acc = await createOrReuseAuthAccount(phone, pin, name.trim());
+  const u = acc.user;
+  if(!acc.isNew){
+    const existing = await getDoc(doc(db,'karyawan',u.uid));
+    if(existing.exists()) throw {message:'Nomor HP ini udah pernah daftar jadi karyawan sebelumnya. Coba masuk (login) aja.'};
+  }
   await setDoc(doc(db,'karyawan',u.uid), {
     namaLengkap:name.trim(), phone:normPhone(phone), outlet:outlet,
     shift:(shift||'').trim(), fotoProfil:'',
@@ -1421,6 +1443,7 @@ async function registerKaryawan(data){
     approvalStatus:'pending', active:true,
     registeredAt:serverTimestamp(), updatedAt:serverTimestamp()
   });
+  try{ await setDoc(doc(db,'karyawanHR',u.uid), { email:emailTrim, updatedAt:serverTimestamp() }, {merge:true}); }catch(e){}
   return { uid:u.uid };
 }
 async function loginKaryawan(phone, pin){
@@ -1479,14 +1502,35 @@ function computeOrgLabel(h){
   if(h.grade) base = base + (base?' - ':'') + h.grade;
   return base || '-';
 }
-async function listKaryawanHR(){
-  if(!(await isHRD())) return [];
+async function fetchAllPages(pagedFn, opts){
+  let all=[]; let cursor=null; let guard=0;
+  while(guard<200){
+    const res = await pagedFn(Object.assign({}, opts||{}, {cursor}));
+    all = all.concat(res.items||[]);
+    if(!res.hasMore || !res.cursor) break;
+    cursor = res.cursor; guard++;
+  }
+  return all;
+}
+async function listKaryawanHR(opts){
+  if(!(await isHRD())) return {items:[], hasMore:false, cursor:null};
+  opts=opts||{};
   try{
-    const basicSnap=await getDocs(collection(db,'karyawan')); const basic={};
-    basicSnap.forEach(d=>{ basic[d.id]=d.data()||{}; });
-    const hrSnap=await getDocs(collection(db,'karyawanHR')); const arr=[];
-    Object.keys(basic).forEach(uid=>{
-      const b=basic[uid]; const h=(function(){ let found=null; hrSnap.forEach(d=>{ if(d.id===uid) found=d.data(); }); return found||{}; })();
+    let qBase = collection(db,'karyawan');
+    let constraints=[orderBy('registeredAt','desc')];
+    if(opts.approvalStatus) constraints.unshift(where('approvalStatus','==',opts.approvalStatus));
+    if(opts.divisi) constraints.unshift(where('divisi','==',opts.divisi));
+    if(opts.fromDate) constraints.push(where('registeredAt','>=', new Date(opts.fromDate+'T00:00:00')));
+    if(opts.toDate) constraints.push(where('registeredAt','<=', new Date(opts.toDate+'T23:59:59')));
+    if(opts.cursor) constraints.push(startAfter(opts.cursor));
+    constraints.push(limit(10));
+    const basicSnap = await getDocs(query(qBase, ...constraints));
+    const uids=[]; const basic={};
+    basicSnap.forEach(d=>{ uids.push(d.id); basic[d.id]=d.data()||{}; });
+    const arr=[];
+    for(const uid of uids){
+      let h={}; try{ const hSnap=await getDoc(doc(db,'karyawanHR',uid)); if(hSnap.exists()) h=hSnap.data(); }catch(e){}
+      const b=basic[uid];
       const item={ id:uid, namaLengkap:b.namaLengkap||'', phone:b.phone||'', outlet:b.outlet||'', shift:b.shift||'', approvalStatus:b.approvalStatus||'pending', active:b.active!==false, nomorPegawai:b.nomorPegawai||'',
         claimDivisi:b.claimDivisi||'', claimSubDivisi:b.claimSubDivisi||'', claimPosisi:b.claimPosisi||'', claimStrukturalLevel:b.claimStrukturalLevel||'',
         posisi:h.posisi||'', divisi:h.divisi||'', subDivisi:h.subDivisi||'', strukturalLevel:h.strukturalLevel||'', grade:h.grade||'',
@@ -1494,10 +1538,10 @@ async function listKaryawanHR(){
         dob:h.dob||'', alamat:h.alamat||'', noKtp:h.noKtp||'', kontakDaruratNama:h.kontakDaruratNama||'', kontakDaruratHp:h.kontakDaruratHp||'', email:h.email||'', customFields:h.customFields||{} };
       item.orgLabel = computeOrgLabel(h);
       arr.push(item);
-    });
-    arr.sort((a,b)=>(a.divisi||'').localeCompare(b.divisi||'')||(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
-    return arr;
-  }catch(e){ return []; }
+    }
+    const lastDoc = basicSnap.docs.length ? basicSnap.docs[basicSnap.docs.length-1] : null;
+    return { items:arr, hasMore: basicSnap.docs.length===10, cursor:lastDoc };
+  }catch(e){ return { items:[], hasMore:false, cursor:null }; }
 }
 async function updateKaryawanHR(uid, patch){
   if(!(await isHRD())) throw {message:'Khusus HRD/admin utama.'};
@@ -1579,16 +1623,26 @@ async function listMyCuti(){
     return arr;
   }catch(e){ return []; }
 }
-async function listCutiHRD(){
-  if(!(await isHRD())) return [];
+async function listCutiHRD(opts){
+  if(!(await isHRD())) return { items:[], hasMore:false, cursor:null };
+  opts=opts||{};
   try{
-    const snap=await getDocs(collection(db,'cuti')); const arr=[];
-    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
-    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:names[x.karyawanUid]||'(tidak ditemukan)', jenisCuti:x.jenisCuti||'', tanggalMulai:x.tanggalMulai||'', tanggalSelesai:x.tanggalSelesai||'', alasan:x.alasan||'', status:x.status||'pending', catatanHRD:x.catatanHRD||'', validatedByHRD:x.validatedByHRD===true, ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
-    arr.sort((a,b)=>b.ts-a.ts);
-    return arr;
-  }catch(e){ return []; }
+    let constraints=[orderBy('tanggalMulai','desc')];
+    if(opts.status) constraints.unshift(where('status','==',opts.status));
+    if(opts.fromDate) constraints.push(where('tanggalMulai','>=',opts.fromDate));
+    if(opts.toDate) constraints.push(where('tanggalMulai','<=',opts.toDate));
+    if(opts.cursor) constraints.push(startAfter(opts.cursor));
+    constraints.push(limit(10));
+    const snap = await getDocs(query(collection(db,'cuti'), ...constraints));
+    const arr=[];
+    for(const d of snap.docs){
+      const x=d.data(); let nama='(tidak ditemukan)';
+      try{ const kw=await getDoc(doc(db,'karyawan',x.karyawanUid)); if(kw.exists()) nama=kw.data().namaLengkap||nama; }catch(e){}
+      arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:nama, jenisCuti:x.jenisCuti||'', tanggalMulai:x.tanggalMulai||'', tanggalSelesai:x.tanggalSelesai||'', alasan:x.alasan||'', status:x.status||'pending', catatanHRD:x.catatanHRD||'', validatedByHRD:x.validatedByHRD===true, ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 });
+    }
+    const lastDoc = snap.docs.length ? snap.docs[snap.docs.length-1] : null;
+    return { items:arr, hasMore: snap.docs.length===10, cursor:lastDoc };
+  }catch(e){ return { items:[], hasMore:false, cursor:null }; }
 }
 async function listCutiToApprove(){
   const scope=await getMyOrgScope();
@@ -1904,16 +1958,26 @@ async function submitWfaLaporan(reportId, fileBlob, managerEmail){
     await sendEmailNotif(email, 'Laporan Kerja WFA — '+nama, 'Laporan kerja WFA dari '+nama+' udah masuk. Cek/download di link berikut:\n'+fileUrl);
   }catch(e){}
 }
-async function listWfaLaporanHRD(){
-  if(!(await isHRD())) return [];
+async function listWfaLaporanHRD(opts){
+  if(!(await isHRD())) return { items:[], hasMore:false, cursor:null };
+  opts=opts||{};
   try{
-    const snap=await getDocs(collection(db,'wfaLaporan')); const arr=[];
-    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
-    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:names[x.karyawanUid]||'(tidak ditemukan)', tanggalWfa:x.tanggalWfa||'', status:x.status||'perlu_lapor', fileUrl:x.fileUrl||'', managerEmail:x.managerEmail||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
-    arr.sort((a,b)=>b.ts-a.ts);
-    return arr;
-  }catch(e){ return []; }
+    let constraints=[orderBy('tanggalWfa','desc')];
+    if(opts.status) constraints.unshift(where('status','==',opts.status));
+    if(opts.fromDate) constraints.push(where('tanggalWfa','>=',opts.fromDate));
+    if(opts.toDate) constraints.push(where('tanggalWfa','<=',opts.toDate));
+    if(opts.cursor) constraints.push(startAfter(opts.cursor));
+    constraints.push(limit(10));
+    const snap = await getDocs(query(collection(db,'wfaLaporan'), ...constraints));
+    const arr=[];
+    for(const d of snap.docs){
+      const x=d.data(); let nama='(tidak ditemukan)';
+      try{ const kw=await getDoc(doc(db,'karyawan',x.karyawanUid)); if(kw.exists()) nama=kw.data().namaLengkap||nama; }catch(e){}
+      arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:nama, tanggalWfa:x.tanggalWfa||'', status:x.status||'perlu_lapor', fileUrl:x.fileUrl||'', managerEmail:x.managerEmail||'', ts:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 });
+    }
+    const lastDoc = snap.docs.length ? snap.docs[snap.docs.length-1] : null;
+    return { items:arr, hasMore: snap.docs.length===10, cursor:lastDoc };
+  }catch(e){ return { items:[], hasMore:false, cursor:null }; }
 }
 
 // ---- jadwal & lembur (SPV/Manajer/GM) ----
@@ -1999,16 +2063,26 @@ async function listMyLembur(){
     return arr;
   }catch(e){ return []; }
 }
-async function listLemburHRD(){
-  if(!(await isHRD())) return [];
+async function listLemburHRD(opts){
+  if(!(await isHRD())) return { items:[], hasMore:false, cursor:null };
+  opts=opts||{};
   try{
-    const snap=await getDocs(collection(db,'lembur')); const arr=[];
-    const kwSnap=await getDocs(collection(db,'karyawan')); const names={};
-    kwSnap.forEach(d=>{ const x=d.data()||{}; names[d.id]=x.namaLengkap||''; });
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:names[x.karyawanUid]||'', tanggal:x.tanggal||'', jamKeluarAktual:x.jamKeluarAktual||'', jamSelesaiJadwal:x.jamSelesaiJadwal||'', durasiLemburMenit:x.durasiLemburMenit||0, status:x.status||'pending', validatedByHRD:x.validatedByHRD===true }); });
-    arr.sort((a,b)=>b.tanggal.localeCompare(a.tanggal));
-    return arr;
-  }catch(e){ return []; }
+    let constraints=[orderBy('tanggal','desc')];
+    if(opts.status) constraints.unshift(where('status','==',opts.status));
+    if(opts.fromDate) constraints.push(where('tanggal','>=',opts.fromDate));
+    if(opts.toDate) constraints.push(where('tanggal','<=',opts.toDate));
+    if(opts.cursor) constraints.push(startAfter(opts.cursor));
+    constraints.push(limit(10));
+    const snap = await getDocs(query(collection(db,'lembur'), ...constraints));
+    const arr=[];
+    for(const d of snap.docs){
+      const x=d.data(); let nama='';
+      try{ const kw=await getDoc(doc(db,'karyawan',x.karyawanUid)); if(kw.exists()) nama=kw.data().namaLengkap||''; }catch(e){}
+      arr.push({ id:d.id, karyawanUid:x.karyawanUid||'', namaKaryawan:nama, tanggal:x.tanggal||'', jamKeluarAktual:x.jamKeluarAktual||'', jamSelesaiJadwal:x.jamSelesaiJadwal||'', durasiLemburMenit:x.durasiLemburMenit||0, status:x.status||'pending', validatedByHRD:x.validatedByHRD===true });
+    }
+    const lastDoc = snap.docs.length ? snap.docs[snap.docs.length-1] : null;
+    return { items:arr, hasMore: snap.docs.length===10, cursor:lastDoc };
+  }catch(e){ return { items:[], hasMore:false, cursor:null }; }
 }
 async function validateLemburHRD(id){
   if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
@@ -2257,7 +2331,7 @@ window.OmaOpa = {
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
   registerKaryawan, loginKaryawan, getKaryawanProfile, listKaryawan, approveKaryawan, rejectKaryawan, updateKaryawanProfile, deleteKaryawan, haversineMeters,
   listJabatan, saveJabatanList, listKaryawanFields, saveKaryawanFields, updateKaryawanOwnProfile,
-  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, getOrgStructure, saveOrgStructure, listGrade, saveGradeList, computeOrgLabel,
+  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, fetchAllPages, getOrgStructure, saveOrgStructure, listGrade, saveGradeList, computeOrgLabel,
   listJenisCuti, saveJenisCutiList, submitCuti, listMyCuti, listCutiHRD, approveCuti, rejectCuti, listCutiToApprove, validateCutiHRD,
   sendKaryawanNotif, listMyKaryawanNotif, markKaryawanNotifRead,
   getEmailTemplates, saveEmailTemplates, sendEventEmail,
