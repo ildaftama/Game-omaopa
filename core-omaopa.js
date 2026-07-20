@@ -1577,8 +1577,8 @@ async function updateKaryawanHR(uid, patch){
   // salin divisi/subDivisi/strukturalLevel ke koleksi karyawan basic (dipakai buat cari tim SPV/Manajer,
   // tanpa perlu buka akses ke data HR sensitif lain kayak KTP/alamat)
   const p=patch||{};
-  if('divisi' in p || 'subDivisi' in p || 'strukturalLevel' in p){
-    const denorm={}; if('divisi' in p) denorm.divisi=p.divisi; if('subDivisi' in p) denorm.subDivisi=p.subDivisi; if('strukturalLevel' in p) denorm.strukturalLevel=p.strukturalLevel;
+  if('divisi' in p || 'subDivisi' in p || 'strukturalLevel' in p || 'posisi' in p){
+    const denorm={}; if('divisi' in p) denorm.divisi=p.divisi; if('subDivisi' in p) denorm.subDivisi=p.subDivisi; if('strukturalLevel' in p) denorm.strukturalLevel=p.strukturalLevel; if('posisi' in p) denorm.posisi=p.posisi;
     try{ await setDoc(doc(db,'karyawan',uid), denorm, {merge:true}); }catch(e){}
   }
 }
@@ -2029,7 +2029,7 @@ async function listTeamKaryawan(){
       if(d.id===myUid) return; // jangan tampilin diri sendiri
       const lvl=x.strukturalLevel||'staff';
       if(lvl==='manajer' || lvl==='gm') return; // jam kerja fleksibel, gak perlu dijadwalin
-      arr.push({ uid:d.id, namaLengkap:x.namaLengkap||'', divisi:x.divisi||'', subDivisi:x.subDivisi||'', strukturalLevel:lvl });
+      arr.push({ uid:d.id, namaLengkap:x.namaLengkap||'', divisi:x.divisi||'', subDivisi:x.subDivisi||'', posisi:x.posisi||'', strukturalLevel:lvl });
     });
     arr.sort((a,b)=>(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
     return arr;
@@ -2053,7 +2053,7 @@ async function generateDummyKaryawan(){
       namaLengkap:d.nama, phone:'0800000'+(1000+i), outlet:'', fotoProfil:'',
       approvalStatus:'approved', active:true, isDummy:true,
       registeredAt:serverTimestamp(), updatedAt:serverTimestamp(),
-      divisi:d.divisi, subDivisi:d.subDivisi, strukturalLevel:d.level
+      divisi:d.divisi, subDivisi:d.subDivisi, strukturalLevel:d.level, posisi:d.posisi
     });
     await setDoc(doc(db,'karyawanHR',uid), {
       divisi:d.divisi, subDivisi:d.subDivisi, posisi:d.posisi, strukturalLevel:d.level, grade:'',
@@ -2085,6 +2085,11 @@ async function saveJadwal(karyawanUid, tanggal, jamMulai, jamSelesai){
     divisi:kw.divisi||'', subDivisi:kw.subDivisi||'',
     createdBy:auth.currentUser.uid, createdAt:serverTimestamp()
   }, {merge:true});
+}
+async function deleteJadwal(karyawanUid, tanggal){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  if(!karyawanUid || !tanggal) throw {message:'Data gak lengkap.'};
+  await deleteDoc(doc(db,'jadwal',karyawanUid+'_'+tanggal));
 }
 async function getPriorDayJadwal(karyawanUid, tanggal){
   try{
@@ -2430,7 +2435,7 @@ window.OmaOpa = {
   getEmailTemplates, saveEmailTemplates, sendEventEmail, sendEmailNotif,
   recordAttendance, getLastAttendance, uploadAttendancePhoto, uploadKaryawanProfilePhoto, getKaryawanProfilePhotoUrl, listAttendance,
   listWfaReportFormat, saveWfaReportFormat, listMyWfaLaporan, uploadWfaLaporanFile, submitWfaLaporan, listWfaLaporanHRD,
-  getMyOrgScope, listTeamKaryawan, generateDummyKaryawan, deleteAllDummyKaryawan, saveJadwal, getPriorDayJadwal, listJadwalSummary, listJadwalForKaryawan, listMyJadwal,
+  getMyOrgScope, listTeamKaryawan, generateDummyKaryawan, deleteAllDummyKaryawan, saveJadwal, deleteJadwal, getPriorDayJadwal, listJadwalSummary, listJadwalForKaryawan, listMyJadwal,
   listLemburToApprove, approveLembur, rejectLembur, listMyLembur, listLemburHRD, validateLemburHRD,
   outletGroup, matchOutletKey,
   sendBroadcast, listBroadcasts, deactivateBroadcast, deleteBroadcast, getMemberBroadcasts, markBroadcastRead,

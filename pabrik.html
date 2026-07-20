@@ -50,7 +50,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=140"></script>
+<script type="module" src="core-omaopa.js?v=142"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
@@ -79,7 +79,7 @@
     renderApp(scope);
   }
 
-  function renderApp(scope){
+  async function renderApp(scope){
     panel.innerHTML =
       '<div class="card"><div class="nm">🗓️ Buat Jadwal</div><div class="muted" style="font-size:.78rem;margin-bottom:8px">Pilih siapa aja, rentang tanggal, isi jam masuk sekali — langsung ke-apply ke semua yang dipilih.</div>'
       +'<div id="jdTeamBox" class="muted">Memuat tim…</div>'
@@ -90,17 +90,15 @@
       +'<label>Jam Pulang <span style="font-weight:400">(otomatis +8 jam, bisa diedit)</span></label><input type="time" id="jdJamSelesai">'
       +'<button class="btn" id="jdSaveBulk" style="margin-top:10px">💾 Simpan Jadwal buat yang Dipilih</button>'
       +'<div id="jdBulkMsg"></div></div>'
-      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Jadwal</div></div>'
-      +'<div style="display:flex;gap:6px;margin-bottom:10px"><button class="btn sm sec" id="ringkasWeek" style="flex:1">Minggu Ini</button><button class="btn sm sec" id="ringkasMonth" style="flex:1">Bulan Ini</button></div>'
-      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><button class="btn sm sec" id="ringkasPrev" style="width:auto">‹ Sebelumnya</button><div id="ringkasPeriodLabel" class="muted" style="flex:1;text-align:center;font-weight:800"></div><button class="btn sm sec" id="ringkasNext" style="width:auto">Berikutnya ›</button></div>'
-      +'<div id="ringkasTotal" style="display:flex;gap:8px;margin-bottom:10px"></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Shift</div></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><button class="btn sm sec" id="ringkasPrev" style="width:auto">‹</button><input type="date" id="ringkasTgl" style="flex:1"><button class="btn sm sec" id="ringkasNext" style="width:auto">›</button></div>'
       +'<div id="ringkasTable" class="muted">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">📋 Jadwal Sudah Dibuat</div><div id="timList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">📋 Daftar Karyawan</div><div class="muted" style="font-size:.72rem;margin-bottom:8px">Titik warna = shift tanggal di atas. Klik nama buat lihat jadwal sebulan.</div><div id="timList" class="muted">Memuat…</div></div>'
       +'<div class="card"><div class="nm">⏰ Approval Lembur</div><div id="lemburApprovalList" class="muted">Memuat…</div></div>'
       +'<div class="card"><div class="nm">🌴 Approval Cuti</div><div id="cutiApprovalList" class="muted">Memuat…</div></div>'
       +'<button class="btn sec" id="outBtn">Keluar</button>';
     document.getElementById('outBtn').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
-    initJadwalForm();
+    await initJadwalForm();
     initRingkasan();
     loadTim();
     loadLemburApproval();
@@ -132,59 +130,33 @@
   }
   var HARI_ID=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
   var BULAN_ID=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  var SHIFT_COLOR = { Pagi:'#4CAF50', Middle:'#FFC21A', Malam:'#2E3A6E', Libur:'#FFFFFF' };
 
-  var _ringkasMode='week', _ringkasOffset=0;
-  function ringkasRange(){
-    var now=new Date();
-    if(_ringkasMode==='week'){
-      var day=now.getDay(); var mondayOffset=(day===0?-6:1-day);
-      var monday=new Date(now); monday.setDate(now.getDate()+mondayOffset+(_ringkasOffset*7));
-      var sunday=new Date(monday); sunday.setDate(monday.getDate()+6);
-      return { from:monday.toISOString().slice(0,10), to:sunday.toISOString().slice(0,10), label:'Minggu '+monday.getDate()+' '+BULAN_ID[monday.getMonth()]+' – '+sunday.getDate()+' '+BULAN_ID[sunday.getMonth()] };
-    } else {
-      var target=new Date(now.getFullYear(), now.getMonth()+_ringkasOffset, 1);
-      var firstDay=new Date(target.getFullYear(), target.getMonth(), 1);
-      var lastDay=new Date(target.getFullYear(), target.getMonth()+1, 0);
-      return { from:firstDay.toISOString().slice(0,10), to:lastDay.toISOString().slice(0,10), label:BULAN_ID[target.getMonth()]+' '+target.getFullYear() };
-    }
-  }
   function initRingkasan(){
-    document.getElementById('ringkasWeek').onclick=function(){ _ringkasMode='week'; _ringkasOffset=0; loadRingkasan(); };
-    document.getElementById('ringkasMonth').onclick=function(){ _ringkasMode='month'; _ringkasOffset=0; loadRingkasan(); };
-    document.getElementById('ringkasPrev').onclick=function(){ _ringkasOffset--; loadRingkasan(); };
-    document.getElementById('ringkasNext').onclick=function(){ _ringkasOffset++; loadRingkasan(); };
+    var tglInput=document.getElementById('ringkasTgl');
+    tglInput.value = new Date().toISOString().slice(0,10);
+    tglInput.onchange=function(){ loadRingkasan(); loadTim(); };
+    document.getElementById('ringkasPrev').onclick=function(){ var d=new Date(tglInput.value+'T00:00:00'); d.setDate(d.getDate()-1); tglInput.value=d.toISOString().slice(0,10); loadRingkasan(); loadTim(); };
+    document.getElementById('ringkasNext').onclick=function(){ var d=new Date(tglInput.value+'T00:00:00'); d.setDate(d.getDate()+1); tglInput.value=d.toISOString().slice(0,10); loadRingkasan(); loadTim(); };
     loadRingkasan();
   }
   async function loadRingkasan(){
-    var totBox=document.getElementById('ringkasTotal'), tblBox=document.getElementById('ringkasTable'), lblBox=document.getElementById('ringkasPeriodLabel');
-    if(!totBox||!tblBox) return;
-    document.getElementById('ringkasWeek').style.borderColor = _ringkasMode==='week' ? 'var(--kuning)' : '#E7D8BE';
-    document.getElementById('ringkasMonth').style.borderColor = _ringkasMode==='month' ? 'var(--kuning)' : '#E7D8BE';
-    var r=ringkasRange(); lblBox.textContent=r.label;
+    var tblBox=document.getElementById('ringkasTable'); if(!tblBox) return;
+    var tgl=document.getElementById('ringkasTgl').value; if(!tgl) return;
     tblBox.innerHTML='<div class="muted">Memuat…</div>';
-    var raw=[]; try{ raw=await window.OmaOpa.listJadwalSummary(r.from, r.to); }catch(e){}
-    var byDate={};
+    var raw=[]; try{ raw=await window.OmaOpa.listJadwalSummary(tgl, tgl); }catch(e){}
+    // kelompokin per shift lalu per posisi
+    var byShift={ Pagi:{}, Middle:{}, Malam:{} };
     raw.forEach(function(j){
       var sh=classifyShift(j.jamMulai); if(!sh) return;
-      if(!byDate[j.tanggal]) byDate[j.tanggal]={Pagi:0,Middle:0,Malam:0};
-      byDate[j.tanggal][sh]++;
+      var t=_jdTeamCache.find(function(x){ return x.uid===j.karyawanUid; });
+      var pos=(t && t.posisi) ? t.posisi : (t && t.strukturalLevel==='spv' ? 'SPV' : 'Lainnya');
+      byShift[sh][pos]=(byShift[sh][pos]||0)+1;
     });
-    var totalP=0, totalM=0, totalMl=0;
-    Object.keys(byDate).forEach(function(t){ totalP+=byDate[t].Pagi; totalM+=byDate[t].Middle; totalMl+=byDate[t].Malam; });
-    totBox.innerHTML = [
-      {lbl:'🌅 Pagi', n:totalP, c:'#FF8C5A'},
-      {lbl:'☀️ Middle', n:totalM, c:'#FFC21A'},
-      {lbl:'🌙 Malam', n:totalMl, c:'#2E3A6E'}
-    ].map(function(s){ return '<div style="flex:1;background:'+s.c+';border-radius:10px;padding:10px 6px;text-align:center;color:#fff"><div style="font-size:1.3rem;font-weight:900">'+s.n+'</div><div style="font-size:.68rem;font-weight:800">'+s.lbl+'</div></div>'; }).join('');
-    var dates = dateRangeList(r.from, r.to);
-    var maxCount = 1; dates.forEach(function(t){ var c=byDate[t]; if(c) maxCount=Math.max(maxCount, c.Pagi, c.Middle, c.Malam); });
-    tblBox.innerHTML = dates.map(function(t){
-      var c = byDate[t] || {Pagi:0,Middle:0,Malam:0};
-      var dObj=new Date(t+'T00:00:00');
-      function bar(n, color){ var w = n? Math.max(14, Math.round((n/maxCount)*100)) : 0; return '<div style="display:flex;align-items:center;gap:5px;margin:2px 0"><div style="width:'+w+'%;min-width:'+(n?'14px':'0')+';background:'+color+';border-radius:5px;height:14px"></div><span style="font-size:.72rem;font-weight:800">'+(n||'')+'</span></div>'; }
-      return '<div style="border-top:1px solid #F2E8D5;padding:7px 0"><div style="font-size:.78rem;font-weight:800;margin-bottom:3px">'+HARI_ID[dObj.getDay()]+', '+dObj.getDate()+' '+BULAN_ID[dObj.getMonth()]+'</div>'
-        + bar(c.Pagi,'#FF8C5A') + bar(c.Middle,'#FFC21A') + bar(c.Malam,'#2E3A6E')
-        + '</div>';
+    tblBox.innerHTML = ['Pagi','Middle','Malam'].map(function(sh){
+      var posMap=byShift[sh]; var total=Object.keys(posMap).reduce(function(s,k){return s+posMap[k];},0);
+      var posRows=Object.keys(posMap).sort().map(function(p){ return '<div class="info-row" style="padding:3px 0 3px 14px"><span>'+esc(p)+'</span><b>'+posMap[p]+' orang</b></div>'; }).join('') || '<div class="muted" style="padding:3px 0 3px 14px;font-size:.76rem">Belum ada yang dijadwalkan</div>';
+      return '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="width:14px;height:14px;border-radius:4px;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002"></div><b>'+sh+'</b><span class="muted">('+total+' orang)</span></div>'+posRows+'</div>';
     }).join('');
   }
 
@@ -258,22 +230,100 @@
 
   async function loadTim(){
     var box=document.getElementById('timList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var team=_jdTeamCache.length ? _jdTeamCache : (function(){ return []; })();
-    if(!team.length){ try{ team=await window.OmaOpa.listTeamKaryawan(); }catch(e){} }
+    var team=_jdTeamCache;
     if(!team.length){ box.innerHTML='<div class="muted">Belum ada anggota tim.</div>'; return; }
-    var today=new Date().toISOString().slice(0,10);
-    var rows=[];
-    for(var i=0;i<team.length;i++){
-      var t=team[i]; var upcoming=[];
-      try{ upcoming=await window.OmaOpa.listJadwalForKaryawan(t.uid, today, null); }catch(e){}
-      if(upcoming.length){
-        rows.push('<div style="border-top:1px dashed #E7D8BE;padding-top:8px;margin-top:8px"><b style="font-size:.85rem">'+esc(t.namaLengkap)+'</b>'
-          + upcoming.slice(0,5).map(function(j){ return '<div class="info-row" style="padding:3px 0"><span>'+esc(j.tanggal)+' ('+esc(classifyShift(j.jamMulai))+')</span><b>'+esc(j.jamMulai)+'–'+esc(j.jamSelesai)+'</b></div>'; }).join('')
-          + '</div>');
+    var tgl=(document.getElementById('ringkasTgl')||{}).value || new Date().toISOString().slice(0,10);
+    var raw=[]; try{ raw=await window.OmaOpa.listJadwalSummary(tgl, tgl); }catch(e){}
+    var shiftByUid={};
+    raw.forEach(function(j){ shiftByUid[j.karyawanUid]=classifyShift(j.jamMulai); });
+    box.innerHTML = team.map(function(t){
+      var sh=shiftByUid[t.uid] || 'Libur';
+      var color=SHIFT_COLOR[sh];
+      return '<div class="row" data-karyawanrow="'+esc(t.uid)+'" style="cursor:pointer">'
+        + '<div style="width:16px;height:16px;border-radius:50%;background:'+color+';border:1.5px solid #0002;flex-shrink:0"></div>'
+        + '<div class="grow"><div class="nm">'+esc(t.namaLengkap)+'</div><div class="sub">'+esc(t.posisi||(t.strukturalLevel==='spv'?'SPV':'-'))+' · '+esc(sh)+'</div></div>'
+        + '<span class="muted">›</span></div>';
+    }).join('');
+    box.querySelectorAll('[data-karyawanrow]').forEach(function(el){ el.onclick=function(){ var t=team.find(function(x){return x.uid===el.getAttribute('data-karyawanrow');}); if(t) openKaryawanJadwalDetail(t); }; });
+  }
+
+  async function openKaryawanJadwalDetail(t){
+    var bk=document.createElement('div');
+    bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    var now=new Date();
+    var state={ year:now.getFullYear(), month:now.getMonth() };
+    bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;max-height:88vh;overflow:auto">'
+      +'<div style="font-weight:800;color:var(--coklat);margin-bottom:4px">'+esc(t.namaLengkap)+'</div>'
+      +'<div class="muted" style="font-size:.76rem;margin-bottom:10px">'+esc(t.posisi||(t.strukturalLevel==='spv'?'SPV':'-'))+'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><button class="btn sm sec" id="dtPrev" style="width:auto">‹</button><div id="dtLabel" class="muted" style="flex:1;text-align:center;font-weight:800"></div><button class="btn sm sec" id="dtNext" style="width:auto">›</button></div>'
+      +'<div id="dtGrid"></div>'
+      +'<div id="dtEditPanel" style="display:none;border-top:1px dashed #E7D8BE;margin-top:10px;padding-top:10px"></div>'
+      +'<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;font-size:.72rem">'
+        +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+SHIFT_COLOR.Pagi+';border:1px solid #0002"></span> Pagi</span>'
+        +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+SHIFT_COLOR.Middle+';border:1px solid #0002"></span> Middle</span>'
+        +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+SHIFT_COLOR.Malam+';border:1px solid #0002"></span> Malam</span>'
+        +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:'+SHIFT_COLOR.Libur+';border:1px solid #0002"></span> Libur (klik buat isi jadwal baru)</span>'
+      +'</div>'
+      +'<button class="btn sec" id="dtClose" style="margin-top:14px">Tutup</button>'
+      +'</div>';
+    document.body.appendChild(bk);
+    bk.onclick=function(e){ if(e.target===bk) bk.remove(); };
+    bk.querySelector('#dtClose').onclick=function(){ bk.remove(); };
+    var _byDateCache={};
+    function showEditPanel(dateStr){
+      var panel=bk.querySelector('#dtEditPanel');
+      var existing=_byDateCache[dateStr]; // {jamMulai, jamSelesai} kalau ada
+      panel.innerHTML = '<div style="font-weight:800;margin-bottom:6px">'+dateStr+'</div>'
+        + '<div style="display:flex;gap:8px"><div style="flex:1"><label>Jam Masuk</label><input type="time" id="dtJm" value="'+(existing?esc(existing.jamMulai):'')+'"></div><div style="flex:1"><label>Jam Selesai</label><input type="time" id="dtJs" value="'+(existing?esc(existing.jamSelesai):'')+'"></div></div>'
+        + '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn sm" id="dtSave" style="flex:1">💾 '+(existing?'Simpan Perubahan':'Simpan Jadwal Baru')+'</button>'
+        + (existing? '<button class="btn sm red" id="dtDel" style="flex:1">🗑 Hapus</button>' : '')
+        + '</div><div id="dtEditMsg"></div>';
+      panel.style.display='block';
+      bk.querySelector('#dtSave').onclick=async function(){
+        if(busy) return; var jm=bk.querySelector('#dtJm').value, js=bk.querySelector('#dtJs').value;
+        var msgEl=bk.querySelector('#dtEditMsg');
+        if(!jm||!js){ msgEl.innerHTML='<div class="res bad">Isi jam masuk & selesai dulu.</div>'; return; }
+        busy=true; this.disabled=true;
+        try{ await window.OmaOpa.saveJadwal(t.uid, dateStr, jm, js); panel.style.display='none'; renderGrid(); loadTim(); loadRingkasan(); }
+        catch(e){ msgEl.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal')+'</div>'; }
+        this.disabled=false; busy=false;
+      };
+      if(existing){
+        bk.querySelector('#dtDel').onclick=async function(){
+          if(busy) return; if(!confirm('Hapus jadwal tanggal '+dateStr+'?')) return;
+          busy=true; this.disabled=true;
+          try{ await window.OmaOpa.deleteJadwal(t.uid, dateStr); panel.style.display='none'; renderGrid(); loadTim(); loadRingkasan(); }
+          catch(e){ alert((e&&e.message)||'Gagal'); }
+          this.disabled=false; busy=false;
+        };
       }
     }
-    box.innerHTML = rows.length ? rows.join('') : '<div class="muted">Belum ada jadwal yang dibuat.</div>';
+    async function renderGrid(){
+      var firstDay=new Date(state.year, state.month, 1), lastDay=new Date(state.year, state.month+1, 0);
+      var fromStr=firstDay.toISOString().slice(0,10), toStr=lastDay.toISOString().slice(0,10);
+      bk.querySelector('#dtLabel').textContent=BULAN_ID[state.month]+' '+state.year;
+      bk.querySelector('#dtGrid').innerHTML='<div class="muted">Memuat…</div>';
+      bk.querySelector('#dtEditPanel').style.display='none';
+      var entries=[]; try{ entries=await window.OmaOpa.listJadwalForKaryawan(t.uid, fromStr, toStr); }catch(e){}
+      _byDateCache={}; entries.forEach(function(j){ _byDateCache[j.tanggal]={jamMulai:j.jamMulai, jamSelesai:j.jamSelesai}; });
+      var startWeekday=firstDay.getDay(); // 0=minggu
+      var cells=[];
+      for(var i=0;i<startWeekday;i++) cells.push('<div></div>');
+      for(var d=1; d<=lastDay.getDate(); d++){
+        var dateStr=new Date(state.year, state.month, d).toISOString().slice(0,10);
+        var jm=_byDateCache[dateStr] ? _byDateCache[dateStr].jamMulai : null; var sh=jm ? classifyShift(jm) : 'Libur';
+        cells.push('<div data-daycell="'+dateStr+'" title="'+dateStr+(jm?(' - '+jm):' - Libur')+'" style="cursor:pointer;aspect-ratio:1;border-radius:6px;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:'+(sh==='Libur'||sh==='Middle'?'#613925':'#fff')+'">'+d+'</div>');
+      }
+      bk.querySelector('#dtGrid').innerHTML = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;font-size:.66rem;text-align:center;font-weight:800;color:#9a7a5e">'
+        + ['Min','Sen','Sel','Rab','Kam','Jum','Sab'].map(function(h){return '<div>'+h+'</div>';}).join('')
+        + '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">'+cells.join('')+'</div>';
+      bk.querySelectorAll('[data-daycell]').forEach(function(el){ el.onclick=function(){ showEditPanel(el.getAttribute('data-daycell')); }; });
+    }
+    bk.querySelector('#dtPrev').onclick=function(){ state.month--; if(state.month<0){state.month=11;state.year--;} renderGrid(); };
+    bk.querySelector('#dtNext').onclick=function(){ state.month++; if(state.month>11){state.month=0;state.year++;} renderGrid(); };
+    renderGrid();
   }
+
 
   async function loadLemburApproval(){
     var box=document.getElementById('lemburApprovalList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
