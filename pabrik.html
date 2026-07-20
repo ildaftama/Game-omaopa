@@ -21,6 +21,9 @@
   .card{ background:#fff; border:2px solid #EFE2C4; border-radius:18px; padding:16px; margin-bottom:14px; }
   .card .nm{ font-weight:800; color:var(--coklat); margin-bottom:4px; }
   .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  .info-row{ display:flex; justify-content:space-between; align-items:center; font-size:.85rem; padding:6px 0; border-bottom:1px solid #F2E4C6; }
+  .info-row:last-child{ border-bottom:none; }
+  .info-row b{ color:var(--coklat); }
   label{ font-size:.78rem; font-weight:800; color:#8a6a3a; display:block; margin:10px 0 5px; }
   label:first-child{ margin-top:0; }
   input, select{ width:100%; border:2px solid #E7D8BE; border-radius:12px; padding:13px; font-size:1rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
@@ -50,7 +53,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=143"></script>
+<script type="module" src="core-omaopa.js?v=144"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
@@ -205,7 +208,7 @@
     tblBox.innerHTML = '<div style="font-weight:800;margin-bottom:8px">📅 '+_ringkasSelectedDate+'</div>'
       + ['Pagi','Middle','Malam'].map(function(sh){
       var posMap=byShift[sh]; var total=Object.keys(posMap).reduce(function(s,k){return s+posMap[k];},0);
-      var posRows=Object.keys(posMap).sort().map(function(p){ return '<div class="info-row" style="padding:3px 0 3px 14px"><span>'+esc(p)+'</span><b>'+posMap[p]+' orang</b></div>'; }).join('') || '<div class="muted" style="padding:3px 0 3px 14px;font-size:.76rem">Belum ada yang dijadwalkan</div>';
+      var posRows=Object.keys(posMap).sort().map(function(p){ return '<div class="info-row" style="padding:3px 0 3px 14px"><span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002;flex-shrink:0"></span>'+esc(p)+'</span><b>'+posMap[p]+' orang</b></div>'; }).join('') || '<div class="muted" style="padding:3px 0 3px 14px;font-size:.76rem">Belum ada yang dijadwalkan</div>';
       return '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="width:14px;height:14px;border-radius:4px;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002"></div><b>'+sh+'</b><span class="muted">('+total+' orang)</span></div>'+posRows+'</div>';
     }).join('');
   }
@@ -295,7 +298,7 @@
     _timAccum=_timAccum.concat(res.items||[]); _timCursor=res.cursor;
     moreBtn.style.display = res.hasMore ? 'block' : 'none';
     if(!_timAccum.length){ box.innerHTML='<div class="muted">Belum ada anggota tim'+(subDiv?' di sub-divisi ini':'')+'.</div>'; return; }
-    var tgl=_ringkasSelectedDate || new Date().toISOString().slice(0,10);
+    var tgl=new Date().toISOString().slice(0,10); // selalu hari ini, gak ikut tanggal kalender Ringkasan Shift
     var raw=[]; try{ raw=await window.OmaOpa.listJadwalSummary(tgl, tgl); }catch(e){}
     var shiftByUid={}; raw.forEach(function(j){ shiftByUid[j.karyawanUid]=classifyShift(j.jamMulai); });
     box.innerHTML = _timAccum.map(function(t){
