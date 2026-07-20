@@ -1512,6 +1512,33 @@ async function fetchAllPages(pagedFn, opts){
   }
   return all;
 }
+async function listKontrakExpiringSoon(){
+  if(!(await isHRD())) return [];
+  try{
+    const today=new Date(); const in45=new Date(); in45.setDate(today.getDate()+45);
+    const todayStr=today.toISOString().slice(0,10), in45Str=in45.toISOString().slice(0,10);
+    const snap=await getDocs(query(collection(db,'karyawanHR'), where('kontrakSelesai','>=',todayStr), where('kontrakSelesai','<=',in45Str)));
+    const arr=[];
+    for(const d of snap.docs){
+      const x=d.data(); let nama='(tidak ditemukan)';
+      try{ const kw=await getDoc(doc(db,'karyawan',d.id)); if(kw.exists()) nama=kw.data().namaLengkap||nama; }catch(e){}
+      arr.push({ uid:d.id, namaKaryawan:nama, kontrakSelesai:x.kontrakSelesai||'', kontrakJenis:x.kontrakJenis||'', divisi:x.divisi||'' });
+    }
+    arr.sort((a,b)=>a.kontrakSelesai.localeCompare(b.kontrakSelesai));
+    return arr;
+  }catch(e){ return []; }
+}
+async function getManajerEmailForDivisi(divisi){
+  if(!divisi) return '';
+  try{
+    const snap=await getDocs(query(collection(db,'karyawan'), where('divisi','==',divisi), where('strukturalLevel','==','manajer')));
+    for(const d of snap.docs){
+      const hr=await getDoc(doc(db,'karyawanHR',d.id));
+      if(hr.exists() && hr.data().email) return hr.data().email;
+    }
+    return '';
+  }catch(e){ return ''; }
+}
 async function listKaryawanHR(opts){
   if(!(await isHRD())) return {items:[], hasMore:false, cursor:null};
   opts=opts||{};
@@ -1990,16 +2017,61 @@ async function getMyOrgScope(){
 async function listTeamKaryawan(){
   const scope=await getMyOrgScope();
   if(!scope || scope.strukturalLevel==='staff') return [];
+  const myUid = auth.currentUser ? auth.currentUser.uid : null;
   try{
     let q;
     if(scope.strukturalLevel==='gm') q=collection(db,'karyawan');
     else if(scope.strukturalLevel==='manajer') q=query(collection(db,'karyawan'), where('divisi','==',scope.divisi));
     else q=query(collection(db,'karyawan'), where('divisi','==',scope.divisi), where('subDivisi','==',scope.subDivisi));
     const snap=await getDocs(q); const arr=[];
-    snap.forEach(d=>{ const x=d.data()||{}; if(x.approvalStatus==='approved') arr.push({ uid:d.id, namaLengkap:x.namaLengkap||'', divisi:x.divisi||'', subDivisi:x.subDivisi||'', strukturalLevel:x.strukturalLevel||'staff' }); });
+    snap.forEach(d=>{ const x=d.data()||{};
+      if(x.approvalStatus!=='approved') return;
+      if(d.id===myUid) return; // jangan tampilin diri sendiri
+      const lvl=x.strukturalLevel||'staff';
+      if(lvl==='manajer' || lvl==='gm') return; // jam kerja fleksibel, gak perlu dijadwalin
+      arr.push({ uid:d.id, namaLengkap:x.namaLengkap||'', divisi:x.divisi||'', subDivisi:x.subDivisi||'', strukturalLevel:lvl });
+    });
     arr.sort((a,b)=>(a.namaLengkap||'').localeCompare(b.namaLengkap||''));
     return arr;
   }catch(e){ return []; }
+}
+async function generateDummyKaryawan(){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  const dummies = [];
+  for(let i=1;i<=19;i++) dummies.push({ nama:'Baker '+String(i).padStart(2,'0'), divisi:'Pabrik', subDivisi:'Produksi', posisi:'Baker', level:'staff' });
+  for(let i=1;i<=9;i++) dummies.push({ nama:'Packing '+String(i).padStart(2,'0'), divisi:'Pabrik', subDivisi:'Produksi', posisi:'Packing', level:'staff' });
+  dummies.push({ nama:'Dedi Supervisor', divisi:'Pabrik', subDivisi:'Produksi', posisi:'', level:'spv' });
+  dummies.push({ nama:'Eka Kurir', divisi:'Pabrik', subDivisi:'Logistik', posisi:'Kurir', level:'staff' });
+  dummies.push({ nama:'Fajar Gudang', divisi:'Pabrik', subDivisi:'Logistik', posisi:'Admin Gudang', level:'staff' });
+  dummies.push({ nama:'Gita Supervisor', divisi:'Pabrik', subDivisi:'Logistik', posisi:'', level:'spv' });
+  dummies.push({ nama:'Hendra Manajer', divisi:'Pabrik', subDivisi:'', posisi:'', level:'manajer' });
+  const ts = Date.now();
+  for(let i=0;i<dummies.length;i++){
+    const d = dummies[i];
+    const uid = 'dummy_'+ts+'_'+i;
+    await setDoc(doc(db,'karyawan',uid), {
+      namaLengkap:d.nama, phone:'0800000'+(1000+i), outlet:'', fotoProfil:'',
+      approvalStatus:'approved', active:true, isDummy:true,
+      registeredAt:serverTimestamp(), updatedAt:serverTimestamp(),
+      divisi:d.divisi, subDivisi:d.subDivisi, strukturalLevel:d.level
+    });
+    await setDoc(doc(db,'karyawanHR',uid), {
+      divisi:d.divisi, subDivisi:d.subDivisi, posisi:d.posisi, strukturalLevel:d.level, grade:'',
+      email:'dummy'+i+'@contoh.com', isDummy:true, updatedAt:serverTimestamp()
+    });
+  }
+  return dummies.length;
+}
+async function deleteAllDummyKaryawan(){
+  if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
+  const snap = await getDocs(query(collection(db,'karyawan'), where('isDummy','==',true)));
+  let count=0;
+  for(const d of snap.docs){
+    try{ await deleteDoc(doc(db,'karyawan',d.id)); }catch(e){}
+    try{ await deleteDoc(doc(db,'karyawanHR',d.id)); }catch(e){}
+    count++;
+  }
+  return count;
 }
 async function saveJadwal(karyawanUid, tanggal, jamMulai, jamSelesai){
   if(!auth.currentUser) throw {message:'Belum login.'};
@@ -2013,6 +2085,27 @@ async function saveJadwal(karyawanUid, tanggal, jamMulai, jamSelesai){
     divisi:kw.divisi||'', subDivisi:kw.subDivisi||'',
     createdBy:auth.currentUser.uid, createdAt:serverTimestamp()
   }, {merge:true});
+}
+async function getPriorDayJadwal(karyawanUid, tanggal){
+  try{
+    const d=new Date(tanggal+'T00:00:00'); d.setDate(d.getDate()-1);
+    const prevStr=d.toISOString().slice(0,10);
+    const snap=await getDoc(doc(db,'jadwal',karyawanUid+'_'+prevStr));
+    return snap.exists() ? { tanggal:prevStr, jamMulai:snap.data().jamMulai||'' } : null;
+  }catch(e){ return null; }
+}
+async function listJadwalSummary(fromDate, toDate){
+  const scope = await getMyOrgScope();
+  if(!scope || scope.strukturalLevel==='staff') return [];
+  try{
+    let constraints=[where('tanggal','>=',fromDate), where('tanggal','<=',toDate)];
+    if(scope.strukturalLevel==='manajer') constraints.unshift(where('divisi','==',scope.divisi));
+    else if(scope.strukturalLevel==='spv'){ constraints.unshift(where('subDivisi','==',scope.subDivisi)); constraints.unshift(where('divisi','==',scope.divisi)); }
+    const snap = await getDocs(query(collection(db,'jadwal'), ...constraints));
+    const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ tanggal:x.tanggal||'', jamMulai:x.jamMulai||'', karyawanUid:x.karyawanUid||'' }); });
+    return arr;
+  }catch(e){ return []; }
 }
 async function listJadwalForKaryawan(karyawanUid, fromDate, toDate){
   try{
@@ -2331,13 +2424,13 @@ window.OmaOpa = {
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
   registerKaryawan, loginKaryawan, getKaryawanProfile, listKaryawan, approveKaryawan, rejectKaryawan, updateKaryawanProfile, deleteKaryawan, haversineMeters,
   listJabatan, saveJabatanList, listKaryawanFields, saveKaryawanFields, updateKaryawanOwnProfile,
-  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, fetchAllPages, getOrgStructure, saveOrgStructure, listGrade, saveGradeList, computeOrgLabel,
+  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, fetchAllPages, listKontrakExpiringSoon, getManajerEmailForDivisi, getOrgStructure, saveOrgStructure, listGrade, saveGradeList, computeOrgLabel,
   listJenisCuti, saveJenisCutiList, submitCuti, listMyCuti, listCutiHRD, approveCuti, rejectCuti, listCutiToApprove, validateCutiHRD,
   sendKaryawanNotif, listMyKaryawanNotif, markKaryawanNotifRead,
-  getEmailTemplates, saveEmailTemplates, sendEventEmail,
+  getEmailTemplates, saveEmailTemplates, sendEventEmail, sendEmailNotif,
   recordAttendance, getLastAttendance, uploadAttendancePhoto, uploadKaryawanProfilePhoto, getKaryawanProfilePhotoUrl, listAttendance,
   listWfaReportFormat, saveWfaReportFormat, listMyWfaLaporan, uploadWfaLaporanFile, submitWfaLaporan, listWfaLaporanHRD,
-  getMyOrgScope, listTeamKaryawan, saveJadwal, listJadwalForKaryawan, listMyJadwal,
+  getMyOrgScope, listTeamKaryawan, generateDummyKaryawan, deleteAllDummyKaryawan, saveJadwal, getPriorDayJadwal, listJadwalSummary, listJadwalForKaryawan, listMyJadwal,
   listLemburToApprove, approveLembur, rejectLembur, listMyLembur, listLemburHRD, validateLemburHRD,
   outletGroup, matchOutletKey,
   sendBroadcast, listBroadcasts, deactivateBroadcast, deleteBroadcast, getMemberBroadcasts, markBroadcastRead,

@@ -47,7 +47,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=136"></script>
+<script type="module" src="core-omaopa.js?v=140"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -86,7 +86,9 @@
   var _orgCache = {divisi:[], subDivisi:{}, posisi:{}};
 
   function render(){
-    app.innerHTML='<div class="card"><div class="nm">🏢 Struktur Organisasi</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Divisi → Sub-Divisi → Posisi. Tambah/hapus sesuka hati, langsung kepake di form daftar karyawan & edit di sini.</div>'
+    app.innerHTML='<div class="card"><div class="nm">⚠️ Kontrak Mau Habis (H-45)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Muncul otomatis tiap halaman ini dibuka.</div>'
+      +'<div id="kontrakExpList" class="muted">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">🏢 Struktur Organisasi</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Divisi → Sub-Divisi → Posisi. Tambah/hapus sesuka hati, langsung kepake di form daftar karyawan & edit di sini.</div>'
       +'<div id="orgTree" class="muted">Memuat…</div>'
       +'<div style="display:flex;gap:6px;margin-top:10px"><input id="divNew" placeholder="Nama divisi baru" style="flex:1"><button class="btn sm" id="divAdd">＋ Tambah Divisi</button></div><div id="divMsg"></div></div>'
       +'<div class="card"><div class="nm">🎓 Daftar Grade</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat karyawan level Staff (misal Training/Junior/Senior). Tambah/hapus sesuka hati.</div>'
@@ -101,6 +103,8 @@
       +'<select id="cutiFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved">✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua —</option></select>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="cutiFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="cutiTo" style="flex:1;min-width:0"></div>'
       +'<div id="cutiList" class="muted">Memuat…</div><button class="btn sec" id="cutiMore" style="display:none">Muat 10 lagi</button></div>'
+      +'<div class="card"><div class="nm">🧪 Data Dummy (Testing)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat 33 karyawan contoh di divisi Pabrik: 19 Baker + 9 Packing (Produksi), 1 SPV Produksi, 2 staff + 1 SPV Logistik, 1 Manajer. Hapus lagi kalau udah kelar testing.</div>'
+      +'<div style="display:flex;gap:8px"><button class="btn sec" id="dummyGen" style="flex:1">＋ Generate Dummy</button><button class="btn red" id="dummyDel" style="flex:1">🗑 Hapus Semua Dummy</button></div><div id="dummyMsg"></div></div>'
       +'<div class="card"><div class="nm">📝 Format Laporan WFA</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Kolom yang wajib diisi karyawan di file laporan (jadi header kolom XLS). Tambah/hapus sesuka hati.</div>'
       +'<div id="wfaFmtList" class="muted">Memuat…</div>'
       +'<div style="display:flex;gap:6px;margin-top:8px"><input id="wfaFmtNew" placeholder="Nama kolom baru" style="flex:1"><button class="btn sm" id="wfaFmtAdd">＋ Tambah</button></div><div id="wfaFmtMsg"></div></div>'
@@ -120,7 +124,23 @@
       +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="atExFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="atExTo" style="flex:1;min-width:0"></div>'
       +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div>';
 
+    loadKontrakExpiring();
     loadOrgStructure();
+    document.getElementById('dummyGen').onclick=async function(){
+      if(busy) return; busy=true; this.disabled=true; this.textContent='Membuat…';
+      var msg=document.getElementById('dummyMsg'); msg.innerHTML='';
+      try{ var n=await O.generateDummyKaryawan(); msg.innerHTML='<div class="res ok">✓ '+n+' karyawan dummy dibuat. Cek di Daftar Karyawan (filter Divisi = Pabrik).</div>'; }
+      catch(e){ msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal')+'</div>'; }
+      this.disabled=false; this.textContent='＋ Generate Dummy'; busy=false;
+    };
+    document.getElementById('dummyDel').onclick=async function(){
+      if(busy) return; if(!confirm('Hapus SEMUA data dummy? Ini gak bisa dibatalin.')) return;
+      busy=true; this.disabled=true; this.textContent='Menghapus…';
+      var msg=document.getElementById('dummyMsg'); msg.innerHTML='';
+      try{ var n=await O.deleteAllDummyKaryawan(); msg.innerHTML='<div class="res ok">✓ '+n+' data dummy dihapus.</div>'; loadHRList(false); }
+      catch(e){ msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal')+'</div>'; }
+      this.disabled=false; this.textContent='🗑 Hapus Semua Dummy'; busy=false;
+    };
     loadGradeList();
     loadJenisCutiList();
     loadEmailTemplates();
@@ -175,6 +195,30 @@
       this.disabled=false; this.textContent='⬇ Export CSV'; busy=false;
     };
     loadHRList();
+  }
+
+  async function loadKontrakExpiring(){
+    var box=document.getElementById('kontrakExpList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listKontrakExpiringSoon(); }catch(e){}
+    if(!arr.length){ box.innerHTML='<div class="muted">Gak ada kontrak yang mau habis dalam 45 hari ke depan.</div>'; return; }
+    box.innerHTML = arr.map(function(k){
+      return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm">'+esc(k.namaKaryawan)+'</div>'
+        +'<div class="sub">Kontrak '+esc(k.kontrakJenis||'-')+' habis '+esc(k.kontrakSelesai)+' · Divisi '+esc(k.divisi||'-')+'</div></div>'
+        +'<button class="btn sm sec" data-kirimmanajer="'+esc(k.uid)+'" data-divisi="'+esc(k.divisi)+'" data-nama="'+esc(k.namaKaryawan)+'" data-selesai="'+esc(k.kontrakSelesai)+'" style="width:auto">✉ Kirim ke Manajer</button>'
+        +'</div>';
+    }).join('');
+    box.querySelectorAll('[data-kirimmanajer]').forEach(function(b){ b.onclick=async function(){
+      if(busy) return; busy=true; b.disabled=true; b.textContent='Mengirim…';
+      try{
+        var email=await O.getManajerEmailForDivisi(b.getAttribute('data-divisi'));
+        if(!email){ alert('Belum ketemu email Manajer buat divisi ini (pastikan Manajer-nya udah isi email di profilnya).'); }
+        else{
+          await O.sendEmailNotif(email, 'Kontrak Karyawan Akan Berakhir', 'Kontrak kerja '+b.getAttribute('data-nama')+' akan berakhir pada '+b.getAttribute('data-selesai')+'. Mohon ditindaklanjuti.');
+          alert('Notif terkirim ke '+email);
+        }
+      }catch(e){ alert((e&&e.message)||'Gagal kirim'); }
+      b.disabled=false; b.textContent='✉ Kirim ke Manajer'; busy=false;
+    }; });
   }
 
   async function loadOrgStructure(){
@@ -447,7 +491,6 @@
       +'<div id="kePosWrap" style="display:none"><label>Posisi</label><select id="kePosisi"></select></div>'
       +'<div id="keGradeWrap" style="display:none"><label>Grade (opsional)</label><select id="keGrade"></select></div>'
       +'<label>Lokasi absen</label><select id="keOut">'+buildOutletOpts()+'</select>'
-      +'<label>Shift</label><select id="keShift"><option value="">— pilih shift —</option><option>Pagi</option><option>Siang</option><option>Malam</option><option>Fleksibel</option></select>'
       +'<div style="border-top:1px dashed #E7D8BE;margin:14px 0 4px"></div>'
       +'<label>Jenis Kontrak</label><select id="keKontrakJenis"><option value="">— pilih jenis —</option><option>Training</option><option>Kontrak</option><option>Tetap</option></select>'
       +'<label>Tanggal Mulai</label><input type="date" id="keKontrakMulai" value="'+esc(k.kontrakMulai||'')+'">'
@@ -458,7 +501,6 @@
       +'</div>';
     document.body.appendChild(bk);
     var outSel=bk.querySelector('#keOut'); if(k.outlet) outSel.value=k.outlet;
-    var shiftSel=bk.querySelector('#keShift'); if(k.shift) shiftSel.value=k.shift;
     var kjSel=bk.querySelector('#keKontrakJenis'); if(k.kontrakJenis) kjSel.value=k.kontrakJenis;
     var kmI=bk.querySelector('#keKontrakMulai'), ksI=bk.querySelector('#keKontrakSelesai'), durEl=bk.querySelector('#keDurasi');
     function refreshDurasi(){ var d=hitungDurasi(kmI.value,ksI.value); durEl.textContent=d?('Durasi: '+d):''; }
@@ -507,7 +549,7 @@
       else if(subSel.value==='__MANAJER__') orgPatch={ strukturalLevel:'manajer', divisi:dV, subDivisi:'', posisi:'', grade:'' };
       else if(posSel.value==='__SPV__') orgPatch={ strukturalLevel:'spv', divisi:dV, subDivisi:subSel.value, posisi:'', grade:'' };
       else orgPatch={ strukturalLevel:'staff', divisi:dV, subDivisi:subSel.value, posisi:posSel.value, grade:gradeSel.value };
-      var basicPatch={ namaLengkap:nm, nomorPegawai:(bk.querySelector('#keNoPeg').value||'').trim(), outlet:outSel.value, shift:shiftSel.value };
+      var basicPatch={ namaLengkap:nm, nomorPegawai:(bk.querySelector('#keNoPeg').value||'').trim(), outlet:outSel.value };
       var hrPatch=Object.assign({ kontrakJenis:kjSel.value, kontrakMulai:kmI.value, kontrakSelesai:ksI.value }, orgPatch);
       var gradeBerubah = !isPending && orgPatch.strukturalLevel==='staff' && (orgPatch.grade||'')!==(k.grade||'');
       busy=true; this.disabled=true; this.textContent='Menyimpan…';
