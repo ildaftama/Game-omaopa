@@ -2035,6 +2035,31 @@ async function listTeamKaryawan(){
     return arr;
   }catch(e){ return []; }
 }
+async function listTeamKaryawanPaged(opts){
+  const scope=await getMyOrgScope();
+  if(!scope || scope.strukturalLevel==='staff') return { items:[], hasMore:false, cursor:null };
+  opts=opts||{};
+  const myUid = auth.currentUser ? auth.currentUser.uid : null;
+  try{
+    let constraints=[orderBy('namaLengkap')];
+    if(scope.strukturalLevel==='manajer') constraints.unshift(where('divisi','==',scope.divisi));
+    else if(scope.strukturalLevel==='spv'){ constraints.unshift(where('subDivisi','==',scope.subDivisi)); constraints.unshift(where('divisi','==',scope.divisi)); }
+    if(opts.subDivisi) constraints.push(where('subDivisi','==',opts.subDivisi));
+    if(opts.cursor) constraints.push(startAfter(opts.cursor));
+    constraints.push(limit(10));
+    const snap=await getDocs(query(collection(db,'karyawan'), ...constraints));
+    const arr=[];
+    snap.forEach(d=>{ const x=d.data()||{};
+      if(x.approvalStatus!=='approved') return;
+      if(d.id===myUid) return;
+      const lvl=x.strukturalLevel||'staff';
+      if(lvl==='manajer' || lvl==='gm') return;
+      arr.push({ uid:d.id, namaLengkap:x.namaLengkap||'', divisi:x.divisi||'', subDivisi:x.subDivisi||'', posisi:x.posisi||'', strukturalLevel:lvl });
+    });
+    const lastDoc = snap.docs.length ? snap.docs[snap.docs.length-1] : null;
+    return { items:arr, hasMore: snap.docs.length===10, cursor:lastDoc };
+  }catch(e){ return { items:[], hasMore:false, cursor:null }; }
+}
 async function generateDummyKaryawan(){
   if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
   const dummies = [];
@@ -2435,7 +2460,7 @@ window.OmaOpa = {
   getEmailTemplates, saveEmailTemplates, sendEventEmail, sendEmailNotif,
   recordAttendance, getLastAttendance, uploadAttendancePhoto, uploadKaryawanProfilePhoto, getKaryawanProfilePhotoUrl, listAttendance,
   listWfaReportFormat, saveWfaReportFormat, listMyWfaLaporan, uploadWfaLaporanFile, submitWfaLaporan, listWfaLaporanHRD,
-  getMyOrgScope, listTeamKaryawan, generateDummyKaryawan, deleteAllDummyKaryawan, saveJadwal, deleteJadwal, getPriorDayJadwal, listJadwalSummary, listJadwalForKaryawan, listMyJadwal,
+  getMyOrgScope, listTeamKaryawan, listTeamKaryawanPaged, generateDummyKaryawan, deleteAllDummyKaryawan, saveJadwal, deleteJadwal, getPriorDayJadwal, listJadwalSummary, listJadwalForKaryawan, listMyJadwal,
   listLemburToApprove, approveLembur, rejectLembur, listMyLembur, listLemburHRD, validateLemburHRD,
   outletGroup, matchOutletKey,
   sendBroadcast, listBroadcasts, deactivateBroadcast, deleteBroadcast, getMemberBroadcasts, markBroadcastRead,

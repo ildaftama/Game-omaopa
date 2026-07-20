@@ -50,7 +50,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=142"></script>
+<script type="module" src="core-omaopa.js?v=143"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
@@ -91,16 +91,22 @@
       +'<button class="btn" id="jdSaveBulk" style="margin-top:10px">💾 Simpan Jadwal buat yang Dipilih</button>'
       +'<div id="jdBulkMsg"></div></div>'
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Shift</div></div>'
-      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><button class="btn sm sec" id="ringkasPrev" style="width:auto">‹</button><input type="date" id="ringkasTgl" style="flex:1"><button class="btn sm sec" id="ringkasNext" style="width:auto">›</button></div>'
-      +'<div id="ringkasTable" class="muted">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">📋 Daftar Karyawan</div><div class="muted" style="font-size:.72rem;margin-bottom:8px">Titik warna = shift tanggal di atas. Klik nama buat lihat jadwal sebulan.</div><div id="timList" class="muted">Memuat…</div></div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm sec" id="ringkasP1" style="flex:1">1 Minggu</button><button class="btn sm sec" id="ringkasP2" style="flex:1">2 Minggu</button><button class="btn sm sec" id="ringkasP3" style="flex:1">1 Bulan</button></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><button class="btn sm sec" id="ringkasPrev" style="width:auto">‹</button><div id="ringkasPeriodLabel" class="muted" style="flex:1;text-align:center;font-weight:800"></div><button class="btn sm sec" id="ringkasNext" style="width:auto">›</button></div>'
+      +'<div id="ringkasCalendar"></div>'
+      +'<div id="ringkasTable" class="muted" style="margin-top:10px">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">📋 Daftar Karyawan</div>'
+      +'<select id="timSubDivFilter" style="margin-bottom:8px"><option value="">— semua sub-divisi —</option></select>'
+      +'<div id="timList" class="muted">Memuat…</div><button class="btn sec" id="timMore" style="display:none">Muat 10 lagi</button></div>'
       +'<div class="card"><div class="nm">⏰ Approval Lembur</div><div id="lemburApprovalList" class="muted">Memuat…</div></div>'
       +'<div class="card"><div class="nm">🌴 Approval Cuti</div><div id="cutiApprovalList" class="muted">Memuat…</div></div>'
       +'<button class="btn sec" id="outBtn">Keluar</button>';
     document.getElementById('outBtn').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
     await initJadwalForm();
+    populateSubDivFilter();
+    document.getElementById('timMore').onclick=function(){ loadTim(true); };
     initRingkasan();
-    loadTim();
+    loadTim(false);
     loadLemburApproval();
     loadCutiApproval();
   }
@@ -132,20 +138,63 @@
   var BULAN_ID=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   var SHIFT_COLOR = { Pagi:'#4CAF50', Middle:'#FFC21A', Malam:'#2E3A6E', Libur:'#FFFFFF' };
 
+  var _ringkasPeriod='week', _ringkasOffset=0, _ringkasSelectedDate=null, _ringkasRawCache=[];
+  function ringkasRange(){
+    var now=new Date(); var day=now.getDay(); var mondayOffset=(day===0?-6:1-day);
+    if(_ringkasPeriod==='week'){
+      var monday=new Date(now); monday.setDate(now.getDate()+mondayOffset+(_ringkasOffset*7));
+      var end=new Date(monday); end.setDate(monday.getDate()+6);
+      return { from:monday.toISOString().slice(0,10), to:end.toISOString().slice(0,10), label:monday.getDate()+' '+BULAN_ID[monday.getMonth()]+' – '+end.getDate()+' '+BULAN_ID[end.getMonth()] };
+    } else if(_ringkasPeriod==='2week'){
+      var monday=new Date(now); monday.setDate(now.getDate()+mondayOffset+(_ringkasOffset*14));
+      var end=new Date(monday); end.setDate(monday.getDate()+13);
+      return { from:monday.toISOString().slice(0,10), to:end.toISOString().slice(0,10), label:monday.getDate()+' '+BULAN_ID[monday.getMonth()]+' – '+end.getDate()+' '+BULAN_ID[end.getMonth()] };
+    } else {
+      var target=new Date(now.getFullYear(), now.getMonth()+_ringkasOffset, 1);
+      var firstDay=new Date(target.getFullYear(), target.getMonth(), 1);
+      var lastDay=new Date(target.getFullYear(), target.getMonth()+1, 0);
+      return { from:firstDay.toISOString().slice(0,10), to:lastDay.toISOString().slice(0,10), label:BULAN_ID[target.getMonth()]+' '+target.getFullYear() };
+    }
+  }
   function initRingkasan(){
-    var tglInput=document.getElementById('ringkasTgl');
-    tglInput.value = new Date().toISOString().slice(0,10);
-    tglInput.onchange=function(){ loadRingkasan(); loadTim(); };
-    document.getElementById('ringkasPrev').onclick=function(){ var d=new Date(tglInput.value+'T00:00:00'); d.setDate(d.getDate()-1); tglInput.value=d.toISOString().slice(0,10); loadRingkasan(); loadTim(); };
-    document.getElementById('ringkasNext').onclick=function(){ var d=new Date(tglInput.value+'T00:00:00'); d.setDate(d.getDate()+1); tglInput.value=d.toISOString().slice(0,10); loadRingkasan(); loadTim(); };
+    document.getElementById('ringkasP1').onclick=function(){ _ringkasPeriod='week'; _ringkasOffset=0; loadRingkasan(); };
+    document.getElementById('ringkasP2').onclick=function(){ _ringkasPeriod='2week'; _ringkasOffset=0; loadRingkasan(); };
+    document.getElementById('ringkasP3').onclick=function(){ _ringkasPeriod='month'; _ringkasOffset=0; loadRingkasan(); };
+    document.getElementById('ringkasPrev').onclick=function(){ _ringkasOffset--; loadRingkasan(); };
+    document.getElementById('ringkasNext').onclick=function(){ _ringkasOffset++; loadRingkasan(); };
     loadRingkasan();
   }
   async function loadRingkasan(){
+    var calBox=document.getElementById('ringkasCalendar'), tblBox=document.getElementById('ringkasTable'), lblBox=document.getElementById('ringkasPeriodLabel');
+    if(!calBox||!tblBox) return;
+    document.getElementById('ringkasP1').style.borderColor = _ringkasPeriod==='week' ? 'var(--kuning)' : '#E7D8BE';
+    document.getElementById('ringkasP2').style.borderColor = _ringkasPeriod==='2week' ? 'var(--kuning)' : '#E7D8BE';
+    document.getElementById('ringkasP3').style.borderColor = _ringkasPeriod==='month' ? 'var(--kuning)' : '#E7D8BE';
+    var r=ringkasRange(); lblBox.textContent=r.label;
+    calBox.innerHTML='<div class="muted">Memuat…</div>';
+    _ringkasRawCache=[]; try{ _ringkasRawCache=await window.OmaOpa.listJadwalSummary(r.from, r.to); }catch(e){}
+    var byDate={}; _ringkasRawCache.forEach(function(j){ byDate[j.tanggal]=(byDate[j.tanggal]||0)+1; });
+    var dates=dateRangeList(r.from, r.to);
+    var firstDate=new Date(r.from+'T00:00:00');
+    var leadBlank = _ringkasPeriod==='month' ? firstDate.getDay() : 0; // week/2week selalu mulai Senin, gak perlu blank
+    var cells=[]; for(var i=0;i<leadBlank;i++) cells.push('<div></div>');
+    var todayStr=new Date().toISOString().slice(0,10);
+    dates.forEach(function(t){
+      var n=byDate[t]||0; var dObj=new Date(t+'T00:00:00');
+      var isSel = t===_ringkasSelectedDate;
+      cells.push('<div data-ringkascell="'+t+'" style="cursor:pointer;aspect-ratio:1;border-radius:6px;background:'+(isSel?'var(--kuning)':(t===todayStr?'#FFF3D6':'#F7F0DF'))+';border:1.5px solid '+(isSel?'var(--kuning-d)':'#E7D8BE')+';display:flex;flex-direction:column;align-items:center;justify-content:center">'
+        + '<div style="font-size:.68rem;font-weight:800">'+dObj.getDate()+'</div>'+(n?'<div style="font-size:.6rem;color:#8a6a3a;font-weight:800">'+n+'</div>':'')+'</div>');
+    });
+    calBox.innerHTML = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;font-size:.6rem;text-align:center;font-weight:800;color:#9a7a5e">'
+      + ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(function(h){return '<div>'+h+'</div>';}).join('')
+      + '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">'+cells.join('')+'</div>';
+    calBox.querySelectorAll('[data-ringkascell]').forEach(function(el){ el.onclick=function(){ _ringkasSelectedDate=el.getAttribute('data-ringkascell'); loadRingkasan(); }; });
+    if(!_ringkasSelectedDate || _ringkasSelectedDate<r.from || _ringkasSelectedDate>r.to){ _ringkasSelectedDate = (dates.indexOf(todayStr)>=0) ? todayStr : dates[0]; }
+    renderBreakdown();
+  }
+  function renderBreakdown(){
     var tblBox=document.getElementById('ringkasTable'); if(!tblBox) return;
-    var tgl=document.getElementById('ringkasTgl').value; if(!tgl) return;
-    tblBox.innerHTML='<div class="muted">Memuat…</div>';
-    var raw=[]; try{ raw=await window.OmaOpa.listJadwalSummary(tgl, tgl); }catch(e){}
-    // kelompokin per shift lalu per posisi
+    var raw=_ringkasRawCache.filter(function(j){ return j.tanggal===_ringkasSelectedDate; });
     var byShift={ Pagi:{}, Middle:{}, Malam:{} };
     raw.forEach(function(j){
       var sh=classifyShift(j.jamMulai); if(!sh) return;
@@ -153,7 +202,8 @@
       var pos=(t && t.posisi) ? t.posisi : (t && t.strukturalLevel==='spv' ? 'SPV' : 'Lainnya');
       byShift[sh][pos]=(byShift[sh][pos]||0)+1;
     });
-    tblBox.innerHTML = ['Pagi','Middle','Malam'].map(function(sh){
+    tblBox.innerHTML = '<div style="font-weight:800;margin-bottom:8px">📅 '+_ringkasSelectedDate+'</div>'
+      + ['Pagi','Middle','Malam'].map(function(sh){
       var posMap=byShift[sh]; var total=Object.keys(posMap).reduce(function(s,k){return s+posMap[k];},0);
       var posRows=Object.keys(posMap).sort().map(function(p){ return '<div class="info-row" style="padding:3px 0 3px 14px"><span>'+esc(p)+'</span><b>'+posMap[p]+' orang</b></div>'; }).join('') || '<div class="muted" style="padding:3px 0 3px 14px;font-size:.76rem">Belum ada yang dijadwalkan</div>';
       return '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="width:14px;height:14px;border-radius:4px;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002"></div><b>'+sh+'</b><span class="muted">('+total+' orang)</span></div>'+posRows+'</div>';
@@ -224,27 +274,39 @@
     msg.innerHTML='<div class="res ok">✓ '+okCount+' jadwal tersimpan'+(failCount?(' ('+failCount+' gagal)'):'')+'.</div>';
     document.getElementById('jdSaveBulk').disabled=false; document.getElementById('jdSaveBulk').textContent='💾 Simpan Jadwal buat yang Dipilih';
     busy=false;
-    loadTim();
+    loadTim(false);
     loadRingkasan();
   }
 
-  async function loadTim(){
-    var box=document.getElementById('timList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var team=_jdTeamCache;
-    if(!team.length){ box.innerHTML='<div class="muted">Belum ada anggota tim.</div>'; return; }
-    var tgl=(document.getElementById('ringkasTgl')||{}).value || new Date().toISOString().slice(0,10);
+  var _timCursor=null, _timAccum=[];
+  function populateSubDivFilter(){
+    var sel=document.getElementById('timSubDivFilter'); if(!sel) return;
+    var subs=[]; _jdTeamCache.forEach(function(t){ if(t.subDivisi && subs.indexOf(t.subDivisi)<0) subs.push(t.subDivisi); });
+    var cur=sel.value;
+    sel.innerHTML='<option value="">— semua sub-divisi —</option>'+subs.map(function(s){ return '<option>'+esc(s)+'</option>'; }).join('');
+    sel.value=cur;
+    sel.onchange=function(){ loadTim(false); };
+  }
+  async function loadTim(loadMore){
+    var box=document.getElementById('timList'); var moreBtn=document.getElementById('timMore'); if(!box) return;
+    if(!loadMore){ _timCursor=null; _timAccum=[]; box.innerHTML='<div class="muted">Memuat…</div>'; }
+    var subDiv=(document.getElementById('timSubDivFilter')||{}).value||'';
+    var res={items:[],hasMore:false,cursor:null}; try{ res=await window.OmaOpa.listTeamKaryawanPaged({ subDivisi:subDiv||undefined, cursor:_timCursor }); }catch(e){}
+    _timAccum=_timAccum.concat(res.items||[]); _timCursor=res.cursor;
+    moreBtn.style.display = res.hasMore ? 'block' : 'none';
+    if(!_timAccum.length){ box.innerHTML='<div class="muted">Belum ada anggota tim'+(subDiv?' di sub-divisi ini':'')+'.</div>'; return; }
+    var tgl=_ringkasSelectedDate || new Date().toISOString().slice(0,10);
     var raw=[]; try{ raw=await window.OmaOpa.listJadwalSummary(tgl, tgl); }catch(e){}
-    var shiftByUid={};
-    raw.forEach(function(j){ shiftByUid[j.karyawanUid]=classifyShift(j.jamMulai); });
-    box.innerHTML = team.map(function(t){
+    var shiftByUid={}; raw.forEach(function(j){ shiftByUid[j.karyawanUid]=classifyShift(j.jamMulai); });
+    box.innerHTML = _timAccum.map(function(t){
       var sh=shiftByUid[t.uid] || 'Libur';
       var color=SHIFT_COLOR[sh];
       return '<div class="row" data-karyawanrow="'+esc(t.uid)+'" style="cursor:pointer">'
         + '<div style="width:16px;height:16px;border-radius:50%;background:'+color+';border:1.5px solid #0002;flex-shrink:0"></div>'
-        + '<div class="grow"><div class="nm">'+esc(t.namaLengkap)+'</div><div class="sub">'+esc(t.posisi||(t.strukturalLevel==='spv'?'SPV':'-'))+' · '+esc(sh)+'</div></div>'
+        + '<div class="grow"><div class="nm">'+esc(t.namaLengkap)+'</div><div class="sub">'+esc(t.posisi||(t.strukturalLevel==='spv'?'SPV':'-'))+' · '+esc(t.subDivisi||'-')+' · '+esc(sh)+'</div></div>'
         + '<span class="muted">›</span></div>';
     }).join('');
-    box.querySelectorAll('[data-karyawanrow]').forEach(function(el){ el.onclick=function(){ var t=team.find(function(x){return x.uid===el.getAttribute('data-karyawanrow');}); if(t) openKaryawanJadwalDetail(t); }; });
+    box.querySelectorAll('[data-karyawanrow]').forEach(function(el){ el.onclick=function(){ var t=_timAccum.find(function(x){return x.uid===el.getAttribute('data-karyawanrow');}); if(t) openKaryawanJadwalDetail(t); }; });
   }
 
   async function openKaryawanJadwalDetail(t){
@@ -284,7 +346,7 @@
         var msgEl=bk.querySelector('#dtEditMsg');
         if(!jm||!js){ msgEl.innerHTML='<div class="res bad">Isi jam masuk & selesai dulu.</div>'; return; }
         busy=true; this.disabled=true;
-        try{ await window.OmaOpa.saveJadwal(t.uid, dateStr, jm, js); panel.style.display='none'; renderGrid(); loadTim(); loadRingkasan(); }
+        try{ await window.OmaOpa.saveJadwal(t.uid, dateStr, jm, js); panel.style.display='none'; renderGrid(); loadTim(false); loadRingkasan(); }
         catch(e){ msgEl.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal')+'</div>'; }
         this.disabled=false; busy=false;
       };
@@ -292,7 +354,7 @@
         bk.querySelector('#dtDel').onclick=async function(){
           if(busy) return; if(!confirm('Hapus jadwal tanggal '+dateStr+'?')) return;
           busy=true; this.disabled=true;
-          try{ await window.OmaOpa.deleteJadwal(t.uid, dateStr); panel.style.display='none'; renderGrid(); loadTim(); loadRingkasan(); }
+          try{ await window.OmaOpa.deleteJadwal(t.uid, dateStr); panel.style.display='none'; renderGrid(); loadTim(false); loadRingkasan(); }
           catch(e){ alert((e&&e.message)||'Gagal'); }
           this.disabled=false; busy=false;
         };
