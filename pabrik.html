@@ -65,7 +65,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=153"></script>
+<script type="module" src="core-omaopa.js?v=155"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
@@ -235,7 +235,7 @@
     calBox.innerHTML = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;font-size:.68rem;text-align:center;font-weight:800;color:#5A6B85">'
       + ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(function(h){return '<div>'+h+'</div>';}).join('')
       + '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">'+cells.join('')+'</div>'
-      + '<div class="muted" style="font-size:.68rem;margin-top:8px">Kode = singkatan posisi (diatur HRD di Struktur Organisasi), angka = jumlah orang. Warna = shift.</div>';
+      + '<div class="muted" style="font-size:.68rem;margin-top:8px">Simbol = kode posisi (diatur HRD di Struktur Organisasi), angka = jumlah orang. Warna = shift.</div>';
     calBox.querySelectorAll('[data-ringkascell]').forEach(function(el){ el.onclick=function(){ _ringkasSelectedDate=el.getAttribute('data-ringkascell'); loadRingkasan(); }; });
     if(!_ringkasSelectedDate || _ringkasSelectedDate<r.from || _ringkasSelectedDate>r.to){ _ringkasSelectedDate = (dates.indexOf(todayStr)>=0) ? todayStr : dates[0]; }
     renderBreakdown();

@@ -53,7 +53,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=152"></script>
+<script type="module" src="core-omaopa.js?v=155"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -109,7 +109,7 @@
       +'<select id="cutiFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved">✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua —</option></select>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="cutiFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="cutiTo" style="flex:1;min-width:0"></div>'
       +'<div id="cutiList" class="muted">Memuat…</div><button class="btn sec" id="cutiMore" style="display:none">Muat 10 lagi</button></div>'
-      +'<div class="card"><div class="nm">🧪 Data Dummy (Testing)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat 33 karyawan contoh di divisi Pabrik: 19 Baker(BR) + 9 Packing(PK) di Produksi, 1 SPV Produksi, Driver(DR) + Warehouse(WH) + 1 SPV di Logistik, 1 Manajer. Kode posisi otomatis kedaftar juga. Hapus lagi kalau udah kelar testing.</div>'
+      +'<div class="card"><div class="nm">🧪 Data Dummy (Testing)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat 33 karyawan contoh di divisi Pabrik: 19 Baker● + 9 Packing★ di Produksi, 1 SPV Produksi, Driver▲ + Warehouse■ + 1 SPV di Logistik, 1 Manajer. Kode simbol (warnanya otomatis ngikut shift) otomatis kedaftar juga. Hapus lagi kalau udah kelar testing.</div>'
       +'<div style="display:flex;gap:8px"><button class="btn sec" id="dummyGen" style="flex:1">＋ Generate Dummy</button><button class="btn red" id="dummyDel" style="flex:1">🗑 Hapus Semua Dummy</button></div><div id="dummyMsg"></div></div>'
       +'<div class="card"><div class="nm">📝 Template Laporan WFA</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Upload file .xlsx yang udah diformat rapi (header, styling, dsb) — ini yang bakal didownload karyawan buat diisi. Upload ulang buat ganti template-nya.</div>'
       +'<div id="wfaTemplateStatus" class="muted">Memuat…</div>'
@@ -254,12 +254,14 @@
           var poss = _orgCache.posisi[pk]||[];
           var possHtml = poss.map(function(p, pi){
             var kode=(_orgCache.posisiKode||{})[p]||'';
-            return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+(kode?(' <b style="font-weight:900">['+esc(kode)+']</b>'):'')+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
+            return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+(kode?(kode+' '):'')+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
           }).join('') || '<span class="muted" style="font-size:.76rem">(belum ada posisi)</span>';
+          var emojiPicks=['●','■','▲','★','◆','▼','✚','♦','✦','▶'];
           return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #EFE2C4">'
             + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.85rem">'+esc(sd)+'</b><span class="muted" style="cursor:pointer;font-size:.72rem" data-rmsub="'+esc(d)+'|'+si+'">✕ hapus sub-divisi</span></div>'
             + '<div style="margin-top:4px">'+possHtml+'</div>'
-            + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:2;padding:7px;font-size:.82rem"><input data-posinputkode="'+esc(pk)+'" placeholder="Kode" maxlength="4" style="flex:1;padding:7px;font-size:.82rem;text-transform:uppercase"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
+            + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:2;padding:7px;font-size:.82rem"><input data-posinputkode="'+esc(pk)+'" placeholder="●" maxlength="4" style="flex:0 0 60px;padding:7px;font-size:1rem;text-align:center"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
+            + '<div class="muted" style="font-size:.68rem;margin-top:4px">Kode buat simbol di kalender (warnanya otomatis ngikut shift, jangan pakai emoji biar warnanya kepakai). Pilih cepat: '+emojiPicks.map(function(e){ return '<span data-emojipick="'+pk+'" data-emoji="'+e+'" style="cursor:pointer;font-size:1.1rem;margin-right:6px;font-weight:900">'+e+'</span>'; }).join('')+'</div>'
             + '</div>';
         }).join('');
         return '<div style="margin-top:10px;padding:10px;border:1.5px solid #EFE2C4;border-radius:12px">'
@@ -289,8 +291,9 @@
       subs.splice(si,1); next.subDivisi[d]=subs; delete next.posisi[d+'::'+sd];
       try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
 
+    box.querySelectorAll('[data-emojipick]').forEach(function(el){ el.onclick=function(){ var pk=el.getAttribute('data-emojipick'); var inp=box.querySelector('[data-posinputkode="'+pk+'"]'); if(inp) inp.value=el.getAttribute('data-emoji'); }; });
     box.querySelectorAll('[data-posadd]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var pk=el.getAttribute('data-posadd'); var inp=box.querySelector('[data-posinput="'+pk+'"]'); var v=(inp.value||'').trim();
-      var kodeInp=box.querySelector('[data-posinputkode="'+pk+'"]'); var kode=(kodeInp.value||'').trim().toUpperCase();
+      var kodeInp=box.querySelector('[data-posinputkode="'+pk+'"]'); var kode=(kodeInp.value||'').trim();
       if(!v) return; var poss=(_orgCache.posisi[pk]||[]); if(poss.indexOf(v)>=0){ alert('Posisi itu udah ada.'); return; }
       busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       next.posisi[pk]=poss.concat([v]);

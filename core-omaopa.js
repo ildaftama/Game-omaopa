@@ -2144,7 +2144,7 @@ async function generateDummyKaryawan(){
     const pkProduksi='Pabrik::Produksi', pkLogistik='Pabrik::Logistik';
     next.posisi[pkProduksi] = Array.from(new Set((next.posisi[pkProduksi]||[]).concat(['Baker','Packing'])));
     next.posisi[pkLogistik] = Array.from(new Set((next.posisi[pkLogistik]||[]).concat(['Driver','Warehouse'])));
-    Object.assign(next.posisiKode, { Baker:'BR', Packing:'PK', Driver:'DR', Warehouse:'WH' });
+    Object.assign(next.posisiKode, { Baker:'●', Packing:'★', Driver:'▲', Warehouse:'■' });
     await saveOrgStructure(next);
   }catch(e){}
   return dummies.length;
