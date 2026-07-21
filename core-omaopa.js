@@ -2156,6 +2156,10 @@ async function deleteAllDummyKaryawan(){
   for(const d of snap.docs){
     try{ await deleteDoc(doc(db,'karyawan',d.id)); }catch(e){}
     try{ await deleteDoc(doc(db,'karyawanHR',d.id)); }catch(e){}
+    try{
+      const jSnap = await getDocs(query(collection(db,'jadwal'), where('karyawanUid','==',d.id)));
+      for(const jd of jSnap.docs){ try{ await deleteDoc(doc(db,'jadwal',jd.id)); }catch(e){} }
+    }catch(e){}
     count++;
   }
   return count;
@@ -2177,6 +2181,23 @@ async function deleteJadwal(karyawanUid, tanggal){
   if(!auth.currentUser) throw {message:'Belum login.'};
   if(!karyawanUid || !tanggal) throw {message:'Data gak lengkap.'};
   await deleteDoc(doc(db,'jadwal',karyawanUid+'_'+tanggal));
+}
+async function deleteJadwalByDateShift(tanggal, shiftName){
+  const scope = await getMyOrgScope();
+  if(!scope || scope.strukturalLevel==='staff') throw {message:'Gak punya akses.'};
+  if(!tanggal || !shiftName) throw {message:'Data gak lengkap.'};
+  let constraints=[where('tanggal','==',tanggal)];
+  if(scope.strukturalLevel==='manajer') constraints.unshift(where('divisi','==',scope.divisi));
+  else if(scope.strukturalLevel==='spv'){ constraints.unshift(where('subDivisi','==',scope.subDivisi)); constraints.unshift(where('divisi','==',scope.divisi)); }
+  const snap = await getDocs(query(collection(db,'jadwal'), ...constraints));
+  let count=0;
+  for(const d of snap.docs){
+    const x=d.data();
+    const h=parseInt((x.jamMulai||'').split(':')[0],10);
+    const sh = isNaN(h) ? null : (h<12?'Pagi':(h<18?'Middle':'Malam'));
+    if(sh===shiftName){ try{ await deleteDoc(doc(db,'jadwal',d.id)); count++; }catch(e){} }
+  }
+  return count;
 }
 async function getPriorDayJadwal(karyawanUid, tanggal){
   try{
@@ -2522,7 +2543,7 @@ window.OmaOpa = {
   getEmailTemplates, saveEmailTemplates, sendEventEmail, sendEmailNotif,
   recordAttendance, getLastAttendance, uploadAttendancePhoto, uploadKaryawanProfilePhoto, getKaryawanProfilePhotoUrl, listAttendance,
   uploadWfaTemplate, getWfaTemplateUrl, listMyWfaLaporan, uploadWfaLaporanFile, submitWfaLaporan, listWfaLaporanHRD,
-  getMyOrgScope, listTeamKaryawan, listTeamKaryawanPaged, generateDummyKaryawan, deleteAllDummyKaryawan, saveJadwal, deleteJadwal, getPriorDayJadwal, listJadwalSummary, listJadwalForKaryawan, listMyJadwal,
+  getMyOrgScope, listTeamKaryawan, listTeamKaryawanPaged, generateDummyKaryawan, deleteAllDummyKaryawan, saveJadwal, deleteJadwal, deleteJadwalByDateShift, getPriorDayJadwal, listJadwalSummary, listJadwalForKaryawan, listMyJadwal,
   listLemburToApprove, approveLembur, rejectLembur, listMyLembur, listLemburHRD, validateLemburHRD,
   outletGroup, matchOutletKey,
   sendBroadcast, listBroadcasts, deactivateBroadcast, deleteBroadcast, getMemberBroadcasts, markBroadcastRead,
