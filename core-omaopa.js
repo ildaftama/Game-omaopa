@@ -759,6 +759,18 @@ async function memberOutletSummary(outletNames){
       total=(await getCountFromServer(query(collection(db,'users'), where('homeOutlet','in',names)))).data().count;
       active=(await getCountFromServer(query(collection(db,'users'), where('homeOutlet','in',names), where('lastTxnAt','>=',cutoff)))).data().count;
     }
+    // kecualiin staff yang kebetulan juga punya akun member, biar konsisten sama hitungan di Ringkasan
+    try{
+      const staffSnap=await getDocs(collection(db,'staff'));
+      for(const d of staffSnap.docs){
+        const uSnap=await getDoc(doc(db,'users',d.id));
+        if(!uSnap.exists()) continue;
+        const ud=uSnap.data();
+        if(names.length && names.indexOf(ud.homeOutlet)<0) continue;
+        total=Math.max(0,total-1);
+        if(ud.lastTxnAt && ud.lastTxnAt.toMillis && ud.lastTxnAt.toMillis()>=cutoff.getTime()) active=Math.max(0,active-1);
+      }
+    }catch(e){}
     return { total:total, active:active, ok:true };
   }catch(e){ return { total:0, active:0, ok:false, error:(e&&e.message)||String(e) }; }
 }
@@ -2099,8 +2111,8 @@ async function generateDummyKaryawan(){
   for(let i=1;i<=19;i++) dummies.push({ nama:'Baker '+String(i).padStart(2,'0'), divisi:'Pabrik', subDivisi:'Produksi', posisi:'Baker', level:'staff' });
   for(let i=1;i<=9;i++) dummies.push({ nama:'Packing '+String(i).padStart(2,'0'), divisi:'Pabrik', subDivisi:'Produksi', posisi:'Packing', level:'staff' });
   dummies.push({ nama:'Dedi Supervisor', divisi:'Pabrik', subDivisi:'Produksi', posisi:'', level:'spv' });
-  dummies.push({ nama:'Eka Kurir', divisi:'Pabrik', subDivisi:'Logistik', posisi:'Kurir', level:'staff' });
-  dummies.push({ nama:'Fajar Gudang', divisi:'Pabrik', subDivisi:'Logistik', posisi:'Admin Gudang', level:'staff' });
+  dummies.push({ nama:'Eka Driver', divisi:'Pabrik', subDivisi:'Logistik', posisi:'Driver', level:'staff' });
+  dummies.push({ nama:'Fajar Gudang', divisi:'Pabrik', subDivisi:'Logistik', posisi:'Warehouse', level:'staff' });
   dummies.push({ nama:'Gita Supervisor', divisi:'Pabrik', subDivisi:'Logistik', posisi:'', level:'spv' });
   dummies.push({ nama:'Hendra Manajer', divisi:'Pabrik', subDivisi:'', posisi:'', level:'manajer' });
   const ts = Date.now();
@@ -2118,6 +2130,18 @@ async function generateDummyKaryawan(){
       email:'dummy'+i+'@contoh.com', isDummy:true, updatedAt:serverTimestamp()
     });
   }
+  // daftarin posisi & kode singkatnya ke Struktur Organisasi biar langsung kepake di kalender (BR/PK/DR/WH)
+  try{
+    const org = await getOrgStructure();
+    const next = { divisi:org.divisi.slice(), subDivisi:Object.assign({},org.subDivisi), posisi:Object.assign({},org.posisi), posisiKode:Object.assign({},org.posisiKode) };
+    if(next.divisi.indexOf('Pabrik')<0) next.divisi.push('Pabrik');
+    next.subDivisi['Pabrik'] = Array.from(new Set((next.subDivisi['Pabrik']||[]).concat(['Produksi','Logistik'])));
+    const pkProduksi='Pabrik::Produksi', pkLogistik='Pabrik::Logistik';
+    next.posisi[pkProduksi] = Array.from(new Set((next.posisi[pkProduksi]||[]).concat(['Baker','Packing'])));
+    next.posisi[pkLogistik] = Array.from(new Set((next.posisi[pkLogistik]||[]).concat(['Driver','Warehouse'])));
+    Object.assign(next.posisiKode, { Baker:'BR', Packing:'PK', Driver:'DR', Warehouse:'WH' });
+    await saveOrgStructure(next);
+  }catch(e){}
   return dummies.length;
 }
 async function deleteAllDummyKaryawan(){

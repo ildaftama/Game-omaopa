@@ -65,9 +65,9 @@
 
   @media (min-width:900px){
     .wrap{ max-width:1240px; }
-    #tab{ display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:14px; align-items:start; }
-    #tab > .card{ margin-bottom:0; }
-    #tab > .card.full, #tab table.mt{ grid-column:1 / -1; }
+    #tab{ column-width:380px; column-gap:14px; }
+    #tab > .card, #tab > #mdetail{ break-inside:avoid; display:inline-block; width:100%; margin-bottom:14px; }
+    #tab table.mt{ break-inside:avoid; }
   }
 </style>
 </head>
@@ -100,7 +100,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=140"></script>
+<script type="module" src="core-omaopa.js?v=150"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');

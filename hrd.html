@@ -40,8 +40,8 @@
 
   @media (min-width:900px){
     .wrap{ max-width:1240px; }
-    #app{ display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:14px; align-items:start; }
-    #app > .card{ margin-bottom:0; }
+    #app{ column-width:380px; column-gap:14px; }
+    #app > .card{ break-inside:avoid; display:inline-block; width:100%; margin-bottom:14px; }
   }
 </style>
 </head>
@@ -53,7 +53,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=147"></script>
+<script type="module" src="core-omaopa.js?v=150"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -109,7 +109,7 @@
       +'<select id="cutiFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved">✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua —</option></select>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="cutiFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="cutiTo" style="flex:1;min-width:0"></div>'
       +'<div id="cutiList" class="muted">Memuat…</div><button class="btn sec" id="cutiMore" style="display:none">Muat 10 lagi</button></div>'
-      +'<div class="card"><div class="nm">🧪 Data Dummy (Testing)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat 33 karyawan contoh di divisi Pabrik: 19 Baker + 9 Packing (Produksi), 1 SPV Produksi, 2 staff + 1 SPV Logistik, 1 Manajer. Hapus lagi kalau udah kelar testing.</div>'
+      +'<div class="card"><div class="nm">🧪 Data Dummy (Testing)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat 33 karyawan contoh di divisi Pabrik: 19 Baker(BR) + 9 Packing(PK) di Produksi, 1 SPV Produksi, Driver(DR) + Warehouse(WH) + 1 SPV di Logistik, 1 Manajer. Kode posisi otomatis kedaftar juga. Hapus lagi kalau udah kelar testing.</div>'
       +'<div style="display:flex;gap:8px"><button class="btn sec" id="dummyGen" style="flex:1">＋ Generate Dummy</button><button class="btn red" id="dummyDel" style="flex:1">🗑 Hapus Semua Dummy</button></div><div id="dummyMsg"></div></div>'
       +'<div class="card"><div class="nm">📝 Format Laporan WFA</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Kolom yang wajib diisi karyawan di file laporan (jadi header kolom XLS). Tambah/hapus sesuka hati.</div>'
       +'<div id="wfaFmtList" class="muted">Memuat…</div>'
