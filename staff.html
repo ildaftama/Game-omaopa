@@ -58,7 +58,7 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=74"></script>
+<script type="module" src="core-omaopa.js?v=149"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
 (function(){
@@ -99,12 +99,18 @@
       + '<button class="btn" id="scanBtn">📷 Scan QR (Member / Voucher)</button>'
       + '<div id="reader" style="display:none;margin-top:12px;border-radius:14px;overflow:hidden"></div>'
       + '<div style="text-align:center;margin:16px 0 8px;color:#b59a7e;font-weight:800;font-size:.8rem">— atau input manual —</div>'
-      + '<label>Kode voucher</label>'
+      + '<label>Kode Member (6 digit, kalau QR gagal discan)</label>'
+      + '<input id="memberCode" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="off">'
+      + '<button class="btn sec" id="checkMemberBtn">Cek member</button>'
+      + '<label style="margin-top:14px">Kode voucher</label>'
       + '<input id="code" placeholder="OO-XXXXXXXX" autocomplete="off" autocapitalize="characters">'
       + '<button class="btn sec" id="checkBtn">Cek voucher</button>'
       + '<div id="out"></div>'
       + '<div style="text-align:right;margin-top:14px"><a class="link" href="rekap.html?v=49">📊 Rekap</a> &nbsp;·&nbsp; <a class="link" id="logoutStaff" href="#">Keluar staff</a></div>';
     document.getElementById('scanBtn').onclick = toggleScan;
+    var mcInput = document.getElementById('memberCode');
+    document.getElementById('checkMemberBtn').onclick = function(){ doCheckMemberCode(mcInput.value); };
+    mcInput.addEventListener('keydown', function(e){ if(e.key==='Enter') doCheckMemberCode(mcInput.value); });
     var input = document.getElementById('code');
     document.getElementById('checkBtn').onclick = function(){ doCheck(input.value); };
     input.addEventListener('keydown', function(e){ if(e.key==='Enter') doCheck(input.value); });
@@ -138,6 +144,15 @@
     var out=document.getElementById('out'); if(out) out.innerHTML='<div class="res warn">QR tidak dikenali. Pastikan ini QR Kartu Member / Voucher Oma Opa.</div>';
   }
 
+  async function doCheckMemberCode(code){
+    var out=document.getElementById('out'); if(!out) return;
+    code=(code||'').trim().replace(/\D/g,'');
+    if(code.length!==6){ out.innerHTML='<div class="res bad">Kode member harus 6 digit angka.</div>'; return; }
+    out.innerHTML='<div class="muted" style="margin-top:12px">Mencari…</div>';
+    var m=null; try{ m=await window.OmaOpa.getMemberByCode(code); }catch(e){}
+    if(!m){ out.innerHTML='<div class="res bad">Kode member <b>'+esc(code)+'</b> gak ketemu. Cek lagi kodenya.</div>'; return; }
+    showMember(m.uid);
+  }
   async function showMember(uid){
     var out=document.getElementById('out'); if(!out) return;
     out.innerHTML='<div class="muted" style="margin-top:12px">Mengambil data member…</div>';

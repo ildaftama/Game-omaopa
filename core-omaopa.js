@@ -599,6 +599,34 @@ async function getMemberByUid(uid){
     return { uid:uid, name:d.name||'', phone:d.phone||'', points:(typeof d.points==='number')?d.points:0 }; }
   catch(e){ return null; }
 }
+async function getOrCreateMemberCode(){
+  if(!auth.currentUser) throw {message:'Belum login.'};
+  const uid=auth.currentUser.uid;
+  try{
+    const uSnap=await getDoc(doc(db,'users',uid));
+    if(uSnap.exists() && uSnap.data().memberCode) return uSnap.data().memberCode;
+  }catch(e){}
+  for(let i=0;i<8;i++){
+    const code=String(Math.floor(100000+Math.random()*900000)); // 6 digit
+    try{
+      const existing=await getDoc(doc(db,'memberCodes',code));
+      if(existing.exists()) continue;
+      await setDoc(doc(db,'memberCodes',code), { uid:uid, createdAt:serverTimestamp() });
+      await setDoc(doc(db,'users',uid), { memberCode:code }, {merge:true});
+      return code;
+    }catch(e){ continue; }
+  }
+  throw {message:'Gagal bikin kode member, coba lagi.'};
+}
+async function getMemberByCode(code){
+  code=(code||'').trim().replace(/\D/g,'');
+  if(!code) return null;
+  try{
+    const cSnap=await getDoc(doc(db,'memberCodes',code));
+    if(!cSnap.exists()) return null;
+    return await getMemberByUid(cSnap.data().uid);
+  }catch(e){ return null; }
+}
 const EARN_PER_POINT = 4000;   // Rp per 1 poin
 async function awardPoints(uid, nominal){
   uid=(uid||'').trim(); nominal=Math.max(0, Math.floor(Number(nominal)||0));
@@ -969,7 +997,7 @@ function renderRewards(){
           +(st==='aktif'?`<div class="vqr" data-vq="${v.code}" style="width:122px;height:122px;margin:9px auto 0;background:#fff;border:1.5px solid #F1E4CC;border-radius:11px;display:flex;align-items:center;justify-content:center"></div>`:'')
           +`</div>`;
       }).join('');
-      ensureQRLib().then(()=>{ body.querySelectorAll('.vqr').forEach(el=>{ if(el.dataset.done)return; el.dataset.done='1'; el.innerHTML=''; try{ new QRCode(el,{text:'OMAOPA:VOUCHER:'+el.dataset.vq, width:114, height:114, correctLevel:QRCode.CorrectLevel.M}); }catch(e){} }); }).catch(()=>{});
+      ensureQRLib().then(()=>{ body.querySelectorAll('.vqr').forEach(el=>{ if(el.dataset.done)return; el.dataset.done='1'; el.innerHTML=''; try{ new QRCode(el,{text:'OMAOPA:VOUCHER:'+el.dataset.vq, width:114, height:114, correctLevel:QRCode.CorrectLevel.H}); }catch(e){} }); }).catch(()=>{});
     });
   }
 }
@@ -997,6 +1025,10 @@ mcBk.innerHTML = `<div class="oo-card" style="position:relative;text-align:cente
   <div class="rw-pts" id="mcPts">🪙 0 poin</div>
   <div id="mcQR" style="width:200px;height:200px;margin:6px auto 8px;background:#fff;border:2px solid #F1E4CC;border-radius:14px;display:flex;align-items:center;justify-content:center"></div>
   <div class="oo-mini">Tunjukkan QR ini ke kasir buat dapat poin tiap belanja.</div>
+  <div style="margin-top:10px;padding:10px;background:#FFF8EC;border:1.5px dashed #E7D8BE;border-radius:12px">
+    <div class="oo-mini" style="margin-bottom:4px">Kalau QR gagal discan, kasih kode ini ke kasir:</div>
+    <div id="mcCode" style="font-weight:900;font-size:1.3rem;letter-spacing:3px;color:${CO}">••••••</div>
+  </div>
   <button class="oo-out" id="mcOut" style="margin-top:12px">Keluar akun</button>
 </div>`;
 function mountMc(){ if(!document.body.contains(mcBk)) document.body.appendChild(mcBk); }
@@ -1012,8 +1044,9 @@ async function openMemberCard(){
   (async()=>{ try{ const txs=await listMyTransactions(); const spend=txs.reduce((s,t)=>s+(t.nominal||0),0); const tr=tierOf(spend); const el=mcBk.querySelector('#mcTier'); if(el) el.innerHTML='<span style="display:inline-block;background:'+tr.color+';color:#fff;font-weight:900;font-size:.72rem;border-radius:999px;padding:3px 12px">★ '+tr.name+'</span>'; }catch(e){} })();
   const box=mcBk.querySelector('#mcQR'); box.innerHTML='<span style="color:#b59a7e;font-weight:700;font-size:.8rem">Memuat QR…</span>';
   mcBk.classList.add('show');
-  try{ await ensureQRLib(); box.innerHTML=''; new QRCode(box,{text:'OMAOPA:MEMBER:'+user.uid, width:188, height:188, correctLevel:QRCode.CorrectLevel.M}); }
+  try{ await ensureQRLib(); box.innerHTML=''; new QRCode(box,{text:'OMAOPA:MEMBER:'+user.uid, width:188, height:188, correctLevel:QRCode.CorrectLevel.H}); }
   catch(e){ box.innerHTML='<span style="color:#C0392B;font-weight:700;font-size:.8rem">QR gagal dimuat</span>'; }
+  (async()=>{ try{ const code=await getOrCreateMemberCode(); const el=mcBk.querySelector('#mcCode'); if(el) el.textContent=code; }catch(e){} })();
 }
 
 // ====== Profil (rincian member, read-only) ======
@@ -1583,11 +1616,11 @@ async function updateKaryawanHR(uid, patch){
   }
 }
 async function getOrgStructure(){
-  try{ const snap=await getDoc(doc(db,'settings','orgStructure')); return snap.exists() ? Object.assign({divisi:[],subDivisi:{},posisi:{}}, snap.data()) : {divisi:[],subDivisi:{},posisi:{}}; }catch(e){ return {divisi:[],subDivisi:{},posisi:{}}; }
+  try{ const snap=await getDoc(doc(db,'settings','orgStructure')); return snap.exists() ? Object.assign({divisi:[],subDivisi:{},posisi:{},posisiKode:{}}, snap.data()) : {divisi:[],subDivisi:{},posisi:{},posisiKode:{}}; }catch(e){ return {divisi:[],subDivisi:{},posisi:{},posisiKode:{}}; }
 }
 async function saveOrgStructure(data){
   if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
-  await setDoc(doc(db,'settings','orgStructure'), { divisi:data.divisi||[], subDivisi:data.subDivisi||{}, posisi:data.posisi||{}, updatedAt:serverTimestamp() });
+  await setDoc(doc(db,'settings','orgStructure'), { divisi:data.divisi||[], subDivisi:data.subDivisi||{}, posisi:data.posisi||{}, posisiKode:data.posisiKode||{}, updatedAt:serverTimestamp() });
 }
 async function listGrade(){
   try{ const snap=await getDoc(doc(db,'settings','gradeList')); return snap.exists() ? (snap.data().list||[]) : []; }catch(e){ return []; }
@@ -2447,7 +2480,7 @@ window.OmaOpa = {
   submitScore, listPointLeaderboard, listScoreLeaderboard, listMyTransactions,
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
-  getMemberByUid, awardPoints, getStaffOutlet,
+  getMemberByUid, getOrCreateMemberCode, getMemberByCode, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, backfillLastTxnAt, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
