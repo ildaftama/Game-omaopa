@@ -44,6 +44,12 @@
   .warn{ background:#FFF3D6; border:2px solid #F2D98A; }
   .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; }
   a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+
+  @media (min-width:900px){
+    .wrap{ max-width:1240px; }
+    #panel{ display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:14px; align-items:start; }
+    #panel > .card{ margin-bottom:0; }
+  }
 </style>
 </head>
 <body>
@@ -53,7 +59,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=144"></script>
+<script type="module" src="core-omaopa.js?v=147"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
@@ -96,6 +102,7 @@
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Shift</div></div>'
       +'<div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm sec" id="ringkasP1" style="flex:1">1 Minggu</button><button class="btn sm sec" id="ringkasP2" style="flex:1">2 Minggu</button><button class="btn sm sec" id="ringkasP3" style="flex:1">1 Bulan</button></div>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><button class="btn sm sec" id="ringkasPrev" style="width:auto">‹</button><div id="ringkasPeriodLabel" class="muted" style="flex:1;text-align:center;font-weight:800"></div><button class="btn sm sec" id="ringkasNext" style="width:auto">›</button></div>'
+      +'<select id="ringkasSubDivFilter" style="margin-bottom:8px"><option value="">— semua sub-divisi —</option></select>'
       +'<div id="ringkasCalendar"></div>'
       +'<div id="ringkasTable" class="muted" style="margin-top:10px">Memuat…</div></div>'
       +'<div class="card"><div class="nm">📋 Daftar Karyawan</div>'
@@ -159,7 +166,16 @@
       return { from:firstDay.toISOString().slice(0,10), to:lastDay.toISOString().slice(0,10), label:BULAN_ID[target.getMonth()]+' '+target.getFullYear() };
     }
   }
+  function populateRingkasSubDivFilter(){
+    var sel=document.getElementById('ringkasSubDivFilter'); if(!sel) return;
+    var subs=[]; _jdTeamCache.forEach(function(t){ if(t.subDivisi && subs.indexOf(t.subDivisi)<0) subs.push(t.subDivisi); });
+    var cur=sel.value;
+    sel.innerHTML='<option value="">— semua sub-divisi —</option>'+subs.map(function(s){ return '<option>'+esc(s)+'</option>'; }).join('');
+    sel.value=cur;
+    sel.onchange=function(){ loadRingkasan(); };
+  }
   function initRingkasan(){
+    populateRingkasSubDivFilter();
     document.getElementById('ringkasP1').onclick=function(){ _ringkasPeriod='week'; _ringkasOffset=0; loadRingkasan(); };
     document.getElementById('ringkasP2').onclick=function(){ _ringkasPeriod='2week'; _ringkasOffset=0; loadRingkasan(); };
     document.getElementById('ringkasP3').onclick=function(){ _ringkasPeriod='month'; _ringkasOffset=0; loadRingkasan(); };
@@ -176,28 +192,57 @@
     var r=ringkasRange(); lblBox.textContent=r.label;
     calBox.innerHTML='<div class="muted">Memuat…</div>';
     _ringkasRawCache=[]; try{ _ringkasRawCache=await window.OmaOpa.listJadwalSummary(r.from, r.to); }catch(e){}
-    var byDate={}; _ringkasRawCache.forEach(function(j){ byDate[j.tanggal]=(byDate[j.tanggal]||0)+1; });
+    var subFilter=(document.getElementById('ringkasSubDivFilter')||{}).value||'';
+    var filtered=_ringkasRawCache.filter(function(j){
+      if(!subFilter) return true;
+      var t=_jdTeamCache.find(function(x){ return x.uid===j.karyawanUid; });
+      return t && t.subDivisi===subFilter;
+    });
+    var byDate={}; // tanggal -> { Pagi:{posisi:n,...}, Middle:{...}, Malam:{...} }
+    filtered.forEach(function(j){
+      var sh=classifyShift(j.jamMulai); if(!sh) return;
+      var t=_jdTeamCache.find(function(x){ return x.uid===j.karyawanUid; });
+      var pos=(t && t.posisi) ? t.posisi : (t && t.strukturalLevel==='spv' ? 'SPV' : 'Lainnya');
+      if(!byDate[j.tanggal]) byDate[j.tanggal]={Pagi:{},Middle:{},Malam:{}};
+      byDate[j.tanggal][sh][pos]=(byDate[j.tanggal][sh][pos]||0)+1;
+    });
     var dates=dateRangeList(r.from, r.to);
     var firstDate=new Date(r.from+'T00:00:00');
     var leadBlank = _ringkasPeriod==='month' ? firstDate.getDay() : 0; // week/2week selalu mulai Senin, gak perlu blank
     var cells=[]; for(var i=0;i<leadBlank;i++) cells.push('<div></div>');
     var todayStr=new Date().toISOString().slice(0,10);
+    function posInisial(p){ var kode=(_orgPosisiKode||{})[p]; if(kode) return kode; return (p||'?').trim().charAt(0).toUpperCase(); }
+    function shiftLine(posMap, color){
+      var keys=Object.keys(posMap).sort();
+      if(!keys.length) return '';
+      return keys.map(function(p){ return '<span style="color:'+color+'">'+posInisial(p)+posMap[p]+'</span>'; }).join(' ');
+    }
     dates.forEach(function(t){
-      var n=byDate[t]||0; var dObj=new Date(t+'T00:00:00');
+      var c=byDate[t]||{Pagi:{},Middle:{},Malam:{}}; var dObj=new Date(t+'T00:00:00');
       var isSel = t===_ringkasSelectedDate;
-      cells.push('<div data-ringkascell="'+t+'" style="cursor:pointer;aspect-ratio:1;border-radius:6px;background:'+(isSel?'var(--kuning)':(t===todayStr?'#FFF3D6':'#F7F0DF'))+';border:1.5px solid '+(isSel?'var(--kuning-d)':'#E7D8BE')+';display:flex;flex-direction:column;align-items:center;justify-content:center">'
-        + '<div style="font-size:.68rem;font-weight:800">'+dObj.getDate()+'</div>'+(n?'<div style="font-size:.6rem;color:#8a6a3a;font-weight:800">'+n+'</div>':'')+'</div>');
+      var lines=[shiftLine(c.Pagi,SHIFT_COLOR.Pagi), shiftLine(c.Middle,SHIFT_COLOR.Middle), shiftLine(c.Malam,SHIFT_COLOR.Malam)].filter(Boolean);
+      cells.push('<div data-ringkascell="'+t+'" style="cursor:pointer;min-height:64px;border-radius:6px;background:'+(isSel?'var(--kuning)':(t===todayStr?'#FFF3D6':'#F7F0DF'))+';border:1.5px solid '+(isSel?'var(--kuning-d)':'#E7D8BE')+';display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px 1px;gap:1px">'
+        + '<div style="font-size:.66rem;font-weight:800">'+dObj.getDate()+'</div>'
+        + (lines.length ? lines.map(function(l){ return '<div style="font-size:.54rem;font-weight:800;line-height:1.3">'+l+'</div>'; }).join('') : '<div style="font-size:.54rem;color:#c9b896">–</div>')
+        + '</div>');
     });
     calBox.innerHTML = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;font-size:.6rem;text-align:center;font-weight:800;color:#9a7a5e">'
       + ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(function(h){return '<div>'+h+'</div>';}).join('')
-      + '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">'+cells.join('')+'</div>';
+      + '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">'+cells.join('')+'</div>'
+      + '<div class="muted" style="font-size:.68rem;margin-top:8px">Kode = singkatan posisi (diatur HRD di Struktur Organisasi), angka = jumlah orang. Warna = shift.</div>';
     calBox.querySelectorAll('[data-ringkascell]').forEach(function(el){ el.onclick=function(){ _ringkasSelectedDate=el.getAttribute('data-ringkascell'); loadRingkasan(); }; });
     if(!_ringkasSelectedDate || _ringkasSelectedDate<r.from || _ringkasSelectedDate>r.to){ _ringkasSelectedDate = (dates.indexOf(todayStr)>=0) ? todayStr : dates[0]; }
     renderBreakdown();
   }
   function renderBreakdown(){
     var tblBox=document.getElementById('ringkasTable'); if(!tblBox) return;
-    var raw=_ringkasRawCache.filter(function(j){ return j.tanggal===_ringkasSelectedDate; });
+    var subFilter=(document.getElementById('ringkasSubDivFilter')||{}).value||'';
+    var raw=_ringkasRawCache.filter(function(j){
+      if(j.tanggal!==_ringkasSelectedDate) return false;
+      if(!subFilter) return true;
+      var t=_jdTeamCache.find(function(x){ return x.uid===j.karyawanUid; });
+      return t && t.subDivisi===subFilter;
+    });
     var byShift={ Pagi:{}, Middle:{}, Malam:{} };
     raw.forEach(function(j){
       var sh=classifyShift(j.jamMulai); if(!sh) return;
@@ -214,9 +259,11 @@
   }
 
   var _jdTeamCache = [];
+  var _orgPosisiKode = {};
   async function initJadwalForm(){
     var box=document.getElementById('jdTeamBox'); if(!box) return; box.innerHTML='<div class="muted">Memuat tim…</div>';
     _jdTeamCache=[]; try{ _jdTeamCache=await window.OmaOpa.listTeamKaryawan(); }catch(e){}
+    try{ var org=await window.OmaOpa.getOrgStructure(); _orgPosisiKode=org.posisiKode||{}; }catch(e){ _orgPosisiKode={}; }
     if(!_jdTeamCache.length){ box.innerHTML='<div class="muted">Belum ada anggota tim.</div>'; }
     else{
       box.innerHTML = '<div style="max-height:220px;overflow:auto;border:2px solid #E7D8BE;border-radius:10px;padding:8px">'

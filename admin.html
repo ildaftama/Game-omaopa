@@ -62,6 +62,13 @@
   .bar{ margin:9px 0; } .bar .bl{ display:flex; justify-content:space-between; gap:8px; font-size:.78rem; font-weight:800; color:#5b4636; margin-bottom:3px; }
   .bar .bt{ height:13px; background:#EFE6D2; border-radius:999px; overflow:hidden; }
   .bar .bf{ height:100%; background:linear-gradient(90deg,#FFC21A,#E0915B); border-radius:999px; }
+
+  @media (min-width:900px){
+    .wrap{ max-width:1240px; }
+    #tab{ display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:14px; align-items:start; }
+    #tab > .card{ margin-bottom:0; }
+    #tab > .card.full, #tab table.mt{ grid-column:1 / -1; }
+  }
 </style>
 </head>
 <body>
@@ -93,7 +100,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=136"></script>
+<script type="module" src="core-omaopa.js?v=140"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');

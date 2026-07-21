@@ -37,6 +37,12 @@
   .tag{ font-size:.64rem; font-weight:900; border-radius:999px; padding:2px 8px; }
   .tag.on{ background:#2E7D32; color:#fff; } .tag.off{ background:#bdae98; color:#fff; } .tag.adm{ background:var(--kuning); color:#5A3A05; }
   a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+
+  @media (min-width:900px){
+    .wrap{ max-width:1240px; }
+    #app{ display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:14px; align-items:start; }
+    #app > .card{ margin-bottom:0; }
+  }
 </style>
 </head>
 <body>
@@ -47,7 +53,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=140"></script>
+<script type="module" src="core-omaopa.js?v=147"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -230,7 +236,7 @@
       if(!v){ msg.innerHTML='<div class="res bad">Isi nama divisi dulu.</div>'; return; }
       if(_orgCache.divisi.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Divisi itu udah ada.</div>'; return; }
       busy=true; this.disabled=true;
-      var next={divisi:_orgCache.divisi.concat([v]), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      var next={divisi:_orgCache.divisi.concat([v]), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       try{ await O.saveOrgStructure(next); inp.value=''; msg.innerHTML=''; loadOrgStructure(); }
       catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
       this.disabled=false; busy=false;
@@ -246,12 +252,13 @@
           var pk=d+'::'+sd;
           var poss = _orgCache.posisi[pk]||[];
           var possHtml = poss.map(function(p, pi){
-            return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
+            var kode=(_orgCache.posisiKode||{})[p]||'';
+            return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+(kode?(' <b style="font-weight:900">['+esc(kode)+']</b>'):'')+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
           }).join('') || '<span class="muted" style="font-size:.76rem">(belum ada posisi)</span>';
           return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #EFE2C4">'
             + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.85rem">'+esc(sd)+'</b><span class="muted" style="cursor:pointer;font-size:.72rem" data-rmsub="'+esc(d)+'|'+si+'">✕ hapus sub-divisi</span></div>'
             + '<div style="margin-top:4px">'+possHtml+'</div>'
-            + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
+            + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:2;padding:7px;font-size:.82rem"><input data-posinputkode="'+esc(pk)+'" placeholder="Kode" maxlength="4" style="flex:1;padding:7px;font-size:.82rem;text-transform:uppercase"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
             + '</div>';
         }).join('');
         return '<div style="margin-top:10px;padding:10px;border:1.5px solid #EFE2C4;border-radius:12px">'
@@ -265,31 +272,35 @@
 
     box.querySelectorAll('[data-rmdiv]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var di=parseInt(el.getAttribute('data-rmdiv'),10); var d=_orgCache.divisi[di];
       if(!confirm('Hapus divisi "'+d+'"? Sub-divisi & posisi di dalamnya juga ikut hilang dari daftar (data karyawan yang udah kepasang gak berubah).')) return;
-      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       next.divisi.splice(di,1); delete next.subDivisi[d];
       try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
 
     box.querySelectorAll('[data-subadd]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var d=el.getAttribute('data-subadd'); var inp=box.querySelector('[data-subinput="'+d+'"]'); var v=(inp.value||'').trim();
       if(!v) return; var subs=(_orgCache.subDivisi[d]||[]); if(subs.indexOf(v)>=0){ alert('Sub-divisi itu udah ada.'); return; }
-      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       next.subDivisi[d]=subs.concat([v]);
       try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
 
     box.querySelectorAll('[data-rmsub]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var parts=el.getAttribute('data-rmsub').split('|'); var d=parts[0], si=parseInt(parts[1],10); var subs=(_orgCache.subDivisi[d]||[]).slice(); var sd=subs[si];
       if(!confirm('Hapus sub-divisi "'+sd+'"?')) return;
-      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       subs.splice(si,1); next.subDivisi[d]=subs; delete next.posisi[d+'::'+sd];
       try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
 
     box.querySelectorAll('[data-posadd]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var pk=el.getAttribute('data-posadd'); var inp=box.querySelector('[data-posinput="'+pk+'"]'); var v=(inp.value||'').trim();
+      var kodeInp=box.querySelector('[data-posinputkode="'+pk+'"]'); var kode=(kodeInp.value||'').trim().toUpperCase();
       if(!v) return; var poss=(_orgCache.posisi[pk]||[]); if(poss.indexOf(v)>=0){ alert('Posisi itu udah ada.'); return; }
-      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       next.posisi[pk]=poss.concat([v]);
+      if(kode) next.posisiKode[v]=kode;
       try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
 
     box.querySelectorAll('[data-rmpos]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var parts=el.getAttribute('data-rmpos').split('|'); var pk=parts[0], pi=parseInt(parts[1],10); var poss=(_orgCache.posisi[pk]||[]).slice();
-      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi)};
+      var removedName=poss[pi];
+      busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       poss.splice(pi,1); next.posisi[pk]=poss;
+      if(removedName) delete next.posisiKode[removedName];
       try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
 
