@@ -68,6 +68,9 @@
     #tab{ column-width:380px; column-gap:14px; }
     #tab > .card, #tab > #mdetail{ break-inside:avoid; display:inline-block; width:100%; margin-bottom:14px; }
     #tab table.mt{ break-inside:avoid; }
+    #oList{ column-width:320px; column-gap:16px; }
+    #oList .row{ break-inside:avoid; margin-bottom:6px; }
+    #oList .area-h{ break-after:avoid; break-inside:avoid; }
   }
 </style>
 </head>
@@ -100,7 +103,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=150"></script>
+<script type="module" src="core-omaopa.js?v=152"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -197,6 +200,7 @@
     var mem=await getMembers(), txn=[], vou=[];
     txn=await getTxn();
     try{ vou=await O.listUsedVouchers(''); }catch(e){}
+    var accurateTotal=mem.length; try{ var _sm=await O.memberOutletSummary([]); if(_sm && _sm.ok) accurateTotal=_sm.total; }catch(e){}
     var promoNotif=''; try{ var _pr=await O.getPromo(); if(_pr && _pr.active && _pr.start && _pr.end){ promoNotif='<div class="card" style="background:#EAF7EE;border-color:#BEE6C9"><div style="font-weight:800;color:#1E7A46;font-size:.88rem">🟢 Promo bonus pendaftaran sedang aktif</div><div style="font-size:.82rem;color:#5A3017;margin-top:2px">Daftar '+_pr.start+' s/d '+_pr.end+' → +'+_pr.bonus+' poin. <a href="#" id="homePromoLink" style="color:#1E7A46;font-weight:700">Kelola di Promo →</a></div></div>'; } }catch(e){}
     var now=new Date(), mKey=now.getFullYear()+'-'+(now.getMonth()+1);
     var inMonth=function(ts){ var d=new Date(ts); return (d.getFullYear()+'-'+(d.getMonth()+1))===mKey; };
@@ -205,7 +209,7 @@
     var spendBy={}; txn.forEach(function(t){ if(t.uid) spendBy[t.uid]=(spendBy[t.uid]||0)+(t.nominal||0); });
     var tierCnt={}; mem.forEach(function(m){ var tr=O.tierOf(spendBy[m.uid]||0); tierCnt[tr.name]=(tierCnt[tr.name]||0)+1; });
     var html=promoNotif+'<div class="kpis">'
-      +'<div class="kpi"><div class="v">'+num(mem.length)+'</div><div class="l">Total member</div></div>'
+      +'<div class="kpi"><div class="v">'+num(accurateTotal)+'</div><div class="l">Total member</div></div>'
       +'<div class="kpi"><div class="v">'+num(poin)+'</div><div class="l">Poin beredar</div></div>'
       +'<div class="kpi"><div class="v">'+num(txnM.length)+'</div><div class="l">Transaksi bln ini</div></div>'
       +'<div class="kpi"><div class="v" style="font-size:1.15rem">'+rp(omzetM)+'</div><div class="l">Omzet bln ini</div></div>'

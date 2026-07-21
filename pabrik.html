@@ -59,7 +59,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=150"></script>
+<script type="module" src="core-omaopa.js?v=151"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
@@ -98,6 +98,7 @@
       +'<div id="jdShiftLabel" class="muted" style="margin-top:4px"></div>'
       +'<label>Jam Pulang <span style="font-weight:400">(otomatis +8 jam, bisa diedit)</span></label><input type="time" id="jdJamSelesai">'
       +'<button class="btn" id="jdSaveBulk" style="margin-top:10px">💾 Simpan Jadwal buat yang Dipilih</button>'
+      +'<button class="btn red" id="jdDeleteBulk" style="margin-top:8px">🗑 Hapus Jadwal (Dari Tanggal itu, buat yang Dipilih)</button>'
       +'<div id="jdBulkMsg"></div></div>'
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Shift</div></div>'
       +'<div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm sec" id="ringkasP1" style="flex:1">1 Minggu</button><button class="btn sm sec" id="ringkasP2" style="flex:1">2 Minggu</button><button class="btn sm sec" id="ringkasP3" style="flex:1">1 Bulan</button></div>'
@@ -281,6 +282,7 @@
       if(jmInput.value) jsInput.value = addHoursToTime(jmInput.value, 8);
     };
     document.getElementById('jdSaveBulk').onclick=doBulkSaveJadwal;
+    document.getElementById('jdDeleteBulk').onclick=doBulkDeleteJadwal;
   }
 
   async function doBulkSaveJadwal(){
@@ -323,6 +325,33 @@
     }
     msg.innerHTML='<div class="res ok">✓ '+okCount+' jadwal tersimpan'+(failCount?(' ('+failCount+' gagal)'):'')+'.</div>';
     document.getElementById('jdSaveBulk').disabled=false; document.getElementById('jdSaveBulk').textContent='💾 Simpan Jadwal buat yang Dipilih';
+    busy=false;
+    loadTim(false);
+    loadRingkasan();
+  }
+
+  async function doBulkDeleteJadwal(){
+    if(busy) return;
+    var msg=document.getElementById('jdBulkMsg'); msg.innerHTML='';
+    var uids=Array.prototype.slice.call(document.querySelectorAll('.jdMember:checked')).map(function(c){ return c.value; });
+    var from=document.getElementById('jdFrom').value, to=document.getElementById('jdTo').value;
+    if(!uids.length){ msg.innerHTML='<div class="res bad">Pilih minimal 1 orang dulu.</div>'; return; }
+    if(!from||!to){ msg.innerHTML='<div class="res bad">Isi rentang tanggal dulu.</div>'; return; }
+    var dates = dateRangeList(from, to);
+    if(!dates.length){ msg.innerHTML='<div class="res bad">Rentang tanggal gak valid (sampai harus setelah dari).</div>'; return; }
+    var namaList=uids.map(function(u){ var t=_jdTeamCache.find(function(x){return x.uid===u;}); return t?t.namaLengkap:u; });
+    var ok=confirm('⚠️ Hapus jadwal '+dates.length+' hari ('+from+' s/d '+to+') buat '+uids.length+' orang berikut?\n\n'+namaList.join(', ')+'\n\nJadwal yang gak ada di tanggal itu bakal dilewatin aja. Ini gak bisa dibatalin.');
+    if(!ok) return;
+    busy=true; var btn=document.getElementById('jdDeleteBulk'); btn.disabled=true; btn.textContent='Menghapus…';
+    var okCount=0, failCount=0;
+    for(var u=0;u<uids.length;u++){
+      for(var d=0;d<dates.length;d++){
+        try{ await window.OmaOpa.deleteJadwal(uids[u], dates[d]); okCount++; }
+        catch(e){ failCount++; }
+      }
+    }
+    msg.innerHTML='<div class="res ok">✓ '+okCount+' jadwal berhasil diproses hapus'+(failCount?(' ('+failCount+' gagal)'):'')+'.</div>';
+    btn.disabled=false; btn.textContent='🗑 Hapus Jadwal (Dari Tanggal itu, buat yang Dipilih)';
     busy=false;
     loadTim(false);
     loadRingkasan();

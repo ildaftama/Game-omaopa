@@ -57,7 +57,7 @@
   <div style="text-align:center"><a class="link" href="absensi.html">‹ Ke halaman Absensi</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=136"></script>
+<script type="module" src="core-omaopa.js?v=152"></script>
 <script>
 (function(){
   var panel = document.getElementById('panel');
@@ -237,47 +237,28 @@
     toggleTimLink();
   }
 
-  function loadXLSXLib(){
-    if(window.XLSX) return Promise.resolve(window.XLSX);
-    return new Promise(function(resolve, reject){
-      var s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload=function(){ resolve(window.XLSX); };
-      s.onerror=reject;
-      document.head.appendChild(s);
-    });
-  }
-  async function downloadWfaTemplate(fields){
-    try{
-      var XLSX = await loadXLSXLib();
-      var headers = fields && fields.length ? fields : ['Uraian Pekerjaan','Progress','Kendala'];
-      var ws = XLSX.utils.aoa_to_sheet([headers, []]);
-      var wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Laporan WFA');
-      XLSX.writeFile(wb, 'template-laporan-wfa.xlsx');
-    }catch(e){ alert('Gagal bikin file template. Cek koneksi internet.'); }
-  }
   async function loadWfaList(){
     var card=document.getElementById('wfaCard'), box=document.getElementById('wfaList');
     if(!card || !box) return;
     var list=[]; try{ list=await window.OmaOpa.listMyWfaLaporan(); }catch(e){}
     if(!list.length){ card.style.display='none'; return; }
     card.style.display='';
-    var fields=[]; try{ fields=await window.OmaOpa.listWfaReportFormat(); }catch(e){}
+    var templateUrl=''; try{ templateUrl=await window.OmaOpa.getWfaTemplateUrl(); }catch(e){}
     box.innerHTML = list.map(function(r){
       if(r.status==='submitted'){
         return '<div class="info-row" style="display:block;padding:8px 0"><div><b>'+esc(r.tanggalWfa)+'</b> · <span style="color:#2E7D32;font-weight:800">✓ Sudah disubmit</span></div></div>';
       }
       return '<div style="border-top:1px dashed #E7D8BE;padding-top:10px;margin-top:10px" data-wfarow="'+esc(r.id)+'">'
         + '<div><b>'+esc(r.tanggalWfa)+'</b> · <span style="color:#a9861c;font-weight:800">⏳ Perlu lapor</span></div>'
-        + '<button class="btn sec" data-wfatemplate="'+esc(r.id)+'" style="margin-top:8px">⬇ Download Template</button>'
+        + (templateUrl
+            ? ('<a class="btn sec" href="'+esc(templateUrl)+'" target="_blank" style="margin-top:8px;text-align:center;text-decoration:none;box-sizing:border-box;display:block">⬇ Download Template</a>')
+            : '<div class="res warn" style="margin-top:8px">Template belum diupload HRD, hubungi HRD dulu ya.</div>')
         + '<label>Upload Laporan (.xlsx yang udah diisi)</label><input type="file" accept=".xlsx" data-wfafile="'+esc(r.id)+'">'
         + '<label>Email Manajer/Atasan</label><input type="email" placeholder="manajer@email.com" data-wfaemail="'+esc(r.id)+'">'
         + '<button class="btn" data-wfasubmit="'+esc(r.id)+'" style="margin-top:8px">📤 Submit Laporan</button>'
         + '<div data-wfamsg="'+esc(r.id)+'"></div>'
         + '</div>';
     }).join('');
-    box.querySelectorAll('[data-wfatemplate]').forEach(function(b){ b.onclick=function(){ downloadWfaTemplate(fields); }; });
     box.querySelectorAll('[data-wfasubmit]').forEach(function(b){ b.onclick=async function(){
       if(busy) return; var id=b.getAttribute('data-wfasubmit');
       var fileInp=box.querySelector('[data-wfafile="'+id+'"]'); var emailInp=box.querySelector('[data-wfaemail="'+id+'"]'); var msgEl=box.querySelector('[data-wfamsg="'+id+'"]');

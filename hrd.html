@@ -53,7 +53,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=150"></script>
+<script type="module" src="core-omaopa.js?v=152"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -111,9 +111,10 @@
       +'<div id="cutiList" class="muted">Memuat…</div><button class="btn sec" id="cutiMore" style="display:none">Muat 10 lagi</button></div>'
       +'<div class="card"><div class="nm">🧪 Data Dummy (Testing)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat 33 karyawan contoh di divisi Pabrik: 19 Baker(BR) + 9 Packing(PK) di Produksi, 1 SPV Produksi, Driver(DR) + Warehouse(WH) + 1 SPV di Logistik, 1 Manajer. Kode posisi otomatis kedaftar juga. Hapus lagi kalau udah kelar testing.</div>'
       +'<div style="display:flex;gap:8px"><button class="btn sec" id="dummyGen" style="flex:1">＋ Generate Dummy</button><button class="btn red" id="dummyDel" style="flex:1">🗑 Hapus Semua Dummy</button></div><div id="dummyMsg"></div></div>'
-      +'<div class="card"><div class="nm">📝 Format Laporan WFA</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Kolom yang wajib diisi karyawan di file laporan (jadi header kolom XLS). Tambah/hapus sesuka hati.</div>'
-      +'<div id="wfaFmtList" class="muted">Memuat…</div>'
-      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="wfaFmtNew" placeholder="Nama kolom baru" style="flex:1"><button class="btn sm" id="wfaFmtAdd">＋ Tambah</button></div><div id="wfaFmtMsg"></div></div>'
+      +'<div class="card"><div class="nm">📝 Template Laporan WFA</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Upload file .xlsx yang udah diformat rapi (header, styling, dsb) — ini yang bakal didownload karyawan buat diisi. Upload ulang buat ganti template-nya.</div>'
+      +'<div id="wfaTemplateStatus" class="muted">Memuat…</div>'
+      +'<input type="file" id="wfaTemplateFile" accept=".xlsx" style="margin-top:8px">'
+      +'<button class="btn sm" id="wfaTemplateUpload" style="margin-top:8px">⬆ Upload Template</button><div id="wfaTemplateMsg"></div></div>'
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📝 Laporan WFA Masuk</div><button class="btn sm sec" id="wfaLapReload">↻</button></div>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="wfaFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="wfaTo" style="flex:1;min-width:0"></div>'
       +'<div id="wfaLapList" class="muted">Memuat…</div><button class="btn sec" id="wfaMore" style="display:none">Muat 10 lagi</button></div>'
@@ -367,19 +368,18 @@
   }
 
   async function loadWfaFormat(){
-    var box=document.getElementById('wfaFmtList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var list=[]; try{ list=await O.listWfaReportFormat(); }catch(e){}
-    if(!list.length){ box.innerHTML='<div class="muted">Belum ada kolom. Tambah dulu di bawah.</div>'; }
-    else { box.innerHTML=list.map(function(f,i){ return '<span class="tag on" style="display:inline-flex;align-items:center;gap:5px;margin:2px 4px 2px 0">'+esc(f)+' <b data-rmwf="'+i+'" style="cursor:pointer">✕</b></span>'; }).join(''); }
-    box.querySelectorAll('[data-rmwf]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var idx=parseInt(b.getAttribute('data-rmwf'),10); var cur=list.slice(); cur.splice(idx,1); busy=true; try{ await O.saveWfaReportFormat(cur); loadWfaFormat(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    var addBtn=document.getElementById('wfaFmtAdd'); if(addBtn) addBtn.onclick=async function(){
-      if(busy) return; var inp=document.getElementById('wfaFmtNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('wfaFmtMsg');
-      if(!v){ msg.innerHTML='<div class="res bad">Isi nama kolom dulu.</div>'; return; }
-      if(list.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Kolom itu udah ada.</div>'; return; }
-      busy=true; this.disabled=true;
-      try{ await O.saveWfaReportFormat(list.concat([v])); inp.value=''; msg.innerHTML=''; loadWfaFormat(); }
+    var box=document.getElementById('wfaTemplateStatus'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var url=''; try{ url=await O.getWfaTemplateUrl(); }catch(e){}
+    box.innerHTML = url
+      ? '<div class="res ok">✓ Template udah ada. <a href="'+esc(url)+'" target="_blank" style="font-weight:800">Lihat file saat ini →</a></div>'
+      : '<div class="res warn">⚠️ Belum ada template diupload. Karyawan belum bisa download template WFA.</div>';
+    var upBtn=document.getElementById('wfaTemplateUpload'); if(upBtn) upBtn.onclick=async function(){
+      if(busy) return; var inp=document.getElementById('wfaTemplateFile'); var file=inp.files && inp.files[0]; var msg=document.getElementById('wfaTemplateMsg');
+      if(!file){ msg.innerHTML='<div class="res bad">Pilih file .xlsx dulu.</div>'; return; }
+      busy=true; this.disabled=true; this.textContent='Mengupload…';
+      try{ await O.uploadWfaTemplate(file); inp.value=''; msg.innerHTML='<div class="res ok">✓ Template berhasil diupload.</div>'; loadWfaFormat(); }
       catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-      this.disabled=false; busy=false;
+      this.disabled=false; this.textContent='⬆ Upload Template'; busy=false;
     };
   }
 

@@ -1991,13 +1991,18 @@ async function listAttendance(){
 }
 
 // ---- laporan kerja WFA ----
-async function listWfaReportFormat(){
-  try{ const snap=await getDoc(doc(db,'settings','wfaReportFormat')); return snap.exists() ? (snap.data().fields||[]) : []; }catch(e){ return []; }
-}
-async function saveWfaReportFormat(fields){
+async function uploadWfaTemplate(blob){
   if(!(await isHRD())) throw {message:'Khusus HRD/Master.'};
-  const clean=(fields||[]).filter(Boolean).map(f=>String(f));
-  await setDoc(doc(db,'settings','wfaReportFormat'), { fields: clean, updatedAt:serverTimestamp() }, {merge:true});
+  if(!blob) throw {message:'File kosong.'};
+  const path = 'wfa-template/template.xlsx';
+  const sref = storageRef(storage, path);
+  await uploadBytes(sref, blob, {contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url = await getDownloadURL(sref);
+  await setDoc(doc(db,'settings','wfaReportFormat'), { templateUrl:url, updatedAt:serverTimestamp() }, {merge:true});
+  return url;
+}
+async function getWfaTemplateUrl(){
+  try{ const snap=await getDoc(doc(db,'settings','wfaReportFormat')); return snap.exists() ? (snap.data().templateUrl||'') : ''; }catch(e){ return ''; }
 }
 async function listMyWfaLaporan(){
   if(!auth.currentUser) return [];
@@ -2516,7 +2521,7 @@ window.OmaOpa = {
   sendKaryawanNotif, listMyKaryawanNotif, markKaryawanNotifRead,
   getEmailTemplates, saveEmailTemplates, sendEventEmail, sendEmailNotif,
   recordAttendance, getLastAttendance, uploadAttendancePhoto, uploadKaryawanProfilePhoto, getKaryawanProfilePhotoUrl, listAttendance,
-  listWfaReportFormat, saveWfaReportFormat, listMyWfaLaporan, uploadWfaLaporanFile, submitWfaLaporan, listWfaLaporanHRD,
+  uploadWfaTemplate, getWfaTemplateUrl, listMyWfaLaporan, uploadWfaLaporanFile, submitWfaLaporan, listWfaLaporanHRD,
   getMyOrgScope, listTeamKaryawan, listTeamKaryawanPaged, generateDummyKaryawan, deleteAllDummyKaryawan, saveJadwal, deleteJadwal, getPriorDayJadwal, listJadwalSummary, listJadwalForKaryawan, listMyJadwal,
   listLemburToApprove, approveLembur, rejectLembur, listMyLembur, listLemburHRD, validateLemburHRD,
   outletGroup, matchOutletKey,
