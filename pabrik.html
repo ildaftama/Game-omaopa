@@ -54,8 +54,8 @@
     .wrap{ max-width:1240px; }
     #panel{ column-width:380px; column-gap:14px; }
     #panel > .card{ break-inside:avoid; display:inline-block; width:100%; margin-bottom:14px; }
-    #panel > .card.full{ column-span:all; width:100%; }
-    #panel > .pair-layout{ column-span:all; width:100%; break-inside:avoid; }
+    #panel > .card.full{ column-span:all; width:100%; display:block; }
+    #panel > .pair-layout{ column-span:all; width:100%; display:block; break-inside:avoid; }
     .pair-layout{ flex-direction:row; align-items:flex-start; }
     .ringkas-layout{ flex-direction:row; align-items:flex-start; }
     .ringkas-cal-col{ max-width:760px; }
@@ -69,7 +69,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=156"></script>
+<script type="module" src="core-omaopa.js?v=157"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
