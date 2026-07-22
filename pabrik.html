@@ -45,16 +45,20 @@
   .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; }
   a.link{ color:#2E4A7A; font-weight:800; text-decoration:none; }
   .ringkas-layout{ display:flex; flex-direction:column; gap:16px; }
-  .ringkas-cal-col{ flex:1.3; min-width:0; }
+  .ringkas-cal-col{ flex:1.6; min-width:0; }
   .ringkas-detail-col{ flex:1; min-width:0; }
+  .pair-layout{ display:flex; flex-direction:column; gap:14px; margin-bottom:14px; }
+  .pair-col{ flex:1; min-width:0; margin-bottom:0 !important; }
 
   @media (min-width:900px){
     .wrap{ max-width:1240px; }
     #panel{ column-width:380px; column-gap:14px; }
     #panel > .card{ break-inside:avoid; display:inline-block; width:100%; margin-bottom:14px; }
     #panel > .card.full{ column-span:all; width:100%; }
+    #panel > .pair-layout{ column-span:all; width:100%; break-inside:avoid; }
+    .pair-layout{ flex-direction:row; align-items:flex-start; }
     .ringkas-layout{ flex-direction:row; align-items:flex-start; }
-    .ringkas-cal-col{ max-width:600px; }
+    .ringkas-cal-col{ max-width:760px; }
   }
 </style>
 </head>
@@ -65,7 +69,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=155"></script>
+<script type="module" src="core-omaopa.js?v=156"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
@@ -96,26 +100,31 @@
 
   async function renderApp(scope){
     panel.innerHTML =
-      '<div class="card"><div class="nm">🗓️ Buat Jadwal</div><div class="muted" style="font-size:.78rem;margin-bottom:8px">Pilih siapa aja, rentang tanggal, isi jam masuk sekali — langsung ke-apply ke semua yang dipilih.</div>'
-      +'<div id="jdTeamBox" class="muted">Memuat tim…</div>'
-      +'<label>Dari Tanggal</label><input type="date" id="jdFrom">'
-      +'<label>Sampai Tanggal</label><input type="date" id="jdTo">'
-      +'<label>Jam Masuk</label><input type="time" id="jdJamMulai">'
-      +'<div id="jdShiftLabel" class="muted" style="margin-top:4px"></div>'
-      +'<label>Jam Pulang <span style="font-weight:400">(otomatis +8 jam, bisa diedit)</span></label><input type="time" id="jdJamSelesai">'
-      +'<button class="btn" id="jdSaveBulk" style="margin-top:10px">💾 Simpan Jadwal buat yang Dipilih</button>'
-      +'<button class="btn red" id="jdDeleteBulk" style="margin-top:8px">🗑 Hapus Jadwal (Dari Tanggal itu, buat yang Dipilih)</button>'
-      +'<div id="jdBulkMsg"></div></div>'
-      +'<div class="card full" id="ringkasCard"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Shift</div></div>'
-      +'<div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm sec" id="ringkasP1" style="flex:1">1 Minggu</button><button class="btn sm sec" id="ringkasP2" style="flex:1">2 Minggu</button><button class="btn sm sec" id="ringkasP3" style="flex:1">1 Bulan</button></div>'
-      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px"><button class="btn sm sec" id="ringkasPrev" style="width:auto">‹</button><div id="ringkasPeriodLabel" class="muted" style="flex:1;text-align:center;font-weight:800"></div><button class="btn sm sec" id="ringkasNext" style="width:auto">›</button></div>'
-      +'<select id="ringkasSubDivFilter" style="margin-bottom:8px"><option value="">— semua sub-divisi —</option></select>'
+      '<div class="card full" id="ringkasCard"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Shift</div></div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:8px;max-width:420px">'
+      +'<button class="btn sm sec" id="ringkasP1" style="flex:1">1 Minggu</button><button class="btn sm sec" id="ringkasP2" style="flex:1">2 Minggu</button><button class="btn sm sec" id="ringkasP3" style="flex:1">1 Bulan</button></div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;max-width:420px"><button class="btn sm sec" id="ringkasPrev" style="width:auto">‹</button><div id="ringkasPeriodLabel" class="muted" style="flex:1;text-align:center;font-weight:800"></div><button class="btn sm sec" id="ringkasNext" style="width:auto">›</button></div>'
+      +'<select id="ringkasSubDivFilter" style="margin-bottom:8px;max-width:420px">'+'<option value="">— semua sub-divisi —</option></select>'
       +'<div class="ringkas-layout"><div class="ringkas-cal-col"><div id="ringkasCalendar"></div></div><div class="ringkas-detail-col"><div id="ringkasTable" class="muted">Memuat…</div></div></div></div>'
-      +'<div class="card"><div class="nm">📋 Daftar Karyawan</div>'
-      +'<select id="timSubDivFilter" style="margin-bottom:8px"><option value="">— semua sub-divisi —</option></select>'
-      +'<div id="timList" class="muted">Memuat…</div><button class="btn sec" id="timMore" style="display:none">Muat 10 lagi</button></div>'
-      +'<div class="card"><div class="nm">⏰ Approval Lembur</div><div id="lemburApprovalList" class="muted">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">🌴 Approval Cuti</div><div id="cutiApprovalList" class="muted">Memuat…</div></div>'
+      +'<div class="pair-layout">'
+        +'<div class="pair-col card"><div class="nm">🗓️ Buat Jadwal</div><div class="muted" style="font-size:.78rem;margin-bottom:8px">Pilih siapa aja, rentang tanggal, isi jam masuk sekali — langsung ke-apply ke semua yang dipilih.</div>'
+        +'<div id="jdTeamBox" class="muted">Memuat tim…</div>'
+        +'<label>Dari Tanggal</label><input type="date" id="jdFrom">'
+        +'<label>Sampai Tanggal</label><input type="date" id="jdTo">'
+        +'<label>Jam Masuk</label><input type="time" id="jdJamMulai">'
+        +'<div id="jdShiftLabel" class="muted" style="margin-top:4px"></div>'
+        +'<label>Jam Pulang <span style="font-weight:400">(otomatis +8 jam, bisa diedit)</span></label><input type="time" id="jdJamSelesai">'
+        +'<button class="btn" id="jdSaveBulk" style="margin-top:10px">💾 Simpan Jadwal buat yang Dipilih</button>'
+        +'<button class="btn red" id="jdDeleteBulk" style="margin-top:8px">🗑 Hapus (Rentang, buat yang Dipilih)</button>'
+        +'<div id="jdBulkMsg"></div></div>'
+        +'<div class="pair-col card"><div class="nm">📋 Daftar Karyawan</div>'
+        +'<select id="timSubDivFilter" style="margin-bottom:8px"><option value="">— semua sub-divisi —</option></select>'
+        +'<div id="timList" class="muted">Memuat…</div><button class="btn sec" id="timMore" style="display:none">Muat 10 lagi</button></div>'
+      +'</div>'
+      +'<div class="pair-layout">'
+        +'<div class="pair-col card"><div class="nm">⏰ Approval Lembur</div><div id="lemburApprovalList" class="muted">Memuat…</div></div>'
+        +'<div class="pair-col card"><div class="nm">🌴 Approval Cuti</div><div id="cutiApprovalList" class="muted">Memuat…</div></div>'
+      +'</div>'
       +'<button class="btn sec" id="outBtn">Keluar</button>';
     document.getElementById('outBtn').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
     await initJadwalForm();
@@ -152,7 +161,7 @@
   }
   var HARI_ID=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
   var BULAN_ID=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  var SHIFT_COLOR = { Pagi:'#4CAF50', Middle:'#FFC21A', Malam:'#2E3A6E', Libur:'#FFFFFF' };
+  var SHIFT_COLOR = { Pagi:'#8B3A3A', Middle:'#B8860B', Malam:'#2E3A6E', Libur:'#FFFFFF' };
 
   var _ringkasPeriod='week', _ringkasOffset=0, _ringkasSelectedDate=null, _ringkasRawCache=[];
   function ringkasRange(){
@@ -227,19 +236,20 @@
       var c=byDate[t]||{Pagi:{},Middle:{},Malam:{}}; var dObj=new Date(t+'T00:00:00');
       var isSel = t===_ringkasSelectedDate;
       var lines=[shiftLine(c.Pagi,SHIFT_COLOR.Pagi), shiftLine(c.Middle,SHIFT_COLOR.Middle), shiftLine(c.Malam,SHIFT_COLOR.Malam)].filter(Boolean);
-      cells.push('<div data-ringkascell="'+t+'" style="cursor:pointer;min-height:82px;border-radius:8px;background:'+(isSel?'var(--kuning)':(t===todayStr?'#E8EDF5':'#EEF1F6'))+';border:1.5px solid '+(isSel?'var(--kuning-d)':'#D5DCE8')+';display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 2px;gap:2px">'
-        + '<div style="font-size:.8rem;font-weight:900;color:'+(isSel?'#fff':'inherit')+'">'+dObj.getDate()+'</div>'
-        + (lines.length ? lines.map(function(l){ return '<div style="font-size:.64rem;font-weight:800;line-height:1.4">'+l+'</div>'; }).join('') : '<div style="font-size:.64rem;color:#9AA8BD">–</div>')
+      cells.push('<div data-ringkascell="'+t+'" style="cursor:pointer;min-height:96px;border-radius:9px;background:'+(isSel?'var(--kuning)':(t===todayStr?'#E8EDF5':'#EEF1F6'))+';border:1.5px solid '+(isSel?'var(--kuning-d)':'#D5DCE8')+';display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 3px;gap:3px">'
+        + '<div style="font-size:.9rem;font-weight:900;color:'+(isSel?'#fff':'inherit')+'">'+dObj.getDate()+'</div>'
+        + (lines.length ? lines.map(function(l){ return '<div style="font-size:.7rem;font-weight:800;line-height:1.4">'+l+'</div>'; }).join('') : '<div style="font-size:.7rem;color:#9AA8BD">–</div>')
         + '</div>');
     });
-    calBox.innerHTML = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px;font-size:.68rem;text-align:center;font-weight:800;color:#5A6B85">'
+    calBox.innerHTML = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-bottom:7px;font-size:.72rem;text-align:center;font-weight:800;color:#5A6B85">'
       + ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(function(h){return '<div>'+h+'</div>';}).join('')
-      + '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">'+cells.join('')+'</div>'
+      + '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">'+cells.join('')+'</div>'
       + '<div class="muted" style="font-size:.68rem;margin-top:8px">Simbol = kode posisi (diatur HRD di Struktur Organisasi), angka = jumlah orang. Warna = shift.</div>';
     calBox.querySelectorAll('[data-ringkascell]').forEach(function(el){ el.onclick=function(){ _ringkasSelectedDate=el.getAttribute('data-ringkascell'); loadRingkasan(); }; });
     if(!_ringkasSelectedDate || _ringkasSelectedDate<r.from || _ringkasSelectedDate>r.to){ _ringkasSelectedDate = (dates.indexOf(todayStr)>=0) ? todayStr : dates[0]; }
     renderBreakdown();
   }
+  var SHIFT_STD_JAM = { Pagi:'06:00', Middle:'13:00', Malam:'19:00' };
   function renderBreakdown(){
     var tblBox=document.getElementById('ringkasTable'); if(!tblBox) return;
     var subFilter=(document.getElementById('ringkasSubDivFilter')||{}).value||'';
@@ -249,6 +259,7 @@
       var t=_jdTeamCache.find(function(x){ return x.uid===j.karyawanUid; });
       return t && t.subDivisi===subFilter;
     });
+    var scheduledUids={}; raw.forEach(function(j){ scheduledUids[j.karyawanUid]=true; });
     var byShift={ Pagi:{}, Middle:{}, Malam:{} };
     raw.forEach(function(j){
       var sh=classifyShift(j.jamMulai); if(!sh) return;
@@ -260,17 +271,48 @@
       + ['Pagi','Middle','Malam'].map(function(sh){
       var posMap=byShift[sh]; var total=Object.keys(posMap).reduce(function(s,k){return s+posMap[k];},0);
       var posRows=Object.keys(posMap).sort().map(function(p){ return '<div class="info-row" style="padding:3px 0 3px 14px"><span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002;flex-shrink:0"></span>'+esc(p)+'</span><b>'+posMap[p]+' orang</b></div>'; }).join('') || '<div class="muted" style="padding:3px 0 3px 14px;font-size:.76rem">Belum ada yang dijadwalkan</div>';
-      return '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px"><div style="width:14px;height:14px;border-radius:4px;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002"></div><b>'+sh+'</b><span class="muted">('+total+' orang)</span>'
-        +(total>0?('<button class="btn sm red" data-delshift="'+sh+'" style="width:auto;margin:0 0 0 auto;padding:4px 9px;font-size:.7rem">🗑 Hapus shift ini</button>'):'')
-        +'</div>'+posRows+'</div>';
+      return '<div style="margin-bottom:10px"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><div style="width:14px;height:14px;border-radius:4px;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002"></div><b>'+sh+'</b><span class="muted">('+total+' orang)</span>'
+        +'<button class="btn sm sec" data-addshift="'+sh+'" style="width:auto;margin:0 0 0 auto;padding:4px 9px;font-size:.7rem">➕ Tambah</button>'
+        +(total>0?('<button class="btn sm red" data-delshift="'+sh+'" style="width:auto;padding:4px 9px;font-size:.7rem">🗑 Hapus shift</button>'):'')
+        +'</div>'+posRows
+        +'<div id="addPanel-'+sh+'" style="display:none;margin-top:8px;padding:8px;background:#F4F6F9;border-radius:8px"></div>'
+        +'</div>';
     }).join('');
     tblBox.querySelectorAll('[data-delshift]').forEach(function(b){ b.onclick=async function(){
       if(busy) return; var sh=b.getAttribute('data-delshift');
       if(!confirm('Hapus SEMUA jadwal shift '+sh+' tanggal '+_ringkasSelectedDate+'? Ini gak bisa dibatalin.')) return;
       busy=true; b.disabled=true; b.textContent='Menghapus…';
       try{ var n=await window.OmaOpa.deleteJadwalByDateShift(_ringkasSelectedDate, sh); loadRingkasan(); loadTim(false); alert(n+' jadwal shift '+sh+' berhasil dihapus.'); }
-      catch(e){ alert((e&&e.message)||'Gagal'); b.disabled=false; b.textContent='🗑 Hapus shift ini'; }
+      catch(e){ alert((e&&e.message)||'Gagal'); b.disabled=false; b.textContent='🗑 Hapus shift'; }
       busy=false;
+    }; });
+    tblBox.querySelectorAll('[data-addshift]').forEach(function(b){ b.onclick=function(){
+      var sh=b.getAttribute('data-addshift');
+      var panel=document.getElementById('addPanel-'+sh);
+      var isOpen = panel.style.display==='block';
+      tblBox.querySelectorAll('[id^="addPanel-"]').forEach(function(p){ p.style.display='none'; });
+      if(isOpen) return;
+      var available=_jdTeamCache.filter(function(t){ return !scheduledUids[t.uid] && (!subFilter || t.subDivisi===subFilter); });
+      if(!available.length){ panel.innerHTML='<div class="muted" style="font-size:.78rem">Semua orang udah dijadwalkan hari ini (atau tim kosong).</div>'; }
+      else{
+        panel.innerHTML = '<div style="max-height:180px;overflow:auto">'+available.map(function(t){
+          return '<label style="display:flex;align-items:center;gap:6px;margin:3px 0;font-size:.78rem;font-weight:700"><input type="checkbox" class="addChk-'+sh+'" value="'+esc(t.uid)+'" style="width:auto">'+esc(t.namaLengkap)+' <span class="muted">('+esc(t.posisi||(t.strukturalLevel==='spv'?'SPV':'-'))+')</span></label>';
+        }).join('')
+        + '<button class="btn sm" data-savesh="'+sh+'" style="margin-top:6px">💾 Simpan ke shift '+sh+'</button><div data-addmsg="'+sh+'"></div>';
+      }
+      panel.style.display='block';
+      var saveBtn=panel.querySelector('[data-savesh]'); if(saveBtn) saveBtn.onclick=async function(){
+        if(busy) return;
+        var uids=Array.prototype.slice.call(panel.querySelectorAll('.addChk-'+sh+':checked')).map(function(c){return c.value;});
+        var msgEl=panel.querySelector('[data-addmsg="'+sh+'"]');
+        if(!uids.length){ msgEl.innerHTML='<div class="res bad">Pilih minimal 1 orang.</div>'; return; }
+        busy=true; this.disabled=true; this.textContent='Menyimpan…';
+        var jm=SHIFT_STD_JAM[sh], js=addHoursToTime(jm,8);
+        var ok=0, fail=0;
+        for(var i=0;i<uids.length;i++){ try{ await window.OmaOpa.saveJadwal(uids[i], _ringkasSelectedDate, jm, js); ok++; }catch(e){ fail++; } }
+        msgEl.innerHTML='<div class="res ok">✓ '+ok+' orang ditambahkan'+(fail?(' ('+fail+' gagal)'):'')+'.</div>';
+        loadRingkasan(); loadTim(false);
+      };
     }; });
   }
 
@@ -392,14 +434,17 @@
     var tgl=new Date().toISOString().slice(0,10); // selalu hari ini, gak ikut tanggal kalender Ringkasan Shift
     var raw=[]; try{ raw=await window.OmaOpa.listJadwalSummary(tgl, tgl); }catch(e){}
     var shiftByUid={}; raw.forEach(function(j){ shiftByUid[j.karyawanUid]=classifyShift(j.jamMulai); });
-    box.innerHTML = _timAccum.map(function(t){
+    var lastSub=null; var rows=[];
+    _timAccum.forEach(function(t){
+      if(t.subDivisi!==lastSub){ rows.push('<div style="font-size:.7rem;font-weight:900;color:#fff;background:var(--kuning);border-radius:8px;padding:5px 10px;margin:'+(lastSub===null?'0':'12px')+' 0 6px;text-transform:uppercase;letter-spacing:.5px">'+esc(t.subDivisi||'(Tanpa Sub-Divisi)')+'</div>'); lastSub=t.subDivisi; }
       var sh=shiftByUid[t.uid] || 'Libur';
       var color=SHIFT_COLOR[sh];
-      return '<div class="row" data-karyawanrow="'+esc(t.uid)+'" style="cursor:pointer">'
+      rows.push('<div class="row" data-karyawanrow="'+esc(t.uid)+'" style="cursor:pointer">'
         + '<div style="width:16px;height:16px;border-radius:50%;background:'+color+';border:1.5px solid #0002;flex-shrink:0"></div>'
-        + '<div class="grow"><div class="nm">'+esc(t.namaLengkap)+'</div><div class="sub">'+esc(t.posisi||(t.strukturalLevel==='spv'?'SPV':'-'))+' · '+esc(t.subDivisi||'-')+' · '+esc(sh)+'</div></div>'
-        + '<span class="muted">›</span></div>';
-    }).join('');
+        + '<div class="grow"><div class="nm">'+esc(t.namaLengkap)+'</div><div class="sub">'+esc(t.posisi||(t.strukturalLevel==='spv'?'SPV':'-'))+' · '+esc(sh)+'</div></div>'
+        + '<span class="muted">›</span></div>');
+    });
+    box.innerHTML = rows.join('');
     box.querySelectorAll('[data-karyawanrow]').forEach(function(el){ el.onclick=function(){ var t=_timAccum.find(function(x){return x.uid===el.getAttribute('data-karyawanrow');}); if(t) openKaryawanJadwalDetail(t); }; });
   }
 
@@ -468,7 +513,7 @@
       for(var d=1; d<=lastDay.getDate(); d++){
         var dateStr=new Date(state.year, state.month, d).toISOString().slice(0,10);
         var jm=_byDateCache[dateStr] ? _byDateCache[dateStr].jamMulai : null; var sh=jm ? classifyShift(jm) : 'Libur';
-        cells.push('<div data-daycell="'+dateStr+'" title="'+dateStr+(jm?(' - '+jm):' - Libur')+'" style="cursor:pointer;aspect-ratio:1;border-radius:6px;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:'+(sh==='Libur'||sh==='Middle'?'#1B2A4A':'#fff')+'">'+d+'</div>');
+        cells.push('<div data-daycell="'+dateStr+'" title="'+dateStr+(jm?(' - '+jm):' - Libur')+'" style="cursor:pointer;aspect-ratio:1;border-radius:6px;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:'+(sh==='Libur'?'#1B2A4A':'#fff')+'">'+d+'</div>');
       }
       bk.querySelector('#dtGrid').innerHTML = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;font-size:.66rem;text-align:center;font-weight:800;color:#5A6B85">'
         + ['Min','Sen','Sel','Rab','Kam','Jum','Sab'].map(function(h){return '<div>'+h+'</div>';}).join('')

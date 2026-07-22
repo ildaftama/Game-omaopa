@@ -2091,7 +2091,7 @@ async function listTeamKaryawanPaged(opts){
   opts=opts||{};
   const myUid = auth.currentUser ? auth.currentUser.uid : null;
   try{
-    let constraints=[orderBy('namaLengkap')];
+    let constraints=[orderBy('subDivisi'), orderBy('namaLengkap')];
     if(scope.strukturalLevel==='manajer') constraints.unshift(where('divisi','==',scope.divisi));
     else if(scope.strukturalLevel==='spv'){ constraints.unshift(where('subDivisi','==',scope.subDivisi)); constraints.unshift(where('divisi','==',scope.divisi)); }
     if(opts.subDivisi) constraints.push(where('subDivisi','==',opts.subDivisi));
