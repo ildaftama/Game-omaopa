@@ -49,6 +49,8 @@
   .ringkas-detail-col{ flex:1; min-width:0; }
   .pair-layout{ display:flex; flex-direction:column; gap:14px; margin-bottom:14px; }
   .pair-col{ flex:1; min-width:0; margin-bottom:0 !important; }
+  .cal-cell{ cursor:pointer; border-radius:9px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px 3px; gap:5px; transition:transform .08s, box-shadow .08s; }
+  .cal-cell:hover{ transform:translateY(-1px); box-shadow:0 3px 8px rgba(27,42,74,.14); }
 
   @media (min-width:900px){
     .wrap{ max-width:1240px; }
@@ -69,7 +71,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="karyawan.html">‹ Profil Saya</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=158"></script>
+<script type="module" src="core-omaopa.js?v=159"></script>
 <script>
 (function(){
   var panel=document.getElementById('panel'), busy=false;
@@ -100,11 +102,15 @@
 
   async function renderApp(scope){
     panel.innerHTML =
-      '<div class="card full" id="ringkasCard"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Shift</div></div>'
-      +'<div style="display:flex;gap:6px;margin-bottom:8px;max-width:420px">'
-      +'<button class="btn sm sec" id="ringkasP1" style="flex:1">1 Minggu</button><button class="btn sm sec" id="ringkasP2" style="flex:1">2 Minggu</button><button class="btn sm sec" id="ringkasP3" style="flex:1">1 Bulan</button></div>'
-      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;max-width:420px"><button class="btn sm sec" id="ringkasPrev" style="width:auto">‹</button><div id="ringkasPeriodLabel" class="muted" style="flex:1;text-align:center;font-weight:800"></div><button class="btn sm sec" id="ringkasNext" style="width:auto">›</button></div>'
-      +'<select id="ringkasSubDivFilter" style="margin-bottom:8px;max-width:420px">'+'<option value="">— semua sub-divisi —</option></select>'
+      '<div class="card full" id="ringkasCard"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📊 Ringkasan Shift</div><button class="btn sm sec" id="outBtn" style="margin:0;width:auto;padding:6px 14px">Keluar</button></div>'
+      +'<div id="todayBar" style="display:none;align-items:center;gap:12px;flex-wrap:wrap;background:#F4F6F9;border:1.5px solid #E2E7EF;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-weight:800;font-size:.85rem"></div>'
+      +'<div class="ringkas-controls" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
+      +'<button class="btn sm sec" id="ringkasP1" style="margin:0">1 Minggu</button><button class="btn sm sec" id="ringkasP2" style="margin:0">2 Minggu</button><button class="btn sm sec" id="ringkasP3" style="margin:0">1 Bulan</button>'
+      +'<span style="width:10px"></span>'
+      +'<button class="btn sm sec" id="ringkasPrev" style="margin:0;width:auto">‹</button><div id="ringkasPeriodLabel" class="muted" style="font-weight:800;min-width:150px;text-align:center"></div><button class="btn sm sec" id="ringkasNext" style="margin:0;width:auto">›</button>'
+      +'<span style="width:10px"></span>'
+      +'<select id="ringkasSubDivFilter" style="width:auto;flex:0 1 220px;padding:9px 12px;font-size:.85rem"><option value="">— semua sub-divisi —</option></select>'
+      +'</div>'
       +'<div class="ringkas-layout"><div class="ringkas-cal-col"><div id="ringkasCalendar"></div></div><div class="ringkas-detail-col"><div id="ringkasTable" class="muted">Memuat…</div></div></div></div>'
       +'<div class="pair-layout">'
         +'<div class="pair-col card"><div class="nm">🗓️ Buat Jadwal</div><div class="muted" style="font-size:.78rem;margin-bottom:8px">Pilih siapa aja, rentang tanggal, isi jam masuk sekali — langsung ke-apply ke semua yang dipilih.</div>'
@@ -124,8 +130,7 @@
       +'<div class="pair-layout">'
         +'<div class="pair-col card"><div class="nm">⏰ Approval Lembur</div><div id="lemburApprovalList" class="muted">Memuat…</div></div>'
         +'<div class="pair-col card"><div class="nm">🌴 Approval Cuti</div><div id="cutiApprovalList" class="muted">Memuat…</div></div>'
-      +'</div>'
-      +'<button class="btn sec" id="outBtn">Keluar</button>';
+      +'</div>';
     document.getElementById('outBtn').onclick=async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} refresh(); };
     await initJadwalForm();
     populateSubDivFilter();
@@ -161,7 +166,7 @@
   }
   var HARI_ID=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
   var BULAN_ID=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  var SHIFT_COLOR = { Pagi:'#2E5339', Middle:'#B8860B', Malam:'#2E3A6E', Libur:'#FFFFFF' };
+  var SHIFT_COLOR = { Pagi:'#E8930C', Middle:'#2E86AB', Malam:'#1B2A4A', Libur:'#FFFFFF' };
 
   var _ringkasPeriod='week', _ringkasOffset=0, _ringkasSelectedDate=null, _ringkasRawCache=[];
   function ringkasRange(){
@@ -201,9 +206,13 @@
   async function loadRingkasan(){
     var calBox=document.getElementById('ringkasCalendar'), tblBox=document.getElementById('ringkasTable'), lblBox=document.getElementById('ringkasPeriodLabel');
     if(!calBox||!tblBox) return;
-    document.getElementById('ringkasP1').style.borderColor = _ringkasPeriod==='week' ? 'var(--kuning)' : '#D5DCE8';
-    document.getElementById('ringkasP2').style.borderColor = _ringkasPeriod==='2week' ? 'var(--kuning)' : '#D5DCE8';
-    document.getElementById('ringkasP3').style.borderColor = _ringkasPeriod==='month' ? 'var(--kuning)' : '#D5DCE8';
+    ['ringkasP1','ringkasP2','ringkasP3'].forEach(function(id, idx){
+      var active = (_ringkasPeriod===['week','2week','month'][idx]);
+      var b=document.getElementById(id);
+      b.style.background = active ? 'var(--kuning)' : '#fff';
+      b.style.color = active ? '#fff' : 'var(--coklat)';
+      b.style.borderColor = active ? 'var(--kuning-d)' : '#D5DCE8';
+    });
     var r=ringkasRange(); lblBox.textContent=r.label;
     calBox.innerHTML='<div class="muted">Memuat…</div>';
     _ringkasRawCache=[]; try{ _ringkasRawCache=await window.OmaOpa.listJadwalSummary(r.from, r.to); }catch(e){}
@@ -228,17 +237,36 @@
     dates.forEach(function(t){
       var c=byDate[t]||{Pagi:0,Middle:0,Malam:0}; var dObj=new Date(t+'T00:00:00');
       var isSel = t===_ringkasSelectedDate;
+      var isToday = t===todayStr;
       var badges=[miniBadge(c.Pagi,SHIFT_COLOR.Pagi), miniBadge(c.Middle,SHIFT_COLOR.Middle), miniBadge(c.Malam,SHIFT_COLOR.Malam)].filter(Boolean).join(' ');
-      cells.push('<div data-ringkascell="'+t+'" style="cursor:pointer;min-height:76px;border-radius:9px;background:'+(isSel?'var(--kuning)':(t===todayStr?'#E8EDF5':'#EEF1F6'))+';border:1.5px solid '+(isSel?'var(--kuning-d)':'#D5DCE8')+';display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 3px;gap:5px">'
-        + '<div style="font-size:.9rem;font-weight:900;color:'+(isSel?'#fff':'inherit')+'">'+dObj.getDate()+'</div>'
+      cells.push('<div data-ringkascell="'+t+'" class="cal-cell'+(isSel?' cal-sel':'')+'" style="min-height:76px;background:'+(isSel?'var(--kuning)':'#FBFCFE')+';border:1.5px solid '+(isSel?'var(--kuning-d)':(isToday?'var(--kuning)':'#D5DCE8'))+';'+(isToday&&!isSel?'border-width:2.5px;':'')+'">'
+        + '<div style="font-size:.9rem;font-weight:900;color:'+(isSel?'#fff':'inherit')+'">'+dObj.getDate()+(isToday?'<span style="font-size:.56rem;font-weight:800;display:block;color:'+(isSel?'#fff':'#5A6B85')+'">hari ini</span>':'')+'</div>'
         + (badges ? '<div style="font-size:.72rem;font-weight:900">'+badges+'</div>' : '<div style="font-size:.7rem;color:#9AA8BD">–</div>')
         + '</div>');
     });
+    var legend='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-size:.72rem;font-weight:800;color:#3D4F6B">'
+      +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+SHIFT_COLOR.Pagi+'"></span> Pagi</span>'
+      +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+SHIFT_COLOR.Middle+'"></span> Middle</span>'
+      +'<span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+SHIFT_COLOR.Malam+'"></span> Malam</span>'
+      +'<span class="muted" style="font-weight:700">· klik tanggal buat rincian & atur jadwal</span></div>';
     calBox.innerHTML = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-bottom:7px;font-size:.72rem;text-align:center;font-weight:800;color:#5A6B85">'
       + ['Sen','Sel','Rab','Kam','Jum','Sab','Min'].map(function(h){return '<div>'+h+'</div>';}).join('')
       + '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">'+cells.join('')+'</div>'
-      + '<div class="muted" style="font-size:.68rem;margin-top:8px">Titik warna = jumlah orang per shift. Klik tanggal buat lihat rincian per posisi.</div>';
+      + legend;
     calBox.querySelectorAll('[data-ringkascell]').forEach(function(el){ el.onclick=function(){ _ringkasSelectedDate=el.getAttribute('data-ringkascell'); loadRingkasan(); }; });
+    // bar Hari Ini — dari data yang udah ke-load, gak nambah baca Firestore
+    var tb=document.getElementById('todayBar');
+    if(tb){
+      var tc=byDate[todayStr]||{Pagi:0,Middle:0,Malam:0};
+      var totalTeam=_jdTeamCache.filter(function(t){ return !subFilter || t.subDivisi===subFilter; }).length;
+      var kerja=tc.Pagi+tc.Middle+tc.Malam; var libur=Math.max(0, totalTeam-kerja);
+      tb.innerHTML='<span style="color:#3D4F6B">📍 Hari ini:</span>'
+        +'<span style="color:'+SHIFT_COLOR.Pagi+'">● Pagi '+tc.Pagi+'</span>'
+        +'<span style="color:'+SHIFT_COLOR.Middle+'">● Middle '+tc.Middle+'</span>'
+        +'<span style="color:'+SHIFT_COLOR.Malam+'">● Malam '+tc.Malam+'</span>'
+        +'<span style="color:#5A6B85">○ Libur '+libur+'</span>';
+      tb.style.display='flex';
+    }
     if(!_ringkasSelectedDate || _ringkasSelectedDate<r.from || _ringkasSelectedDate>r.to){ _ringkasSelectedDate = (dates.indexOf(todayStr)>=0) ? todayStr : dates[0]; }
     renderBreakdown();
   }
@@ -260,7 +288,9 @@
       var pos=(t && t.posisi) ? t.posisi : (t && t.strukturalLevel==='spv' ? 'SPV' : 'Lainnya');
       byShift[sh][pos]=(byShift[sh][pos]||0)+1;
     });
-    tblBox.innerHTML = '<div style="font-weight:800;margin-bottom:8px">📅 '+_ringkasSelectedDate+'</div>'
+    var selD=new Date(_ringkasSelectedDate+'T00:00:00');
+    var selLabel=HARI_ID[selD.getDay()]+', '+selD.getDate()+' '+BULAN_ID[selD.getMonth()];
+    tblBox.innerHTML = '<div style="font-weight:900;font-size:1rem;margin-bottom:10px">📅 '+selLabel+'</div>'
       + ['Pagi','Middle','Malam'].map(function(sh){
       var posMap=byShift[sh]; var total=Object.keys(posMap).reduce(function(s,k){return s+posMap[k];},0);
       var posRows=Object.keys(posMap).sort().map(function(p){ return '<div class="info-row" style="padding:3px 0 3px 14px"><span style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:'+SHIFT_COLOR[sh]+';border:1px solid #0002;flex-shrink:0"></span>'+esc(p)+'</span><b>'+posMap[p]+' orang</b></div>'; }).join('') || '<div class="muted" style="padding:3px 0 3px 14px;font-size:.76rem">Belum ada yang dijadwalkan</div>';
