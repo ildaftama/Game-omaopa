@@ -53,7 +53,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=157"></script>
+<script type="module" src="core-omaopa.js?v=158"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -94,48 +94,86 @@
   function render(){
     app.innerHTML='<div class="card"><div class="nm">⚠️ Kontrak Mau Habis (H-45)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Muncul otomatis tiap halaman ini dibuka.</div>'
       +'<div id="kontrakExpList" class="muted">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">➕ Tambah Divisi Baru</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Isi nama divisi, simpan, terus muncul di daftar di bawah.</div>'
-      +'<label>Nama Divisi</label><input id="divNew" placeholder="misal: Pabrik, Outlet, Kantor">'
-      +'<button class="btn" id="divAdd">＋ Simpan Divisi</button><div id="divMsg"></div></div>'
-      +'<div class="card"><div class="nm">🏢 Daftar Divisi</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Divisi → Sub-Divisi → Posisi. Langsung kepake di form daftar karyawan & edit di sini.</div>'
-      +'<div id="orgTree" class="muted">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">🎓 Daftar Grade</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat karyawan level Staff (misal Training/Junior/Senior). Tambah/hapus sesuka hati.</div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">🏢 Struktur Organisasi</div><button class="btn sm sec" id="toggleNewDiv" style="width:auto;margin:0">➕ Tambah Divisi</button><button class="btn sm sec" id="toggleDivList" style="width:auto;margin:0">👁 Lihat Daftar</button></div>'
+      +'<div id="newDivBody" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #E2E7EF"></div>'
+      +'<div id="divListBody" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #E2E7EF"><div id="orgTree" class="muted">Memuat…</div></div>'
+      +'</div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">🎓 Daftar Grade</div><button class="btn sm sec" id="toggleGrade" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="gradeBody" style="display:none;margin-top:8px"><div class="muted" style="font-size:.76rem;margin-bottom:8px">Buat karyawan level Staff (misal Training/Junior/Senior). Tambah/hapus sesuka hati.</div>'
       +'<div id="gradeList" class="muted">Memuat…</div>'
-      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="gradeNew" placeholder="Nama grade baru" style="flex:1"><button class="btn sm" id="gradeAdd">＋ Tambah</button></div><div id="gradeMsg"></div></div>'
-      +'<div class="card"><div class="nm">🏖️ Jenis Cuti</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Dipilih karyawan pas ngajuin cuti. Tambah/hapus sesuka hati.</div>'
+      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="gradeNew" placeholder="Nama grade baru" style="flex:1"><button class="btn sm" id="gradeAdd">＋ Tambah</button></div><div id="gradeMsg"></div></div></div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">🏖️ Jenis Cuti</div><button class="btn sm sec" id="toggleJC" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="jcBody" style="display:none;margin-top:8px"><div class="muted" style="font-size:.76rem;margin-bottom:8px">Dipilih karyawan pas ngajuin cuti. Tambah/hapus sesuka hati.</div>'
       +'<div id="jcList" class="muted">Memuat…</div>'
-      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="jcNew" placeholder="Nama jenis cuti baru" style="flex:1"><button class="btn sm" id="jcAdd">＋ Tambah</button></div><div id="jcMsg"></div></div>'
-      +'<div class="card"><div class="nm">✉️ Template Email</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Isi {nama}/{jenisCuti}/{tanggalMulai}/{tanggalSelesai}/{catatan}/{grade} otomatis kesubstitusi. Kosongkan subjek buat nonaktifin email jenis itu (tetap ada notif Kotak Pesan).</div>'
-      +'<div id="etList">Memuat…</div></div>'
+      +'<div style="display:flex;gap:6px;margin-top:8px"><input id="jcNew" placeholder="Nama jenis cuti baru" style="flex:1"><button class="btn sm" id="jcAdd">＋ Tambah</button></div><div id="jcMsg"></div></div></div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">✉️ Template Email</div><button class="btn sm sec" id="toggleET" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="etBody" style="display:none;margin-top:8px"><div class="muted" style="font-size:.76rem;margin-bottom:8px">Isi {nama}/{jenisCuti}/{tanggalMulai}/{tanggalSelesai}/{catatan}/{grade} otomatis kesubstitusi. Kosongkan subjek buat nonaktifin email jenis itu (tetap ada notif Kotak Pesan).</div>'
+      +'<div id="etList">Memuat…</div></div></div>'
+
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🏖️ Pengajuan Cuti</div><button class="btn sm sec" id="cutiReload">↻</button></div>'
       +'<select id="cutiFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved">✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua —</option></select>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="cutiFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="cutiTo" style="flex:1;min-width:0"></div>'
       +'<div id="cutiList" class="muted">Memuat…</div><button class="btn sec" id="cutiMore" style="display:none">Muat 10 lagi</button></div>'
-      +'<div class="card"><div class="nm">🧪 Data Dummy (Testing)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat 33 karyawan contoh di divisi Pabrik: 19 Baker● + 9 Packing★ di Produksi, 1 SPV Produksi, Driver▲ + Warehouse■ + 1 SPV di Logistik, 1 Manajer. Kode simbol (warnanya otomatis ngikut shift) otomatis kedaftar juga. Hapus lagi kalau udah kelar testing.</div>'
-      +'<div style="display:flex;gap:8px"><button class="btn sec" id="dummyGen" style="flex:1">＋ Generate Dummy</button><button class="btn red" id="dummyDel" style="flex:1">🗑 Hapus Semua Dummy</button></div><div id="dummyMsg"></div></div>'
-      +'<div class="card"><div class="nm">📝 Template Laporan WFA</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Upload file .xlsx yang udah diformat rapi (header, styling, dsb) — ini yang bakal didownload karyawan buat diisi. Upload ulang buat ganti template-nya.</div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">🧪 Data Dummy (Testing)</div><button class="btn sm sec" id="toggleDummy" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="dummyBody" style="display:none;margin-top:8px"><div class="muted" style="font-size:.76rem;margin-bottom:9px">Buat 33 karyawan contoh di divisi Pabrik: 19 Baker● + 9 Packing★ di Produksi, 1 SPV Produksi, Driver▲ + Warehouse■ + 1 SPV di Logistik, 1 Manajer. Kode simbol (warnanya otomatis ngikut shift) otomatis kedaftar juga. Hapus lagi kalau udah kelar testing.</div>'
+      +'<div style="display:flex;gap:8px"><button class="btn sec" id="dummyGen" style="flex:1">＋ Generate Dummy</button><button class="btn red" id="dummyDel" style="flex:1">🗑 Hapus Semua Dummy</button></div><div id="dummyMsg"></div></div></div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">📝 Template Laporan WFA</div><button class="btn sm sec" id="toggleWfaTpl" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="wfaTplBody" style="display:none;margin-top:8px"><div class="muted" style="font-size:.76rem;margin-bottom:9px">Upload file .xlsx yang udah diformat rapi (header, styling, dsb) — ini yang bakal didownload karyawan buat diisi. Upload ulang buat ganti template-nya.</div>'
       +'<div id="wfaTemplateStatus" class="muted">Memuat…</div>'
       +'<input type="file" id="wfaTemplateFile" accept=".xlsx" style="margin-top:8px">'
-      +'<button class="btn sm" id="wfaTemplateUpload" style="margin-top:8px">⬆ Upload Template</button><div id="wfaTemplateMsg"></div></div>'
-      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">📝 Laporan WFA Masuk</div><button class="btn sm sec" id="wfaLapReload">↻</button></div>'
-      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="wfaFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="wfaTo" style="flex:1;min-width:0"></div>'
-      +'<div id="wfaLapList" class="muted">Memuat…</div><button class="btn sec" id="wfaMore" style="display:none">Muat 10 lagi</button></div>'
-      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">⏰ Data Lembur</div><button class="btn sm sec" id="lemburReload">↻</button></div>'
-      +'<div class="muted" style="font-size:.74rem;margin:0 0 8px">HRD cuma terima data — yang approve/tolak SPV/Manajer/GM terkait lewat halaman Profil Karyawan mereka.</div>'
-      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="lemburFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="lemburTo" style="flex:1;min-width:0"></div>'
-      +'<div id="lemburHRList" class="muted">Memuat…</div><button class="btn sec" id="lemburMore" style="display:none">Muat 10 lagi</button></div>'
+      +'<button class="btn sm" id="wfaTemplateUpload" style="margin-top:8px">⬆ Upload Template</button><div id="wfaTemplateMsg"></div></div></div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">📝 Laporan WFA Masuk</div><button class="btn sm sec" id="toggleWfaLap" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="wfaLapBody" style="display:none;margin-top:8px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><input type="date" id="wfaFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="wfaTo" style="flex:1;min-width:0"><button class="btn sm sec" id="wfaLapReload" style="width:auto;margin:0">↻</button></div>'
+      +'<div id="wfaLapList" class="muted">Memuat…</div><button class="btn sec" id="wfaMore" style="display:none">Muat 10 lagi</button></div></div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">⏰ Data Lembur</div><button class="btn sm sec" id="toggleLembur" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="lemburBody" style="display:none;margin-top:8px"><div class="muted" style="font-size:.74rem;margin:0 0 8px">HRD cuma terima data — yang approve/tolak SPV/Manajer/GM terkait lewat halaman Profil Karyawan mereka.</div>'
+      +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><input type="date" id="lemburFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="lemburTo" style="flex:1;min-width:0"><button class="btn sm sec" id="lemburReload" style="width:auto;margin:0">↻</button></div>'
+      +'<div id="lemburHRList" class="muted">Memuat…</div><button class="btn sec" id="lemburMore" style="display:none">Muat 10 lagi</button></div></div>'
+
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🗂️ Daftar Karyawan (Lengkap)</div><button class="btn sm sec" id="hrExport">⬇ CSV</button><button class="btn sm sec" id="hrReload">↻</button></div>'
       +'<select id="hrStatusFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved" selected>✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua status —</option></select>'
       +'<select id="hrDivFilter" style="margin-bottom:8px"><option value="">— semua divisi —</option></select>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="hrFrom" style="flex:1;min-width:0" title="Tanggal daftar dari"><span>—</span><input type="date" id="hrTo" style="flex:1;min-width:0" title="Tanggal daftar sampai"></div>'
       +'<div id="hrList" class="muted">Memuat…</div>'
       +'<div id="hrPager" style="display:none;align-items:center;gap:8px;margin-top:10px"><button class="btn sm sec" id="hrPrev" style="margin:0;width:auto">‹ Sebelumnya</button><div id="hrPageLabel" class="muted grow" style="text-align:center;font-weight:800"></div><button class="btn sm sec" id="hrNext" style="margin:0;width:auto">Berikutnya ›</button></div></div>'
-      +'<div class="card"><div class="nm">⬇️ Export Riwayat Absensi (CSV)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan kedua tanggal buat export semua riwayat.</div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">⬇️ Export Riwayat Absensi</div><button class="btn sm sec" id="toggleAtExport" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="atExportBody" style="display:none;margin-top:8px"><div class="muted" style="font-size:.76rem;margin:0 0 9px">Kosongkan kedua tanggal buat export semua riwayat.</div>'
       +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="atExFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="atExTo" style="flex:1;min-width:0"></div>'
-      +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div>';
+      +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div></div>';
+
+    function wireToggle(btnId, bodyId, onFirstOpen, openLabel, closeLabel){
+      var btn=document.getElementById(btnId), body=document.getElementById(bodyId); if(!btn||!body) return;
+      var loaded=false;
+      btn.onclick=function(){
+        var opening = body.style.display==='none';
+        body.style.display = opening ? 'block' : 'none';
+        btn.textContent = opening ? (closeLabel||'🔼 Tutup') : (openLabel||'👁 Lihat');
+        if(opening && !loaded && onFirstOpen){ loaded=true; onFirstOpen(); }
+      };
+    }
 
     loadKontrakExpiring();
     loadOrgStructure();
+    wireToggle('toggleNewDiv','newDivBody', renderNewDivForm, '➕ Tambah Divisi', '✕ Tutup Form');
+    wireToggle('toggleDivList','divListBody', null, '👁 Lihat Daftar', '🔼 Tutup Daftar');
+    wireToggle('toggleGrade','gradeBody', loadGradeList);
+    wireToggle('toggleJC','jcBody', loadJenisCutiList);
+    wireToggle('toggleET','etBody', loadEmailTemplates);
+    wireToggle('toggleDummy','dummyBody', function(){});
+    wireToggle('toggleWfaTpl','wfaTplBody', loadWfaFormat);
+    wireToggle('toggleWfaLap','wfaLapBody', function(){ loadWfaLaporanList(false); });
+    wireToggle('toggleLembur','lemburBody', function(){ loadLemburHRList(false); });
+    wireToggle('toggleAtExport','atExportBody', function(){});
+
     document.getElementById('dummyGen').onclick=async function(){
       if(busy) return; busy=true; this.disabled=true; this.textContent='Membuat…';
       var msg=document.getElementById('dummyMsg'); msg.innerHTML='';
@@ -147,32 +185,26 @@
       if(busy) return; if(!confirm('Hapus SEMUA data dummy? Ini gak bisa dibatalin.')) return;
       busy=true; this.disabled=true; this.textContent='Menghapus…';
       var msg=document.getElementById('dummyMsg'); msg.innerHTML='';
-      try{ var n=await O.deleteAllDummyKaryawan(); msg.innerHTML='<div class="res ok">✓ '+n+' data dummy dihapus.</div>'; loadHRList(false); }
+      try{ var n=await O.deleteAllDummyKaryawan(); msg.innerHTML='<div class="res ok">✓ '+n+' data dummy dihapus.</div>'; loadHRList(); }
       catch(e){ msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal')+'</div>'; }
       this.disabled=false; this.textContent='🗑 Hapus Semua Dummy'; busy=false;
     };
-    loadGradeList();
-    loadJenisCutiList();
-    loadEmailTemplates();
-    loadWfaFormat();
     document.getElementById('wfaLapReload').onclick=function(){ loadWfaLaporanList(false); };
     document.getElementById('wfaFrom').onchange=function(){ loadWfaLaporanList(false); };
     document.getElementById('wfaTo').onchange=function(){ loadWfaLaporanList(false); };
     document.getElementById('wfaMore').onclick=function(){ loadWfaLaporanList(true); };
-    loadWfaLaporanList(false);
     document.getElementById('lemburReload').onclick=function(){ loadLemburHRList(false); };
     document.getElementById('lemburFrom').onchange=function(){ loadLemburHRList(false); };
     document.getElementById('lemburTo').onchange=function(){ loadLemburHRList(false); };
     document.getElementById('lemburMore').onclick=function(){ loadLemburHRList(true); };
-    loadLemburHRList(false);
     document.getElementById('cutiReload').onclick=function(){ loadCutiList(false); };
     document.getElementById('cutiFilter').onchange=function(){ loadCutiList(false); };
     document.getElementById('cutiFrom').onchange=function(){ loadCutiList(false); };
     document.getElementById('cutiTo').onchange=function(){ loadCutiList(false); };
     document.getElementById('cutiMore').onclick=function(){ loadCutiList(true); };
     loadCutiList(false);
-    document.getElementById('hrReload').onclick=function(){ loadHRList(false); };
-    document.getElementById('hrStatusFilter').onchange=function(){ loadHRList(false); };
+    document.getElementById('hrReload').onclick=function(){ loadHRList(); };
+    document.getElementById('hrStatusFilter').onchange=function(){ loadHRList(); };
     document.getElementById('hrDivFilter').onchange=function(){ loadHRList(false); };
     document.getElementById('hrFrom').onchange=function(){ loadHRList(false); };
     document.getElementById('hrTo').onchange=function(){ loadHRList(false); };
@@ -236,18 +268,60 @@
     var box=document.getElementById('orgTree'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     try{ _orgCache = await O.getOrgStructure(); }catch(e){ _orgCache={divisi:[],subDivisi:{},posisi:{}}; }
     renderOrgTree();
-    var addBtn=document.getElementById('divAdd'); if(addBtn) addBtn.onclick=async function(){
-      if(busy) return; var inp=document.getElementById('divNew'); var v=(inp.value||'').trim(); var msg=document.getElementById('divMsg');
-      if(!v){ msg.innerHTML='<div class="res bad">Isi nama divisi dulu.</div>'; return; }
-      if(_orgCache.divisi.indexOf(v)>=0){ msg.innerHTML='<div class="res bad">Divisi itu udah ada.</div>'; return; }
-      busy=true; this.disabled=true;
-      var next={divisi:_orgCache.divisi.concat([v]), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
-      try{ await O.saveOrgStructure(next); inp.value=''; msg.innerHTML=''; loadOrgStructure(); }
-      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-      this.disabled=false; busy=false;
-    };
+  }
+
+  var _newDivBlocks=[{nama:'',posisi:''}];
+  function renderNewDivForm(){
+    var body=document.getElementById('newDivBody'); if(!body) return;
+    body.innerHTML = '<label>Nama Divisi</label><input id="ndName" placeholder="misal: Pabrik, Outlet, Kantor">'
+      + '<div id="ndSubBlocks"></div>'
+      + '<button class="btn sm sec" id="ndAddBlock" style="margin-top:8px">＋ Tambah Sub-Divisi Lagi</button>'
+      + '<button class="btn" id="ndSave" style="margin-top:12px">💾 Simpan Divisi Baru</button><div id="ndMsg"></div>';
+    renderNdBlocks();
+    document.getElementById('ndAddBlock').onclick=function(){ _newDivBlocks.push({nama:'',posisi:''}); renderNdBlocks(); };
+    document.getElementById('ndSave').onclick=doSaveNewDiv;
+  }
+  function renderNdBlocks(){
+    var box=document.getElementById('ndSubBlocks'); if(!box) return;
+    box.innerHTML = _newDivBlocks.map(function(blk, i){
+      return '<div style="margin-top:10px;padding:8px;background:#F4F6F9;border-radius:10px">'
+        + '<div style="display:flex;align-items:center;gap:6px"><b class="grow" style="font-size:.8rem">Sub-Divisi #'+(i+1)+'</b>'
+        + (_newDivBlocks.length>1 ? '<span class="muted" style="cursor:pointer;font-size:.72rem" data-ndrm="'+i+'">✕ hapus</span>' : '')
+        + '</div>'
+        + '<label style="margin-top:6px">Nama Sub-Divisi</label><input data-ndname="'+i+'" value="'+esc(blk.nama)+'" placeholder="misal: Produksi">'
+        + '<label>Posisi (pisah pakai koma)</label><input data-ndpos="'+i+'" value="'+esc(blk.posisi)+'" placeholder="misal: Baker, Packing">'
+        + '</div>';
+    }).join('');
+    box.querySelectorAll('[data-ndname]').forEach(function(el){ el.oninput=function(){ _newDivBlocks[parseInt(el.getAttribute('data-ndname'),10)].nama=el.value; }; });
+    box.querySelectorAll('[data-ndpos]').forEach(function(el){ el.oninput=function(){ _newDivBlocks[parseInt(el.getAttribute('data-ndpos'),10)].posisi=el.value; }; });
+    box.querySelectorAll('[data-ndrm]').forEach(function(el){ el.onclick=function(){ _newDivBlocks.splice(parseInt(el.getAttribute('data-ndrm'),10),1); renderNdBlocks(); }; });
+  }
+  async function doSaveNewDiv(){
+    if(busy) return;
+    var msg=document.getElementById('ndMsg'); msg.innerHTML='';
+    var name=(document.getElementById('ndName').value||'').trim();
+    if(!name){ msg.innerHTML='<div class="res bad">Isi nama divisi dulu.</div>'; return; }
+    var validBlocks=_newDivBlocks.map(function(b){ return { nama:(b.nama||'').trim(), posisi:(b.posisi||'').split(',').map(function(p){ return p.trim(); }).filter(Boolean) }; }).filter(function(b){ return b.nama; });
+    if(!validBlocks.length){ msg.innerHTML='<div class="res bad">Isi minimal 1 sub-divisi (dengan nama).</div>'; return; }
+    var noPos=validBlocks.find(function(b){ return !b.posisi.length; });
+    if(noPos){ msg.innerHTML='<div class="res bad">Sub-divisi "'+esc(noPos.nama)+'" harus punya minimal 1 posisi.</div>'; return; }
+    busy=true; var btn=document.getElementById('ndSave'); btn.disabled=true; btn.textContent='Menyimpan…';
+    try{
+      var org=await O.getOrgStructure();
+      if(org.divisi.indexOf(name)>=0){ msg.innerHTML='<div class="res bad">Divisi itu udah ada.</div>'; btn.disabled=false; btn.textContent='💾 Simpan Divisi Baru'; busy=false; return; }
+      var next={ divisi:org.divisi.concat([name]), subDivisi:Object.assign({},org.subDivisi), posisi:Object.assign({},org.posisi), posisiKode:Object.assign({},org.posisiKode) };
+      next.subDivisi[name]=validBlocks.map(function(b){ return b.nama; });
+      validBlocks.forEach(function(b){ next.posisi[name+'::'+b.nama]=b.posisi; });
+      await O.saveOrgStructure(next);
+      _orgCache=next;
+      msg.innerHTML='<div class="res ok">✓ Divisi "'+esc(name)+'" berhasil dibuat.</div>';
+      _newDivBlocks=[{nama:'',posisi:''}];
+      renderOrgTree();
+    }catch(e){ msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal')+'</div>'; }
+    btn.disabled=false; btn.textContent='💾 Simpan Divisi Baru'; busy=false;
   }
   var _orgExpanded={}; // divisi name -> true kalau lagi dibuka
+  var _orgEditMode={}; // divisi name -> true kalau lagi mode edit sub-divisi/posisi
   var _orgKaryawanCount={}; // divisi name -> jumlah karyawan (cache biar gak query ulang tiap render)
   function renderOrgTree(){
     var box=document.getElementById('orgTree'); if(!box) return;
@@ -268,23 +342,38 @@
         var detail='';
         if(isOpen){
           var countLabel = (_orgKaryawanCount[d]!==undefined) ? ('👥 '+_orgKaryawanCount[d]+' karyawan aktif di divisi ini') : 'Menghitung jumlah karyawan…';
-          var subsHtml = subs.map(function(sd, si){
-            var pk=d+'::'+sd;
-            var poss = _orgCache.posisi[pk]||[];
-            var possHtml = poss.map(function(p, pi){
-              return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
-            }).join('') || '<span class="muted" style="font-size:.76rem">(belum ada posisi)</span>';
-            return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #E2E7EF">'
-              + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.85rem">'+esc(sd)+'</b><span class="muted" style="cursor:pointer;font-size:.72rem" data-rmsub="'+esc(d)+'|'+si+'">✕ hapus sub-divisi</span></div>'
-              + '<div style="margin-top:4px">'+possHtml+'</div>'
-              + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
+          var isEdit = !!_orgEditMode[d];
+          if(!isEdit){
+            // MODE LIHAT: read-only, cuma tag nama sub-divisi + posisi di dalamnya
+            var readSubs = subs.length ? subs.map(function(sd){
+              var pk=d+'::'+sd; var poss=_orgCache.posisi[pk]||[];
+              return '<div style="margin:6px 0 0 14px"><b style="font-size:.85rem">'+esc(sd)+'</b><div style="margin-top:3px">'
+                + (poss.length ? poss.map(function(p){ return '<span class="tag on" style="font-size:.74rem;margin:2px 4px 0 0">'+esc(p)+'</span>'; }).join('') : '<span class="muted" style="font-size:.74rem">(belum ada posisi)</span>')
+                + '</div></div>';
+            }).join('') : '<div class="muted" style="font-size:.78rem;margin-left:14px">Belum ada sub-divisi.</div>';
+            detail = '<div style="margin:10px 0 0 24px;padding-top:10px;border-top:1px dashed #E2E7EF">'
+              + '<div style="display:flex;align-items:center;gap:8px"><div class="muted grow" style="font-weight:800;font-size:.8rem">'+countLabel+'</div><button class="btn sm sec" data-editdiv="'+esc(d)+'" style="width:auto;margin:0;padding:5px 11px;font-size:.72rem">✏️ Edit</button></div>'
+              + readSubs
               + '</div>';
-          }).join('');
-          detail = '<div style="margin:10px 0 0 24px;padding-top:10px;border-top:1px dashed #E2E7EF">'
-            + '<div class="muted" style="font-weight:800;font-size:.8rem;margin-bottom:6px">'+countLabel+'</div>'
-            + subsHtml
-            + '<div style="display:flex;gap:5px;margin-top:8px"><input data-subinput="'+esc(d)+'" placeholder="Sub-divisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-subadd="'+esc(d)+'" style="padding:7px 10px">＋</button></div>'
-            + '</div>';
+          } else {
+            var subsHtml = subs.map(function(sd, si){
+              var pk=d+'::'+sd;
+              var poss = _orgCache.posisi[pk]||[];
+              var possHtml = poss.map(function(p, pi){
+                return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
+              }).join('') || '<span class="muted" style="font-size:.76rem">(belum ada posisi)</span>';
+              return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #E2E7EF">'
+                + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.85rem">'+esc(sd)+'</b><span class="muted" style="cursor:pointer;font-size:.72rem" data-rmsub="'+esc(d)+'|'+si+'">✕ hapus sub-divisi</span></div>'
+                + '<div style="margin-top:4px">'+possHtml+'</div>'
+                + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
+                + '</div>';
+            }).join('');
+            detail = '<div style="margin:10px 0 0 24px;padding-top:10px;border-top:1px dashed #E2E7EF">'
+              + '<div style="display:flex;align-items:center;gap:8px"><div class="muted grow" style="font-weight:800;font-size:.8rem">'+countLabel+'</div><button class="btn sm sec" data-editdiv="'+esc(d)+'" style="width:auto;margin:0;padding:5px 11px;font-size:.72rem">✓ Selesai Edit</button></div>'
+              + subsHtml
+              + '<div style="display:flex;gap:5px;margin-top:8px"><input data-subinput="'+esc(d)+'" placeholder="Sub-divisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-subadd="'+esc(d)+'" style="padding:7px 10px">＋</button></div>'
+              + '</div>';
+          }
         }
         return '<div style="margin-top:10px;padding:10px;border:1.5px solid #E2E7EF;border-radius:12px">'+header+detail+'</div>';
       }).join('');
@@ -301,6 +390,7 @@
         if(_orgExpanded[d]) renderOrgTree(); // jaga-jaga kalau udah ke-collapse lagi pas nunggu
       }
     }; });
+    box.querySelectorAll('[data-editdiv]').forEach(function(el){ el.onclick=function(e){ e.stopPropagation(); var d=el.getAttribute('data-editdiv'); _orgEditMode[d]=!_orgEditMode[d]; renderOrgTree(); }; });
     box.querySelectorAll('[data-rmdiv]').forEach(function(el){ el.onclick=async function(e){ e.stopPropagation(); if(busy) return; var di=parseInt(el.getAttribute('data-rmdiv'),10); var d=_orgCache.divisi[di];
       if(!confirm('Hapus divisi "'+d+'"? Sub-divisi & posisi di dalamnya juga ikut hilang dari daftar (data karyawan yang udah kepasang gak berubah).')) return;
       busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
