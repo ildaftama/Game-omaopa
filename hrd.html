@@ -9,34 +9,34 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root{ --kuning:#FFC21A; --kuning-hi:#FFD64A; --kuning-d:#E5A100; --coklat:#5A3017; --cream:#FFF6E6; --cream2:#FFE9C2; --pop:#FF6A3D; --merah:#E2425A; }
+  :root{ --kuning:#1B2A4A; --kuning-hi:#2E4A7A; --kuning-d:#0F1B33; --coklat:#1B2A4A; --cream:#F4F6F9; --cream2:#E8EDF5; --pop:#2E86AB; --merah:#C0392B; }
   *{box-sizing:border-box}
   body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
-    background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream); min-height:100vh; padding:16px 12px 60px; }
-  label{ font-size:.74rem; font-weight:800; color:#8a6a3a; display:block; margin:9px 0 4px; }
-  input,select{ width:100%; border:2px solid #E7D8BE; border-radius:10px; padding:10px; font-size:.92rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
+    background:radial-gradient(circle at 12% 8%, #E8EDF5 0%, transparent 42%), var(--cream); min-height:100vh; padding:16px 12px 60px; }
+  label{ font-size:.74rem; font-weight:800; color:#3D4F6B; display:block; margin:9px 0 4px; }
+  input,select{ width:100%; border:2px solid #D5DCE8; border-radius:10px; padding:10px; font-size:.92rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
   input:focus,select:focus{ outline:none; border-color:var(--kuning); }
   .wrap{ max-width:560px; margin:0 auto; }
   .head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .head h1{ font-family:'Fredoka'; font-size:1.2rem; margin:0; }
   .badge{ font-size:.66rem; font-weight:900; background:var(--coklat); color:#fff; padding:2px 9px; border-radius:999px; }
-  .card{ background:#fff; border:2px solid #EFE2C4; border-radius:16px; padding:14px; margin-bottom:12px; }
-  .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
-  .btn{ width:100%; border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:.95rem; border-radius:11px; padding:11px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; margin-top:9px; }
+  .card{ background:#fff; border:2px solid #E2E7EF; border-radius:16px; padding:14px; margin-bottom:12px; }
+  .muted{ color:#5A6B85; font-weight:700; font-size:.85rem; }
+  .btn{ width:100%; border:none; background:var(--kuning); color:#fff; font-weight:900; font-size:.95rem; border-radius:11px; padding:11px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; margin-top:9px; }
   .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--kuning-d); }
   .btn[disabled]{ opacity:.55; }
-  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #E7D8BE; box-shadow:none; }
+  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #D5DCE8; box-shadow:none; }
   .btn.red{ background:#C0392B; color:#fff; box-shadow:0 3px 0 #922B21; }
   .btn.sm{ width:auto; padding:6px 11px; font-size:.78rem; margin:0; }
   .res{ border-radius:12px; padding:12px; margin-top:11px; }
   .ok{ background:#E7F6E7; border:2px solid #B7E0B7; } .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; } .warn{ background:#FFF3D6; border:2px solid #F2D98A; }
-  .row{ display:flex; align-items:center; gap:9px; padding:9px 0; border-top:1px solid #F2E8D5; }
+  .row{ display:flex; align-items:center; gap:9px; padding:9px 0; border-top:1px solid #E8ECF2; }
   .row:first-child{ border-top:none; }
   .grow{ flex:1; min-width:0; }
-  .nm{ font-weight:900; } .sub{ font-size:.74rem; color:#9a7a5e; font-weight:700; }
+  .nm{ font-weight:900; } .sub{ font-size:.74rem; color:#5A6B85; font-weight:700; }
   .tag{ font-size:.64rem; font-weight:900; border-radius:999px; padding:2px 8px; }
-  .tag.on{ background:#2E7D32; color:#fff; } .tag.off{ background:#bdae98; color:#fff; } .tag.adm{ background:var(--kuning); color:#5A3A05; }
-  a.link{ color:#C98A1B; font-weight:800; text-decoration:none; }
+  .tag.on{ background:#2E7D32; color:#fff; } .tag.off{ background:#8A9AB0; color:#fff; } .tag.adm{ background:var(--kuning); color:#fff; }
+  a.link{ color:#2E4A7A; font-weight:800; text-decoration:none; }
 
   @media (min-width:900px){
     .wrap{ max-width:1240px; }
@@ -53,7 +53,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=155"></script>
+<script type="module" src="core-omaopa.js?v=156"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -94,9 +94,11 @@
   function render(){
     app.innerHTML='<div class="card"><div class="nm">⚠️ Kontrak Mau Habis (H-45)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Muncul otomatis tiap halaman ini dibuka.</div>'
       +'<div id="kontrakExpList" class="muted">Memuat…</div></div>'
-      +'<div class="card"><div class="nm">🏢 Struktur Organisasi</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Divisi → Sub-Divisi → Posisi. Tambah/hapus sesuka hati, langsung kepake di form daftar karyawan & edit di sini.</div>'
-      +'<div id="orgTree" class="muted">Memuat…</div>'
-      +'<div style="display:flex;gap:6px;margin-top:10px"><input id="divNew" placeholder="Nama divisi baru" style="flex:1"><button class="btn sm" id="divAdd">＋ Tambah Divisi</button></div><div id="divMsg"></div></div>'
+      +'<div class="card"><div class="nm">➕ Tambah Divisi Baru</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Isi nama divisi, simpan, terus muncul di daftar di bawah.</div>'
+      +'<label>Nama Divisi</label><input id="divNew" placeholder="misal: Pabrik, Outlet, Kantor">'
+      +'<button class="btn" id="divAdd">＋ Simpan Divisi</button><div id="divMsg"></div></div>'
+      +'<div class="card"><div class="nm">🏢 Daftar Divisi</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Divisi → Sub-Divisi → Posisi. Langsung kepake di form daftar karyawan & edit di sini.</div>'
+      +'<div id="orgTree" class="muted">Memuat…</div></div>'
       +'<div class="card"><div class="nm">🎓 Daftar Grade</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Buat karyawan level Staff (misal Training/Junior/Senior). Tambah/hapus sesuka hati.</div>'
       +'<div id="gradeList" class="muted">Memuat…</div>'
       +'<div style="display:flex;gap:6px;margin-top:8px"><input id="gradeNew" placeholder="Nama grade baru" style="flex:1"><button class="btn sm" id="gradeAdd">＋ Tambah</button></div><div id="gradeMsg"></div></div>'
@@ -245,7 +247,7 @@
   }
   function renderOrgTree(){
     var box=document.getElementById('orgTree'); if(!box) return;
-    if(!_orgCache.divisi.length){ box.innerHTML='<div class="muted">Belum ada divisi. Tambah dulu di bawah.</div>'; }
+    if(!_orgCache.divisi.length){ box.innerHTML='<div class="muted">Belum ada divisi. Tambah dulu di card "Tambah Divisi Baru" di atas.</div>'; }
     else {
       box.innerHTML = _orgCache.divisi.map(function(d, di){
         var subs = _orgCache.subDivisi[d]||[];
@@ -253,19 +255,16 @@
           var pk=d+'::'+sd;
           var poss = _orgCache.posisi[pk]||[];
           var possHtml = poss.map(function(p, pi){
-            var kode=(_orgCache.posisiKode||{})[p]||'';
-            return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+(kode?(kode+' '):'')+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
+            return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
           }).join('') || '<span class="muted" style="font-size:.76rem">(belum ada posisi)</span>';
-          var emojiPicks=['●','■','▲','★','◆','▼','✚','♦','✦','▶'];
-          return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #EFE2C4">'
+          return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #E2E7EF">'
             + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.85rem">'+esc(sd)+'</b><span class="muted" style="cursor:pointer;font-size:.72rem" data-rmsub="'+esc(d)+'|'+si+'">✕ hapus sub-divisi</span></div>'
             + '<div style="margin-top:4px">'+possHtml+'</div>'
-            + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:2;padding:7px;font-size:.82rem"><input data-posinputkode="'+esc(pk)+'" placeholder="●" maxlength="4" style="flex:0 0 60px;padding:7px;font-size:1rem;text-align:center"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
-            + '<div class="muted" style="font-size:.68rem;margin-top:4px">Kode buat simbol di kalender (warnanya otomatis ngikut shift, jangan pakai emoji biar warnanya kepakai). Pilih cepat: '+emojiPicks.map(function(e){ return '<span data-emojipick="'+pk+'" data-emoji="'+e+'" style="cursor:pointer;font-size:1.1rem;margin-right:6px;font-weight:900">'+e+'</span>'; }).join('')+'</div>'
+            + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
             + '</div>';
         }).join('');
-        return '<div style="margin-top:10px;padding:10px;border:1.5px solid #EFE2C4;border-radius:12px">'
-          + '<div style="display:flex;align-items:center;gap:6px"><b>'+esc(d)+'</b><span class="muted" style="cursor:pointer;font-size:.78rem" data-rmdiv="'+di+'">✕ hapus divisi</span></div>'
+        return '<div style="margin-top:10px;padding:10px;border:1.5px solid #E2E7EF;border-radius:12px">'
+          + '<div style="display:flex;align-items:center;gap:8px"><b class="grow" style="font-size:.95rem">'+esc(d)+'</b><button class="btn sm red" data-rmdiv="'+di+'" style="width:auto;margin:0;padding:6px 12px;font-size:.74rem">🗑 Hapus Divisi</button></div>'
           + subsHtml
           + '<div style="display:flex;gap:5px;margin-top:8px;margin-left:14px"><input data-subinput="'+esc(d)+'" placeholder="Sub-divisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-subadd="'+esc(d)+'" style="padding:7px 10px">＋</button></div>'
           + '</div>';
@@ -291,13 +290,10 @@
       subs.splice(si,1); next.subDivisi[d]=subs; delete next.posisi[d+'::'+sd];
       try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
 
-    box.querySelectorAll('[data-emojipick]').forEach(function(el){ el.onclick=function(){ var pk=el.getAttribute('data-emojipick'); var inp=box.querySelector('[data-posinputkode="'+pk+'"]'); if(inp) inp.value=el.getAttribute('data-emoji'); }; });
     box.querySelectorAll('[data-posadd]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var pk=el.getAttribute('data-posadd'); var inp=box.querySelector('[data-posinput="'+pk+'"]'); var v=(inp.value||'').trim();
-      var kodeInp=box.querySelector('[data-posinputkode="'+pk+'"]'); var kode=(kodeInp.value||'').trim();
       if(!v) return; var poss=(_orgCache.posisi[pk]||[]); if(poss.indexOf(v)>=0){ alert('Posisi itu udah ada.'); return; }
       busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       next.posisi[pk]=poss.concat([v]);
-      if(kode) next.posisiKode[v]=kode;
       try{ await O.saveOrgStructure(next); loadOrgStructure(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
 
     box.querySelectorAll('[data-rmpos]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var parts=el.getAttribute('data-rmpos').split('|'); var pk=parts[0], pi=parseInt(parts[1],10); var poss=(_orgCache.posisi[pk]||[]).slice();
@@ -353,9 +349,9 @@
     var tpls={}; try{ tpls=await O.getEmailTemplates(); }catch(e){}
     box.innerHTML = EMAIL_TPL_DEFS.map(function(d){
       var t=tpls[d.key]||{};
-      return '<div style="border-top:1px dashed #E7D8BE;padding-top:10px;margin-top:10px"><b style="font-size:.86rem">'+esc(d.label)+'</b>'
+      return '<div style="border-top:1px dashed #D5DCE8;padding-top:10px;margin-top:10px"><b style="font-size:.86rem">'+esc(d.label)+'</b>'
         + '<label>Subjek</label><input data-et-subj="'+d.key+'" value="'+esc(t.subject||'')+'" placeholder="Kosongkan buat nonaktifin email jenis ini">'
-        + '<label>Isi</label><textarea data-et-body="'+d.key+'" rows="3" style="width:100%;border:2px solid #E7D8BE;border-radius:10px;padding:10px;font-family:inherit;font-size:.88rem;font-weight:700;color:var(--coklat);box-sizing:border-box">'+esc(t.body||'')+'</textarea>'
+        + '<label>Isi</label><textarea data-et-body="'+d.key+'" rows="3" style="width:100%;border:2px solid #D5DCE8;border-radius:10px;padding:10px;font-family:inherit;font-size:.88rem;font-weight:700;color:var(--coklat);box-sizing:border-box">'+esc(t.body||'')+'</textarea>'
         + '<button class="btn sm sec" data-et-save="'+d.key+'" style="margin-top:6px">💾 Simpan</button><span data-et-msg="'+d.key+'" style="margin-left:8px;font-size:.78rem"></span></div>';
     }).join('');
     box.querySelectorAll('[data-et-save]').forEach(function(b){ b.onclick=async function(){
@@ -505,7 +501,7 @@
       +'<div id="kePosWrap" style="display:none"><label>Posisi</label><select id="kePosisi"></select></div>'
       +'<div id="keGradeWrap" style="display:none"><label>Grade (opsional)</label><select id="keGrade"></select></div>'
       +'<label>Lokasi absen</label><select id="keOut">'+buildOutletOpts()+'</select>'
-      +'<div style="border-top:1px dashed #E7D8BE;margin:14px 0 4px"></div>'
+      +'<div style="border-top:1px dashed #D5DCE8;margin:14px 0 4px"></div>'
       +'<label>Jenis Kontrak</label><select id="keKontrakJenis"><option value="">— pilih jenis —</option><option>Training</option><option>Kontrak</option><option>Tetap</option></select>'
       +'<label>Tanggal Mulai</label><input type="date" id="keKontrakMulai" value="'+esc(k.kontrakMulai||'')+'">'
       +'<label>Tanggal Berakhir</label><input type="date" id="keKontrakSelesai" value="'+esc(k.kontrakSelesai||'')+'">'
