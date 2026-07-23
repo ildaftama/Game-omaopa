@@ -1627,6 +1627,14 @@ async function updateKaryawanHR(uid, patch){
     try{ await setDoc(doc(db,'karyawan',uid), denorm, {merge:true}); }catch(e){}
   }
 }
+async function countKaryawanByDivisi(divisi){
+  if(!(await isHRD())) return 0;
+  if(!divisi) return 0;
+  try{
+    const snap = await getCountFromServer(query(collection(db,'karyawan'), where('divisi','==',divisi), where('approvalStatus','==','approved')));
+    return snap.data().count;
+  }catch(e){ return 0; }
+}
 async function getOrgStructure(){
   try{ const snap=await getDoc(doc(db,'settings','orgStructure')); return snap.exists() ? Object.assign({divisi:[],subDivisi:{},posisi:{},posisiKode:{}}, snap.data()) : {divisi:[],subDivisi:{},posisi:{},posisiKode:{}}; }catch(e){ return {divisi:[],subDivisi:{},posisi:{},posisiKode:{}}; }
 }
@@ -2537,7 +2545,7 @@ window.OmaOpa = {
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
   registerKaryawan, loginKaryawan, getKaryawanProfile, listKaryawan, approveKaryawan, rejectKaryawan, updateKaryawanProfile, deleteKaryawan, haversineMeters,
   listJabatan, saveJabatanList, listKaryawanFields, saveKaryawanFields, updateKaryawanOwnProfile,
-  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, fetchAllPages, listKontrakExpiringSoon, getManajerEmailForDivisi, getOrgStructure, saveOrgStructure, listGrade, saveGradeList, computeOrgLabel,
+  getKaryawanHRProfile, listKaryawanHR, updateKaryawanHR, fetchAllPages, listKontrakExpiringSoon, getManajerEmailForDivisi, getOrgStructure, saveOrgStructure, countKaryawanByDivisi, listGrade, saveGradeList, computeOrgLabel,
   listJenisCuti, saveJenisCutiList, submitCuti, listMyCuti, listCutiHRD, approveCuti, rejectCuti, listCutiToApprove, validateCutiHRD,
   sendKaryawanNotif, listMyKaryawanNotif, markKaryawanNotifRead,
   getEmailTemplates, saveEmailTemplates, sendEventEmail, sendEmailNotif,

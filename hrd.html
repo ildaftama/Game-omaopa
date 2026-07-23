@@ -53,7 +53,7 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=156"></script>
+<script type="module" src="core-omaopa.js?v=157"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -128,7 +128,8 @@
       +'<select id="hrStatusFilter" style="margin-bottom:8px"><option value="pending">⏳ Menunggu approval</option><option value="approved" selected>✓ Disetujui</option><option value="ditolak">✕ Ditolak</option><option value="">— semua status —</option></select>'
       +'<select id="hrDivFilter" style="margin-bottom:8px"><option value="">— semua divisi —</option></select>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="hrFrom" style="flex:1;min-width:0" title="Tanggal daftar dari"><span>—</span><input type="date" id="hrTo" style="flex:1;min-width:0" title="Tanggal daftar sampai"></div>'
-      +'<div id="hrList" class="muted">Memuat…</div><button class="btn sec" id="hrMore" style="display:none">Muat 10 lagi</button></div>'
+      +'<div id="hrList" class="muted">Memuat…</div>'
+      +'<div id="hrPager" style="display:none;align-items:center;gap:8px;margin-top:10px"><button class="btn sm sec" id="hrPrev" style="margin:0;width:auto">‹ Sebelumnya</button><div id="hrPageLabel" class="muted grow" style="text-align:center;font-weight:800"></div><button class="btn sm sec" id="hrNext" style="margin:0;width:auto">Berikutnya ›</button></div></div>'
       +'<div class="card"><div class="nm">⬇️ Export Riwayat Absensi (CSV)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Kosongkan kedua tanggal buat export semua riwayat.</div>'
       +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="atExFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="atExTo" style="flex:1;min-width:0"></div>'
       +'<button class="btn sec" id="atExportBtn" style="margin-top:10px">⬇ Export CSV</button><div id="atExportMsg"></div></div>';
@@ -175,7 +176,8 @@
     document.getElementById('hrDivFilter').onchange=function(){ loadHRList(false); };
     document.getElementById('hrFrom').onchange=function(){ loadHRList(false); };
     document.getElementById('hrTo').onchange=function(){ loadHRList(false); };
-    document.getElementById('hrMore').onclick=function(){ loadHRList(true); };
+    document.getElementById('hrPrev').onclick=function(){ loadHRList('prev'); };
+    document.getElementById('hrNext').onclick=function(){ loadHRList('next'); };
     document.getElementById('hrExport').onclick=async function(){
       if(busy) return; busy=true; this.disabled=true; this.textContent='…';
       try{
@@ -245,34 +247,61 @@
       this.disabled=false; busy=false;
     };
   }
+  var _orgExpanded={}; // divisi name -> true kalau lagi dibuka
+  var _orgKaryawanCount={}; // divisi name -> jumlah karyawan (cache biar gak query ulang tiap render)
   function renderOrgTree(){
     var box=document.getElementById('orgTree'); if(!box) return;
     if(!_orgCache.divisi.length){ box.innerHTML='<div class="muted">Belum ada divisi. Tambah dulu di card "Tambah Divisi Baru" di atas.</div>'; }
     else {
       box.innerHTML = _orgCache.divisi.map(function(d, di){
         var subs = _orgCache.subDivisi[d]||[];
-        var subsHtml = subs.map(function(sd, si){
-          var pk=d+'::'+sd;
-          var poss = _orgCache.posisi[pk]||[];
-          var possHtml = poss.map(function(p, pi){
-            return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
-          }).join('') || '<span class="muted" style="font-size:.76rem">(belum ada posisi)</span>';
-          return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #E2E7EF">'
-            + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.85rem">'+esc(sd)+'</b><span class="muted" style="cursor:pointer;font-size:.72rem" data-rmsub="'+esc(d)+'|'+si+'">✕ hapus sub-divisi</span></div>'
-            + '<div style="margin-top:4px">'+possHtml+'</div>'
-            + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
+        var isOpen = !!_orgExpanded[d];
+        var subBadges = subs.length
+          ? subs.map(function(sd){ return '<span class="tag on" style="font-size:.68rem;margin:2px 3px 0 0">'+esc(sd)+'</span>'; }).join('')
+          : '<span class="muted" style="font-size:.72rem">(belum ada sub-divisi)</span>';
+        var header = '<div data-divtoggle="'+esc(d)+'" style="cursor:pointer;display:flex;align-items:center;gap:8px">'
+          + '<span style="font-size:.7rem;color:#5A6B85;transition:transform .12s;'+(isOpen?'transform:rotate(90deg)':'')+'">▶</span>'
+          + '<b class="grow" style="font-size:.95rem">'+esc(d)+'</b>'
+          + '<button class="btn sm red" data-rmdiv="'+di+'" style="width:auto;margin:0;padding:6px 12px;font-size:.74rem">🗑 Hapus</button>'
+          + '</div>'
+          + '<div style="margin:6px 0 0 24px">'+subBadges+'</div>';
+        var detail='';
+        if(isOpen){
+          var countLabel = (_orgKaryawanCount[d]!==undefined) ? ('👥 '+_orgKaryawanCount[d]+' karyawan aktif di divisi ini') : 'Menghitung jumlah karyawan…';
+          var subsHtml = subs.map(function(sd, si){
+            var pk=d+'::'+sd;
+            var poss = _orgCache.posisi[pk]||[];
+            var possHtml = poss.map(function(p, pi){
+              return '<span class="tag on" style="display:inline-flex;align-items:center;gap:4px;margin:2px 4px 2px 0;font-size:.76rem">'+esc(p)+' <b data-rmpos="'+esc(pk)+'|'+pi+'" style="cursor:pointer">✕</b></span>';
+            }).join('') || '<span class="muted" style="font-size:.76rem">(belum ada posisi)</span>';
+            return '<div style="margin:6px 0 0 14px;padding:8px;border-left:2px solid #E2E7EF">'
+              + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="font-size:.85rem">'+esc(sd)+'</b><span class="muted" style="cursor:pointer;font-size:.72rem" data-rmsub="'+esc(d)+'|'+si+'">✕ hapus sub-divisi</span></div>'
+              + '<div style="margin-top:4px">'+possHtml+'</div>'
+              + '<div style="display:flex;gap:5px;margin-top:5px"><input data-posinput="'+esc(pk)+'" placeholder="Posisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-posadd="'+esc(pk)+'" style="padding:7px 10px">＋</button></div>'
+              + '</div>';
+          }).join('');
+          detail = '<div style="margin:10px 0 0 24px;padding-top:10px;border-top:1px dashed #E2E7EF">'
+            + '<div class="muted" style="font-weight:800;font-size:.8rem;margin-bottom:6px">'+countLabel+'</div>'
+            + subsHtml
+            + '<div style="display:flex;gap:5px;margin-top:8px"><input data-subinput="'+esc(d)+'" placeholder="Sub-divisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-subadd="'+esc(d)+'" style="padding:7px 10px">＋</button></div>'
             + '</div>';
-        }).join('');
-        return '<div style="margin-top:10px;padding:10px;border:1.5px solid #E2E7EF;border-radius:12px">'
-          + '<div style="display:flex;align-items:center;gap:8px"><b class="grow" style="font-size:.95rem">'+esc(d)+'</b><button class="btn sm red" data-rmdiv="'+di+'" style="width:auto;margin:0;padding:6px 12px;font-size:.74rem">🗑 Hapus Divisi</button></div>'
-          + subsHtml
-          + '<div style="display:flex;gap:5px;margin-top:8px;margin-left:14px"><input data-subinput="'+esc(d)+'" placeholder="Sub-divisi baru" style="flex:1;padding:7px;font-size:.82rem"><button class="btn sm sec" data-subadd="'+esc(d)+'" style="padding:7px 10px">＋</button></div>'
-          + '</div>';
+        }
+        return '<div style="margin-top:10px;padding:10px;border:1.5px solid #E2E7EF;border-radius:12px">'+header+detail+'</div>';
       }).join('');
     }
     var filterSel=document.getElementById('hrDivFilter'); if(filterSel){ var cur=filterSel.value; filterSel.innerHTML='<option value="">— semua divisi —</option>'+_orgCache.divisi.map(function(d){ return '<option>'+esc(d)+'</option>'; }).join(''); filterSel.value=cur; }
 
-    box.querySelectorAll('[data-rmdiv]').forEach(function(el){ el.onclick=async function(){ if(busy) return; var di=parseInt(el.getAttribute('data-rmdiv'),10); var d=_orgCache.divisi[di];
+    box.querySelectorAll('[data-divtoggle]').forEach(function(el){ el.onclick=async function(){
+      var d=el.getAttribute('data-divtoggle');
+      _orgExpanded[d] = !_orgExpanded[d];
+      renderOrgTree();
+      if(_orgExpanded[d] && _orgKaryawanCount[d]===undefined){
+        var n=0; try{ n=await O.countKaryawanByDivisi(d); }catch(e){}
+        _orgKaryawanCount[d]=n;
+        if(_orgExpanded[d]) renderOrgTree(); // jaga-jaga kalau udah ke-collapse lagi pas nunggu
+      }
+    }; });
+    box.querySelectorAll('[data-rmdiv]').forEach(function(el){ el.onclick=async function(e){ e.stopPropagation(); if(busy) return; var di=parseInt(el.getAttribute('data-rmdiv'),10); var d=_orgCache.divisi[di];
       if(!confirm('Hapus divisi "'+d+'"? Sub-divisi & posisi di dalamnya juga ikut hilang dari daftar (data karyawan yang udah kepasang gak berubah).')) return;
       busy=true; var next={divisi:_orgCache.divisi.slice(), subDivisi:Object.assign({},_orgCache.subDivisi), posisi:Object.assign({},_orgCache.posisi), posisiKode:Object.assign({},_orgCache.posisiKode)};
       next.divisi.splice(di,1); delete next.subDivisi[d];
@@ -441,19 +470,38 @@
     box.querySelectorAll('[data-valcuti]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.validateCutiHRD(b.getAttribute('data-valcuti')); loadCutiList(false); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
   }
 
-  var _hrCursor=null, _hrAccum=[];
-  async function loadHRList(loadMore){
-    var box=document.getElementById('hrList'); var moreBtn=document.getElementById('hrMore'); if(!box) return;
-    if(!loadMore){ _hrCursor=null; _hrAccum=[]; box.innerHTML='<div class="muted">Memuat…</div>'; }
+  var _hrPageCursors=[null], _hrPageCache=[], _hrPageIndex=0, _hrItems=[];
+  async function loadHRList(mode){
+    var box=document.getElementById('hrList'); var pager=document.getElementById('hrPager'); if(!box) return;
+    if(mode==='next'){ _hrPageIndex++; }
+    else if(mode==='prev'){ _hrPageIndex=Math.max(0,_hrPageIndex-1); }
+    else { _hrPageIndex=0; _hrPageCursors=[null]; _hrPageCache=[]; }
     var sf=(document.getElementById('hrStatusFilter')||{}).value; if(sf===undefined) sf='approved';
     var f=(document.getElementById('hrDivFilter')||{}).value||'';
-    var opts={ approvalStatus:sf||undefined, divisi:f||undefined, fromDate:document.getElementById('hrFrom').value||undefined, toDate:document.getElementById('hrTo').value||undefined, cursor:_hrCursor };
+    var filterKey=JSON.stringify([sf,f,document.getElementById('hrFrom').value,document.getElementById('hrTo').value]);
+    if(_hrPageCache._filterKey!==filterKey){ _hrPageIndex=0; _hrPageCursors=[null]; _hrPageCache=[]; _hrPageCache._filterKey=filterKey; }
+    if(_hrPageCache[_hrPageIndex]){ _hrItems=_hrPageCache[_hrPageIndex]; renderHRList(); updateHRPager(); return; }
+    box.innerHTML='<div class="muted">Memuat…</div>';
+    var opts={ approvalStatus:sf||undefined, divisi:f||undefined, fromDate:document.getElementById('hrFrom').value||undefined, toDate:document.getElementById('hrTo').value||undefined, cursor:_hrPageCursors[_hrPageIndex] };
     var res={items:[],hasMore:false,cursor:null}; try{ res=await O.listKaryawanHR(opts); }catch(e){}
-    _hrAccum = _hrAccum.concat(res.items||[]); _hrCursor = res.cursor;
-    moreBtn.style.display = res.hasMore ? 'block' : 'none';
-    if(!_hrAccum.length){ box.innerHTML='<div class="muted">Tidak ada karyawan yang cocok filter ini.</div>'; return; }
+    _hrItems=res.items||[]; _hrPageCache[_hrPageIndex]=_hrItems;
+    if(res.cursor) _hrPageCursors[_hrPageIndex+1]=res.cursor;
+    _hrPageCache._hasMore=res.hasMore;
+    renderHRList(); updateHRPager();
+  }
+  function updateHRPager(){
+    var pager=document.getElementById('hrPager'); if(!pager) return;
+    var prevBtn=document.getElementById('hrPrev'), nextBtn=document.getElementById('hrNext'), label=document.getElementById('hrPageLabel');
+    prevBtn.disabled = _hrPageIndex===0;
+    nextBtn.disabled = !_hrPageCache._hasMore;
+    label.textContent = 'Halaman '+(_hrPageIndex+1);
+    pager.style.display = (_hrPageIndex>0 || _hrPageCache._hasMore) ? 'flex' : 'none';
+  }
+  function renderHRList(){
+    var box=document.getElementById('hrList'); if(!box) return;
+    if(!_hrItems.length){ box.innerHTML='<div class="muted">Tidak ada karyawan yang cocok filter ini.</div>'; return; }
     function badge(k){ if(k.approvalStatus==='approved') return '<span class="tag on">DISETUJUI</span>'; if(k.approvalStatus==='ditolak') return '<span class="tag off">DITOLAK</span>'; return '<span class="tag adm">PENDING</span>'; }
-    box.innerHTML = _hrAccum.map(function(k){
+    box.innerHTML = _hrItems.map(function(k){
       var subInfo = k.approvalStatus==='approved'
         ? esc(k.orgLabel||'-')
         : ('Klaim: '+esc(k.claimDivisi||'-')+(k.claimSubDivisi?' / '+esc(k.claimSubDivisi):'')+(k.claimPosisi?' / '+esc(k.claimPosisi):(k.claimStrukturalLevel&&k.claimStrukturalLevel!=='staff'?' / '+esc(k.claimStrukturalLevel.toUpperCase()):'')));
@@ -466,10 +514,10 @@
         + (k.approvalStatus==='approved' ? ('<button class="btn sm sec" data-togglehr="'+esc(k.id)+'" data-on="'+(k.active!==false?'1':'0')+'">'+(k.active!==false?'Nonaktifkan':'Aktifkan')+'</button><button class="btn sm sec" data-privy="'+esc(k.id)+'">📄 Kontrak siap Privy</button>') : '')
         +'</div></div>';
     }).join('');
-    box.querySelectorAll('[data-edithr]').forEach(function(b){ b.onclick=function(){ var k=_hrAccum.find(function(x){ return x.id===b.getAttribute('data-edithr'); }); if(k) openKaryawanHREdit(k); }; });
-    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKaryawan(b.getAttribute('data-appr')); loadHRList(false); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKaryawan(b.getAttribute('data-rej')); loadHRList(false); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
-    box.querySelectorAll('[data-privy]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var k=_hrAccum.find(function(x){ return x.id===b.getAttribute('data-privy'); }); if(!k) return;
+    box.querySelectorAll('[data-edithr]').forEach(function(b){ b.onclick=function(){ var k=_hrItems.find(function(x){ return x.id===b.getAttribute('data-edithr'); }); if(k) openKaryawanHREdit(k); }; });
+    box.querySelectorAll('[data-appr]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.approveKaryawan(b.getAttribute('data-appr')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-rej]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Tolak pendaftaran karyawan ini?')) return; busy=true; b.disabled=true; try{ await O.rejectKaryawan(b.getAttribute('data-rej')); loadHRList(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    box.querySelectorAll('[data-privy]').forEach(function(b){ b.onclick=async function(){ if(busy) return; var k=_hrItems.find(function(x){ return x.id===b.getAttribute('data-privy'); }); if(!k) return;
       if(!confirm('Kirim notif "Kontrak siap di Privy" ke '+k.namaLengkap+'?')) return;
       busy=true; b.disabled=true;
       try{
