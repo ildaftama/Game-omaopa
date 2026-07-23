@@ -1847,13 +1847,22 @@ function inBirthdayRange(dob, tp){
   if(from<=to) return dobKey>=from && dobKey<=to;
   return dobKey>=from || dobKey<=to; // rentang muter tahun, misal Des -> Jan
 }
-async function sendBroadcast(data){
+async function sendBroadcast(data, imageBlob){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   const d=data||{}; const body=(d.body||'').trim();
+  const title=(d.title||'').trim();
+  if(!title) throw {message:'Judul wajib diisi.'};
   if(!body) throw {message:'Isi pesan wajib diisi.'};
   if(!d.targetType) throw {message:'Target wajib dipilih.'};
-  await addDoc(collection(db,'broadcasts'), {
-    title:(d.title||'').trim(), body:body, targetType:d.targetType, targetParams:d.targetParams||{},
+  const ref=doc(collection(db,'broadcasts'));
+  let imageUrl='';
+  if(imageBlob){
+    const sref=storageRef(storage, 'broadcast-images/'+ref.id+'.jpg');
+    await uploadBytes(sref, imageBlob, {contentType:'image/jpeg'});
+    imageUrl=await getDownloadURL(sref);
+  }
+  await setDoc(ref, {
+    title:title, body:body, targetType:d.targetType, targetParams:d.targetParams||{}, imageUrl:imageUrl,
     active:true, createdBy:(auth.currentUser?auth.currentUser.uid:''), createdAt:serverTimestamp()
   });
 }
@@ -1862,7 +1871,7 @@ async function listBroadcasts(n){
   try{
     const q=query(collection(db,'broadcasts'), orderBy('createdAt','desc'), limit(n||50));
     const snap=await getDocs(q); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, title:x.title||'', body:x.body||'', targetType:x.targetType||'', targetParams:x.targetParams||{}, active:x.active!==false, createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, title:x.title||'', body:x.body||'', targetType:x.targetType||'', targetParams:x.targetParams||{}, imageUrl:x.imageUrl||'', active:x.active!==false, createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
     return arr;
   }catch(e){ return []; }
 }
@@ -1893,7 +1902,7 @@ async function getMemberBroadcasts(){
       else if(x.targetType==='daterange') match=(!tp.fromMs||regTs>=tp.fromMs)&&(!tp.toMs||regTs<=tp.toMs);
       else if(x.targetType==='outlet') match=(tp.keys||[]).some(k=>matchOutletKey(outlet,k));
       else if(x.targetType==='specific') match=(tp.uids||[]).indexOf(user.uid)>=0;
-      if(match) arr.push({ id:d.id, title:x.title||'', body:x.body||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0, isRead: read.indexOf(d.id)>=0 });
+      if(match) arr.push({ id:d.id, title:x.title||'', body:x.body||'', imageUrl:x.imageUrl||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0, isRead: read.indexOf(d.id)>=0 });
     });
     return arr;
   }catch(e){ return []; }

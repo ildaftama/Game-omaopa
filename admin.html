@@ -19,6 +19,9 @@
   .badge{ font-size:.66rem; font-weight:900; background:var(--coklat); color:#fff; padding:2px 9px; border-radius:999px; }
   .card{ background:#fff; border:2px solid #EFE2C4; border-radius:16px; padding:14px; margin-bottom:12px; }
   .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  .info-row{ display:flex; justify-content:space-between; align-items:center; font-size:.85rem; padding:6px 0; border-bottom:1px solid #F2E4C6; }
+  .info-row:last-child{ border-bottom:none; }
+  .info-row b{ color:var(--coklat); }
   label{ font-size:.74rem; font-weight:800; color:#8a6a3a; display:block; margin:9px 0 4px; }
   input,select{ width:100%; border:2px solid #E7D8BE; border-radius:10px; padding:10px; font-size:.92rem; font-family:inherit; font-weight:700; color:var(--coklat); background:#fff; }
   input:focus,select:focus{ outline:none; border-color:var(--kuning); }
@@ -103,7 +106,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=152"></script>
+<script type="module" src="core-omaopa.js?v=160"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -233,8 +236,9 @@
     var html='<div class="card"><div class="nm">📢 Kirim Pesan Blast</div>'
       +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Kirim pesan ke member — nanti muncul di kotak pesan mereka.</div>'
       +(canSend ? (
-        '<label>Judul (catatan admin doang, member gak lihat ini)</label><input id="bTitle" placeholder="misal: Promo HUT Agustus">'
+        '<label>Judul (tampil ke member di Kotak Pesan)</label><input id="bTitle" placeholder="misal: Promo HUT Agustus">'
         +'<label>Isi pesan</label><textarea id="bBody" rows="4" style="width:100%;border:2px solid #E7D8BE;border-radius:12px;padding:12px;font-family:inherit;font-size:1rem;font-weight:700;color:var(--coklat);box-sizing:border-box" placeholder="Tulis pesan buat member di sini..."></textarea>'
+        +'<label>Gambar (opsional)</label><input type="file" id="bImage" accept="image/*"><div id="bImagePreview" style="margin-top:8px"></div>'
         +'<label>Kirim ke</label><select id="bTarget">'
           +'<option value="all">🟡 Semua member</option>'
           +'<option value="birthday">🎂 Ulang tahun</option>'
@@ -246,11 +250,28 @@
         +'<button class="btn" id="bSend" style="margin-top:14px">📤 Kirim Blast</button><div id="bMsg"></div>'
       ) : '<div class="res warn">👁️ Cuma Admin Utama yang bisa kirim blast.</div>')
       +'</div>'
-      +'<div class="card"><div class="nm">🕑 Riwayat Blast</div><div id="bHist" class="muted" style="margin-top:8px">Memuat…</div></div>';
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">🕑 Riwayat Blast</div><button class="btn sm sec" id="toggleBHist" style="width:auto;margin:0">👁 Lihat</button></div><div id="bHistBody" style="display:none;margin-top:8px"><div id="bHist" class="muted">Memuat…</div></div></div>';
     tabEl.innerHTML=html;
+    var bHistLoaded=false;
+    var toggleBHistBtn=document.getElementById('toggleBHist');
+    if(toggleBHistBtn) toggleBHistBtn.onclick=function(){
+      var body=document.getElementById('bHistBody'); var opening=body.style.display==='none';
+      body.style.display=opening?'block':'none'; toggleBHistBtn.textContent=opening?'🔼 Tutup':'👁 Lihat';
+      if(opening && !bHistLoaded){ bHistLoaded=true; loadBlastHistory(); }
+    };
 
     if(canSend){
       var selectedMembers={};
+      var blastImageBlob=null;
+      var imgInput=document.getElementById('bImage');
+      if(imgInput) imgInput.onchange=function(){
+        var f=imgInput.files&&imgInput.files[0]; var prev=document.getElementById('bImagePreview');
+        if(!f){ blastImageBlob=null; prev.innerHTML=''; return; }
+        if(f.size>5*1024*1024){ alert('Ukuran gambar maksimal 5MB.'); imgInput.value=''; blastImageBlob=null; prev.innerHTML=''; return; }
+        blastImageBlob=f;
+        var url=URL.createObjectURL(f);
+        prev.innerHTML='<img src="'+url+'" style="max-width:160px;border-radius:10px;border:2px solid #E7D8BE">';
+      };
       var targetSel=document.getElementById('bTarget');
       function renderSelectedList(){
         var el=document.getElementById('bSelected'); if(!el) return;
@@ -282,15 +303,16 @@
         } else if(t==='daterange'){
           box.innerHTML='<label>Dari tanggal</label><input type="date" id="bFrom"><label>Sampai tanggal</label><input type="date" id="bTo">';
         } else if(t==='outlet'){
-          var opts=(window.OMA_OUTLETS||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(o){ return '<option value="'+esc(o.name)+'">'+esc((o.name||'').replace(/^Oma Opa Cakery\s*/i,''))+'</option>'; }).join('');
+          var opts=(window.OMA_OUTLETS||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+          var groupChk='<label style="display:flex;align-items:center;gap:8px;font-weight:900;padding:4px 0"><input type="checkbox" class="bOutletChk" value="__metavest" style="width:auto"> 🏢 Semua Metavest</label>'
+            +'<label style="display:flex;align-items:center;gap:8px;font-weight:900;padding:4px 0"><input type="checkbox" class="bOutletChk" value="__area1" style="width:auto"> 🗺️ Area 1</label>'
+            +'<label style="display:flex;align-items:center;gap:8px;font-weight:900;padding:4px 0"><input type="checkbox" class="bOutletChk" value="__area2" style="width:auto"> 🗺️ Area 2</label>'
+            +'<label style="display:flex;align-items:center;gap:8px;font-weight:900;padding:4px 0"><input type="checkbox" class="bOutletChk" value="__area3" style="width:auto"> 🗺️ Area 3</label>'
+            +'<label style="display:flex;align-items:center;gap:8px;font-weight:900;padding:4px 0"><input type="checkbox" class="bOutletChk" value="__kronggahan" style="width:auto"> 🏢 Kronggahan</label>';
+          var indivChk=opts.map(function(o){ return '<label style="display:flex;align-items:center;gap:8px;font-weight:700;padding:3px 0;font-size:.9rem"><input type="checkbox" class="bOutletChk" value="'+esc(o.name)+'" style="width:auto"> '+esc((o.name||'').replace(/^Oma Opa Cakery\s*/i,''))+'</label>'; }).join('');
           box.innerHTML='<label>Pilih outlet/area (bisa lebih dari satu)</label>'
-            +'<select id="bOutletMulti" multiple size="8" style="width:100%;border:2px solid #E7D8BE;border-radius:12px;padding:8px;font-family:inherit;box-sizing:border-box">'
-            +'<option value="__metavest">🏢 Semua Metavest</option>'
-            +'<option value="__area1">🗺️ Area 1</option>'
-            +'<option value="__area2">🗺️ Area 2</option>'
-            +'<option value="__area3">🗺️ Area 3</option>'
-            +'<option value="__kronggahan">🏢 Kronggahan</option>'
-            +opts+'</select><div class="muted" style="font-size:.72rem;margin-top:4px">Tahan Ctrl/Cmd (atau tap-tahan di HP) buat pilih lebih dari satu.</div>';
+            +'<div style="max-height:260px;overflow:auto;border:2px solid #E7D8BE;border-radius:12px;padding:10px 12px">'
+            +groupChk+'<hr style="border:none;border-top:1px dashed #E7D8BE;margin:6px 0">'+indivChk+'</div>';
         } else if(t==='specific'){
           selectedMembers={};
           box.innerHTML='<label>Cari member (nama/No. HP)</label><div style="display:flex;gap:6px"><input id="bSearchQ" style="flex:1" placeholder="cth: Budi / 0812..."><button class="btn sm sec" id="bSearchGo">Cari</button></div>'
@@ -312,45 +334,78 @@
 
       document.getElementById('bSend').onclick=async function(){
         if(busy) return;
+        var title=(document.getElementById('bTitle').value||'').trim();
         var body=(document.getElementById('bBody').value||'').trim();
-        var msg=document.getElementById('bMsg');
+        var msg=document.getElementById('bMsg'); msg.innerHTML='';
+        if(!title){ msg.innerHTML='<div class="res bad">Judul wajib diisi.</div>'; return; }
         if(!body){ msg.innerHTML='<div class="res bad">Isi pesan wajib diisi.</div>'; return; }
-        var t=targetSel.value; var params={};
-        if(t==='birthday'){
+        var t=targetSel.value; var params={}; var targetDesc='';
+        if(t==='all'){ targetDesc='Semua member'; }
+        else if(t==='birthday'){
           var mode=(document.getElementById('bBdMode')||{}).value||'today';
-          if(mode==='today'){ var now=new Date(); params={fromMonth:now.getMonth()+1, fromDay:now.getDate(), toMonth:now.getMonth()+1, toDay:now.getDate()}; }
-          else if(mode==='month'){ var mm=parseInt(document.getElementById('bBdMonth').value,10); params={fromMonth:mm, fromDay:1, toMonth:mm, toDay:LASTDAY[mm-1]}; }
+          if(mode==='today'){ var now=new Date(); params={fromMonth:now.getMonth()+1, fromDay:now.getDate(), toMonth:now.getMonth()+1, toDay:now.getDate()}; targetDesc='Member ulang tahun hari ini'; }
+          else if(mode==='month'){ var mm=parseInt(document.getElementById('bBdMonth').value,10); params={fromMonth:mm, fromDay:1, toMonth:mm, toDay:LASTDAY[mm-1]}; targetDesc='Member ulang tahun bulan '+MONTHS[mm-1]; }
           else if(mode==='range'){
             var fm=parseInt(document.getElementById('bBdFromMonth').value,10), fd=parseInt(document.getElementById('bBdFromDay').value,10);
             var tm=parseInt(document.getElementById('bBdToMonth').value,10), td=parseInt(document.getElementById('bBdToDay').value,10);
             if(!fd||fd<1||fd>31||!td||td<1||td>31){ msg.innerHTML='<div class="res bad">Tanggal belum valid.</div>'; return; }
             params={fromMonth:fm, fromDay:fd, toMonth:tm, toDay:td};
+            targetDesc='Member ulang tahun '+fd+' '+MONTHS[fm-1]+' – '+td+' '+MONTHS[tm-1];
           }
         }
         else if(t==='daterange'){
           var f=document.getElementById('bFrom').value, to=document.getElementById('bTo').value;
           if(!f && !to){ msg.innerHTML='<div class="res bad">Isi minimal salah satu tanggal.</div>'; return; }
           params={ fromMs: f? new Date(f+'T00:00:00').getTime(): 0, toMs: to? new Date(to+'T23:59:59').getTime(): 0 };
+          targetDesc='Member daftar '+(f?new Date(f).toLocaleDateString('id-ID'):'(awal)')+' s/d '+(to?new Date(to).toLocaleDateString('id-ID'):'(sekarang)');
         } else if(t==='outlet'){
-          var sel=document.getElementById('bOutletMulti'); var keys=Array.prototype.filter.call(sel.options,function(o){return o.selected;}).map(function(o){return o.value;});
+          var chks=Array.prototype.slice.call(document.querySelectorAll('.bOutletChk:checked'));
+          var keys=chks.map(function(c){return c.value;});
           if(!keys.length){ msg.innerHTML='<div class="res bad">Pilih minimal 1 outlet/area.</div>'; return; }
           params={ keys:keys };
+          var names=chks.map(function(c){ var lbl=c.parentElement.textContent.trim(); return lbl; });
+          targetDesc=keys.length+' outlet/area dipilih: '+(names.length>5 ? (names.slice(0,5).join(', ')+', +'+(names.length-5)+' lagi') : names.join(', '));
         } else if(t==='specific'){
           var uids=Object.keys(selectedMembers);
           if(!uids.length){ msg.innerHTML='<div class="res bad">Pilih minimal 1 member.</div>'; return; }
           params={ uids:uids };
+          var mnames=uids.map(function(u){return selectedMembers[u];});
+          targetDesc=uids.length+' member dipilih manual: '+(mnames.length>5 ? (mnames.slice(0,5).join(', ')+', +'+(mnames.length-5)+' lagi') : mnames.join(', '));
         }
-        busy=true; this.disabled=true; this.textContent='Mengirim…';
-        try{
-          await O.sendBroadcast({ title:document.getElementById('bTitle').value, body:body, targetType:t, targetParams:params });
-          msg.innerHTML='<div class="res ok">✓ Blast terkirim.</div>';
-          document.getElementById('bTitle').value=''; document.getElementById('bBody').value=''; targetSel.value='all'; renderTargetExtra();
-          loadBlastHistory();
-        }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
-        this.disabled=false; this.textContent='📤 Kirim Blast'; busy=false;
+        showBlastConfirm(title, body, targetDesc, !!blastImageBlob, async function(){
+          var sendBtn=document.getElementById('bSend');
+          busy=true; sendBtn.disabled=true; sendBtn.textContent='Mengirim…';
+          try{
+            await O.sendBroadcast({ title:title, body:body, targetType:t, targetParams:params }, blastImageBlob);
+            msg.innerHTML='<div class="res ok">✓ Blast terkirim.</div>';
+            document.getElementById('bTitle').value=''; document.getElementById('bBody').value=''; targetSel.value='all'; renderTargetExtra();
+            blastImageBlob=null; if(imgInput) imgInput.value=''; var prevEl=document.getElementById('bImagePreview'); if(prevEl) prevEl.innerHTML='';
+            bHistLoaded=true; loadBlastHistory();
+            var histBody=document.getElementById('bHistBody'); if(histBody) histBody.style.display='block';
+            if(toggleBHistBtn) toggleBHistBtn.textContent='🔼 Tutup';
+          }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+          sendBtn.disabled=false; sendBtn.textContent='📤 Kirim Blast'; busy=false;
+        });
       };
     }
 
+    function showBlastConfirm(title, body, targetDesc, hasImage, onConfirm){
+      var bk=document.createElement('div');
+      bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+      var cuplikan=body.length>140?body.slice(0,140)+'…':body;
+      bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow:auto">'
+        +'<div style="font-weight:900;color:var(--coklat);font-size:1.05rem;margin-bottom:12px">📤 Konfirmasi Kirim Blast</div>'
+        +'<div class="info-row"><span>Judul</span><b>'+esc(title)+'</b></div>'
+        +'<div style="padding:8px 0;border-bottom:1px solid #F2E4C6"><div class="muted" style="font-size:.8rem;margin-bottom:3px">Isi pesan</div><div style="font-size:.88rem;white-space:pre-wrap">'+esc(cuplikan)+'</div></div>'
+        +(hasImage?'<div class="info-row"><span>Gambar</span><b>✓ Dilampirkan</b></div>':'')
+        +'<div style="padding:8px 0"><div class="muted" style="font-size:.8rem;margin-bottom:3px">Kirim ke</div><div style="font-size:.88rem;font-weight:700">'+esc(targetDesc)+'</div></div>'
+        +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn sec" id="bcCancel" style="margin:0">Batal</button><button class="btn" id="bcOk" style="margin:0">✓ Kirim Sekarang</button></div>'
+        +'</div>';
+      document.body.appendChild(bk);
+      bk.onclick=function(e){ if(e.target===bk) bk.remove(); };
+      bk.querySelector('#bcCancel').onclick=function(){ bk.remove(); };
+      bk.querySelector('#bcOk').onclick=async function(){ bk.remove(); await onConfirm(); };
+    }
     function targetLabel(x){
       var tp=x.targetParams||{};
       if(x.targetType==='all') return 'Semua member';
@@ -369,7 +424,7 @@
       var arr=[]; try{ arr=await O.listBroadcasts(50); }catch(e){}
       if(!arr.length){ box.innerHTML='<div class="muted">Belum ada blast yang dikirim.</div>'; return; }
       box.innerHTML=arr.map(function(x){
-        return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm" style="font-size:.88rem">'+esc(x.title||'(tanpa judul)')+(x.active?'':' <span class="tag off">NONAKTIF</span>')+'</div>'
+        return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px"><div class="nm" style="font-size:.88rem">'+esc(x.title||'(tanpa judul)')+(x.active?'':' <span class="tag off">NONAKTIF</span>')+(x.imageUrl?' 🖼️':'')+'</div>'
           +'<div class="sub">'+esc(x.body.length>80?x.body.slice(0,80)+'…':x.body)+'</div>'
           +'<div class="sub" style="margin-top:2px">🎯 '+esc(targetLabel(x))+' · '+(x.createdAt?new Date(x.createdAt).toLocaleString('id-ID'):'-')+'</div></div>'
           +((canSend||masterEdit) ? ('<div style="display:flex;gap:5px;margin-top:6px">'
@@ -380,7 +435,6 @@
       box.querySelectorAll('[data-off]').forEach(function(b){ b.onclick=async function(){ if(busy) return; busy=true; b.disabled=true; try{ await O.deactivateBroadcast(b.getAttribute('data-off')); loadBlastHistory(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
       box.querySelectorAll('[data-delb]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Hapus blast ini permanen?')) return; busy=true; b.disabled=true; try{ await O.deleteBroadcast(b.getAttribute('data-delb')); loadBlastHistory(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
     }
-    loadBlastHistory();
   }
 
   function slugKey(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40) || ('f'+Date.now()); }
