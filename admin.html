@@ -93,6 +93,8 @@
       <button data-tab="outlet">🏪 Outlet</button>
       <button data-tab="staff">🧑‍🍳 Staff</button>
       <button data-tab="reward">🎁 Reward</button>
+      <button data-tab="produk">🧁 Produk</button>
+      <button data-tab="menuweb">🎂 Menu Web</button>
       <button data-tab="promo">📣 Promo</button>
       <button data-tab="analitik">📈 Analitik</button>
       <button data-tab="pesanan">🧾 Pesanan</button>
@@ -106,14 +108,14 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=165"></script>
+<script type="module" src="core-omaopa.js?v=167"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
   var tab='home', busy=false, segFilter=null, canEdit=false, masterEdit=false, sPage=0;
   var MEMBERS=null, TXN=null; // cache
   var memStack=[null], memPage=0; // paginasi member (cursor)
-  var curOf='baru', curOrders=[], OUTLETS_CACHE=[];
+  var curOf='baru', curOrders=[], OUTLETS_CACHE=[]; var _mwPendingBlob=null, _mwPendingPreview='';
   var PAL=['#FFC21A','#E0915B','#7CC9B5','#C98A4B','#88B0E0','#F4A6B0','#9a8b78','#B7D77A','#caa6e0'];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function csvCell(s){ s=String(s==null?'':s); return '"'+s.replace(/"/g,'""')+'"'; }
@@ -148,7 +150,7 @@
   document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
     tab=b.getAttribute('data-tab'); document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on'); render();
   }; });
-  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, pengaturan:renderPengaturan}[tab]||renderHome)(); }
+  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, produk:renderProduk, menuweb:renderMenuWeb, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, pengaturan:renderPengaturan}[tab]||renderHome)(); }
   function setActiveTab(name){ tab=name; document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-tab')===name); }); }
   function applySegment(field,val){ segFilter={field:field, value:val}; setActiveTab('member'); render(); }
 
@@ -1606,6 +1608,130 @@
     var msg=document.getElementById('rMsg'); if(msg) msg.innerHTML='<div class="muted" style="margin-top:6px">Mengedit <b>'+esc(r.title)+'</b> — ubah di form atas (item gratis tinggal pilih dari menu, harga ikut menu), lalu Simpan. <a href="#" id="rCancel">Batal</a></div>';
     var cc=document.getElementById('rCancel'); if(cc) cc.onclick=function(e){ e.preventDefault(); resetRewardForm(); };
     try{ document.getElementById('rT').scrollIntoView({block:'center'}); }catch(e){}
+  }
+
+  async function renderProduk(){
+    tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah produk baru</div>'
+      +'<label>Nama produk</label><input id="pN" placeholder="cth: Bolu Gulung Coklat">'
+      +'<label>Kategori (opsional)</label><input id="pC" placeholder="cth: Bolu / Minuman / Snack">'
+      +'<label>Harga jual (Rp)</label><input id="pP" inputmode="numeric" placeholder="cth: 35000">'
+      +'<label>Urutan tampil (opsional, angka kecil = di atas)</label><input id="pS" inputmode="numeric" placeholder="cth: 1">'
+      +'<button class="btn" id="pAdd">＋ Tambah produk</button><div id="pMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola produk.</div>')
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar produk (dipakai di halaman Kasir POS)</div><button class="btn sm sec" id="pReload">↻</button></div><div id="pList"><div class="muted">Memuat…</div></div></div>';
+    if(canEdit){ document.getElementById('pAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('pMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+      try{ var _pl={ name:document.getElementById('pN').value, category:document.getElementById('pC').value, price:document.getElementById('pP').value, sortOrder:document.getElementById('pS').value, active:true };
+        await O.saveProduct(_eid,_pl);
+        msg.innerHTML='<div class="res ok">✓ '+(_eid?'Produk diperbarui.':'Produk ditambahkan.')+'</div>'; resetProductForm(); loadProducts();
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
+    document.getElementById('pReload').onclick=loadProducts; loadProducts();
+  }
+  async function loadProducts(){
+    var box=document.getElementById('pList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listProductsAdmin(); }catch(e){}
+    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada produk. Tambahin dulu di form atas ya.</div>'; return; }
+    box.innerHTML=arr.map(function(p){
+      return '<div class="row"><div class="grow"><div class="nm">'+esc(p.name)+(p.active?'':' <span class="tag off">OFF</span>')+'</div>'
+        +'<div class="sub">'+rp(p.price)+(p.category?(' · '+esc(p.category)):'')+'</div></div>'
+        +(canEdit ? ('<button class="btn sm sec" data-pedit=\''+esc(JSON.stringify({id:p.id,name:p.name,category:p.category,price:p.price,sortOrder:p.sortOrder}))+'\'>Edit</button>'
+          +'<button class="btn sm sec" data-pact="'+esc(p.id)+'" data-on="'+(p.active?'1':'0')+'">'+(p.active?'Off':'On')+'</button>') : '')
+        +(masterEdit ? ('<button class="btn sm red" data-pdel="'+esc(p.id)+'">Hapus</button>') : '')+'</div>'; }).join('');
+    if(canEdit){
+      box.querySelectorAll('[data-pact]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.setProductActive(b.getAttribute('data-pact'), b.getAttribute('data-on')!=='1'); loadProducts(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+      box.querySelectorAll('[data-pedit]').forEach(function(b){ b.onclick=function(){ var p=JSON.parse(b.getAttribute('data-pedit')); editProduct(p); }; });
+    }
+    if(masterEdit){
+      box.querySelectorAll('[data-pdel]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus produk ini? Produk yang udah pernah kejual di transaksi lama gak akan ikut hilang datanya.')) return; busy=true; b.disabled=true; try{ await O.deleteProduct(b.getAttribute('data-pdel')); loadProducts(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    }
+  }
+  function resetProductForm(){
+    ['pN','pC','pP','pS'].forEach(function(i){ var e=document.getElementById(i); if(e) e.value=''; });
+    var add=document.getElementById('pAdd'); if(add){ add.textContent='＋ Tambah produk'; delete add.dataset.editId; }
+    var msg=document.getElementById('pMsg'); if(msg) msg.innerHTML='';
+  }
+  function editProduct(p){
+    var g=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
+    g('pN',p.name); g('pC',p.category||''); g('pP',p.price); g('pS', p.sortOrder||'');
+    var add=document.getElementById('pAdd'); if(add){ add.textContent='💾 Simpan perubahan'; add.dataset.editId=p.id; }
+    var msg=document.getElementById('pMsg'); if(msg) msg.innerHTML='<div class="muted" style="margin-top:6px">Mengedit <b>'+esc(p.name)+'</b> — ubah di form atas, lalu Simpan. <a href="#" id="pCancel">Batal</a></div>';
+    var cc=document.getElementById('pCancel'); if(cc) cc.onclick=function(e){ e.preventDefault(); resetProductForm(); };
+    try{ document.getElementById('pN').scrollIntoView({block:'center'}); }catch(e){}
+  }
+
+  async function renderMenuWeb(){
+    _mwPendingBlob=null; _mwPendingPreview='';
+    tabEl.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:10px">Ini menu buat <b>pesan-online di keranjang index.html</b> — terpisah dari katalog Produk POS. Foto otomatis dikompres sebelum diupload.</div>'
+      +(canEdit ? ('<div class="card"><div class="nm">Tambah / edit menu</div>'
+      +'<div id="mwPreview" style="margin-bottom:8px"></div>'
+      +'<input type="file" id="mwFile" accept="image/*">'
+      +'<label style="margin-top:8px">Kategori / base kue</label><input id="mwCat" placeholder="cth: Ogura Cheese">'
+      +'<label>Nama varian</label><input id="mwName" placeholder="cth: Full Choco">'
+      +'<label>Harga (Rp)</label><input id="mwPrice" inputmode="numeric" placeholder="cth: 56000">'
+      +'<label>Deskripsi (opsional)</label><input id="mwDesc" placeholder="cth: Base keju lembut, tahan 2 hari">'
+      +'<label>Urutan tampil (opsional)</label><input id="mwSort" inputmode="numeric" placeholder="cth: 1">'
+      +'<button class="btn" id="mwAdd">＋ Simpan menu</button><div id="mwMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola menu.</div>')
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar menu web-order</div><button class="btn sm sec" id="mwReload">↻</button></div><div id="mwList"><div class="muted">Memuat…</div></div></div>';
+    if(canEdit){
+      document.getElementById('mwFile').onchange=function(){
+        var f=this.files&&this.files[0]; if(!f) return;
+        if(f.size>8*1024*1024){ alert('Ukuran foto maksimal 8MB.'); this.value=''; return; }
+        var prev=document.getElementById('mwPreview'); prev.innerHTML='<div class="muted">Memproses foto…</div>';
+        var rd=new FileReader();
+        rd.onload=function(){
+          var img=new Image();
+          img.onload=function(){
+            var maxW=640; var sc=Math.min(1,maxW/img.width); var cw=Math.round(img.width*sc), ch=Math.round(img.height*sc);
+            var cv=document.createElement('canvas'); cv.width=cw; cv.height=ch; cv.getContext('2d').drawImage(img,0,0,cw,ch);
+            _mwPendingPreview=cv.toDataURL('image/jpeg',0.85);
+            cv.toBlob(function(blob){ _mwPendingBlob=blob; prev.innerHTML='<img src="'+_mwPendingPreview+'" style="width:120px;border-radius:10px;border:2px solid #EFE2C4;display:block">'+'<div class="muted" style="margin-top:4px">'+cw+'×'+ch+', ~'+Math.round((blob?blob.size:0)/1024)+'KB — siap diupload pas Simpan.</div>'; }, 'image/jpeg', 0.85);
+          };
+          img.onerror=function(){ prev.innerHTML='<div class="res bad">Foto tidak terbaca.</div>'; };
+          img.src=rd.result;
+        };
+        rd.readAsDataURL(f);
+      };
+      document.getElementById('mwAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('mwMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+        try{
+          var _pl={ cat:document.getElementById('mwCat').value, name:document.getElementById('mwName').value, price:document.getElementById('mwPrice').value, desc:document.getElementById('mwDesc').value, sortOrder:document.getElementById('mwSort').value, avail:true };
+          await O.saveMenuItem(_eid, _pl, _mwPendingBlob);
+          msg.innerHTML='<div class="res ok">✓ '+(_eid?'Menu diperbarui.':'Menu ditambahkan.')+'</div>'; resetMenuWebForm(); loadMenuWebItems();
+        }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+    }
+    document.getElementById('mwReload').onclick=loadMenuWebItems; loadMenuWebItems();
+  }
+  async function loadMenuWebItems(){
+    var box=document.getElementById('mwList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listMenuItemsAdmin(); }catch(e){}
+    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada menu tambahan dari admin. Menu bawaan (menu-data.js) tetap tampil normal di index.html — daftar ini cuma buat item yang kamu tambah/override lewat sini.</div>'; return; }
+    box.innerHTML=arr.map(function(m){
+      return '<div class="row">'+(m.imageUrl?('<img src="'+esc(m.imageUrl)+'" style="width:42px;height:42px;border-radius:9px;object-fit:cover;margin-right:8px">'):'')
+        +'<div class="grow"><div class="nm">'+esc(m.cat)+' — '+esc(m.name)+(m.avail?'':' <span class="tag off">OFF</span>')+'</div>'
+        +'<div class="sub">'+rp(m.price)+(m.desc?(' · '+esc(m.desc)):'')+'</div></div>'
+        +(canEdit ? ('<button class="btn sm sec" data-mwedit=\''+esc(JSON.stringify({id:m.id,cat:m.cat,name:m.name,price:m.price,desc:m.desc,sortOrder:m.sortOrder}))+'\'>Edit</button>'
+          +'<button class="btn sm sec" data-mwact="'+esc(m.id)+'" data-on="'+(m.avail?'1':'0')+'">'+(m.avail?'Off':'On')+'</button>') : '')
+        +(masterEdit ? ('<button class="btn sm red" data-mwdel="'+esc(m.id)+'">Hapus</button>') : '')+'</div>'; }).join('');
+    if(canEdit){
+      box.querySelectorAll('[data-mwact]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.setMenuItemAvail(b.getAttribute('data-mwact'), b.getAttribute('data-on')!=='1'); loadMenuWebItems(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+      box.querySelectorAll('[data-mwedit]').forEach(function(b){ b.onclick=function(){ var m=JSON.parse(b.getAttribute('data-mwedit')); editMenuWebItem(m); }; });
+    }
+    if(masterEdit){
+      box.querySelectorAll('[data-mwdel]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus menu ini permanen?')) return; busy=true; b.disabled=true; try{ await O.deleteMenuItem(b.getAttribute('data-mwdel')); loadMenuWebItems(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    }
+  }
+  function resetMenuWebForm(){
+    ['mwCat','mwName','mwPrice','mwDesc','mwSort'].forEach(function(i){ var e=document.getElementById(i); if(e) e.value=''; });
+    var f=document.getElementById('mwFile'); if(f) f.value='';
+    var pv=document.getElementById('mwPreview'); if(pv) pv.innerHTML='';
+    _mwPendingBlob=null; _mwPendingPreview='';
+    var add=document.getElementById('mwAdd'); if(add){ add.textContent='＋ Simpan menu'; delete add.dataset.editId; }
+    var msg=document.getElementById('mwMsg'); if(msg) msg.innerHTML='';
+  }
+  function editMenuWebItem(m){
+    var g=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
+    g('mwCat',m.cat); g('mwName',m.name); g('mwPrice',m.price); g('mwDesc',m.desc||''); g('mwSort',m.sortOrder||'');
+    var add=document.getElementById('mwAdd'); if(add){ add.textContent='💾 Simpan perubahan'; add.dataset.editId=m.id; }
+    var msg=document.getElementById('mwMsg'); if(msg) msg.innerHTML='<div class="muted" style="margin-top:6px">Mengedit <b>'+esc(m.name)+'</b> — foto lama tetap dipakai kalau gak pilih foto baru. <a href="#" id="mwCancel">Batal</a></div>';
+    var cc=document.getElementById('mwCancel'); if(cc) cc.onclick=function(e){ e.preventDefault(); resetMenuWebForm(); };
+    try{ document.getElementById('mwCat').scrollIntoView({block:'center'}); }catch(e){}
   }
 
   var _logoutLink=document.getElementById('logoutLink'); if(_logoutLink) _logoutLink.onclick=async function(){ try{ if(window.OmaOpa) await window.OmaOpa.signOut(); }catch(e){} location.reload(); };

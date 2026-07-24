@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Kasir POS — Oma Opa Cakery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --kuning:#FACC1A; --kuning-d:#E0B100; --coklat:#613925; --cream:#FFF8EC; }
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:'Nunito',system-ui,sans-serif; color:var(--coklat);
+    background:radial-gradient(circle at 12% 8%, #FFE7B8 0%, transparent 42%), var(--cream);
+    min-height:100vh; padding:18px 14px 120px; }
+  .wrap{ max-width:460px; margin:0 auto; }
+  .head{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .head h1{ font-family:'Fredoka'; font-size:1.2rem; margin:0; color:var(--coklat); }
+  .head .badge{ font-size:.66rem; font-weight:900; background:var(--kuning); color:#5A3A05; padding:2px 9px; border-radius:999px; }
+  .card{ background:#fff; border:2px solid #EFE2C4; border-radius:18px; padding:16px; margin-bottom:14px; }
+  .muted{ color:#9a7a5e; font-weight:700; font-size:.85rem; }
+  label{ font-size:.78rem; font-weight:800; color:#8a6a3a; display:block; margin:0 0 5px; }
+  input{ width:100%; border:2px solid #E7D8BE; border-radius:12px; padding:12px; font-size:1rem; font-family:inherit; font-weight:700; color:var(--coklat); }
+  input:focus{ outline:none; border-color:var(--kuning); }
+  .btn{ width:100%; border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:1rem; border-radius:13px; padding:13px; cursor:pointer; box-shadow:0 3px 0 var(--kuning-d); font-family:inherit; margin-top:10px; }
+  .btn:active{ transform:translateY(2px); box-shadow:0 1px 0 var(--kuning-d); }
+  .btn[disabled]{ opacity:.45; cursor:not-allowed; }
+  .btn.sec{ background:#fff; color:var(--coklat); border:2px solid #E7D8BE; box-shadow:none; }
+  .btn.danger{ background:#2E7D32; color:#fff; box-shadow:0 3px 0 #1B5E20; }
+  .btn.sm{ width:auto; padding:8px 14px; font-size:.82rem; margin:0; }
+  .res{ border-radius:14px; padding:14px; margin-top:14px; }
+  .res .t{ font-weight:900; font-size:1.05rem; }
+  .row{ font-size:.82rem; margin-top:6px; display:flex; justify-content:space-between; gap:8px; }
+  .ok{ background:#E7F6E7; border:2px solid #B7E0B7; }
+  .warn{ background:#FFF3D6; border:2px solid #F2D98A; }
+  .bad{ background:#FDECEC; border:2px solid #F3C2C2; color:#C0392B; }
+  a.link{ color:#C98A1B; font-weight:800; text-decoration:none; font-size:.82rem; }
+  .catname{ font-family:'Fredoka'; font-size:.86rem; color:#8a6a3a; margin:14px 0 6px; }
+  .prow{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #F1E4CC; }
+  .prow:last-child{ border-bottom:none; }
+  .prow .pn{ flex:1; font-weight:800; font-size:.92rem; }
+  .prow .pp{ color:#9a7a5e; font-weight:700; font-size:.8rem; }
+  .addb{ border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:1.1rem; width:34px; height:34px; border-radius:10px; cursor:pointer; line-height:1; }
+  .cline{ display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #F1E4CC; }
+  .cline:last-child{ border-bottom:none; }
+  .cline .cn{ flex:1; font-weight:800; font-size:.88rem; }
+  .cline .cp{ color:#9a7a5e; font-weight:700; font-size:.78rem; }
+  .stepper{ display:flex; align-items:center; gap:6px; }
+  .stepper button{ border:2px solid #E7D8BE; background:#fff; width:26px; height:26px; border-radius:8px; font-weight:900; cursor:pointer; color:var(--coklat); }
+  .stepper span{ min-width:20px; text-align:center; font-weight:900; }
+  .cartbar{ position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:2px solid #EFE2C4; padding:12px 14px; box-shadow:0 -4px 14px rgba(0,0,0,.06); }
+  .cartbar .inner{ max-width:460px; margin:0 auto; display:flex; align-items:center; gap:12px; }
+  .cartbar .info{ flex:1; }
+  .cartbar .info .a{ font-weight:900; font-size:.98rem; }
+  .cartbar .info .b{ color:#9a7a5e; font-weight:700; font-size:.76rem; }
+  .cartbar .btn{ width:auto; padding:12px 20px; margin:0; }
+  .memres{ margin-top:8px; border:2px solid #E7D8BE; border-radius:12px; overflow:hidden; }
+  .memres .mi{ padding:10px 12px; border-bottom:1px solid #F1E4CC; cursor:pointer; }
+  .memres .mi:last-child{ border-bottom:none; }
+  .memres .mi:active{ background:#FFF6E6; }
+  .memres .mi .n{ font-weight:900; font-size:.88rem; }
+  .memres .mi .p{ color:#9a7a5e; font-weight:700; font-size:.76rem; }
+  .paywrap{ display:flex; gap:8px; margin-top:6px; }
+  .paybtn{ flex:1; border:2px solid #E7D8BE; background:#fff; border-radius:12px; padding:11px 4px; font-weight:900; font-size:.8rem; cursor:pointer; color:var(--coklat); }
+  .paybtn.on{ background:var(--kuning); border-color:var(--kuning-d); }
+  .divider{ text-align:center; margin:14px 0 8px; color:#b59a7e; font-weight:800; font-size:.78rem; }
+  .uid{ font-family:monospace; font-size:.8rem; background:#F1E4CC; border-radius:8px; padding:6px 9px; word-break:break-all; margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex;gap:7px;margin-bottom:12px">
+    <a href="admin.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">🛠️ Admin</a>
+    <a href="staff.html" style="flex:1;text-align:center;text-decoration:none;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FFF8EC;color:#613925">🧾 Kasir Lama</a>
+    <span style="flex:1;text-align:center;padding:9px 4px;border-radius:11px;font-weight:800;font-size:.82rem;border:2px solid #E0B100;background:#FACC1A;color:#613925">🛒 POS</span>
+  </div>
+  <div class="head">
+    <h1>Kasir POS</h1><span class="badge">STAFF</span>
+  </div>
+  <div id="panel" class="card"><div class="muted">Menyiapkan…</div></div>
+  <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
+</div>
+
+<script type="module" src="core-omaopa.js?v=167"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script>
+(function(){
+  var panel = document.getElementById('panel');
+  var busy = false, scanner = null, scanning = false;
+  var EARN_PER_POINT = 4000;
+  var PRODUCTS = null; // cache katalog
+  var CART = []; // {id,name,price,qty}
+  var STATE = 'cart'; // 'cart' | 'checkout' | 'done'
+  var MEMBER = null; // {uid,name,phone,points}
+  var VOUCHER = null; // {code,title,discType,discValue,discMax,freeItemName}
+  var PAYMENT = 'cash';
+  var searchTimer = null;
+
+  function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  async function stopScan(){ if(scanner && scanning){ try{ await scanner.stop(); }catch(e){} scanning=false; } }
+
+  function cartCount(){ return CART.reduce(function(s,c){ return s+c.qty; }, 0); }
+  function cartSubtotal(){ return CART.reduce(function(s,c){ return s+c.qty*c.price; }, 0); }
+  function voucherDiscount(){
+    if(!VOUCHER) return 0;
+    if(VOUCHER.discType==='percent'){
+      var d=Math.floor(cartSubtotal()*(Number(VOUCHER.discValue)||0)/100);
+      var cap=Number(VOUCHER.discMax)||0; if(cap>0 && d>cap) d=cap;
+      return d;
+    }
+    return 0;
+  }
+  function cartTotal(){ return Math.max(0, cartSubtotal()-voucherDiscount()); }
+
+  async function refresh(){
+    await stopScan();
+    if(!window.OmaOpa){ panel.innerHTML = '<div class="muted">Menyiapkan…</div>'; return; }
+    var u = window.OmaOpa.getUser();
+    if(!u){
+      panel.innerHTML = '<div class="muted">Halaman khusus kasir. Silakan masuk dengan akun staff.</div>'
+        + '<button class="btn" id="loginBtn">Masuk</button>';
+      document.getElementById('loginBtn').onclick = function(){ window.OmaOpa.openLogin(); };
+      return;
+    }
+    panel.innerHTML = '<div class="muted">Memeriksa akses staff…</div>';
+    var staff = false;
+    try{ staff = await window.OmaOpa.isStaff(); }catch(e){ staff=false; }
+    if(!staff){
+      panel.innerHTML = '<div class="t" style="font-weight:900;color:#C0392B">Akun ini belum terdaftar sebagai staff.</div>'
+        + '<div class="muted" style="margin-top:8px">Minta admin menambahkan UID berikut ke daftar staff:</div>'
+        + '<div class="uid">'+esc(u.uid)+'</div>'
+        + '<button class="btn sec" id="outBtn" style="margin-top:12px">Keluar / ganti akun</button>';
+      document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} };
+      return;
+    }
+    if(!PRODUCTS){
+      panel.innerHTML = '<div class="muted">Memuat katalog produk…</div>';
+      try{ PRODUCTS = await window.OmaOpa.listProductsPublic(); }catch(e){ PRODUCTS = []; }
+    }
+    render();
+  }
+
+  function render(){
+    if(STATE==='cart') return renderCartScreen();
+    if(STATE==='checkout') return renderCheckoutScreen();
+    if(STATE==='done') return; // done screen dirender manual pas transaksi selesai
+    renderCartScreen();
+  }
+
+  // ============ LAYAR 1: KATALOG + KERANJANG ============
+  function renderCartScreen(){
+    var existingBar=document.getElementById('cartbar'); if(existingBar) existingBar.remove();
+    if(!PRODUCTS || !PRODUCTS.length){
+      panel.innerHTML = '<div class="res warn">Belum ada produk di katalog. Tambahin dulu di tab <b>Produk</b> pada halaman Admin ya.</div>'
+        + '<button class="btn sec" id="rl">↻ Muat ulang</button>';
+      document.getElementById('rl').onclick=async function(){ PRODUCTS=null; await refresh(); };
+      return;
+    }
+    var byCat={}; var order=[];
+    PRODUCTS.forEach(function(p){ var c=p.category||'Lainnya'; if(!byCat[c]){ byCat[c]=[]; order.push(c); } byCat[c].push(p); });
+    var html='<div class="muted" style="margin-bottom:8px">Pilih produk buat masuk keranjang.</div>';
+    order.forEach(function(cat){
+      html+='<div class="catname">'+esc(cat)+'</div>';
+      byCat[cat].forEach(function(p){
+        var inCart=CART.find(function(c){ return c.id===p.id; });
+        html+='<div class="prow"><div class="pn">'+esc(p.name)+(inCart?(' <span style="color:#2E7D32">×'+inCart.qty+'</span>'):'')+'<div class="pp">'+rp(p.price)+'</div></div>'
+          +'<button class="addb" data-add="'+esc(p.id)+'">＋</button></div>';
+      });
+    });
+    panel.innerHTML = html;
+    panel.querySelectorAll('[data-add]').forEach(function(b){
+      b.onclick=function(){
+        var id=b.getAttribute('data-add'); var p=PRODUCTS.find(function(x){ return x.id===id; }); if(!p) return;
+        var line=CART.find(function(c){ return c.id===id; });
+        if(line){ line.qty++; } else { CART.push({ id:p.id, name:p.name, price:p.price, qty:1 }); }
+        renderCartScreen(); mountCartBar();
+      };
+    });
+    mountCartBar();
+  }
+
+  function mountCartBar(){
+    var old=document.getElementById('cartbar'); if(old) old.remove();
+    if(!cartCount()) return;
+    var bar=document.createElement('div'); bar.id='cartbar'; bar.className='cartbar';
+    bar.innerHTML='<div class="inner"><div class="info"><div class="a">'+cartCount()+' item · '+rp(cartSubtotal())+'</div><div class="b">Ketuk buat lihat/ubah keranjang</div></div>'
+      +'<button class="btn" id="cartGo">Lanjut →</button></div>';
+    document.body.appendChild(bar);
+    document.getElementById('cartGo').onclick=function(){ STATE='checkout'; renderCheckoutScreen(); bar.remove(); };
+    bar.querySelector('.info').onclick=function(){ openCartEditor(); };
+  }
+
+  function openCartEditor(){
+    var html='<div class="muted" style="margin-bottom:8px">Keranjang</div>';
+    CART.forEach(function(c){
+      html+='<div class="cline"><div class="cn">'+esc(c.name)+'<div class="cp">'+rp(c.price)+'</div></div>'
+        +'<div class="stepper"><button data-dec="'+esc(c.id)+'">−</button><span>'+c.qty+'</span><button data-inc="'+esc(c.id)+'">＋</button></div></div>';
+    });
+    html+='<div class="res" style="background:#FFF8EC;border:2px solid #F1E4CC;margin-top:10px"><div class="row"><b>Subtotal</b><b>'+rp(cartSubtotal())+'</b></div></div>'
+      +'<button class="btn" id="ceBack">‹ Kembali pilih produk</button>';
+    panel.innerHTML=html;
+    panel.querySelectorAll('[data-inc]').forEach(function(b){ b.onclick=function(){ var l=CART.find(function(c){return c.id===b.getAttribute('data-inc');}); if(l){ l.qty++; openCartEditor(); } }; });
+    panel.querySelectorAll('[data-dec]').forEach(function(b){ b.onclick=function(){ var id=b.getAttribute('data-dec'); var l=CART.find(function(c){return c.id===id;}); if(l){ l.qty--; if(l.qty<=0) CART=CART.filter(function(c){return c.id!==id;}); openCartEditor(); mountCartBar(); } }; });
+    document.getElementById('ceBack').onclick=function(){ renderCartScreen(); };
+  }
+
+  // ============ LAYAR 2: CHECKOUT (member + voucher + bayar) ============
+  function renderCheckoutScreen(){
+    var old=document.getElementById('cartbar'); if(old) old.remove();
+    var disc=voucherDiscount(); var total=cartTotal();
+    var html='<a href="#" id="backCart" class="link">‹ Ubah keranjang</a>';
+    html+='<div class="catname">Keranjang (' + cartCount() + ' item)</div>';
+    CART.forEach(function(c){ html+='<div class="row" style="font-size:.82rem;margin-top:4px"><span>'+esc(c.name)+' ×'+c.qty+'</span><span>'+rp(c.qty*c.price)+'</span></div>'; });
+
+    html+='<div class="catname">Member</div>';
+    if(!MEMBER){
+      html+='<label>Cari nama member</label><input id="memQ" placeholder="ketik nama…" autocomplete="off">'
+        +'<div id="memResBox"></div>'
+        +'<div class="divider">— atau —</div>'
+        +'<button class="btn sec" id="scanBtn">📷 Scan (Member / Voucher)</button>'
+        +'<div id="reader" style="display:none;margin-top:10px;border-radius:14px;overflow:hidden"></div>'
+        +'<a href="#" id="toggleCode" class="link" style="display:block;margin-top:10px">Kode member gak ketemu? Masukin kode 6 digit</a>'
+        +'<div id="codeBox" style="display:none;margin-top:8px"><input id="memCode" placeholder="123456" inputmode="numeric" maxlength="6"><button class="btn sec" id="codeGo">Cek kode</button></div>'
+        +'<div id="memMsg"></div>';
+    } else {
+      html+='<div class="res ok"><div class="row"><b>'+esc(MEMBER.name||'Member')+'</b><span>'+MEMBER.points+' poin</span></div>'
+        +(MEMBER.phone?('<div class="row"><span class="muted">'+esc(MEMBER.phone)+'</span><span></span></div>'):'')+'</div>'
+        +'<a href="#" id="changeMember" class="link" style="display:block;margin-top:6px">Ganti member</a>';
+
+      html+='<div class="catname">Voucher</div>';
+      if(!VOUCHER){
+        html+='<button class="btn sec" id="scanVoucherBtn">📷 Scan Voucher</button>'
+          +'<div id="reader" style="display:none;margin-top:10px;border-radius:14px;overflow:hidden"></div>'
+          +'<a href="#" id="toggleVCode" class="link" style="display:block;margin-top:10px">Ketik kode voucher manual</a>'
+          +'<div id="vCodeBox" style="display:none;margin-top:8px"><input id="vCode" placeholder="OO-XXXXXXXX" autocapitalize="characters"><button class="btn sec" id="vCodeGo">Cek voucher</button></div>'
+          +'<div id="vMsg"></div>';
+      } else {
+        html+='<div class="res ok"><div class="row"><b>'+esc(VOUCHER.title||VOUCHER.code)+'</b>'
+          +(VOUCHER.discType==='percent'?('<span>−'+VOUCHER.discValue+'%</span>'):(VOUCHER.freeItemName?('<span>Gratis '+esc(VOUCHER.freeItemName)+'</span>'):''))+'</div></div>'
+          +'<a href="#" id="cancelVoucher" class="link" style="display:block;margin-top:6px">Batal pakai voucher</a>';
+      }
+
+      html+='<div class="catname">Metode bayar</div>'
+        +'<div class="paywrap">'
+          +'<button class="paybtn'+(PAYMENT==='cash'?' on':'')+'" data-pay="cash">💵 Cash</button>'
+          +'<button class="paybtn'+(PAYMENT==='qris'?' on':'')+'" data-pay="qris">📱 QRIS</button>'
+          +'<button class="paybtn'+(PAYMENT==='debit'?' on':'')+'" data-pay="debit">💳 Debit</button>'
+        +'</div>';
+      if(PAYMENT==='cash'){
+        html+='<label style="margin-top:12px">Uang diterima</label><input id="cashIn" inputmode="numeric" placeholder="cth: 100000">'
+          +'<div id="changeInfo" class="muted" style="margin-top:6px"></div>';
+      }
+
+      html+='<div class="res" style="background:#FFF8EC;border:2px solid #F1E4CC;margin-top:14px">'
+        +'<div class="row"><span>Subtotal</span><span>'+rp(cartSubtotal())+'</span></div>'
+        +(disc>0?('<div class="row" style="color:#C0392B"><span>Diskon voucher</span><span>−'+rp(disc)+'</span></div>'):'')
+        +'<div class="row" style="font-weight:900;font-size:1rem;margin-top:4px"><span>TOTAL</span><span>'+rp(total)+'</span></div>'
+        +'</div>';
+
+      html+='<button class="btn" id="submitBtn">✅ Selesaikan Transaksi</button>'
+        +'<div id="submitMsg"></div>';
+    }
+
+    panel.innerHTML = html;
+    document.getElementById('backCart').onclick=function(e){ e.preventDefault(); STATE='cart'; renderCartScreen(); };
+
+    if(!MEMBER){
+      var mq=document.getElementById('memQ');
+      mq.addEventListener('input', function(){
+        clearTimeout(searchTimer);
+        var q=mq.value.trim();
+        if(q.length<2){ document.getElementById('memResBox').innerHTML=''; return; }
+        searchTimer=setTimeout(function(){ doMemberSearch(q); }, 350);
+      });
+      document.getElementById('scanBtn').onclick=function(){ toggleScan(handleScanResult); };
+      document.getElementById('toggleCode').onclick=function(e){ e.preventDefault(); var b=document.getElementById('codeBox'); b.style.display = b.style.display==='none'?'block':'none'; };
+      document.getElementById('codeGo').onclick=function(){ doMemberCode(document.getElementById('memCode').value); };
+    } else {
+      document.getElementById('changeMember').onclick=function(e){ e.preventDefault(); MEMBER=null; VOUCHER=null; renderCheckoutScreen(); };
+      if(!VOUCHER){
+        document.getElementById('scanVoucherBtn').onclick=function(){ toggleScan(handleScanResult); };
+        document.getElementById('toggleVCode').onclick=function(e){ e.preventDefault(); var b=document.getElementById('vCodeBox'); b.style.display = b.style.display==='none'?'block':'none'; };
+        document.getElementById('vCodeGo').onclick=function(){ doVoucherCode(document.getElementById('vCode').value); };
+      } else {
+        document.getElementById('cancelVoucher').onclick=function(e){ e.preventDefault(); VOUCHER=null; renderCheckoutScreen(); };
+      }
+      panel.querySelectorAll('[data-pay]').forEach(function(b){ b.onclick=function(){ PAYMENT=b.getAttribute('data-pay'); renderCheckoutScreen(); }; });
+      if(PAYMENT==='cash'){
+        var ci=document.getElementById('cashIn');
+        ci.addEventListener('input', function(){
+          var n=parseInt((ci.value||'').replace(/\D/g,''),10)||0;
+          var chg=n-cartTotal();
+          document.getElementById('changeInfo').textContent = chg>=0 ? ('Kembalian: '+rp(chg)) : ('Kurang '+rp(-chg));
+        });
+      }
+      document.getElementById('submitBtn').onclick=submitTransaction;
+    }
+  }
+
+  // ---- pencarian member by nama ----
+  async function doMemberSearch(q){
+    var box=document.getElementById('memResBox'); if(!box) return;
+    box.innerHTML='<div class="muted" style="margin-top:8px">Mencari…</div>';
+    var list=[]; try{ list = await window.OmaOpa.listMembers(q, 10); }catch(e){ list=[]; }
+    if(!list.length){ box.innerHTML='<div class="muted" style="margin-top:8px">Gak ketemu. Coba scan / kode member.</div>'; return; }
+    box.innerHTML='<div class="memres">'+list.map(function(m){
+      return '<div class="mi" data-uid="'+esc(m.uid)+'"><div class="n">'+esc(m.name||'(tanpa nama)')+'</div><div class="p">'+esc(m.phone||'-')+' · '+m.points+' poin</div></div>';
+    }).join('')+'</div>';
+    box.querySelectorAll('[data-uid]').forEach(function(el){
+      el.onclick=function(){
+        var m=list.find(function(x){ return x.uid===el.getAttribute('data-uid'); });
+        if(m){ MEMBER = { uid:m.uid, name:m.name, phone:m.phone, points:m.points }; renderCheckoutScreen(); }
+      };
+    });
+  }
+
+  async function doMemberCode(code){
+    var msg=document.getElementById('memMsg'); if(!msg) return;
+    code=(code||'').trim().replace(/\D/g,'');
+    if(code.length!==6){ msg.innerHTML='<div class="res bad">Kode member harus 6 digit angka.</div>'; return; }
+    msg.innerHTML='<div class="muted" style="margin-top:8px">Mencari…</div>';
+    var m=null; try{ m=await window.OmaOpa.getMemberByCode(code); }catch(e){}
+    if(!m){ msg.innerHTML='<div class="res bad">Kode member tidak ketemu.</div>'; return; }
+    MEMBER = m; renderCheckoutScreen();
+  }
+
+  async function doVoucherCode(code){
+    var msg=document.getElementById('vMsg'); if(!msg) return;
+    code=(code||'').trim().toUpperCase();
+    if(!code){ msg.innerHTML='<div class="res bad">Masukkan kode voucher dulu.</div>'; return; }
+    msg.innerHTML='<div class="muted" style="margin-top:8px">Mengecek…</div>';
+    await applyVoucher(code, msg);
+  }
+
+  async function applyVoucher(code, msgEl){
+    function fail(t){ if(msgEl) msgEl.innerHTML='<div class="res bad">'+t+'</div>'; else alert(t.replace(/<[^>]+>/g,'')); }
+    var v=null; try{ v=await window.OmaOpa.findVoucher(code); }catch(e){}
+    if(!v){ fail('Voucher tidak ditemukan.'); return; }
+    if(v.status==='terpakai'){ fail('Voucher ini udah dipakai.'); return; }
+    if(v.isExpired){ fail('Voucher ini udah kadaluarsa.'); return; }
+    if(v.uid && MEMBER && v.uid!==MEMBER.uid){ fail('Voucher ini bukan milik '+esc(MEMBER.name||'member')+' — punya '+esc(v.name||'member lain')+'.'); return; }
+    if(v.discType!=='percent' && v.discType!=='freeitem'){ fail('Voucher ini bukan jenis diskon/item gratis.'); return; }
+    VOUCHER = { code:v.code, title:v.title, discType:v.discType, discValue:v.discValue, discMax:v.discMax, freeItemName:v.freeItemName, uid:v.uid };
+    renderCheckoutScreen();
+  }
+
+  // ---- scan QR (member / voucher), dipakai bareng di 2 tempat ----
+  async function toggleScan(onResult){
+    var rd=document.getElementById('reader');
+    if(scanning){ await stopScan(); if(rd) rd.style.display='none'; return; }
+    if(typeof Html5Qrcode==='undefined'){ alert('Scanner belum termuat. Cek koneksi internet lalu coba lagi.'); return; }
+    if(rd){ rd.style.display='block'; rd.innerHTML=''; }
+    if(!scanner) scanner=new Html5Qrcode('reader');
+    try{
+      await scanner.start({facingMode:'environment'}, {fps:10, qrbox:230}, function(text){ onResult(text); }, function(){});
+      scanning=true;
+    }catch(e){
+      if(rd) rd.style.display='none';
+      alert('Tidak bisa akses kamera: '+((e&&e.message)||'izin ditolak')+'. Pastikan situs dibuka via https & izin kamera diberikan.');
+    }
+  }
+
+  async function handleScanResult(text){
+    await stopScan();
+    var rd=document.getElementById('reader'); if(rd) rd.style.display='none';
+    text=(text||'').trim();
+    if(/^OMAOPA:MEMBER:/i.test(text)){
+      var uid=text.replace(/^OMAOPA:MEMBER:/i,'');
+      var full=null; try{ full=await window.OmaOpa.getMemberByUid(uid); }catch(e){}
+      if(!full){ alert('Member tidak ditemukan.'); return; }
+      MEMBER=full; renderCheckoutScreen(); return;
+    }
+    if(/^OMAOPA:VOUCHER:/i.test(text)){
+      var code=text.replace(/^OMAOPA:VOUCHER:/i,'');
+      if(!MEMBER){ alert('Pilih member dulu sebelum pakai voucher.'); return; }
+      await applyVoucher(code, null);
+      return;
+    }
+    alert('QR tidak dikenali. Pastikan ini QR Kartu Member / Voucher Oma Opa.');
+  }
+
+  // ---- submit transaksi ----
+  async function submitTransaction(){
+    if(busy) return;
+    if(!MEMBER){ alert('Pilih member dulu.'); return; }
+    var cashReceived=0;
+    if(PAYMENT==='cash'){
+      cashReceived=parseInt((document.getElementById('cashIn').value||'').replace(/\D/g,''),10)||0;
+      if(cashReceived<cartTotal()){ alert('Uang diterima kurang dari total belanja.'); return; }
+    }
+    busy=true; var b=document.getElementById('submitBtn'); if(b){ b.disabled=true; b.textContent='Memproses…'; }
+    var msg=document.getElementById('submitMsg');
+    try{
+      var r = await window.OmaOpa.recordPosTransaction({
+        uid: MEMBER.uid,
+        items: CART.map(function(c){ return { productId:c.id, name:c.name, qty:c.qty, price:c.price }; }),
+        paymentMethod: PAYMENT,
+        cashReceived: cashReceived,
+        voucherCode: VOUCHER ? VOUCHER.code : ''
+      });
+      renderDoneScreen(r);
+    }catch(e){
+      if(msg) msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'coba lagi')+'</div>';
+    }
+    busy=false;
+  }
+
+  // ============ LAYAR 3: SELESAI / STRUK ============
+  function renderDoneScreen(r){
+    STATE='done';
+    var old=document.getElementById('cartbar'); if(old) old.remove();
+    var html='<div class="res ok"><div class="t">✓ Transaksi berhasil</div>'
+      +'<div class="row"><span>Member</span><span>'+esc(r.name||MEMBER.name||'-')+'</span></div>'
+      +'<div class="row"><span>Total</span><span>'+rp(r.nominal)+'</span></div>'
+      +(r.discount>0?('<div class="row"><span>Diskon voucher</span><span>−'+rp(r.discount)+'</span></div>'):'')
+      +'<div class="row"><span>Metode</span><span>'+String(r.paymentMethod||'').toUpperCase()+'</span></div>'
+      +(r.paymentMethod==='cash'?('<div class="row"><span>Kembalian</span><span>'+rp(r.change)+'</span></div>'):'')
+      +'<div class="row"><span>Poin didapat</span><span>+'+r.points+' (total '+r.newTotal+')</span></div>'
+      +'</div>'
+      +'<button class="btn" id="printBtn">🖨️ Cetak Struk (Bluetooth)</button>'
+      +'<div id="printMsg"></div>'
+      +'<button class="btn sec" id="newTxBtn">🧾 Transaksi Baru</button>';
+    panel.innerHTML=html;
+    document.getElementById('printBtn').onclick=function(){ doPrint(r); };
+    document.getElementById('newTxBtn').onclick=function(){
+      CART=[]; MEMBER=null; VOUCHER=null; PAYMENT='cash'; STATE='cart'; renderCartScreen();
+    };
+  }
+
+  // ============ CETAK STRUK VIA BLUETOOTH (ESC/POS) ============
+  var BLE_CANDIDATES=[
+    { service:'000018f0-0000-1000-8000-00805f9b34fb', chars:['00002af1-0000-1000-8000-00805f9b34fb'] },
+    { service:'49535343-fe7d-4ae5-8fa9-9fafd205e455', chars:['49535343-8841-43f4-a8d4-ecbe34729bb3','49535343-1e4d-4bd9-ba61-23c647249616'] },
+    { service:'0000ff00-0000-1000-8000-00805f9b34fb', chars:['0000ff02-0000-1000-8000-00805f9b34fb'] }
+  ];
+  function buildReceiptBytes(r){
+    var W=32; // lebar kertas 58mm (~32 karakter font A). Kalau printer 80mm, ganti ke 48.
+    function center(s){ s=String(s); var pad=Math.max(0, Math.floor((W-s.length)/2)); return new Array(pad+1).join(' ')+s; }
+    function lineChar(ch){ return new Array(W+1).join(ch||'-'); }
+    function twoCol(l,rr){ l=String(l); rr=String(rr); var sp=Math.max(1, W-l.length-rr.length); return l+new Array(sp+1).join(' ')+rr; }
+    function plainRp(n){ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }
+    var L=[];
+    L.push(center('OMA OPA CAKERY'));
+    if(r.outlet) L.push(center(r.outlet));
+    L.push(lineChar('-'));
+    (r.items||[]).forEach(function(it){
+      L.push(it.name+' x'+it.qty);
+      L.push(twoCol('', plainRp(it.qty*it.price)));
+    });
+    L.push(lineChar('-'));
+    L.push(twoCol('Subtotal', plainRp(r.subtotal)));
+    if(r.discount>0) L.push(twoCol('Diskon', '-'+plainRp(r.discount)));
+    L.push(twoCol('TOTAL', plainRp(r.nominal)));
+    L.push(twoCol('Metode', String(r.paymentMethod||'').toUpperCase()));
+    if(r.paymentMethod==='cash'){
+      L.push(twoCol('Tunai', plainRp(r.cashReceived)));
+      L.push(twoCol('Kembali', plainRp(r.change)));
+    }
+    L.push(lineChar('-'));
+    L.push('Member: '+(r.name||'-'));
+    L.push('Poin  : +'+r.points+' (total '+r.newTotal+')');
+    L.push(lineChar('-'));
+    L.push(center('Terima kasih!'));
+    L.push(''); L.push(''); L.push('');
+    var text=L.join('\n');
+    var bytes=[0x1B,0x40]; // init printer
+    for(var i=0;i<text.length;i++){ var c=text.charCodeAt(i); bytes.push(c<256?c:0x3F); }
+    bytes.push(0x0A,0x0A,0x0A);
+    bytes.push(0x1D,0x56,0x01); // partial cut (kalau printer gak support cut, baris ini biasanya diabaikan aman)
+    return new Uint8Array(bytes);
+  }
+  async function findWritableCharacteristic(server){
+    for(var i=0;i<BLE_CANDIDATES.length;i++){
+      try{
+        var svc=await server.getPrimaryService(BLE_CANDIDATES[i].service);
+        for(var j=0;j<BLE_CANDIDATES[i].chars.length;j++){
+          try{ var ch=await svc.getCharacteristic(BLE_CANDIDATES[i].chars[j]); return ch; }catch(e){}
+        }
+      }catch(e){}
+    }
+    try{
+      var services=await server.getPrimaryServices();
+      for(var s=0;s<services.length;s++){
+        var chars=await services[s].getCharacteristics();
+        for(var c=0;c<chars.length;c++){ if(chars[c].properties.write || chars[c].properties.writeWithoutResponse) return chars[c]; }
+      }
+    }catch(e){}
+    return null;
+  }
+  async function doPrint(r){
+    var msg=document.getElementById('printMsg'); if(msg) msg.innerHTML='<div class="muted" style="margin-top:8px">Menghubungkan ke printer…</div>';
+    if(!navigator.bluetooth){
+      if(msg) msg.innerHTML='<div class="res bad">Browser ini gak support Bluetooth. Pastikan buka pakai Chrome di Android.</div>';
+      return;
+    }
+    try{
+      var device = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices: BLE_CANDIDATES.map(function(c){ return c.service; }) });
+      var server = await device.gatt.connect();
+      var ch = await findWritableCharacteristic(server);
+      if(!ch){ if(msg) msg.innerHTML='<div class="res bad">Gak ketemu printer yang cocok. Kasih tau merk/tipe printer Bluetooth-nya biar disesuaikan.</div>'; return; }
+      var bytes=buildReceiptBytes(r);
+      var CHUNK=180;
+      for(var off=0; off<bytes.length; off+=CHUNK){
+        var chunk=bytes.slice(off, off+CHUNK);
+        try{ await ch.writeValueWithoutResponse(chunk); }catch(e){ await ch.writeValue(chunk); }
+        await new Promise(function(res){ setTimeout(res,60); });
+      }
+      if(msg) msg.innerHTML='<div class="res ok">✓ Struk terkirim ke printer.</div>';
+    }catch(e){
+      if(msg) msg.innerHTML='<div class="res bad">Gagal print: '+esc((e&&e.message)||'coba lagi')+'</div>';
+    }
+  }
+
+  window.addEventListener('omaopa:ready', function(){ if(STATE!=='done') refresh(); });
+  setTimeout(refresh, 800);
+})();
+</script>
+</body>
+</html>
