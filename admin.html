@@ -108,14 +108,14 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=168"></script>
+<script type="module" src="core-omaopa.js?v=169"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
   var tab='home', busy=false, segFilter=null, canEdit=false, masterEdit=false, sPage=0;
   var MEMBERS=null, TXN=null; // cache
   var memStack=[null], memPage=0; // paginasi member (cursor)
-  var curOf='baru', curOrders=[], OUTLETS_CACHE=[]; var _mwPendingBlob=null, _mwPendingPreview='';
+  var curOf='baru', curOrders=[], OUTLETS_CACHE=[]; var _mwPendingBlob=null, _mwPendingPreview=''; var _pPendingBlob=null, _pPendingPreview='';
   var PAL=['#FFC21A','#E0915B','#7CC9B5','#C98A4B','#88B0E0','#F4A6B0','#9a8b78','#B7D77A','#caa6e0'];
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function csvCell(s){ s=String(s==null?'':s); return '"'+s.replace(/"/g,'""')+'"'; }
@@ -1621,6 +1621,8 @@
         +'<div style="display:flex;gap:8px"><input id="catName" placeholder="Nama kategori (cth: Ogura, Topping, Lilin Ulang Tahun)" style="flex:2"><select id="catType" style="flex:1"><option value="utama">Utama</option><option value="addon">Add-on</option></select></div>'
         +'<button class="btn sec" id="catAdd" style="margin-top:8px">＋ Tambah kategori</button><div id="catMsg"></div></div>') : '')
       +(canEdit ? ('<div class="card"><div class="nm">Tambah produk baru</div>'
+      +'<div id="pPreview" style="margin-bottom:8px"></div>'
+      +'<input type="file" id="pFile" accept="image/*">'
       +'<label>Nama produk</label><input id="pN" placeholder="cth: Ogura Cheese Polos">'
       +'<label>Kategori</label><select id="pCat"><option value="">— pilih kategori —</option>'+catOptions+'</select>'
       +'<label>Harga jual (Rp)</label><input id="pP" inputmode="numeric" placeholder="cth: 35000">'
@@ -1628,6 +1630,24 @@
       +'<button class="btn" id="pAdd">＋ Tambah produk</button><div id="pMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola menu POS.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar produk POS</div><button class="btn sm sec" id="pReload">↻</button></div><div id="pList"><div class="muted">Memuat…</div></div></div>';
     if(canEdit){
+      document.getElementById('pFile').onchange=function(){
+        var f=this.files&&this.files[0]; if(!f) return;
+        if(f.size>8*1024*1024){ alert('Ukuran foto maksimal 8MB.'); this.value=''; return; }
+        var prev=document.getElementById('pPreview'); prev.innerHTML='<div class="muted">Memproses foto…</div>';
+        var rd=new FileReader();
+        rd.onload=function(){
+          var img=new Image();
+          img.onload=function(){
+            var maxW=640; var sc=Math.min(1,maxW/img.width); var cw=Math.round(img.width*sc), ch=Math.round(img.height*sc);
+            var cv=document.createElement('canvas'); cv.width=cw; cv.height=ch; cv.getContext('2d').drawImage(img,0,0,cw,ch);
+            _pPendingPreview=cv.toDataURL('image/jpeg',0.85);
+            cv.toBlob(function(blob){ _pPendingBlob=blob; prev.innerHTML='<img src="'+_pPendingPreview+'" style="width:100px;border-radius:10px;border:2px solid #EFE2C4;display:block">'+'<div class="muted" style="margin-top:4px">'+cw+'×'+ch+', ~'+Math.round((blob?blob.size:0)/1024)+'KB — siap diupload pas Simpan.</div>'; }, 'image/jpeg', 0.85);
+          };
+          img.onerror=function(){ prev.innerHTML='<div class="res bad">Foto tidak terbaca.</div>'; };
+          img.src=rd.result;
+        };
+        rd.readAsDataURL(f);
+      };
       document.getElementById('catAdd').onclick=async function(){ if(busy)return; busy=true; var m=document.getElementById('catMsg'); m.innerHTML='<div class="muted" style="margin-top:6px">Menyimpan…</div>';
         try{ await O.savePosCategory(null, { name:document.getElementById('catName').value, type:document.getElementById('catType').value }); renderProduk(); }
         catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
@@ -1635,7 +1655,7 @@
       document.getElementById('pAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('pMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
         try{ var _pl={ name:document.getElementById('pN').value, categoryId:document.getElementById('pCat').value, price:document.getElementById('pP').value, sortOrder:document.getElementById('pS').value, active:true };
           if(!_pl.categoryId){ msg.innerHTML='<div class="res bad">Pilih kategori dulu.</div>'; busy=false; return; }
-          await O.saveProduct(_eid,_pl);
+          await O.saveProduct(_eid,_pl,_pPendingBlob);
           msg.innerHTML='<div class="res ok">✓ '+(_eid?'Produk diperbarui.':'Produk ditambahkan.')+'</div>'; resetProductForm(); loadProducts();
         }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
     }
@@ -1646,9 +1666,10 @@
     var arr=[]; try{ arr=await O.listProductsAdmin(); }catch(e){}
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada produk. Tambahin dulu di form atas ya.</div>'; return; }
     box.innerHTML=arr.map(function(p){
-      return '<div class="row"><div class="grow"><div class="nm">'+esc(p.name)+(p.active?'':' <span class="tag off">OFF</span>')+' <span class="tag '+(p.categoryType==='addon'?'adm':'on')+'">'+(p.categoryType==='addon'?'ADD-ON':'UTAMA')+'</span></div>'
+      return '<div class="row">'+(p.imageUrl?('<img src="'+esc(p.imageUrl)+'" style="width:42px;height:42px;border-radius:9px;object-fit:cover;margin-right:8px">'):'')
+        +'<div class="grow"><div class="nm">'+esc(p.name)+(p.active?'':' <span class="tag off">OFF</span>')+' <span class="tag '+(p.categoryType==='addon'?'adm':'on')+'">'+(p.categoryType==='addon'?'ADD-ON':'UTAMA')+'</span></div>'
         +'<div class="sub">'+rp(p.price)+(p.categoryName?(' · '+esc(p.categoryName)):' · (tanpa kategori)')+'</div></div>'
-        +(canEdit ? ('<button class="btn sm sec" data-pedit=\''+esc(JSON.stringify({id:p.id,name:p.name,categoryId:p.categoryId,price:p.price,sortOrder:p.sortOrder}))+'\'>Edit</button>'
+        +(canEdit ? ('<button class="btn sm sec" data-pedit=\''+esc(JSON.stringify({id:p.id,name:p.name,categoryId:p.categoryId,price:p.price,sortOrder:p.sortOrder,imageUrl:p.imageUrl}))+'\'>Edit</button>'
           +'<button class="btn sm sec" data-pact="'+esc(p.id)+'" data-on="'+(p.active?'1':'0')+'">'+(p.active?'Off':'On')+'</button>') : '')
         +(masterEdit ? ('<button class="btn sm red" data-pdel="'+esc(p.id)+'">Hapus</button>') : '')+'</div>'; }).join('');
     if(canEdit){
@@ -1662,12 +1683,17 @@
   function resetProductForm(){
     ['pN','pP','pS'].forEach(function(i){ var e=document.getElementById(i); if(e) e.value=''; });
     var pc=document.getElementById('pCat'); if(pc) pc.value='';
+    var pf=document.getElementById('pFile'); if(pf) pf.value='';
+    var pv=document.getElementById('pPreview'); if(pv) pv.innerHTML='';
+    _pPendingBlob=null; _pPendingPreview='';
     var add=document.getElementById('pAdd'); if(add){ add.textContent='＋ Tambah produk'; delete add.dataset.editId; }
     var msg=document.getElementById('pMsg'); if(msg) msg.innerHTML='';
   }
   function editProduct(p){
     var g=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
     g('pN',p.name); g('pCat',p.categoryId||''); g('pP',p.price); g('pS', p.sortOrder||'');
+    _pPendingBlob=null; _pPendingPreview='';
+    var pv=document.getElementById('pPreview'); if(pv) pv.innerHTML = p.imageUrl ? ('<img src="'+esc(p.imageUrl)+'" style="width:100px;border-radius:10px;border:2px solid #EFE2C4;display:block"><div class="muted" style="margin-top:4px">Foto lama tetap dipakai kalau gak pilih foto baru.</div>') : '';
     var add=document.getElementById('pAdd'); if(add){ add.textContent='💾 Simpan perubahan'; add.dataset.editId=p.id; }
     var msg=document.getElementById('pMsg'); if(msg) msg.innerHTML='<div class="muted" style="margin-top:6px">Mengedit <b>'+esc(p.name)+'</b> — ubah di form atas, lalu Simpan. <a href="#" id="pCancel">Batal</a></div>';
     var cc=document.getElementById('pCancel'); if(cc) cc.onclick=function(e){ e.preventDefault(); resetProductForm(); };

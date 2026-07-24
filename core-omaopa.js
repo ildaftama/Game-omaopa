@@ -683,7 +683,7 @@ async function deletePosCategory(id){ if(!(await isMaster())) throw {message:'Kh
 async function listProductsAdmin(){
   try{
     const snap=await getDocs(query(collection(db,'products'), limit(300)));
-    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', categoryId:x.categoryId||'', categoryName:x.categoryName||'', categoryType:(x.categoryType==='addon'?'addon':'utama'), price:(typeof x.price==='number')?x.price:0, active:x.active!==false, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', categoryId:x.categoryId||'', categoryName:x.categoryName||'', categoryType:(x.categoryType==='addon'?'addon':'utama'), price:(typeof x.price==='number')?x.price:0, imageUrl:x.imageUrl||'', active:x.active!==false, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
     arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.name.localeCompare(b.name));
     return arr;
   }catch(e){ return []; }
@@ -691,12 +691,12 @@ async function listProductsAdmin(){
 async function listProductsPublic(){
   try{
     const snap=await getDocs(query(collection(db,'products'), where('active','==',true), limit(300)));
-    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', categoryId:x.categoryId||'', categoryName:x.categoryName||'', categoryType:(x.categoryType==='addon'?'addon':'utama'), price:(typeof x.price==='number')?x.price:0, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', categoryId:x.categoryId||'', categoryName:x.categoryName||'', categoryType:(x.categoryType==='addon'?'addon':'utama'), price:(typeof x.price==='number')?x.price:0, imageUrl:x.imageUrl||'', sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
     arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.name.localeCompare(b.name));
     return arr;
   }catch(e){ return []; }
 }
-async function saveProduct(id, patch){
+async function saveProduct(id, patch, imageBlob){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'}; patch=patch||{};
   const isNew=!id;
   if(!id){ const t=(patch.name||'').trim(); if(!t) throw {message:'Nama produk wajib.'}; id=slug(t)+'-'+Date.now().toString(36); }
@@ -712,6 +712,11 @@ async function saveProduct(id, patch){
   if(patch.price!=null && patch.price!=='') data.price=Math.max(0,Math.floor(Number(patch.price)||0));
   if(patch.active!=null) data.active=!!patch.active;
   if(patch.sortOrder!=null && patch.sortOrder!=='') data.sortOrder=Math.floor(Number(patch.sortOrder)||0);
+  if(imageBlob){
+    const sref=storageRef(storage, 'product-images/'+id+'.jpg');
+    await uploadBytes(sref, imageBlob, {contentType:'image/jpeg'});
+    data.imageUrl=await getDownloadURL(sref);
+  }
   data.updatedAt=serverTimestamp();
   if(isNew){ if(data.active==null) data.active=true; data.createdAt=serverTimestamp(); }
   await setDoc(doc(db,'products',id), data, {merge:true});
