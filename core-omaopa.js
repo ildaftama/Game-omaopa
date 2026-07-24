@@ -657,11 +657,33 @@ async function awardPoints(uid, nominal){
   return { points:pts, newTotal:newTotal, outlet:outlet };
 }
 
+// ---------- kategori Menu POS (posCategories/{id}) — tipe 'utama' (base) atau 'addon' (topping/lilin/dll) ----------
+async function listPosCategories(){
+  try{
+    const snap=await getDocs(query(collection(db,'posCategories'), limit(100)));
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', type:(x.type==='addon'?'addon':'utama'), sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
+    arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.name.localeCompare(b.name));
+    return arr;
+  }catch(e){ return []; }
+}
+async function savePosCategory(id, patch){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'}; patch=patch||{};
+  if(!id){ const t=(patch.name||'').trim(); if(!t) throw {message:'Nama kategori wajib.'}; id=slug(t)+'-'+Date.now().toString(36); }
+  const data={};
+  if(patch.name!=null) data.name=String(patch.name).trim();
+  if(patch.type!=null) data.type=(patch.type==='addon'?'addon':'utama');
+  if(patch.sortOrder!=null && patch.sortOrder!=='') data.sortOrder=Math.floor(Number(patch.sortOrder)||0);
+  data.updatedAt=serverTimestamp();
+  await setDoc(doc(db,'posCategories',id), data, {merge:true});
+  return { id:id };
+}
+async function deletePosCategory(id){ if(!(await isMaster())) throw {message:'Khusus Master.'}; await deleteDoc(doc(db,'posCategories',(id||'').trim())); }
+
 // ---------- katalog produk POS (products/{id}) ----------
 async function listProductsAdmin(){
   try{
     const snap=await getDocs(query(collection(db,'products'), limit(300)));
-    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', category:x.category||'', price:(typeof x.price==='number')?x.price:0, active:x.active!==false, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', categoryId:x.categoryId||'', categoryName:x.categoryName||'', categoryType:(x.categoryType==='addon'?'addon':'utama'), price:(typeof x.price==='number')?x.price:0, active:x.active!==false, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
     arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.name.localeCompare(b.name));
     return arr;
   }catch(e){ return []; }
@@ -669,7 +691,7 @@ async function listProductsAdmin(){
 async function listProductsPublic(){
   try{
     const snap=await getDocs(query(collection(db,'products'), where('active','==',true), limit(300)));
-    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', category:x.category||'', price:(typeof x.price==='number')?x.price:0, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', categoryId:x.categoryId||'', categoryName:x.categoryName||'', categoryType:(x.categoryType==='addon'?'addon':'utama'), price:(typeof x.price==='number')?x.price:0, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
     arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.name.localeCompare(b.name));
     return arr;
   }catch(e){ return []; }
@@ -680,7 +702,13 @@ async function saveProduct(id, patch){
   if(!id){ const t=(patch.name||'').trim(); if(!t) throw {message:'Nama produk wajib.'}; id=slug(t)+'-'+Date.now().toString(36); }
   const data={};
   if(patch.name!=null) data.name=String(patch.name).trim();
-  if(patch.category!=null) data.category=String(patch.category).trim();
+  if(patch.categoryId!=null){
+    data.categoryId=String(patch.categoryId).trim();
+    // Denormalisasi nama+tipe kategori biar POS gak perlu join tiap kali render
+    let cats=[]; try{ cats=await listPosCategories(); }catch(e){}
+    const c=cats.find(function(x){ return x.id===data.categoryId; });
+    data.categoryName=c?c.name:''; data.categoryType=c?c.type:'utama';
+  }
   if(patch.price!=null && patch.price!=='') data.price=Math.max(0,Math.floor(Number(patch.price)||0));
   if(patch.active!=null) data.active=!!patch.active;
   if(patch.sortOrder!=null && patch.sortOrder!=='') data.sortOrder=Math.floor(Number(patch.sortOrder)||0);
@@ -706,7 +734,8 @@ async function recordPosTransaction(opts){
     const qty=Math.max(1, Math.floor(Number(it.qty)||1));
     const price=Math.max(0, Math.floor(Number(it.price)||0));
     const lineTotal=qty*price; subtotal+=lineTotal;
-    return { productId:String(it.productId||''), name:String(it.name||''), qty:qty, price:price, subtotal:lineTotal };
+    const addons=Array.isArray(it.addons)?it.addons.map(function(a){ return { id:String(a.id||''), name:String(a.name||''), price:Math.max(0,Math.floor(Number(a.price)||0)) }; }):[];
+    return { productId:String(it.productId||''), name:String(it.name||''), qty:qty, price:price, subtotal:lineTotal, addons:addons };
   });
   let voucher=null, discount=0, freeItemName='';
   if(voucherCode){
@@ -753,17 +782,20 @@ async function recordPosTransaction(opts){
 
 // ---------- katalog menu web-order (menuItems/{id}) — TERPISAH dari products (POS) ----------
 async function listMenuItemsAdmin(){
+  const byId={};
+  try{ (window.OMA_MENU||[]).forEach(function(m){ byId[m.id]={ id:m.id, cat:m.cat||'', name:m.name||'', price:m.price||0, desc:m.desc||'', imageUrl:m.img||'', avail:m.avail!==false, sortOrder:0, fromStatic:true }; }); }catch(e){}
   try{
     const snap=await getDocs(query(collection(db,'menuItems'), limit(300)));
-    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, cat:x.cat||'', name:x.name||'', price:(typeof x.price==='number')?x.price:0, desc:x.desc||'', imageUrl:x.imageUrl||'', avail:x.avail!==false, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
-    arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
-    return arr;
-  }catch(e){ return []; }
+    snap.forEach(d=>{ const x=d.data(); byId[d.id]=Object.assign({}, byId[d.id]||{}, { id:d.id, cat:x.cat||(byId[d.id]?byId[d.id].cat:''), name:x.name||(byId[d.id]?byId[d.id].name:''), price:(typeof x.price==='number')?x.price:(byId[d.id]?byId[d.id].price:0), desc:(x.desc!=null?x.desc:(byId[d.id]?byId[d.id].desc:'')), imageUrl:(x.imageUrl||(byId[d.id]?byId[d.id].imageUrl:'')), avail:x.avail!==false, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0, fromStatic:false }); });
+  }catch(e){}
+  const arr=Object.keys(byId).map(function(k){ return byId[k]; });
+  arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
+  return arr;
 }
 async function listMenuItemsPublic(){
   try{
-    const snap=await getDocs(query(collection(db,'menuItems'), where('avail','==',true), limit(300)));
-    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, cat:x.cat||'', name:x.name||'', price:(typeof x.price==='number')?x.price:0, desc:x.desc||'', img:x.imageUrl||'', avail:true }); });
+    const snap=await getDocs(query(collection(db,'menuItems'), limit(300)));
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, cat:x.cat||'', name:x.name||'', price:(typeof x.price==='number')?x.price:0, desc:x.desc||'', img:x.imageUrl||'', avail:x.avail!==false }); });
     return arr;
   }catch(e){ return []; }
 }
@@ -2043,6 +2075,7 @@ window.OmaOpa = {
   getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, backfillLastTxnAt, backfillNameLower, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   listProductsAdmin, listProductsPublic, saveProduct, setProductActive, deleteProduct, recordPosTransaction,
+  listPosCategories, savePosCategory, deletePosCategory,
   listMenuItemsAdmin, listMenuItemsPublic, saveMenuItem, setMenuItemAvail, deleteMenuItem,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
@@ -2064,5 +2097,12 @@ emit();
 try{ window.dispatchEvent(new CustomEvent('omaopa:ready',{detail:snapshot()})); }catch(e){}
 // Gabungkan outlet dari database (termasuk yang ditambah via admin, mis. Kronggahan) ke daftar picker
 (async function(){ try{ const fs=await listOutlets(); if(fs && fs.length){ const byName={}; (window.OMA_OUTLETS||[]).forEach(o=>{ byName[(o.name||'').toLowerCase().trim()]=o; }); fs.forEach(o=>{ if(o && o.name && o.active!==false) byName[(o.name||'').toLowerCase().trim()]={ name:o.name, area:o.area, maps:o.maps, lat:o.lat, lng:o.lng, internalOnly:o.internalOnly }; }); window.OMA_OUTLETS=Object.keys(byName).map(k=>byName[k]); } }catch(e){} })();
-// Gabungkan menu web-order dari Firestore (menuItems, diedit admin) ke atas data statis menu-data.js — Firestore menang kalau id sama, item baru ikut ditambahkan
-(async function(){ try{ const extra=await listMenuItemsPublic(); if(extra && extra.length){ const byId={}; (window.OMA_MENU||[]).forEach(m=>{ byId[m.id]=m; }); extra.forEach(m=>{ byId[m.id]=m; }); window.OMA_MENU=Object.keys(byId).map(k=>byId[k]); } }catch(e){} })();
+// Gabungkan menu web-order dari Firestore (menuItems, diedit admin) ke atas data statis menu-data.js — override per-field (fallback ke data statis kalau field kosong), avail=false beneran disembunyikan
+(async function(){ try{ const extra=await listMenuItemsPublic(); if(extra && extra.length){ const byId={}; (window.OMA_MENU||[]).forEach(m=>{ byId[m.id]=m; });
+  extra.forEach(o=>{
+    if(o.avail===false){ delete byId[o.id]; return; }
+    const base=byId[o.id]||{};
+    byId[o.id]={ id:o.id, cat:(o.cat||base.cat||''), name:(o.name||base.name||''), price:(o.price||base.price||0), desc:((o.desc!=null&&o.desc!=='')?o.desc:(base.desc||'')), img:(o.img||base.img||''), avail:true };
+  });
+  window.OMA_MENU=Object.keys(byId).map(k=>byId[k]);
+} }catch(e){} })();

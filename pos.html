@@ -68,6 +68,24 @@
   .paybtn.on{ background:var(--kuning); border-color:var(--kuning-d); }
   .divider{ text-align:center; margin:14px 0 8px; color:#b59a7e; font-weight:800; font-size:.78rem; }
   .uid{ font-family:monospace; font-size:.8rem; background:#F1E4CC; border-radius:8px; padding:6px 9px; word-break:break-all; margin-top:6px; }
+  .cattabs{ display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin:-2px -2px 10px; position:sticky; top:0; background:var(--cream); z-index:5; }
+  .catchip{ flex:none; border:2px solid #E7D8BE; background:#fff; border-radius:999px; padding:7px 13px; font-weight:800; font-size:.8rem; color:var(--coklat); cursor:pointer; white-space:nowrap; }
+  .catchip .n{ color:#b59a7e; font-weight:700; }
+  .catchip.on{ background:var(--kuning); border-color:var(--kuning-d); }
+  .catchip.on .n{ color:#7a5a1a; }
+  .pgrid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .ptile{ background:#fff; border:2px solid #EFE2C4; border-radius:14px; padding:10px; display:flex; flex-direction:column; gap:4px; }
+  .ptn{ font-weight:800; font-size:.84rem; line-height:1.25; min-height:2.2em; }
+  .pcnt{ color:#2E7D32; font-weight:900; }
+  .ptp{ color:#9a7a5e; font-weight:700; font-size:.76rem; }
+  .ptbtns{ display:flex; flex-direction:column; gap:5px; margin-top:4px; }
+  .ptadd{ border:none; background:var(--kuning); color:#5A3A05; font-weight:900; font-size:.78rem; border-radius:9px; padding:8px 4px; cursor:pointer; }
+  .ptaddon{ border:2px solid #E7D8BE; background:#fff; color:var(--coklat); font-weight:800; font-size:.72rem; border-radius:9px; padding:6px 4px; cursor:pointer; }
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:50; display:flex; align-items:flex-end; justify-content:center; }
+  .ovcard{ background:#fff; width:100%; max-width:460px; max-height:82vh; overflow-y:auto; border-radius:20px 20px 0 0; padding:18px 16px 20px; }
+  .ovh{ font-family:'Fredoka'; font-size:1rem; margin-bottom:4px; }
+  .addonrow{ display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #F1E4CC; font-size:.86rem; font-weight:700; cursor:pointer; }
+  .addonrow input{ width:auto; }
 </style>
 </head>
 <body>
@@ -84,7 +102,7 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=167"></script>
+<script type="module" src="core-omaopa.js?v=168"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
 (function(){
@@ -92,19 +110,24 @@
   var busy = false, scanner = null, scanning = false;
   var EARN_PER_POINT = 4000;
   var PRODUCTS = null; // cache katalog
-  var CART = []; // {id,name,price,qty}
+  var CATEGORIES = null; // cache kategori {id,name,type}
+  var CUR_CAT = null; // id kategori tab yang lagi aktif
+  var CART = []; // {key,baseId,baseName,basePrice,addons:[{id,name,price}],qty}
   var STATE = 'cart'; // 'cart' | 'checkout' | 'done'
   var MEMBER = null; // {uid,name,phone,points}
   var VOUCHER = null; // {code,title,discType,discValue,discMax,freeItemName}
   var PAYMENT = 'cash';
   var searchTimer = null;
+  var ADDON_TARGET = null; // produk Utama yang lagi dipilihin add-on-nya
 
   function rp(n){ try{ return 'Rp'+Number(n||0).toLocaleString('id-ID'); }catch(e){ return 'Rp'+n; } }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   async function stopScan(){ if(scanner && scanning){ try{ await scanner.stop(); }catch(e){} scanning=false; } }
 
   function cartCount(){ return CART.reduce(function(s,c){ return s+c.qty; }, 0); }
-  function cartSubtotal(){ return CART.reduce(function(s,c){ return s+c.qty*c.price; }, 0); }
+  function lineUnitPrice(c){ return c.basePrice + c.addons.reduce(function(s,a){ return s+a.price; }, 0); }
+  function lineName(c){ return c.baseName + (c.addons.length ? (' + '+c.addons.map(function(a){return a.name;}).join(', ')) : ''); }
+  function cartSubtotal(){ return CART.reduce(function(s,c){ return s+c.qty*lineUnitPrice(c); }, 0); }
   function voucherDiscount(){
     if(!VOUCHER) return 0;
     if(VOUCHER.discType==='percent'){
@@ -115,6 +138,13 @@
     return 0;
   }
   function cartTotal(){ return Math.max(0, cartSubtotal()-voucherDiscount()); }
+  function addonKey(addons){ return addons.map(function(a){return a.id;}).sort().join(','); }
+  function addToCartLine(baseProduct, addons){
+    var key=baseProduct.id+'|'+addonKey(addons);
+    var line=CART.find(function(c){ return c.key===key; });
+    if(line){ line.qty++; return; }
+    CART.push({ key:key, baseId:baseProduct.id, baseName:baseProduct.name, basePrice:baseProduct.price, addons:addons.slice(), qty:1 });
+  }
 
   async function refresh(){
     await stopScan();
@@ -137,9 +167,12 @@
       document.getElementById('outBtn').onclick = async function(){ try{ await window.OmaOpa.signOut(); }catch(e){} };
       return;
     }
-    if(!PRODUCTS){
+    if(!PRODUCTS || !CATEGORIES){
       panel.innerHTML = '<div class="muted">Memuat katalog produk…</div>';
       try{ PRODUCTS = await window.OmaOpa.listProductsPublic(); }catch(e){ PRODUCTS = []; }
+      try{ CATEGORIES = await window.OmaOpa.listPosCategories(); }catch(e){ CATEGORIES = []; }
+      var utamaFirst=CATEGORIES.filter(function(c){return c.type==='utama';})[0];
+      CUR_CAT = utamaFirst ? utamaFirst.id : (CATEGORIES[0] ? CATEGORIES[0].id : null);
     }
     render();
   }
@@ -151,36 +184,74 @@
     renderCartScreen();
   }
 
-  // ============ LAYAR 1: KATALOG + KERANJANG ============
+  // ============ LAYAR 1: KATALOG (tab kategori + grid) + KERANJANG ============
   function renderCartScreen(){
     var existingBar=document.getElementById('cartbar'); if(existingBar) existingBar.remove();
-    if(!PRODUCTS || !PRODUCTS.length){
-      panel.innerHTML = '<div class="res warn">Belum ada produk di katalog. Tambahin dulu di tab <b>Produk</b> pada halaman Admin ya.</div>'
+    if(!PRODUCTS || !PRODUCTS.length || !CATEGORIES || !CATEGORIES.length){
+      panel.innerHTML = '<div class="res warn">Belum ada produk/kategori di katalog. Atur dulu di tab <b>Menu POS</b> pada halaman Admin ya.</div>'
         + '<button class="btn sec" id="rl">↻ Muat ulang</button>';
-      document.getElementById('rl').onclick=async function(){ PRODUCTS=null; await refresh(); };
+      document.getElementById('rl').onclick=async function(){ PRODUCTS=null; CATEGORIES=null; await refresh(); };
       return;
     }
-    var byCat={}; var order=[];
-    PRODUCTS.forEach(function(p){ var c=p.category||'Lainnya'; if(!byCat[c]){ byCat[c]=[]; order.push(c); } byCat[c].push(p); });
-    var html='<div class="muted" style="margin-bottom:8px">Pilih produk buat masuk keranjang.</div>';
-    order.forEach(function(cat){
-      html+='<div class="catname">'+esc(cat)+'</div>';
-      byCat[cat].forEach(function(p){
-        var inCart=CART.find(function(c){ return c.id===p.id; });
-        html+='<div class="prow"><div class="pn">'+esc(p.name)+(inCart?(' <span style="color:#2E7D32">×'+inCart.qty+'</span>'):'')+'<div class="pp">'+rp(p.price)+'</div></div>'
-          +'<button class="addb" data-add="'+esc(p.id)+'">＋</button></div>';
-      });
-    });
-    panel.innerHTML = html;
+    var hasAddonCat = CATEGORIES.some(function(c){ return c.type==='addon'; });
+    var tabsHtml = '<div class="cattabs">'+CATEGORIES.map(function(c){
+      var n=PRODUCTS.filter(function(p){return p.categoryId===c.id;}).length;
+      return '<button class="catchip'+(c.id===CUR_CAT?' on':'')+'" data-cattab="'+esc(c.id)+'">'+esc(c.name)+' <span class="n">'+n+'</span></button>';
+    }).join('')+'</div>';
+    var curProducts = PRODUCTS.filter(function(p){ return p.categoryId===CUR_CAT; });
+    var curCatObj = CATEGORIES.find(function(c){ return c.id===CUR_CAT; });
+    var isAddonTab = curCatObj && curCatObj.type==='addon';
+    var gridHtml = '<div class="pgrid">'+curProducts.map(function(p){
+      var line=CART.find(function(c){ return c.baseId===p.id && !c.addons.length; });
+      return '<div class="ptile">'
+        +'<div class="ptn">'+esc(p.name)+(line?(' <span class="pcnt">×'+line.qty+'</span>'):'')+'</div>'
+        +'<div class="ptp">'+rp(p.price)+'</div>'
+        +'<div class="ptbtns"><button class="ptadd" data-add="'+esc(p.id)+'">＋ Tambah</button>'
+        +((!isAddonTab && hasAddonCat)?('<button class="ptaddon" data-addon="'+esc(p.id)+'">+ Add-on</button>'):'')+'</div>'
+        +'</div>';
+    }).join('')+'</div>';
+    if(!curProducts.length) gridHtml='<div class="muted" style="padding:20px 0;text-align:center">Belum ada produk di kategori ini.</div>';
+    panel.innerHTML = tabsHtml + gridHtml;
+    panel.querySelectorAll('[data-cattab]').forEach(function(b){ b.onclick=function(){ CUR_CAT=b.getAttribute('data-cattab'); renderCartScreen(); }; });
     panel.querySelectorAll('[data-add]').forEach(function(b){
       b.onclick=function(){
         var id=b.getAttribute('data-add'); var p=PRODUCTS.find(function(x){ return x.id===id; }); if(!p) return;
-        var line=CART.find(function(c){ return c.id===id; });
-        if(line){ line.qty++; } else { CART.push({ id:p.id, name:p.name, price:p.price, qty:1 }); }
-        renderCartScreen(); mountCartBar();
+        addToCartLine(p, []); renderCartScreen(); mountCartBar();
+      };
+    });
+    panel.querySelectorAll('[data-addon]').forEach(function(b){
+      b.onclick=function(){
+        var id=b.getAttribute('data-addon'); var p=PRODUCTS.find(function(x){ return x.id===id; }); if(!p) return;
+        openAddonPicker(p);
       };
     });
     mountCartBar();
+  }
+
+  function openAddonPicker(baseProduct){
+    ADDON_TARGET=baseProduct;
+    var addonCats=CATEGORIES.filter(function(c){return c.type==='addon';});
+    var body='<div class="ovh">'+esc(baseProduct.name)+' <span class="muted" style="font-weight:700">'+rp(baseProduct.price)+'</span></div>'
+      +'<div class="muted" style="margin-bottom:10px">Pilih add-on (boleh lebih dari 1), atau langsung Tambahkan tanpa pilih apa-apa.</div>';
+    addonCats.forEach(function(c){
+      var items=PRODUCTS.filter(function(p){ return p.categoryId===c.id; });
+      if(!items.length) return;
+      body+='<div class="catname" style="margin-top:10px">'+esc(c.name)+'</div>';
+      items.forEach(function(p){
+        body+='<label class="addonrow"><input type="checkbox" data-aid="'+esc(p.id)+'" data-aname="'+esc(p.name)+'" data-aprice="'+p.price+'"><span class="grow">'+esc(p.name)+'</span><span>+'+rp(p.price)+'</span></label>';
+      });
+    });
+    body+='<button class="btn" id="addonGo">＋ Tambahkan ke keranjang</button><button class="btn sec" id="addonCancel" style="margin-top:8px">Batal</button>';
+    var ov=document.createElement('div'); ov.id='addonOverlay'; ov.className='overlay';
+    ov.innerHTML='<div class="ovcard">'+body+'</div>';
+    document.body.appendChild(ov);
+    document.getElementById('addonCancel').onclick=function(){ ov.remove(); ADDON_TARGET=null; };
+    document.getElementById('addonGo').onclick=function(){
+      var chosen=[]; ov.querySelectorAll('input[type=checkbox]:checked').forEach(function(cb){ chosen.push({ id:cb.getAttribute('data-aid'), name:cb.getAttribute('data-aname'), price:Number(cb.getAttribute('data-aprice'))||0 }); });
+      addToCartLine(ADDON_TARGET, chosen);
+      ov.remove(); ADDON_TARGET=null;
+      renderCartScreen(); mountCartBar();
+    };
   }
 
   function mountCartBar(){
@@ -197,14 +268,14 @@
   function openCartEditor(){
     var html='<div class="muted" style="margin-bottom:8px">Keranjang</div>';
     CART.forEach(function(c){
-      html+='<div class="cline"><div class="cn">'+esc(c.name)+'<div class="cp">'+rp(c.price)+'</div></div>'
-        +'<div class="stepper"><button data-dec="'+esc(c.id)+'">−</button><span>'+c.qty+'</span><button data-inc="'+esc(c.id)+'">＋</button></div></div>';
+      html+='<div class="cline"><div class="cn">'+esc(lineName(c))+'<div class="cp">'+rp(lineUnitPrice(c))+'</div></div>'
+        +'<div class="stepper"><button data-dec="'+esc(c.key)+'">−</button><span>'+c.qty+'</span><button data-inc="'+esc(c.key)+'">＋</button></div></div>';
     });
     html+='<div class="res" style="background:#FFF8EC;border:2px solid #F1E4CC;margin-top:10px"><div class="row"><b>Subtotal</b><b>'+rp(cartSubtotal())+'</b></div></div>'
       +'<button class="btn" id="ceBack">‹ Kembali pilih produk</button>';
     panel.innerHTML=html;
-    panel.querySelectorAll('[data-inc]').forEach(function(b){ b.onclick=function(){ var l=CART.find(function(c){return c.id===b.getAttribute('data-inc');}); if(l){ l.qty++; openCartEditor(); } }; });
-    panel.querySelectorAll('[data-dec]').forEach(function(b){ b.onclick=function(){ var id=b.getAttribute('data-dec'); var l=CART.find(function(c){return c.id===id;}); if(l){ l.qty--; if(l.qty<=0) CART=CART.filter(function(c){return c.id!==id;}); openCartEditor(); mountCartBar(); } }; });
+    panel.querySelectorAll('[data-inc]').forEach(function(b){ b.onclick=function(){ var l=CART.find(function(c){return c.key===b.getAttribute('data-inc');}); if(l){ l.qty++; openCartEditor(); } }; });
+    panel.querySelectorAll('[data-dec]').forEach(function(b){ b.onclick=function(){ var key=b.getAttribute('data-dec'); var l=CART.find(function(c){return c.key===key;}); if(l){ l.qty--; if(l.qty<=0) CART=CART.filter(function(c){return c.key!==key;}); openCartEditor(); mountCartBar(); } }; });
     document.getElementById('ceBack').onclick=function(){ renderCartScreen(); };
   }
 
@@ -214,7 +285,7 @@
     var disc=voucherDiscount(); var total=cartTotal();
     var html='<a href="#" id="backCart" class="link">‹ Ubah keranjang</a>';
     html+='<div class="catname">Keranjang (' + cartCount() + ' item)</div>';
-    CART.forEach(function(c){ html+='<div class="row" style="font-size:.82rem;margin-top:4px"><span>'+esc(c.name)+' ×'+c.qty+'</span><span>'+rp(c.qty*c.price)+'</span></div>'; });
+    CART.forEach(function(c){ html+='<div class="row" style="font-size:.82rem;margin-top:4px"><span>'+esc(lineName(c))+' ×'+c.qty+'</span><span>'+rp(c.qty*lineUnitPrice(c))+'</span></div>'; });
 
     html+='<div class="catname">Member</div>';
     if(!MEMBER){
@@ -397,7 +468,7 @@
     try{
       var r = await window.OmaOpa.recordPosTransaction({
         uid: MEMBER.uid,
-        items: CART.map(function(c){ return { productId:c.id, name:c.name, qty:c.qty, price:c.price }; }),
+        items: CART.map(function(c){ return { productId:c.baseId, name:lineName(c), qty:c.qty, price:lineUnitPrice(c), addons:c.addons }; }),
         paymentMethod: PAYMENT,
         cashReceived: cashReceived,
         voucherCode: VOUCHER ? VOUCHER.code : ''

@@ -93,7 +93,7 @@
       <button data-tab="outlet">🏪 Outlet</button>
       <button data-tab="staff">🧑‍🍳 Staff</button>
       <button data-tab="reward">🎁 Reward</button>
-      <button data-tab="produk">🧁 Produk</button>
+      <button data-tab="produk">🧁 Menu POS</button>
       <button data-tab="menuweb">🎂 Menu Web</button>
       <button data-tab="promo">📣 Promo</button>
       <button data-tab="analitik">📈 Analitik</button>
@@ -108,7 +108,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=167"></script>
+<script type="module" src="core-omaopa.js?v=168"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -1611,18 +1611,34 @@
   }
 
   async function renderProduk(){
-    tabEl.innerHTML=(canEdit ? ('<div class="card"><div class="nm">Tambah produk baru</div>'
-      +'<label>Nama produk</label><input id="pN" placeholder="cth: Bolu Gulung Coklat">'
-      +'<label>Kategori (opsional)</label><input id="pC" placeholder="cth: Bolu / Minuman / Snack">'
+    var cats=[]; try{ cats=await O.listPosCategories(); }catch(e){}
+    var utamaCats=cats.filter(function(c){return c.type==='utama';});
+    var addonCats=cats.filter(function(c){return c.type==='addon';});
+    var catOptions=cats.map(function(c){ return '<option value="'+esc(c.id)+'">'+esc(c.name)+' ('+(c.type==='addon'?'Add-on':'Utama')+')</option>'; }).join('');
+    tabEl.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:10px">Menu buat halaman <b>Kasir POS</b> — kategori <b>Utama</b> = base kue yang bisa dipesan langsung, kategori <b>Add-on</b> = topping/lilin/pelengkap yang bisa ditambahin ke base saat transaksi.</div>'
+      +(canEdit ? ('<div class="card"><div class="nm">Kategori</div>'
+        +'<div id="catList" style="margin-bottom:10px">'+(cats.length? cats.map(function(c){ return '<div class="row"><div class="grow"><div class="nm" style="font-size:.88rem">'+esc(c.name)+' <span class="tag '+(c.type==='addon'?'adm':'on')+'">'+(c.type==='addon'?'ADD-ON':'UTAMA')+'</span></div></div>'+(masterEdit?('<button class="btn sm red" data-catdel="'+esc(c.id)+'">Hapus</button>'):'')+'</div>'; }).join('') : '<div class="muted" style="font-size:.8rem">Belum ada kategori — bikin dulu minimal 1 kategori Utama.</div>')+'</div>'
+        +'<div style="display:flex;gap:8px"><input id="catName" placeholder="Nama kategori (cth: Ogura, Topping, Lilin Ulang Tahun)" style="flex:2"><select id="catType" style="flex:1"><option value="utama">Utama</option><option value="addon">Add-on</option></select></div>'
+        +'<button class="btn sec" id="catAdd" style="margin-top:8px">＋ Tambah kategori</button><div id="catMsg"></div></div>') : '')
+      +(canEdit ? ('<div class="card"><div class="nm">Tambah produk baru</div>'
+      +'<label>Nama produk</label><input id="pN" placeholder="cth: Ogura Cheese Polos">'
+      +'<label>Kategori</label><select id="pCat"><option value="">— pilih kategori —</option>'+catOptions+'</select>'
       +'<label>Harga jual (Rp)</label><input id="pP" inputmode="numeric" placeholder="cth: 35000">'
       +'<label>Urutan tampil (opsional, angka kecil = di atas)</label><input id="pS" inputmode="numeric" placeholder="cth: 1">'
-      +'<button class="btn" id="pAdd">＋ Tambah produk</button><div id="pMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola produk.</div>')
-      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar produk (dipakai di halaman Kasir POS)</div><button class="btn sm sec" id="pReload">↻</button></div><div id="pList"><div class="muted">Memuat…</div></div></div>';
-    if(canEdit){ document.getElementById('pAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('pMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
-      try{ var _pl={ name:document.getElementById('pN').value, category:document.getElementById('pC').value, price:document.getElementById('pP').value, sortOrder:document.getElementById('pS').value, active:true };
-        await O.saveProduct(_eid,_pl);
-        msg.innerHTML='<div class="res ok">✓ '+(_eid?'Produk diperbarui.':'Produk ditambahkan.')+'</div>'; resetProductForm(); loadProducts();
-      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }
+      +'<button class="btn" id="pAdd">＋ Tambah produk</button><div id="pMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola menu POS.</div>')
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar produk POS</div><button class="btn sm sec" id="pReload">↻</button></div><div id="pList"><div class="muted">Memuat…</div></div></div>';
+    if(canEdit){
+      document.getElementById('catAdd').onclick=async function(){ if(busy)return; busy=true; var m=document.getElementById('catMsg'); m.innerHTML='<div class="muted" style="margin-top:6px">Menyimpan…</div>';
+        try{ await O.savePosCategory(null, { name:document.getElementById('catName').value, type:document.getElementById('catType').value }); renderProduk(); }
+        catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+      if(masterEdit){ tabEl.querySelectorAll('[data-catdel]').forEach(function(b){ b.onclick=async function(){ if(!confirm('Hapus kategori ini? Produk yang udah pakai kategori ini gak ikut kehapus, cuma jadi tanpa kategori.')) return; busy=true; try{ await O.deletePosCategory(b.getAttribute('data-catdel')); renderProduk(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; }); }
+      document.getElementById('pAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('pMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+        try{ var _pl={ name:document.getElementById('pN').value, categoryId:document.getElementById('pCat').value, price:document.getElementById('pP').value, sortOrder:document.getElementById('pS').value, active:true };
+          if(!_pl.categoryId){ msg.innerHTML='<div class="res bad">Pilih kategori dulu.</div>'; busy=false; return; }
+          await O.saveProduct(_eid,_pl);
+          msg.innerHTML='<div class="res ok">✓ '+(_eid?'Produk diperbarui.':'Produk ditambahkan.')+'</div>'; resetProductForm(); loadProducts();
+        }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; };
+    }
     document.getElementById('pReload').onclick=loadProducts; loadProducts();
   }
   async function loadProducts(){
@@ -1630,9 +1646,9 @@
     var arr=[]; try{ arr=await O.listProductsAdmin(); }catch(e){}
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada produk. Tambahin dulu di form atas ya.</div>'; return; }
     box.innerHTML=arr.map(function(p){
-      return '<div class="row"><div class="grow"><div class="nm">'+esc(p.name)+(p.active?'':' <span class="tag off">OFF</span>')+'</div>'
-        +'<div class="sub">'+rp(p.price)+(p.category?(' · '+esc(p.category)):'')+'</div></div>'
-        +(canEdit ? ('<button class="btn sm sec" data-pedit=\''+esc(JSON.stringify({id:p.id,name:p.name,category:p.category,price:p.price,sortOrder:p.sortOrder}))+'\'>Edit</button>'
+      return '<div class="row"><div class="grow"><div class="nm">'+esc(p.name)+(p.active?'':' <span class="tag off">OFF</span>')+' <span class="tag '+(p.categoryType==='addon'?'adm':'on')+'">'+(p.categoryType==='addon'?'ADD-ON':'UTAMA')+'</span></div>'
+        +'<div class="sub">'+rp(p.price)+(p.categoryName?(' · '+esc(p.categoryName)):' · (tanpa kategori)')+'</div></div>'
+        +(canEdit ? ('<button class="btn sm sec" data-pedit=\''+esc(JSON.stringify({id:p.id,name:p.name,categoryId:p.categoryId,price:p.price,sortOrder:p.sortOrder}))+'\'>Edit</button>'
           +'<button class="btn sm sec" data-pact="'+esc(p.id)+'" data-on="'+(p.active?'1':'0')+'">'+(p.active?'Off':'On')+'</button>') : '')
         +(masterEdit ? ('<button class="btn sm red" data-pdel="'+esc(p.id)+'">Hapus</button>') : '')+'</div>'; }).join('');
     if(canEdit){
@@ -1644,13 +1660,14 @@
     }
   }
   function resetProductForm(){
-    ['pN','pC','pP','pS'].forEach(function(i){ var e=document.getElementById(i); if(e) e.value=''; });
+    ['pN','pP','pS'].forEach(function(i){ var e=document.getElementById(i); if(e) e.value=''; });
+    var pc=document.getElementById('pCat'); if(pc) pc.value='';
     var add=document.getElementById('pAdd'); if(add){ add.textContent='＋ Tambah produk'; delete add.dataset.editId; }
     var msg=document.getElementById('pMsg'); if(msg) msg.innerHTML='';
   }
   function editProduct(p){
     var g=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
-    g('pN',p.name); g('pC',p.category||''); g('pP',p.price); g('pS', p.sortOrder||'');
+    g('pN',p.name); g('pCat',p.categoryId||''); g('pP',p.price); g('pS', p.sortOrder||'');
     var add=document.getElementById('pAdd'); if(add){ add.textContent='💾 Simpan perubahan'; add.dataset.editId=p.id; }
     var msg=document.getElementById('pMsg'); if(msg) msg.innerHTML='<div class="muted" style="margin-top:6px">Mengedit <b>'+esc(p.name)+'</b> — ubah di form atas, lalu Simpan. <a href="#" id="pCancel">Batal</a></div>';
     var cc=document.getElementById('pCancel'); if(cc) cc.onclick=function(e){ e.preventDefault(); resetProductForm(); };
@@ -1701,14 +1718,14 @@
   async function loadMenuWebItems(){
     var box=document.getElementById('mwList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     var arr=[]; try{ arr=await O.listMenuItemsAdmin(); }catch(e){}
-    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada menu tambahan dari admin. Menu bawaan (menu-data.js) tetap tampil normal di index.html — daftar ini cuma buat item yang kamu tambah/override lewat sini.</div>'; return; }
+    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada menu sama sekali.</div>'; return; }
     box.innerHTML=arr.map(function(m){
       return '<div class="row">'+(m.imageUrl?('<img src="'+esc(m.imageUrl)+'" style="width:42px;height:42px;border-radius:9px;object-fit:cover;margin-right:8px">'):'')
-        +'<div class="grow"><div class="nm">'+esc(m.cat)+' — '+esc(m.name)+(m.avail?'':' <span class="tag off">OFF</span>')+'</div>'
+        +'<div class="grow"><div class="nm">'+esc(m.cat)+' — '+esc(m.name)+(m.avail?'':' <span class="tag off">OFF</span>')+(m.fromStatic?' <span class="tag adm">BAWAAN</span>':'')+'</div>'
         +'<div class="sub">'+rp(m.price)+(m.desc?(' · '+esc(m.desc)):'')+'</div></div>'
         +(canEdit ? ('<button class="btn sm sec" data-mwedit=\''+esc(JSON.stringify({id:m.id,cat:m.cat,name:m.name,price:m.price,desc:m.desc,sortOrder:m.sortOrder}))+'\'>Edit</button>'
           +'<button class="btn sm sec" data-mwact="'+esc(m.id)+'" data-on="'+(m.avail?'1':'0')+'">'+(m.avail?'Off':'On')+'</button>') : '')
-        +(masterEdit ? ('<button class="btn sm red" data-mwdel="'+esc(m.id)+'">Hapus</button>') : '')+'</div>'; }).join('');
+        +(masterEdit && !m.fromStatic ? ('<button class="btn sm red" data-mwdel="'+esc(m.id)+'">Hapus</button>') : '')+'</div>'; }).join('');
     if(canEdit){
       box.querySelectorAll('[data-mwact]').forEach(function(b){ b.onclick=async function(){ busy=true; b.disabled=true; try{ await O.setMenuItemAvail(b.getAttribute('data-mwact'), b.getAttribute('data-on')!=='1'); loadMenuWebItems(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
       box.querySelectorAll('[data-mwedit]').forEach(function(b){ b.onclick=function(){ var m=JSON.parse(b.getAttribute('data-mwedit')); editMenuWebItem(m); }; });
