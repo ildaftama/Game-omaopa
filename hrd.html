@@ -53,7 +53,8 @@
   <div style="text-align:center;margin-top:6px;display:flex;gap:10px;justify-content:center;align-items:center"><a class="link" href="admin.html">‹ Ke Admin</a><span class="muted">·</span><a class="link" href="index.html">Beranda</a><span class="muted">·</span><a class="link" href="javascript:void(0)" id="logoutLink">Keluar</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=158"></script>
+<script type="module" src="core-omaopa.js?v=164"></script>
+<script type="module" src="core-hrd.js?v=1"></script>
 <script>
 (function(){
   var O=null, busy=false;
@@ -99,6 +100,26 @@
       +'<div id="newDivBody" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #E2E7EF"></div>'
       +'<div id="divListBody" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #E2E7EF"><div id="orgTree" class="muted">Memuat…</div></div>'
       +'</div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">🏢 Lokasi Internal (Kantor/Pabrik)</div><button class="btn sm sec" id="toggleLokasiInt" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="lokasiIntBody" style="display:none;margin-top:8px">'
+      +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Lokasi murni internal (bukan outlet customer) — dipakai buat validasi GPS pas karyawan absen. Gak pernah muncul di dropdown pendaftaran member.</div>'
+      +'<div id="lokasiIntList" class="muted">Memuat…</div>'
+      +'<div style="border-top:1px dashed #E2E7EF;margin-top:10px;padding-top:10px">'
+      +'<label>Nama Lokasi</label><input id="liNm" placeholder="misal: Kantor Pusat, Pabrik Produksi">'
+      +'<label>Area</label><input id="liAr" placeholder="misal: Yogya" value="Kantor/Pabrik">'
+      +'<label>Link Google Maps</label><input id="liMp" placeholder="https://maps.app.goo.gl/...">'
+      +'<div id="liParseMsg" style="margin:6px 0 2px;font-size:.8rem"></div>'
+      +'<div id="liManualWrap" style="display:none"><label>Latitude</label><input id="liLat" placeholder="-7.xxxxxx"><label>Longitude</label><input id="liLng" placeholder="110.xxxxxx"></div>'
+      +'<button class="btn" id="liAdd" style="margin-top:8px">＋ Tambah Lokasi</button><div id="liMsg"></div>'
+      +'</div></div></div>'
+
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">📍 Perbaiki Lokasi Outlet (GPS)</div><button class="btn sm sec" id="toggleFixGps" style="width:auto;margin:0">👁 Lihat</button></div>'
+      +'<div id="fixGpsBody" style="display:none;margin-top:8px">'
+      +'<div class="muted" style="font-size:.76rem;margin-bottom:9px">Kalau kasir lapor lokasi/GPS outlet-nya salah, cari & benerin di sini langsung (gak perlu lewat Admin Utama). Cuma bisa ubah link peta & koordinat — nama/area outlet tetap dikelola Admin Utama.</div>'
+      +'<label>Cari Outlet</label><div style="display:flex;gap:6px"><input id="fgSearch" placeholder="ketik nama outlet..."><button class="btn sm sec" id="fgFind" style="width:auto;margin:0">Cari</button></div>'
+      +'<div id="fgResult" style="margin-top:8px"></div>'
+      +'</div></div>'
 
       +'<div class="card"><div class="row" style="border:none;padding:0 0 4px"><div class="grow nm">🎓 Daftar Grade</div><button class="btn sm sec" id="toggleGrade" style="width:auto;margin:0">👁 Lihat</button></div>'
       +'<div id="gradeBody" style="display:none;margin-top:8px"><div class="muted" style="font-size:.76rem;margin-bottom:8px">Buat karyawan level Staff (misal Training/Junior/Senior). Tambah/hapus sesuka hati.</div>'
@@ -165,6 +186,8 @@
     loadOrgStructure();
     wireToggle('toggleNewDiv','newDivBody', renderNewDivForm, '➕ Tambah Divisi', '✕ Tutup Form');
     wireToggle('toggleDivList','divListBody', null, '👁 Lihat Daftar', '🔼 Tutup Daftar');
+    wireToggle('toggleLokasiInt','lokasiIntBody', loadLokasiInternal);
+    wireToggle('toggleFixGps','fixGpsBody', initFixGps);
     wireToggle('toggleGrade','gradeBody', loadGradeList);
     wireToggle('toggleJC','jcBody', loadJenisCutiList);
     wireToggle('toggleET','etBody', loadEmailTemplates);
@@ -264,6 +287,133 @@
     }; });
   }
 
+  async function loadLokasiInternal(){
+    var box=document.getElementById('lokasiIntList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listOutlets(); }catch(e){}
+    var internal=arr.filter(function(o){return o.internalOnly;});
+    if(!internal.length){ box.innerHTML='<div class="muted">Belum ada lokasi internal. Tambah dulu di bawah.</div>'; }
+    else{
+      box.innerHTML=internal.map(function(o){
+        return '<div class="row"><div class="grow"><div class="nm">'+esc(o.name)+'</div><div class="sub">'+esc(o.area||'-')+' · '+(typeof o.lat==='number'?'📍 koordinat OK':'⚠️ belum ada koordinat')+'</div></div>'
+          + (o.maps ? ('<a class="btn sm sec" href="'+esc(o.maps)+'" target="_blank" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">📍</a>') : '')
+          + '<button class="btn sm sec" data-liedit="'+esc(o.id)+'">⚙️</button>'
+          + '<button class="btn sm red" data-lidel="'+esc(o.id)+'" data-nm="'+esc(o.name)+'">Hapus</button>'
+          + '</div>';
+      }).join('');
+      box.querySelectorAll('[data-liedit]').forEach(function(b){ b.onclick=function(){ var o=internal.find(function(x){return x.id===b.getAttribute('data-liedit');}); if(o) openLokasiIntEdit(o); }; });
+      box.querySelectorAll('[data-lidel]').forEach(function(b){ b.onclick=async function(){ if(busy) return; if(!confirm('Hapus lokasi "'+b.getAttribute('data-nm')+'"?')) return; busy=true; b.disabled=true; try{ await O.deleteOutlet(b.getAttribute('data-lidel')); loadLokasiInternal(); }catch(e){ alert((e&&e.message)||'Gagal'); } busy=false; }; });
+    }
+    var mpEl=document.getElementById('liMp');
+    function tryParseAdd(){
+      var link=(mpEl.value||'').trim(); var msgEl=document.getElementById('liParseMsg'); var manualWrap=document.getElementById('liManualWrap');
+      if(!link){ msgEl.innerHTML=''; return; }
+      var ll=null; try{ ll=O.parseMapsLatLng(link); }catch(e){ ll=null; }
+      if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Lokasi berhasil terbaca dari link.</span>'; document.getElementById('liLat').value=ll.lat; document.getElementById('liLng').value=ll.lng; manualWrap.style.display='none'; }
+      else{ msgEl.innerHTML='<span style="color:#C0392B">⚠️ Link gak kebaca otomatis. Isi koordinat manual di bawah.</span>'; manualWrap.style.display='block'; }
+    }
+    mpEl.oninput=tryParseAdd; mpEl.onblur=tryParseAdd;
+    document.getElementById('liAdd').onclick=async function(){
+      if(busy) return;
+      var msg=document.getElementById('liMsg'); msg.innerHTML='';
+      var nm=(document.getElementById('liNm').value||'').trim();
+      if(!nm){ msg.innerHTML='<div class="res bad">Isi nama lokasi dulu.</div>'; return; }
+      var lat=parseFloat(document.getElementById('liLat').value), lng=parseFloat(document.getElementById('liLng').value);
+      var payload={ name:nm, area:(document.getElementById('liAr').value||'Kantor/Pabrik').trim(), maps:(mpEl.value||'').trim(), internalOnly:true };
+      if(!isNaN(lat)&&!isNaN(lng)){ payload.lat=lat; payload.lng=lng; if(!payload.maps){ try{ payload.maps=O.buildMapsLink(lat,lng); }catch(e){} } }
+      busy=true; document.getElementById('liAdd').disabled=true;
+      try{
+        await O.addOutlet(payload);
+        msg.innerHTML='<div class="res ok">✓ Lokasi ditambahkan.</div>';
+        document.getElementById('liNm').value=''; mpEl.value=''; document.getElementById('liLat').value=''; document.getElementById('liLng').value=''; document.getElementById('liParseMsg').innerHTML=''; document.getElementById('liManualWrap').style.display='none';
+        loadLokasiInternal();
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      document.getElementById('liAdd').disabled=false; busy=false;
+    };
+  }
+  function openLokasiIntEdit(o){
+    var bk=document.createElement('div');
+    bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:380px;width:100%;max-height:90vh;overflow:auto">'
+      +'<div style="font-weight:800;color:var(--coklat);margin-bottom:10px">⚙️ Edit Lokasi Internal</div>'
+      +'<label>Nama Lokasi</label><input id="lieNm" value="'+esc(o.name||'')+'">'
+      +'<label>Area</label><input id="lieAr" value="'+esc(o.area||'')+'">'
+      +'<label>Link Google Maps</label><input id="lieMp" placeholder="https://maps.app.goo.gl/..." value="'+esc(o.maps||'')+'">'
+      +'<div id="lieParseMsg" style="margin:6px 0 2px;font-size:.8rem"></div>'
+      +'<div id="lieManualWrap" style="display:none"><label>Latitude</label><input id="lieLat" placeholder="-7.xxxxxx"><label>Longitude</label><input id="lieLng" placeholder="110.xxxxxx"></div>'
+      +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="lieSaveBtn" style="flex:1">💾 Simpan</button><button class="btn sec" id="lieCancelBtn" style="flex:1">Batal</button></div>'
+      +'</div>';
+    document.body.appendChild(bk);
+    var latI=bk.querySelector('#lieLat'), lngI=bk.querySelector('#lieLng'), msgEl=bk.querySelector('#lieParseMsg'), manualWrap=bk.querySelector('#lieManualWrap'), mpI=bk.querySelector('#lieMp');
+    if(typeof o.lat==='number' && typeof o.lng==='number'){ latI.value=o.lat; lngI.value=o.lng; }
+    function tryParse(){ var link=(mpI.value||'').trim();
+      if(!link){ msgEl.innerHTML=''; return; }
+      var ll=null; try{ ll=O.parseMapsLatLng(link); }catch(e){ ll=null; }
+      if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Lokasi berhasil terbaca dari link.</span>'; latI.value=ll.lat; lngI.value=ll.lng; manualWrap.style.display='none'; }
+      else{ msgEl.innerHTML='<span style="color:#C0392B">⚠️ Link gak kebaca otomatis. Isi koordinat manual.</span>'; manualWrap.style.display='block'; } }
+    mpI.oninput=tryParse; mpI.onblur=tryParse; tryParse();
+    function shut(){ bk.remove(); }
+    bk.querySelector('#lieCancelBtn').onclick=shut;
+    bk.onclick=function(e){ if(e.target===bk) shut(); };
+    bk.querySelector('#lieSaveBtn').onclick=async function(){
+      if(busy) return;
+      var nm=(bk.querySelector('#lieNm').value||'').trim(); var ar=(bk.querySelector('#lieAr').value||'').trim();
+      if(!nm){ alert('Nama lokasi wajib diisi.'); return; }
+      var origLink=(mpI.value||'').trim();
+      var lat=parseFloat(latI.value), lng=parseFloat(lngI.value);
+      var patch={ name:nm, area:ar||'Kantor/Pabrik', internalOnly:true };
+      if(!isNaN(lat) && !isNaN(lng)){ patch.lat=lat; patch.lng=lng; patch.maps=origLink||(function(){ try{ return O.buildMapsLink(lat,lng); }catch(e){ return ''; } })(); } else { patch.maps=origLink; }
+      busy=true; this.disabled=true; this.textContent='Menyimpan…';
+      try{ await O.updateOutlet(o.id, patch); shut(); loadLokasiInternal(); }
+      catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
+      busy=false;
+    };
+  }
+  function initFixGps(){
+    document.getElementById('fgFind').onclick=async function(){
+      var q=(document.getElementById('fgSearch').value||'').trim();
+      var box=document.getElementById('fgResult');
+      if(!q){ box.innerHTML='<div class="muted">Ketik nama outlet dulu.</div>'; return; }
+      box.innerHTML='<div class="muted">Mencari…</div>';
+      var arr=[]; try{ arr=await O.listOutlets(); }catch(e){}
+      var ql=q.toLowerCase();
+      var matches=arr.filter(function(o){ return (o.name||'').toLowerCase().indexOf(ql)>=0; });
+      if(!matches.length){ box.innerHTML='<div class="muted">Outlet gak ketemu.</div>'; return; }
+      box.innerHTML=matches.slice(0,15).map(function(o){
+        return '<div class="row" data-fgpick="'+esc(o.id)+'" style="cursor:pointer"><div class="grow"><div class="nm" style="font-size:.86rem">'+esc(o.name)+(o.internalOnly?' <span class="tag adm">INTERNAL</span>':'')+'</div><div class="sub">'+esc(o.area||'-')+' · '+(typeof o.lat==='number'?'📍 koordinat OK':'⚠️ belum ada koordinat')+'</div></div><div class="btn sm">Pilih</div></div>';
+      }).join('');
+      box.querySelectorAll('[data-fgpick]').forEach(function(r){ r.onclick=function(){ var o=matches.find(function(x){return x.id===r.getAttribute('data-fgpick');}); if(o) renderFixGpsForm(o); }; });
+    };
+  }
+  function renderFixGpsForm(o){
+    var box=document.getElementById('fgResult');
+    box.innerHTML='<div style="border-top:1px dashed #E2E7EF;margin-top:8px;padding-top:8px">'
+      + '<div class="nm" style="margin-bottom:6px">'+esc(o.name)+'</div>'
+      + '<label>Link Google Maps baru</label><input id="fgMp" placeholder="https://maps.app.goo.gl/..." value="'+esc(o.maps||'')+'">'
+      + '<div id="fgParseMsg" style="margin:6px 0 2px;font-size:.8rem"></div>'
+      + '<div id="fgManualWrap" style="display:none"><label>Latitude</label><input id="fgLat" placeholder="-7.xxxxxx" value="'+(typeof o.lat==='number'?o.lat:'')+'"><label>Longitude</label><input id="fgLng" placeholder="110.xxxxxx" value="'+(typeof o.lng==='number'?o.lng:'')+'"></div>'
+      + '<button class="btn" id="fgSaveBtn" style="margin-top:8px">💾 Simpan Lokasi Baru</button><div id="fgSaveMsg"></div>'
+      + '</div>';
+    var mpEl=box.querySelector('#fgMp');
+    function tryParse(){
+      var link=(mpEl.value||'').trim(); var msgEl=box.querySelector('#fgParseMsg'); var manualWrap=box.querySelector('#fgManualWrap');
+      if(!link){ msgEl.innerHTML=''; return; }
+      var ll=null; try{ ll=O.parseMapsLatLng(link); }catch(e){ ll=null; }
+      if(ll){ msgEl.innerHTML='<span style="color:#2E7D32">✅ Lokasi berhasil terbaca dari link.</span>'; box.querySelector('#fgLat').value=ll.lat; box.querySelector('#fgLng').value=ll.lng; manualWrap.style.display='none'; }
+      else{ msgEl.innerHTML='<span style="color:#C0392B">⚠️ Link gak kebaca otomatis. Isi koordinat manual.</span>'; manualWrap.style.display='block'; }
+    }
+    mpEl.oninput=tryParse; mpEl.onblur=tryParse;
+    box.querySelector('#fgSaveBtn').onclick=async function(){
+      if(busy) return;
+      var msg=box.querySelector('#fgSaveMsg');
+      var lat=parseFloat(box.querySelector('#fgLat').value), lng=parseFloat(box.querySelector('#fgLng').value);
+      var patch={ maps:(mpEl.value||'').trim() };
+      if(!isNaN(lat)&&!isNaN(lng)){ patch.lat=lat; patch.lng=lng; }
+      busy=true; this.disabled=true; this.textContent='Menyimpan…';
+      try{ await O.updateOutlet(o.id, patch); msg.innerHTML='<div class="res ok">✓ Lokasi berhasil diperbarui.</div>'; }
+      catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; this.textContent='💾 Simpan Lokasi Baru'; busy=false;
+    };
+  }
   async function loadOrgStructure(){
     var box=document.getElementById('orgTree'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
     try{ _orgCache = await O.getOrgStructure(); }catch(e){ _orgCache={divisi:[],subDivisi:{},posisi:{}}; }

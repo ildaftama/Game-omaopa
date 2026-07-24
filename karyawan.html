@@ -57,14 +57,14 @@
   <div style="text-align:center"><a class="link" href="absensi.html">‹ Ke halaman Absensi</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=152"></script>
+<script type="module" src="core-omaopa.js?v=163"></script>
+<script type="module" src="core-hrd.js?v=1"></script>
 <script>
 (function(){
   var panel = document.getElementById('panel');
   var busy = false;
   var mode = 'login';
   var currentProfile = null;
-  var customFieldDefs = [];
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
@@ -94,7 +94,6 @@
 
     var hrProfile = {}; try{ hrProfile = await window.OmaOpa.getKaryawanHRProfile(); }catch(e){ hrProfile={}; }
     currentProfile = Object.assign({}, profile, hrProfile||{});
-    try{ customFieldDefs = await window.OmaOpa.listKaryawanFields(); }catch(e){ customFieldDefs=[]; }
     if(profile.fotoProfil){ try{ currentProfile._fotoUrl = await window.OmaOpa.getKaryawanProfilePhotoUrl(profile.fotoProfil); }catch(e){} }
     renderProfile();
   }
@@ -110,7 +109,6 @@
 
   function renderProfile(){
     var p = currentProfile;
-    var cf = p.customFields||{};
     var fotoUrl = p._fotoUrl || '';
     var orgLabel = (window.OmaOpa.computeOrgLabel ? window.OmaOpa.computeOrgLabel(p) : (p.posisi||'-'));
     var html = '<div class="card" style="text-align:center">'
@@ -138,10 +136,6 @@
       + '<label>No. KTP</label><input id="pKtp" value="'+esc(p.noKtp||'')+'" placeholder="16 digit NIK" inputmode="numeric">'
       + '<label>Nama Kontak Darurat</label><input id="pKdNama" value="'+esc(p.kontakDaruratNama||'')+'">'
       + '<label>No. HP Kontak Darurat</label><input id="pKdHp" type="tel" value="'+esc(p.kontakDaruratHp||'')+'" inputmode="numeric">'
-      + customFieldDefs.map(function(f){
-          var v = cf[f.key]||'';
-          return '<label>'+esc(f.label)+'</label><input '+(f.type==='date'?'type="date"':'type="text"')+' data-cf="'+esc(f.key)+'" value="'+esc(v)+'">';
-        }).join('')
       + '<button class="btn" id="pSave">💾 Simpan Data Diri</button><div id="pMsg"></div></div>'
       + '<div class="card"><div class="nm">🌴 Ajukan Cuti</div>'
       + '<label>Jenis Cuti</label><select id="cuJenis"><option value="">Memuat…</option></select>'
@@ -179,8 +173,6 @@
     document.getElementById('pSave').onclick = async function(){
       if(busy) return; busy=true; this.disabled=true; this.textContent='Menyimpan…';
       var msg=document.getElementById('pMsg'); msg.innerHTML='';
-      var customFields={};
-      customFieldDefs.forEach(function(f){ var el=document.querySelector('[data-cf="'+f.key+'"]'); if(el) customFields[f.key]=el.value; });
       try{
         await window.OmaOpa.updateKaryawanOwnProfile({
           email: document.getElementById('pEmail').value,
@@ -188,8 +180,7 @@
           alamat: document.getElementById('pAlamat').value,
           noKtp: document.getElementById('pKtp').value,
           kontakDaruratNama: document.getElementById('pKdNama').value,
-          kontakDaruratHp: document.getElementById('pKdHp').value,
-          customFields: customFields
+          kontakDaruratHp: document.getElementById('pKdHp').value
         });
         msg.innerHTML='<div class="res ok">✓ Data diri tersimpan.</div>';
       }catch(e){ msg.innerHTML='<div class="res bad">'+esc((e&&e.message)||'Gagal menyimpan.')+'</div>'; }
