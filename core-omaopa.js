@@ -578,7 +578,12 @@ async function isStaff(){
 }
 async function findVoucher(code){
   code=(code||'').trim().toUpperCase(); if(!code) return null;
-  try{ const s = await getDoc(doc(db,'vouchers',code)); return s.exists()? Object.assign({code:s.id}, s.data()) : null; }catch(e){ return null; }
+  try{
+    const s = await getDoc(doc(db,'vouchers',code)); if(!s.exists()) return null;
+    const v=Object.assign({code:s.id}, s.data());
+    if(v.expiresAt){ const expMs=(v.expiresAt.seconds)?v.expiresAt.seconds*1000:new Date(v.expiresAt).getTime(); v.isExpired = !isNaN(expMs) && Date.now()>expMs; }
+    return v;
+  }catch(e){ return null; }
 }
 async function getStaffOutlet(){
   if(!user) return '';
@@ -590,6 +595,7 @@ async function markVoucherUsed(code){
   const outlet=await getStaffOutlet();
   let data={};
   try{ const s=await getDoc(doc(db,'vouchers',code)); if(s.exists()) data=s.data(); }catch(e){}
+  if(data.expiresAt){ const expMs=(data.expiresAt.seconds)?data.expiresAt.seconds*1000:new Date(data.expiresAt).getTime(); if(!isNaN(expMs) && Date.now()>expMs) throw {message:'Voucher ini udah kadaluarsa, gak bisa dipakai lagi.'}; }
   await setDoc(doc(db,'vouchers',code), { status:'terpakai', usedAt: serverTimestamp(), usedOutlet:outlet, usedBy:(user?user.uid:'') }, {merge:true});
   pushToSheet({ type:'voucher', waktu:new Date().toISOString(), outlet:outlet, kode:code, title:data.title||'', nama:data.name||'', uid:data.uid||'' });
 }
@@ -1531,7 +1537,63 @@ function inBirthdayRange(dob, tp){
   if(from<=to) return dobKey>=from && dobKey<=to;
   return dobKey>=from || dobKey<=to; // rentang muter tahun, misal Des -> Jan
 }
-async function sendBroadcast(data, imageBlob){
+async function resolveBlastRecipientUids(targetType, targetParams){
+  const tp=targetParams||{};
+  const uids=[];
+  if(targetType==='specific'){
+    return (tp.uids||[]).slice();
+  }
+  if(targetType==='outlet'){
+    const outlets=await listOutlets();
+    const nameSet={};
+    (tp.keys||[]).forEach(k=>{
+      if(k.indexOf('__')===0){ outlets.forEach(o=>{ if(matchOutletKey(o.name,k)) nameSet[o.name]=true; }); }
+      else nameSet[k]=true;
+    });
+    const names=Object.keys(nameSet);
+    for(let i=0;i<names.length;i+=30){
+      const chunk=names.slice(i,i+30);
+      try{ const snap=await getDocs(query(collection(db,'users'), where('homeOutlet','in',chunk))); snap.forEach(d=>uids.push(d.id)); }catch(e){}
+    }
+    return uids;
+  }
+  if(targetType==='daterange'){
+    let constraints=[];
+    if(tp.fromMs) constraints.push(where('createdAt','>=', new Date(tp.fromMs)));
+    if(tp.toMs) constraints.push(where('createdAt','<=', new Date(tp.toMs)));
+    try{ const snap=await getDocs(constraints.length? query(collection(db,'users'), ...constraints) : collection(db,'users')); snap.forEach(d=>uids.push(d.id)); }catch(e){}
+    return uids;
+  }
+  if(targetType==='birthday'){
+    try{ const snap=await getDocs(collection(db,'users')); snap.forEach(d=>{ const x=d.data(); if(x.dob){ const dob=new Date(x.dob); if(!isNaN(dob) && inBirthdayRange(dob, tp)) uids.push(d.id); } }); }catch(e){}
+    return uids;
+  }
+  // 'all'
+  try{ const snap=await getDocs(collection(db,'users')); snap.forEach(d=>uids.push(d.id)); }catch(e){}
+  return uids;
+}
+async function grantVouchersForBroadcast(targetType, targetParams, voucherConfig, broadcastId){
+  const uids=await resolveBlastRecipientUids(targetType, targetParams);
+  let count=0, fail=0;
+  for(const uid of uids){
+    try{
+      const code=genCode();
+      let nm=''; try{ const us=await getDoc(doc(db,'users',uid)); if(us.exists()) nm=us.data().name||''; }catch(e){}
+      await setDoc(doc(db,'vouchers',code), {
+        code:code, uid:uid, name:nm, rewardId:'', title:voucherConfig.title||'Voucher Promo', note:voucherConfig.note||'',
+        cost:0, status:'aktif',
+        discType:voucherConfig.discType||'none', discValue:voucherConfig.discValue||0, discMax:voucherConfig.discMax||0,
+        freeItemId:voucherConfig.freeItemId||'', freeItemName:voucherConfig.freeItemName||'', freeItemPrice:voucherConfig.freeItemPrice||0,
+        expiresAt: voucherConfig.expiresAt || null,
+        fromBroadcast: broadcastId||'',
+        createdAt: serverTimestamp()
+      });
+      count++;
+    }catch(e){ fail++; }
+  }
+  return { count, fail, total:uids.length };
+}
+async function sendBroadcast(data, imageBlob, voucherConfig){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   const d=data||{}; const body=(d.body||'').trim();
   const title=(d.title||'').trim();
@@ -1547,8 +1609,14 @@ async function sendBroadcast(data, imageBlob){
   }
   await setDoc(ref, {
     title:title, body:body, targetType:d.targetType, targetParams:d.targetParams||{}, imageUrl:imageUrl,
+    expiresAt: d.expiresAt || null, hasVoucher: !!voucherConfig,
     active:true, createdBy:(auth.currentUser?auth.currentUser.uid:''), createdAt:serverTimestamp()
   });
+  let voucherResult=null;
+  if(voucherConfig){
+    voucherResult=await grantVouchersForBroadcast(d.targetType, d.targetParams||{}, voucherConfig, ref.id);
+  }
+  return { id:ref.id, voucherResult:voucherResult };
 }
 async function listBroadcasts(n){
   if(!(await isAdmin())) return [];
@@ -1580,7 +1648,9 @@ async function getMemberBroadcasts(){
     const outlet=(profile&&profile.homeOutlet)||'';
     const arr=[];
     snap.forEach(d=>{
-      const x=d.data(); const tp=x.targetParams||{}; let match=false;
+      const x=d.data();
+      if(x.expiresAt){ const expMs=(x.expiresAt.seconds)?x.expiresAt.seconds*1000:new Date(x.expiresAt).getTime(); if(!isNaN(expMs) && Date.now()>expMs) return; }
+      const tp=x.targetParams||{}; let match=false;
       if(x.targetType==='all') match=true;
       else if(x.targetType==='birthday' && dob) match=inBirthdayRange(dob, tp);
       else if(x.targetType==='daterange') match=(!tp.fromMs||regTs>=tp.fromMs)&&(!tp.toMs||regTs<=tp.toMs);

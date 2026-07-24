@@ -58,7 +58,7 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=163"></script>
+<script type="module" src="core-omaopa.js?v=165"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
 (function(){
@@ -197,18 +197,20 @@
     try{ v = await window.OmaOpa.findVoucher(code); }catch(e){ v=null; }
     if(!v){ out.innerHTML = '<div class="res bad">Voucher <b>'+esc(code)+'</b> tidak ditemukan.</div>'; return; }
     var used = (v.status==='terpakai');
-    var cls = used ? 'warn' : 'ok';
+    var expired = !!v.isExpired;
+    var cls = used ? 'warn' : (expired ? 'bad' : 'ok');
     var html = '<div class="res '+cls+'">'
       + '<div class="t">'+esc(v.title||'Voucher')+'</div>'
       + (v.note?'<div class="n">'+esc(v.note)+'</div>':'')
       + '<div class="row">Kode: <b>'+esc(v.code)+'</b></div>'
       + '<div class="row">Pemilik: <b>'+esc(v.name||'-')+'</b></div>'
-      + '<div class="row">Status: <span class="pill '+(used?'terpakai':'aktif')+'">'+(used?'SUDAH DIPAKAI':'AKTIF')+'</span></div>';
+      + '<div class="row">Status: <span class="pill '+(used?'terpakai':(expired?'terpakai':'aktif'))+'">'+(used?'SUDAH DIPAKAI':(expired?'KADALUARSA':'AKTIF'))+'</span></div>';
     if(used){ html += '<div class="row">Dipakai: '+fmtDate(v.usedAt)+'</div>'; }
+    if(!used && v.expiresAt){ html += '<div class="row">Berlaku sampai: '+fmtDate(v.expiresAt)+'</div>'; }
     html += '</div>';
-    if(!used){ html += '<button class="btn danger" id="useBtn">✓ Tandai TERPAKAI</button>'; }
+    if(!used && !expired){ html += '<button class="btn danger" id="useBtn">✓ Tandai TERPAKAI</button>'; }
     out.innerHTML = html;
-    if(!used){
+    if(!used && !expired){
       document.getElementById('useBtn').onclick = async function(ev){
         if(busy) return; busy=true;
         var b=ev.target; b.disabled=true; b.textContent='Memproses…';

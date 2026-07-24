@@ -106,7 +106,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=164"></script>
+<script type="module" src="core-omaopa.js?v=165"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -247,6 +247,19 @@
           +'<option value="specific">🔍 Pilih member manual</option>'
         +'</select>'
         +'<div id="bTargetExtra" style="margin-top:8px"></div>'
+        +'<label>Pesan otomatis hilang dari Kotak Pesan mulai <span style="font-weight:400">(opsional, kosongkan kalau gak perlu)</span></label><input type="datetime-local" id="bAutoHide">'
+        +'<div style="border-top:1px dashed #E7D8BE;margin-top:12px;padding-top:12px">'
+        +'<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="bVoucherChk" style="width:auto"> 🎁 Sertakan Voucher Promo</label>'
+        +'<div id="bVoucherBody" style="display:none;margin-top:8px">'
+        +'<div class="muted" style="font-size:.74rem;margin-bottom:8px">Tiap member yang kena target blast ini bakal dapet 1 kode voucher masing-masing (kayak nuker poin, tapi gratis). Kalau target-nya "Semua member"/ribuan orang, proses ini bisa makan waktu beberapa menit — jangan tutup halaman pas lagi proses.</div>'
+        +'<label>Jenis Diskon</label><select id="bvType"><option value="percent">Persen (%)</option><option value="fixed">Potongan Rp</option><option value="freeitem">Gratis Item</option></select>'
+        +'<div id="bvValueWrap"><label>Nilai Diskon</label><input type="number" id="bvValue" placeholder="misal 17"></div>'
+        +'<div id="bvMaxWrap"><label>Maks Potongan (Rp, opsional)</label><input type="number" id="bvMax" placeholder="misal 20000"></div>'
+        +'<div id="bvFreeItemWrap" style="display:none"><label>Pilih Item Gratis</label><select id="bvFreeItem"><option value="">— pilih item —</option></select></div>'
+        +'<label>Judul Voucher (tampil di member)</label><input id="bvTitle" placeholder="misal: Promo Merdeka 17%">'
+        +'<label>Berlaku Dari</label><input type="date" id="bvFrom">'
+        +'<label>Berlaku Sampai</label><input type="date" id="bvTo">'
+        +'</div></div>'
         +'<button class="btn" id="bSend" style="margin-top:14px">📤 Kirim Blast</button><div id="bMsg"></div>'
       ) : '<div class="res warn">👁️ Cuma Admin Utama yang bisa kirim blast.</div>')
       +'</div>'
@@ -332,6 +345,17 @@
       }
       targetSel.onchange=renderTargetExtra; renderTargetExtra();
 
+      document.getElementById('bVoucherChk').onchange=function(){ document.getElementById('bVoucherBody').style.display=this.checked?'block':'none'; };
+      var bvFI=document.getElementById('bvFreeItem');
+      bvFI.innerHTML='<option value="">— pilih item —</option>'+(window.OMA_MENU||[]).map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>';}).join('');
+      document.getElementById('bvType').onchange=function(){
+        var t=this.value;
+        document.getElementById('bvValueWrap').style.display = (t==='freeitem') ? 'none' : 'block';
+        document.getElementById('bvMaxWrap').style.display = (t==='percent') ? 'block' : 'none';
+        document.getElementById('bvFreeItemWrap').style.display = (t==='freeitem') ? 'block' : 'none';
+      };
+      document.getElementById('bvType').onchange();
+
       document.getElementById('bSend').onclick=async function(){
         if(busy) return;
         var title=(document.getElementById('bTitle').value||'').trim();
@@ -372,13 +396,44 @@
           var mnames=uids.map(function(u){return selectedMembers[u];});
           targetDesc=uids.length+' member dipilih manual: '+(mnames.length>5 ? (mnames.slice(0,5).join(', ')+', +'+(mnames.length-5)+' lagi') : mnames.join(', '));
         }
-        showBlastConfirm(title, body, targetDesc, !!blastImageBlob, async function(){
+        var voucherConfig=null, voucherDesc='';
+        if(document.getElementById('bVoucherChk').checked){
+          var vType=document.getElementById('bvType').value;
+          var vTitle=(document.getElementById('bvTitle').value||'').trim();
+          var vFrom=document.getElementById('bvFrom').value, vTo=document.getElementById('bvTo').value;
+          if(!vTitle){ msg.innerHTML='<div class="res bad">Isi judul voucher dulu.</div>'; return; }
+          if(!vTo){ msg.innerHTML='<div class="res bad">Isi tanggal "Berlaku Sampai" buat voucher.</div>'; return; }
+          voucherConfig={ title:vTitle, expiresAt:new Date(vTo+'T23:59:59') };
+          if(vType==='freeitem'){
+            var fid=document.getElementById('bvFreeItem').value;
+            var mi=(window.OMA_MENU||[]).find(function(m){return m.id===fid;});
+            if(!fid){ msg.innerHTML='<div class="res bad">Pilih item gratisnya dulu.</div>'; return; }
+            voucherConfig.discType='freeitem'; voucherConfig.freeItemId=fid; voucherConfig.freeItemName=mi?((mi.cat?mi.cat+' — ':'')+mi.name):''; voucherConfig.freeItemPrice=mi?mi.price:0;
+            voucherDesc='🎁 Voucher: '+vTitle+' (gratis '+(voucherConfig.freeItemName||'item')+')';
+          } else {
+            var vVal=parseFloat(document.getElementById('bvValue').value);
+            if(!vVal || vVal<=0){ msg.innerHTML='<div class="res bad">Isi nilai diskon voucher dulu.</div>'; return; }
+            voucherConfig.discType=vType; voucherConfig.discValue=vVal;
+            if(vType==='percent'){ var vMax=parseFloat(document.getElementById('bvMax').value); if(vMax>0) voucherConfig.discMax=vMax; voucherDesc='🎁 Voucher: '+vTitle+' (diskon '+vVal+'%)'; }
+            else { voucherDesc='🎁 Voucher: '+vTitle+' (potongan Rp'+vVal.toLocaleString('id-ID')+')'; }
+          }
+          voucherDesc += ' · berlaku sampai '+new Date(vTo).toLocaleDateString('id-ID');
+        }
+        var autoHideVal=document.getElementById('bAutoHide').value;
+        var expiresAt = autoHideVal ? new Date(autoHideVal) : null;
+        var autoHideDesc = expiresAt ? ('Pesan otomatis hilang mulai '+expiresAt.toLocaleString('id-ID')) : '';
+        showBlastConfirm(title, body, targetDesc, !!blastImageBlob, voucherDesc, autoHideDesc, async function(){
           var sendBtn=document.getElementById('bSend');
           busy=true; sendBtn.disabled=true; sendBtn.textContent='Mengirim…';
           try{
-            await O.sendBroadcast({ title:title, body:body, targetType:t, targetParams:params }, blastImageBlob);
-            msg.innerHTML='<div class="res ok">✓ Blast terkirim.</div>';
+            var res=await O.sendBroadcast({ title:title, body:body, targetType:t, targetParams:params, expiresAt:expiresAt }, blastImageBlob, voucherConfig);
+            var okMsg='<div class="res ok">✓ Blast terkirim.';
+            if(res && res.voucherResult){ okMsg+=' 🎁 '+res.voucherResult.count+' voucher berhasil dibuat'+(res.voucherResult.fail?(' ('+res.voucherResult.fail+' gagal)'):'')+'.'; }
+            okMsg+='</div>';
+            msg.innerHTML=okMsg;
             document.getElementById('bTitle').value=''; document.getElementById('bBody').value=''; targetSel.value='all'; renderTargetExtra();
+            document.getElementById('bAutoHide').value=''; document.getElementById('bVoucherChk').checked=false; document.getElementById('bVoucherBody').style.display='none';
+            document.getElementById('bvTitle').value=''; document.getElementById('bvValue').value=''; document.getElementById('bvMax').value=''; document.getElementById('bvFrom').value=''; document.getElementById('bvTo').value='';
             blastImageBlob=null; if(imgInput) imgInput.value=''; var prevEl=document.getElementById('bImagePreview'); if(prevEl) prevEl.innerHTML='';
             bHistLoaded=true; loadBlastHistory();
             var histBody=document.getElementById('bHistBody'); if(histBody) histBody.style.display='block';
@@ -389,7 +444,7 @@
       };
     }
 
-    function showBlastConfirm(title, body, targetDesc, hasImage, onConfirm){
+    function showBlastConfirm(title, body, targetDesc, hasImage, voucherDesc, autoHideDesc, onConfirm){
       var bk=document.createElement('div');
       bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
       var cuplikan=body.length>140?body.slice(0,140)+'…':body;
@@ -399,6 +454,8 @@
         +'<div style="padding:8px 0;border-bottom:1px solid #F2E4C6"><div class="muted" style="font-size:.8rem;margin-bottom:3px">Isi pesan</div><div style="font-size:.88rem;white-space:pre-wrap">'+esc(cuplikan)+'</div></div>'
         +(hasImage?'<div class="info-row"><span>Gambar</span><b>✓ Dilampirkan</b></div>':'')
         +'<div style="padding:8px 0"><div class="muted" style="font-size:.8rem;margin-bottom:3px">Kirim ke</div><div style="font-size:.88rem;font-weight:700">'+esc(targetDesc)+'</div></div>'
+        +(voucherDesc?('<div style="padding:8px 0;border-top:1px solid #F2E4C6"><div style="font-size:.86rem;font-weight:700;color:#2E7D32">'+esc(voucherDesc)+'</div></div>'):'')
+        +(autoHideDesc?('<div style="padding:8px 0;border-top:1px solid #F2E4C6"><div class="muted" style="font-size:.8rem">⏱ '+esc(autoHideDesc)+'</div></div>'):'')
         +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn sec" id="bcCancel" style="margin:0">Batal</button><button class="btn" id="bcOk" style="margin:0">✓ Kirim Sekarang</button></div>'
         +'</div>';
       document.body.appendChild(bk);
