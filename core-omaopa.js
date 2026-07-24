@@ -227,7 +227,7 @@ async function registerPhonePin(data){
   if(rc){ try{ const rm=await getDoc(doc(db,'refcodes',rc)); if(rm.exists()){ const ru=(rm.data().uid||''); if(ru && ru!==user.uid) referredBy=ru; } }catch(e){} }
   // buat kode referral unik untuk akun ini
   const myCode=await ensureUniqueRefCode();
-  await ensureDoc({ name:name.trim(), phone:normPhone(phone), gender, age, dob, occupation, homeOutlet, consent:true, provider:'phone', profileComplete:true, refCode:myCode, referredBy:referredBy, refRewarded:false });
+  await ensureDoc({ name:name.trim(), nameLower:name.trim().toLowerCase(), phone:normPhone(phone), gender, age, dob, occupation, homeOutlet, consent:true, provider:'phone', profileComplete:true, refCode:myCode, referredBy:referredBy, refRewarded:false });
   try{ await setDoc(doc(db,'refcodes',myCode), { uid:user.uid, name:name.trim(), createdAt:serverTimestamp() }); }catch(e){}
   pushToSheet({
     type: 'member',
@@ -774,6 +774,22 @@ async function memberOutletSummary(outletNames){
     return { total:total, active:active, ok:true };
   }catch(e){ return { total:0, active:0, ok:false, error:(e&&e.message)||String(e) }; }
 }
+async function backfillNameLower(){
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
+  let n=0;
+  try{
+    const snap=await getDocs(collection(db,'users'));
+    for(const d of snap.docs){
+      const x=d.data();
+      if(x.nameLower) continue;
+      const nl=(x.name||'').trim().toLowerCase();
+      if(!nl) continue;
+      try{ await setDoc(doc(db,'users',d.id), { nameLower:nl }, {merge:true}); n++; }catch(e){}
+    }
+  }catch(e){}
+  logAudit('backfill_namelower', 'Migrasi nameLower buat pencarian member ('+n+' member terupdate).');
+  return { count:n };
+}
 async function backfillLastTxnAt(){
   if(!(await isMaster())) throw {message:'Khusus Master.'};
   let txs=[];
@@ -1260,13 +1276,32 @@ async function getMemberByPhone(phone){
   }catch(e){ return null; }
 }
 async function listMembers(qstr, n){
-  n=n||500; qstr=(qstr||'').trim().toLowerCase();
-  try{ const snap=await getDocs(query(collection(db,'users'), limit(n))); const arr=[];
-    snap.forEach(d=>{ const x=d.data(); const nm=(x.name||''), ph=(x.phone||'');
-      if(qstr && nm.toLowerCase().indexOf(qstr)<0 && ph.indexOf(qstr)<0) return;
-      arr.push({uid:d.id,name:nm,phone:ph,points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', dob:x.dob||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0, earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
-    arr.sort((a,b)=>b.points-a.points); return arr;
-  }catch(e){ return []; }
+  n=n||500; qstr=(qstr||'').trim();
+  if(!qstr){
+    try{ const snap=await getDocs(query(collection(db,'users'), limit(n))); const arr=[];
+      snap.forEach(d=>{ const x=d.data(); arr.push({uid:d.id,name:x.name||'',phone:x.phone||'',points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', dob:x.dob||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0, earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0}); });
+      arr.sort((a,b)=>b.points-a.points); return arr;
+    }catch(e){ return []; }
+  }
+  const qLower=qstr.toLowerCase();
+  const seen={}; const arr=[];
+  function pushDoc(d){
+    if(seen[d.id]) return; seen[d.id]=true;
+    const x=d.data();
+    arr.push({uid:d.id,name:x.name||'',phone:x.phone||'',points:(typeof x.points==='number')?x.points:0, gender:x.gender||'', age:x.age||'', dob:x.dob||'', occupation:x.occupation||'', homeOutlet:x.homeOutlet||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0, earnGame:(typeof x.earn_game==='number')?x.earn_game:0, earnCheckin:(typeof x.earn_checkin==='number')?x.earn_checkin:0});
+  }
+  try{
+    const nameSnap=await getDocs(query(collection(db,'users'), where('nameLower','>=',qLower), where('nameLower','<=',qLower+'\uf8ff'), limit(n)));
+    nameSnap.forEach(pushDoc);
+  }catch(e){ console.error('listMembers nameLower query gagal (mungkin belum ada nameLower/index):', e); }
+  try{
+    if(/^[0-9+]/.test(qstr)){
+      const phoneSnap=await getDocs(query(collection(db,'users'), where('phone','>=',qstr), where('phone','<=',qstr+'\uf8ff'), limit(n)));
+      phoneSnap.forEach(pushDoc);
+    }
+  }catch(e){ console.error('listMembers phone query gagal:', e); }
+  arr.sort((a,b)=>b.points-a.points);
+  return arr;
 }
 async function getMemberScore(uid){ try{ const s=await getDoc(doc(db,'scores',(uid||'').trim())); return s.exists()?(s.data().score||0):0; }catch(e){ return 0; } }
 async function listMembersPage(n, after){
@@ -1905,7 +1940,7 @@ async function getMemberBroadcasts(){
       if(match) arr.push({ id:d.id, title:x.title||'', body:x.body||'', imageUrl:x.imageUrl||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0, isRead: read.indexOf(d.id)>=0 });
     });
     return arr;
-  }catch(e){ return []; }
+  }catch(e){ console.error('getMemberBroadcasts gagal:', e); return []; }
 }
 async function markBroadcastRead(id){
   if(!user || !id) return;
@@ -2548,7 +2583,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, getOrCreateMemberCode, getMemberByCode, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, backfillLastTxnAt, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, backfillLastTxnAt, backfillNameLower, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,

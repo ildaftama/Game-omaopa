@@ -106,7 +106,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=160"></script>
+<script type="module" src="core-omaopa.js?v=162"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -325,7 +325,7 @@
             res.innerHTML='<div class="muted">Mencari…</div>';
             var arr=[]; try{ if(/^[0-9+]/.test(q)){ var one=await O.getMemberByPhone(q); arr=one?[one]:[]; } if(!arr.length) arr=await O.listMembers(q,30); }catch(e){}
             if(!arr.length){ res.innerHTML='<div class="muted">Member tidak ketemu.</div>'; return; }
-            res.innerHTML=arr.slice(0,20).map(function(m){ return '<div class="row" data-uid="'+esc(m.uid)+'" data-nm="'+esc(m.name||'')+'" style="cursor:pointer"><div class="grow"><div class="nm" style="font-size:.85rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+esc(m.phone||'-')+'</div></div><div class="btn sm">+ Tambah</div></div>'; }).join('');
+            res.innerHTML=arr.slice(0,20).map(function(m){ return '<div class="row" data-uid="'+esc(m.uid)+'" data-nm="'+esc(m.name||'')+'" style="cursor:pointer"><div class="grow"><div class="nm" style="font-size:.85rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+esc(m.phone||'-')+'</div><div class="muted" style="font-size:.62rem;word-break:break-all">ID: '+esc(m.uid)+'</div></div><div class="btn sm">+ Tambah</div></div>'; }).join('');
             res.querySelectorAll('[data-uid]').forEach(function(r){ r.onclick=function(){ selectedMembers[r.getAttribute('data-uid')]=r.getAttribute('data-nm')||'(tanpa nama)'; renderSelectedList(); }; });
           };
         } else { box.innerHTML=''; }
@@ -461,6 +461,7 @@
       +'<div id="cfList" class="muted">Memuat…</div>'
       +'<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><input id="cfNew" placeholder="Nama field baru" style="flex:1;min-width:140px"><select id="cfType" style="width:auto"><option value="text">Teks</option><option value="date">Tanggal</option></select><button class="btn sm" id="cfAdd">＋ Tambah</button></div><div id="cfMsg"></div></div>'
       +(masterEdit?('<div class="card"><div class="nm">🔄 Migrasi status "aktif" member</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: hitung tanggal transaksi terakhir tiap member dari riwayat lama, biar filter "Member aktif (30 hari)" di tab Member langsung akurat (bukan nunggu transaksi baru). Aman dijalankan berkali-kali.</div><button class="btn sec" id="bfBtn">Jalankan migrasi</button><div id="bfMsg"></div></div>'):'')
+      +(masterEdit?('<div class="card"><div class="nm">🔎 Migrasi pencarian nama member</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: siapin index nama (huruf kecil) buat member lama, biar pencarian nama di Blast/fitur lain jadi akurat (sebelumnya cuma nemu kalau kebetulan ada di 30 data pertama). Member baru otomatis kesiapin sendiri pas daftar. Aman dijalankan berkali-kali.</div><button class="btn sec" id="nlBtn">Jalankan migrasi</button><div id="nlMsg"></div></div>'):'')
       +'<div class="card"><div class="nm">📜 Rekap Audit (riwayat tindakan)</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Catatan semua tindakan penting admin/master: adjust poin, hapus data, ubah promo/banner/pesan, ubah peran staff, dll — lengkap siapa & kapan.</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="auPer"><button class="btn sm sec aup" data-m="1">1 bulan</button><button class="btn sm sec aup" data-m="2">2 bulan</button><button class="btn sm sec aup" data-m="3">3 bulan</button><button class="btn sm sec aup" data-m="6">6 bulan</button><button class="btn sm sec aup" data-m="12">12 bulan</button></div>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:.8rem"><input type="date" id="auFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="auTo" style="flex:1;min-width:0"><button class="btn sm" id="auGo">OK</button></div>'
@@ -494,6 +495,13 @@
       if(busy) return; if(!confirm('Jalankan migrasi status aktif? Ini membaca seluruh riwayat transaksi lama (sekali proses, aman).')) return;
       busy=true; this.disabled=true; var m=document.getElementById('bfMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Memproses… (jangan tutup halaman, bisa makan waktu)</div>';
       try{ var r=await O.backfillLastTxnAt(); m.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' member ter-update.</div>'; }
+      catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      busy=false; this.disabled=false;
+    };
+    var nl=document.getElementById('nlBtn'); if(nl) nl.onclick=async function(){
+      if(busy) return; if(!confirm('Jalankan migrasi pencarian nama? Ini membaca seluruh data member lama (sekali proses, aman).')) return;
+      busy=true; this.disabled=true; var m=document.getElementById('nlMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Memproses… (jangan tutup halaman, bisa makan waktu kalau member-nya ribuan)</div>';
+      try{ var r=await O.backfillNameLower(); m.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' member ter-update.</div>'; }
       catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
       busy=false; this.disabled=false;
     };
