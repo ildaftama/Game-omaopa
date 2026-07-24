@@ -657,6 +657,140 @@ async function awardPoints(uid, nominal){
   return { points:pts, newTotal:newTotal, outlet:outlet };
 }
 
+// ---------- katalog produk POS (products/{id}) ----------
+async function listProductsAdmin(){
+  try{
+    const snap=await getDocs(query(collection(db,'products'), limit(300)));
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', category:x.category||'', price:(typeof x.price==='number')?x.price:0, active:x.active!==false, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
+    arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.name.localeCompare(b.name));
+    return arr;
+  }catch(e){ return []; }
+}
+async function listProductsPublic(){
+  try{
+    const snap=await getDocs(query(collection(db,'products'), where('active','==',true), limit(300)));
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', category:x.category||'', price:(typeof x.price==='number')?x.price:0, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
+    arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.name.localeCompare(b.name));
+    return arr;
+  }catch(e){ return []; }
+}
+async function saveProduct(id, patch){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'}; patch=patch||{};
+  const isNew=!id;
+  if(!id){ const t=(patch.name||'').trim(); if(!t) throw {message:'Nama produk wajib.'}; id=slug(t)+'-'+Date.now().toString(36); }
+  const data={};
+  if(patch.name!=null) data.name=String(patch.name).trim();
+  if(patch.category!=null) data.category=String(patch.category).trim();
+  if(patch.price!=null && patch.price!=='') data.price=Math.max(0,Math.floor(Number(patch.price)||0));
+  if(patch.active!=null) data.active=!!patch.active;
+  if(patch.sortOrder!=null && patch.sortOrder!=='') data.sortOrder=Math.floor(Number(patch.sortOrder)||0);
+  data.updatedAt=serverTimestamp();
+  if(isNew){ if(data.active==null) data.active=true; data.createdAt=serverTimestamp(); }
+  await setDoc(doc(db,'products',id), data, {merge:true});
+  return { id:id };
+}
+async function setProductActive(id, active){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'products',(id||'').trim()), { active:!!active, updatedAt:serverTimestamp() }, {merge:true}); }
+async function deleteProduct(id){ if(!(await isMaster())) throw {message:'Khusus Master.'}; await deleteDoc(doc(db,'products',(id||'').trim())); }
+
+// ---------- transaksi POS (kasir: keranjang produk + member + voucher + metode bayar) ----------
+async function recordPosTransaction(opts){
+  opts=opts||{};
+  const uid=(opts.uid||'').trim();
+  const itemsIn=Array.isArray(opts.items)?opts.items:[];
+  const paymentMethod=(opts.paymentMethod==='qris'||opts.paymentMethod==='debit')?opts.paymentMethod:'cash';
+  const voucherCode=(opts.voucherCode||'').trim().toUpperCase();
+  if(!uid) throw {message:'Member belum dipilih.'};
+  if(!itemsIn.length) throw {message:'Keranjang masih kosong.'};
+  let subtotal=0;
+  const items=itemsIn.map(function(it){
+    const qty=Math.max(1, Math.floor(Number(it.qty)||1));
+    const price=Math.max(0, Math.floor(Number(it.price)||0));
+    const lineTotal=qty*price; subtotal+=lineTotal;
+    return { productId:String(it.productId||''), name:String(it.name||''), qty:qty, price:price, subtotal:lineTotal };
+  });
+  let voucher=null, discount=0, freeItemName='';
+  if(voucherCode){
+    voucher=await findVoucher(voucherCode);
+    if(!voucher) throw {message:'Voucher '+voucherCode+' tidak ditemukan.'};
+    if(voucher.status==='terpakai') throw {message:'Voucher ini sudah pernah dipakai.'};
+    if(voucher.isExpired) throw {message:'Voucher ini sudah kadaluarsa.'};
+    if(voucher.uid && voucher.uid!==uid) throw {message:'Voucher ini bukan milik member yang dipilih.'};
+    if(voucher.discType==='percent'){
+      discount=Math.floor(subtotal*(Number(voucher.discValue)||0)/100);
+      const cap=Number(voucher.discMax)||0; if(cap>0 && discount>cap) discount=cap;
+    } else if(voucher.discType==='freeitem'){
+      freeItemName=voucher.freeItemName||'';
+    }
+  }
+  const nominal=Math.max(0, subtotal-discount);
+  const pts=Math.floor(nominal/EARN_PER_POINT);
+  const outlet=await getStaffOutlet();
+  const cashReceived = paymentMethod==='cash' ? Math.max(0, Math.floor(Number(opts.cashReceived)||0)) : 0;
+  if(paymentMethod==='cash' && cashReceived<nominal) throw {message:'Uang diterima kurang dari total belanja ('+rpFmt(nominal)+').'};
+  const change = paymentMethod==='cash' ? (cashReceived-nominal) : 0;
+  const uref=doc(db,'users',uid);
+  let newTotal=0, mname='';
+  await runTransaction(db, async (tx)=>{
+    const us=await tx.get(uref);
+    if(!us.exists()) throw {message:'Member tidak ditemukan.'};
+    const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||'';
+    newTotal=cur+pts;
+    tx.set(uref, { points:newTotal, lastTxnAt:serverTimestamp(), updatedAt:serverTimestamp() }, {merge:true});
+    tx.set(doc(db,'leaderboard',uid), { name:mname, points:newTotal, updatedAt:serverTimestamp() }, {merge:true});
+    const tref=doc(collection(db,'transactions'));
+    tx.set(tref, {
+      uid:uid, name:mname, nominal:nominal, points:pts, kind:'', outlet:outlet, staffUid:(user?user.uid:''),
+      items:items, paymentMethod:paymentMethod, cashReceived:cashReceived, change:Math.max(0,change),
+      voucherCode:(voucher?voucherCode:''), voucherDiscount:discount, freeItemName:freeItemName,
+      createdAt: serverTimestamp()
+    });
+    if(voucher){ tx.set(doc(db,'vouchers',voucherCode), { status:'terpakai', usedAt:serverTimestamp(), usedOutlet:outlet, usedBy:(user?user.uid:''), usedVia:'pos' }, {merge:true}); }
+  });
+  pushToSheet({ type:'txn', waktu:new Date().toISOString(), outlet:outlet, nama:mname, uid:uid, nominal:nominal, poin:pts, metode:paymentMethod, voucher:(voucher?voucherCode:'') });
+  try{ await maybePayReferral(uid); }catch(e){}
+  return { points:pts, newTotal:newTotal, outlet:outlet, nominal:nominal, subtotal:subtotal, discount:discount, change:Math.max(0,change), freeItemName:freeItemName, name:mname, items:items, paymentMethod:paymentMethod, cashReceived:cashReceived, voucherCode:(voucher?voucherCode:'') };
+}
+
+// ---------- katalog menu web-order (menuItems/{id}) — TERPISAH dari products (POS) ----------
+async function listMenuItemsAdmin(){
+  try{
+    const snap=await getDocs(query(collection(db,'menuItems'), limit(300)));
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, cat:x.cat||'', name:x.name||'', price:(typeof x.price==='number')?x.price:0, desc:x.desc||'', imageUrl:x.imageUrl||'', avail:x.avail!==false, sortOrder:(typeof x.sortOrder==='number')?x.sortOrder:0 }); });
+    arr.sort((a,b)=> (a.sortOrder-b.sortOrder) || a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
+    return arr;
+  }catch(e){ return []; }
+}
+async function listMenuItemsPublic(){
+  try{
+    const snap=await getDocs(query(collection(db,'menuItems'), where('avail','==',true), limit(300)));
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, cat:x.cat||'', name:x.name||'', price:(typeof x.price==='number')?x.price:0, desc:x.desc||'', img:x.imageUrl||'', avail:true }); });
+    return arr;
+  }catch(e){ return []; }
+}
+async function saveMenuItem(id, patch, imageBlob){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'}; patch=patch||{};
+  const isNew=!id;
+  if(!id){ const t=(patch.name||'').trim(); if(!t) throw {message:'Nama menu wajib.'}; id=slug((patch.cat||'')+'-'+t)+'-'+Date.now().toString(36); }
+  const data={};
+  if(patch.cat!=null) data.cat=String(patch.cat).trim();
+  if(patch.name!=null) data.name=String(patch.name).trim();
+  if(patch.price!=null && patch.price!=='') data.price=Math.max(0,Math.floor(Number(patch.price)||0));
+  if(patch.desc!=null) data.desc=String(patch.desc).trim();
+  if(patch.avail!=null) data.avail=!!patch.avail;
+  if(patch.sortOrder!=null && patch.sortOrder!=='') data.sortOrder=Math.floor(Number(patch.sortOrder)||0);
+  if(imageBlob){
+    const sref=storageRef(storage, 'menu-images/'+id+'.jpg');
+    await uploadBytes(sref, imageBlob, {contentType:'image/jpeg'});
+    data.imageUrl=await getDownloadURL(sref);
+  }
+  data.updatedAt=serverTimestamp();
+  if(isNew){ if(data.avail==null) data.avail=true; data.createdAt=serverTimestamp(); }
+  await setDoc(doc(db,'menuItems',id), data, {merge:true});
+  return { id:id };
+}
+async function setMenuItemAvail(id, avail){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; await setDoc(doc(db,'menuItems',(id||'').trim()), { avail:!!avail, updatedAt:serverTimestamp() }, {merge:true}); }
+async function deleteMenuItem(id){ if(!(await isMaster())) throw {message:'Khusus Master.'}; await deleteDoc(doc(db,'menuItems',(id||'').trim())); }
+
 // ---------- referral & poin pesanan ----------
 const REF_REWARD = 25;    // poin untuk pemberi kode tiap referral berhasil
 const REF_WELCOME = 25;   // poin welcome untuk pendaftar baru
@@ -1908,6 +2042,8 @@ window.OmaOpa = {
   getMemberByUid, getOrCreateMemberCode, getMemberByCode, awardPoints, getStaffOutlet,
   getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, backfillLastTxnAt, backfillNameLower, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
+  listProductsAdmin, listProductsPublic, saveProduct, setProductActive, deleteProduct, recordPosTransaction,
+  listMenuItemsAdmin, listMenuItemsPublic, saveMenuItem, setMenuItemAvail, deleteMenuItem,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
   outletGroup, matchOutletKey,
@@ -1928,3 +2064,5 @@ emit();
 try{ window.dispatchEvent(new CustomEvent('omaopa:ready',{detail:snapshot()})); }catch(e){}
 // Gabungkan outlet dari database (termasuk yang ditambah via admin, mis. Kronggahan) ke daftar picker
 (async function(){ try{ const fs=await listOutlets(); if(fs && fs.length){ const byName={}; (window.OMA_OUTLETS||[]).forEach(o=>{ byName[(o.name||'').toLowerCase().trim()]=o; }); fs.forEach(o=>{ if(o && o.name && o.active!==false) byName[(o.name||'').toLowerCase().trim()]={ name:o.name, area:o.area, maps:o.maps, lat:o.lat, lng:o.lng, internalOnly:o.internalOnly }; }); window.OMA_OUTLETS=Object.keys(byName).map(k=>byName[k]); } }catch(e){} })();
+// Gabungkan menu web-order dari Firestore (menuItems, diedit admin) ke atas data statis menu-data.js — Firestore menang kalau id sama, item baru ikut ditambahkan
+(async function(){ try{ const extra=await listMenuItemsPublic(); if(extra && extra.length){ const byId={}; (window.OMA_MENU||[]).forEach(m=>{ byId[m.id]=m; }); extra.forEach(m=>{ byId[m.id]=m; }); window.OMA_MENU=Object.keys(byId).map(k=>byId[k]); } }catch(e){} })();
