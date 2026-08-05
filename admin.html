@@ -239,6 +239,7 @@
     async function loadOmzetBulanChart(){
       var box=document.getElementById('obChart'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
       var sel=document.getElementById('obOutlet').value;
+      if(sel) await ensureOam();
       var names=sel ? outletNamesForSelection(sel) : null;
       var res={rows:[],error:''}; try{ res=await O.omzetByMonth(_obMonths, names); }catch(e){}
       var rows=res.rows||[];
@@ -874,6 +875,7 @@
     async function loadPerBulanChart(){
       var box=document.getElementById('pbChart'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
       var sel=document.getElementById('pbOutlet').value;
+      if(sel) await ensureOam();
       var names=sel ? outletNamesForSelection(sel) : null;
       var res={rows:[],error:''}; try{ res=await O.membersByMonth(_pbMonths, names); }catch(e){}
       var rows=res.rows||[];
