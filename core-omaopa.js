@@ -755,11 +755,11 @@ async function avgTransactionStats(fromMs, toMs){
 }
 var MONTHS_ID=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 async function membersByMonth(monthsBack, outletNames){
-  if(!(await isAdmin())) return [];
+  if(!(await isAdmin())) return { rows:[], error:'' };
   monthsBack=monthsBack||12;
   const names=(outletNames&&outletNames.length)?outletNames.slice(0,30):null;
   const now=new Date();
-  const results=[];
+  const results=[]; let lastError='';
   for(let i=monthsBack-1;i>=0;i--){
     const d=new Date(now.getFullYear(), now.getMonth()-i, 1);
     const start=new Date(d.getFullYear(), d.getMonth(), 1);
@@ -770,17 +770,17 @@ async function membersByMonth(monthsBack, outletNames){
       if(names) constraints.push(where('homeOutlet','in',names));
       const snap=await getCountFromServer(query(collection(db,'users'), ...constraints));
       count=snap.data().count;
-    }catch(e){}
+    }catch(e){ lastError=(e&&e.message)||String(e); console.error('membersByMonth gagal:', e); }
     results.push({ label:MONTHS_ID[d.getMonth()]+' '+d.getFullYear(), year:d.getFullYear(), month:d.getMonth()+1, count:count });
   }
-  return results;
+  return { rows:results, error:lastError };
 }
 async function omzetByMonth(monthsBack, outletNames){
-  if(!(await isAdmin())) return [];
+  if(!(await isAdmin())) return { rows:[], error:'' };
   monthsBack=monthsBack||12;
   const names=(outletNames&&outletNames.length)?outletNames.slice(0,30):null;
   const now=new Date();
-  const results=[];
+  const results=[]; let lastError='';
   for(let i=monthsBack-1;i>=0;i--){
     const d=new Date(now.getFullYear(), now.getMonth()-i, 1);
     const start=new Date(d.getFullYear(), d.getMonth(), 1);
@@ -791,16 +791,16 @@ async function omzetByMonth(monthsBack, outletNames){
       if(names) constraints.push(where('outlet','in',names));
       const agg=await getAggregateFromServer(query(collection(db,'transactions'), ...constraints), { total:sum('nominal') });
       total=agg.data().total||0;
-    }catch(e){}
+    }catch(e){ lastError=(e&&e.message)||String(e); console.error('omzetByMonth (sum) gagal:', e); }
     try{
       let cConstraints=[where('createdAt','>=',start), where('createdAt','<',end)];
       if(names) cConstraints.push(where('outlet','in',names));
       const csnap=await getCountFromServer(query(collection(db,'transactions'), ...cConstraints));
       count=csnap.data().count;
-    }catch(e){}
+    }catch(e){ lastError=(e&&e.message)||String(e); console.error('omzetByMonth (count) gagal:', e); }
     results.push({ label:MONTHS_ID[d.getMonth()]+' '+d.getFullYear(), year:d.getFullYear(), month:d.getMonth()+1, total:total, count:count });
   }
-  return results;
+  return { rows:results, error:lastError };
 }
 async function memberOutletSummary(outletNames){
   const cutoff=new Date(Date.now()-30*86400000);

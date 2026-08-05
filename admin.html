@@ -106,7 +106,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=166"></script>
+<script type="module" src="core-omaopa.js?v=167"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -236,18 +236,15 @@
     html+='<div class="card"><div class="nm">Rekap detail</div><div class="muted" style="margin:5px 0 10px">Transaksi & voucher semua outlet, filter + export CSV.</div><a class="btn" style="display:block;text-align:center;text-decoration:none" href="rekap.html?v=62">Buka Halaman Rekap →</a></div>';
     tabEl.innerHTML=html;
     var _obMonths=12, _obLoaded=false;
-    function resolveOutletSelectionHome(val){
-      if(!val) return null;
-      var all=(window.OMA_OUTLETS||[]).map(function(o){return o.name;});
-      if(val.indexOf('__')===0) return all.filter(function(n){ return O.matchOutletKey(n, val); });
-      return [val];
-    }
     async function loadOmzetBulanChart(){
       var box=document.getElementById('obChart'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-      var names=resolveOutletSelectionHome(document.getElementById('obOutlet').value);
-      var rows=[]; try{ rows=await O.omzetByMonth(_obMonths, names); }catch(e){}
+      var sel=document.getElementById('obOutlet').value;
+      var names=sel ? outletNamesForSelection(sel) : null;
+      var res={rows:[],error:''}; try{ res=await O.omzetByMonth(_obMonths, names); }catch(e){}
+      var rows=res.rows||[];
       var maxT=1; rows.forEach(function(r){ if(r.total>maxT) maxT=r.total; });
-      box.innerHTML=rows.map(function(r){
+      var errHtml = res.error ? ('<div class="res bad" style="margin-bottom:8px">Gagal ambil sebagian data: '+esc(res.error)+'<br>Kalau ada link "create index" di pesan itu (cek juga browser console/F12), klik → Create → tunggu 1-2 menit lalu coba lagi.</div>') : '';
+      box.innerHTML=errHtml+rows.map(function(r){
         var w=Math.max(4, Math.round((r.total/maxT)*100));
         return '<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;font-size:.76rem;font-weight:800;margin-bottom:2px"><span>'+esc(r.label)+'</span><span>'+rp(r.total)+' · '+r.count+' trx</span></div><div style="background:#F2E4C6;border-radius:5px;overflow:hidden;height:14px"><div style="width:'+w+'%;background:var(--kuning);height:100%"></div></div></div>';
       }).join('');
@@ -874,18 +871,15 @@
     var mo=document.getElementById('mOutlet'); if(mo) mo.onchange=function(){ var v=mo.value; if(v){ showOutletSummary(v); } else { document.getElementById('mq').value=''; segFilter=null; showAllSummary(); } };
     document.getElementById('mq').addEventListener('keydown',function(e){ if(e.key==='Enter'){ memSearch(e.target.value); } });
     var _pbMonths=12, _pbLoaded=false;
-    function resolveOutletSelection(val){
-      if(!val) return null;
-      var all=(window.OMA_OUTLETS||[]).map(function(o){return o.name;});
-      if(val.indexOf('__')===0) return all.filter(function(n){ return O.matchOutletKey(n, val); });
-      return [val];
-    }
     async function loadPerBulanChart(){
       var box=document.getElementById('pbChart'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-      var names=resolveOutletSelection(document.getElementById('pbOutlet').value);
-      var rows=[]; try{ rows=await O.membersByMonth(_pbMonths, names); }catch(e){}
+      var sel=document.getElementById('pbOutlet').value;
+      var names=sel ? outletNamesForSelection(sel) : null;
+      var res={rows:[],error:''}; try{ res=await O.membersByMonth(_pbMonths, names); }catch(e){}
+      var rows=res.rows||[];
       var maxC=1; rows.forEach(function(r){ if(r.count>maxC) maxC=r.count; });
-      box.innerHTML=rows.map(function(r){
+      var errHtml = res.error ? ('<div class="res bad" style="margin-bottom:8px">Gagal ambil sebagian data: '+esc(res.error)+'<br>Kalau ada link "create index" di pesan itu (cek juga browser console/F12), klik → Create → tunggu 1-2 menit lalu coba lagi.</div>') : '';
+      box.innerHTML=errHtml+rows.map(function(r){
         var w=Math.max(4, Math.round((r.count/maxC)*100));
         return '<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><div style="width:64px;font-size:.74rem;font-weight:800;flex-shrink:0">'+esc(r.label)+'</div><div style="flex:1;background:#F2E4C6;border-radius:5px;overflow:hidden;height:16px"><div style="width:'+w+'%;background:var(--kuning);height:100%"></div></div><div style="width:36px;text-align:right;font-size:.78rem;font-weight:800">'+r.count+'</div></div>';
       }).join('');
