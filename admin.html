@@ -106,7 +106,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=167"></script>
+<script type="module" src="core-omaopa.js?v=168"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -842,15 +842,22 @@
       +'<label>Kode voucher</label><input id="vq" placeholder="OO-XXXXXXXX" style="text-transform:uppercase">'
       +'<button class="btn sec" id="vfind">Cek voucher</button><div id="vout"></div></div>'
       +'<div class="card"><div class="nm">\ud83d\ude34 Member tidak aktif (win-back)</div>'
+      +'<div class="muted" style="font-size:.74rem;margin:4px 0 9px">Member yang PERNAH belanja tapi udah lama gak balik (bukan yang belum pernah belanja sama sekali).</div>'
       +'<div style="display:flex;gap:6px;margin:9px 0"><button class="btn sm sec" data-inact="30">30 hari</button><button class="btn sm sec" data-inact="60">60 hari</button><button class="btn sm sec" data-inact="90">90 hari</button></div>'
-      +'<div id="inact" class="muted">Pilih rentang di atas untuk lihat member yang sudah lama tidak belanja, lalu sapa via WhatsApp.</div></div>'
+      +'<select id="inactOutlet">'+mOutletOpts+'</select>'
+      +'<div id="inact" class="muted">Pilih rentang di atas untuk lihat member yang sudah lama tidak belanja, lalu sapa via WhatsApp.</div>'
+      +'<div id="inactPager" style="display:none;align-items:center;gap:8px;margin-top:10px"><button class="btn sm sec" id="inactPrev" style="margin:0;width:auto">\u2039 Sebelumnya</button><div id="inactPageLabel" class="muted grow" style="text-align:center;font-weight:800"></div><button class="btn sm sec" id="inactNext" style="margin:0;width:auto">Berikutnya \u203a</button></div>'
+      +'</div>'
       +'<div class="card"><div class="nm">\ud83d\udee1\ufe0f Audit poin (deteksi tidak wajar)</div>'
       +'<div class="muted" style="font-size:.76rem;margin:5px 0 9px">Membandingkan poin dengan total belanja. Poin dari game & check-in itu wajar, jadi pakai ini untuk <b>menyaring kandidat yang perlu dicek</b> sebelum kasih hadiah besar \u2014 bukan vonis.</div>'
       +'<button class="btn sec" id="auditBtn">Tampilkan audit poin</button><div id="auditOut" style="margin-top:8px"></div></div>'
       +'<div class="card"><div class="nm">\u2b07\ufe0f Export Data Member (CSV)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Berdasarkan tanggal daftar. Kosongkan kedua tanggal buat export semua member.</div>'
       +'<div style="display:flex;gap:6px;align-items:center"><input type="date" id="mExFrom" style="flex:1;min-width:0"><span>\u2014</span><input type="date" id="mExTo" style="flex:1;min-width:0"></div>'
       +'<button class="btn sec" id="mExportBtn" style="margin-top:10px">\u2b07 Export CSV</button><div id="mExportMsg"></div></div>';
-    tabEl.querySelectorAll('[data-inact]').forEach(function(b){ b.onclick=function(){ loadInactive(parseInt(b.getAttribute('data-inact'),10)); }; });
+    tabEl.querySelectorAll('[data-inact]').forEach(function(b){ b.onclick=async function(){ _inactDays=parseInt(b.getAttribute('data-inact'),10); if(_inactDays>0) await ensureOam(); loadInactive('reset'); }; });
+    var inactOutletSel=document.getElementById('inactOutlet'); if(inactOutletSel) inactOutletSel.onchange=async function(){ if(_inactDays){ await ensureOam(); loadInactive('reset'); } };
+    var inactPrevBtn=document.getElementById('inactPrev'); if(inactPrevBtn) inactPrevBtn.onclick=function(){ loadInactive('prev'); };
+    var inactNextBtn=document.getElementById('inactNext'); if(inactNextBtn) inactNextBtn.onclick=function(){ loadInactive('next'); };
     var ab=document.getElementById('auditBtn'); if(ab) ab.onclick=loadAudit;
     var mExBtn=document.getElementById('mExportBtn'); if(mExBtn) mExBtn.onclick=async function(){
       if(busy) return; busy=true; this.disabled=true; this.textContent='Menyiapkan…';
@@ -1073,20 +1080,46 @@
   }
 
   /* ---------- WIN-BACK ---------- */
-  async function loadInactive(days){
-    var box=document.getElementById('inact'); if(!box) return; box.innerHTML='Memuat…';
-    var mem=await getMembers(), txn=await getTxn();
-    var last={}; txn.forEach(function(t){ if(t.uid){ if(!last[t.uid]||t.ts>last[t.uid]) last[t.uid]=t.ts; } });
-    var cut=Date.now()-days*86400000;
-    var arr=mem.filter(function(m){ return (last[m.uid]||0)<cut; }).sort(function(a,b){ return (last[a.uid]||0)-(last[b.uid]||0); });
-    if(!arr.length){ box.innerHTML='<div class="res ok">Mantap — semua member aktif dalam '+days+' hari 👍</div>'; return; }
-    box.innerHTML='<div class="muted" style="margin-bottom:6px">'+arr.length+' member belum belanja '+days+'+ hari (atau belum pernah)</div>'
-      + arr.slice(0,60).map(function(m){ var ph=(m.phone||'').replace(/[^0-9]/g,''); if(ph.indexOf('0')===0) ph='62'+ph.slice(1);
-        var msg=encodeURIComponent('Halo '+(m.name||'Sahabat Oma Opa')+'! Kangen nih 🥺 Mampir lagi yuk ke Oma Opa Cakery, ada poin & promo nunggu kamu.');
-        var lt=last[m.uid]?('terakhir '+new Date(last[m.uid]).toLocaleDateString('id-ID')):'belum pernah belanja';
-        return '<div class="row"><div class="grow"><div class="nm" style="font-size:.86rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+esc(m.phone||'-')+' · '+lt+'</div></div>'
-          +(ph?'<a class="btn sm green" style="text-decoration:none" target="_blank" href="https://wa.me/'+ph+'?text='+msg+'">WA</a>':'')+'</div>'; }).join('')
-      + (arr.length>60?'<div class="hint">Tampil 60 dari '+arr.length+'.</div>':'');
+  var _inactDays=0, _inactPageIndex=0, _inactPageCursors=[null], _inactPageCache=[];
+  async function loadInactive(mode){
+    var box=document.getElementById('inact'); var pager=document.getElementById('inactPager'); if(!box) return;
+    if(mode==='next'){ _inactPageIndex++; }
+    else if(mode==='prev'){ _inactPageIndex=Math.max(0,_inactPageIndex-1); }
+    else { _inactPageIndex=0; _inactPageCursors=[null]; _inactPageCache=[]; }
+    var days=_inactDays; if(!days){ box.innerHTML='Pilih rentang di atas untuk lihat member yang sudah lama tidak belanja, lalu sapa via WhatsApp.'; pager.style.display='none'; return; }
+    var sel=document.getElementById('inactOutlet').value;
+    var names=sel ? outletNamesForSelection(sel) : null;
+    var filterKey=days+'|'+sel;
+    if(_inactPageCache._filterKey!==filterKey){ _inactPageIndex=0; _inactPageCursors=[null]; _inactPageCache=[]; _inactPageCache._filterKey=filterKey; }
+    if(_inactPageCache[_inactPageIndex]){ renderInactive(_inactPageCache[_inactPageIndex], days); updateInactPager(); return; }
+    box.innerHTML='<div class="muted">Memuat…</div>'; pager.style.display='none';
+    var res={items:[],hasMore:false,cursor:null}; try{ res=await O.listInactiveMembersPaged({ days:days, outletNames:names, cursor:_inactPageCursors[_inactPageIndex] }); }catch(e){}
+    _inactPageCache[_inactPageIndex]=res.items||[];
+    if(res.cursor) _inactPageCursors[_inactPageIndex+1]=res.cursor;
+    _inactPageCache._hasMore=res.hasMore;
+    if(res.error){ box.innerHTML='<div class="res bad">Gagal ambil data: '+esc(res.error)+'<br>Kalau ada link "create index" di pesan itu (cek juga browser console/F12), klik → Create → tunggu 1-2 menit lalu coba lagi.</div>'; pager.style.display='none'; return; }
+    renderInactive(_inactPageCache[_inactPageIndex], days);
+    updateInactPager();
+  }
+  function updateInactPager(){
+    var pager=document.getElementById('inactPager'); if(!pager) return;
+    var prevBtn=document.getElementById('inactPrev'), nextBtn=document.getElementById('inactNext'), label=document.getElementById('inactPageLabel');
+    prevBtn.disabled=_inactPageIndex===0;
+    nextBtn.disabled=!_inactPageCache._hasMore;
+    label.textContent='Halaman '+(_inactPageIndex+1);
+    pager.style.display=(_inactPageIndex>0 || _inactPageCache._hasMore || (_inactPageCache[_inactPageIndex]&&_inactPageCache[_inactPageIndex].length)) ? 'flex' : 'none';
+  }
+  function renderInactive(items, days){
+    var box=document.getElementById('inact'); if(!box) return;
+    if(!items.length && _inactPageIndex===0){ box.innerHTML='<div class="res ok">Mantap — gak ada member yang nganggur '+days+'+ hari di filter ini 👍</div>'; return; }
+    if(!items.length){ box.innerHTML='<div class="muted">Gak ada lagi di halaman ini.</div>'; return; }
+    box.innerHTML = items.map(function(m){
+      var ph=(m.phone||'').replace(/[^0-9]/g,''); if(ph.indexOf('0')===0) ph='62'+ph.slice(1);
+      var msg=encodeURIComponent('Halo '+(m.name||'Sahabat Oma Opa')+'! Kangen nih 🥺 Mampir lagi yuk ke Oma Opa Cakery, ada poin & promo nunggu kamu.');
+      var lt=m.lastTxnAt?('terakhir '+new Date(m.lastTxnAt).toLocaleDateString('id-ID')):'-';
+      return '<div class="row"><div class="grow"><div class="nm" style="font-size:.86rem">'+esc(m.name||'(tanpa nama)')+'</div><div class="sub">'+esc(m.phone||'-')+' · '+esc(m.homeOutlet||'-')+' · '+lt+'</div></div>'
+        +(ph?'<a class="btn sm green" style="text-decoration:none" target="_blank" href="https://wa.me/'+ph+'?text='+msg+'">WA</a>':'')+'</div>';
+    }).join('');
   }
 
   /* ---------- AUDIT POIN ---------- */

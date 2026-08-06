@@ -605,34 +605,6 @@ async function getMemberByUid(uid){
     return { uid:uid, name:d.name||'', phone:d.phone||'', points:(typeof d.points==='number')?d.points:0 }; }
   catch(e){ return null; }
 }
-async function getOrCreateMemberCode(){
-  if(!auth.currentUser) throw {message:'Belum login.'};
-  const uid=auth.currentUser.uid;
-  try{
-    const uSnap=await getDoc(doc(db,'users',uid));
-    if(uSnap.exists() && uSnap.data().memberCode) return uSnap.data().memberCode;
-  }catch(e){}
-  for(let i=0;i<8;i++){
-    const code=String(Math.floor(100000+Math.random()*900000)); // 6 digit
-    try{
-      const existing=await getDoc(doc(db,'memberCodes',code));
-      if(existing.exists()) continue;
-      await setDoc(doc(db,'memberCodes',code), { uid:uid, createdAt:serverTimestamp() });
-      await setDoc(doc(db,'users',uid), { memberCode:code }, {merge:true});
-      return code;
-    }catch(e){ continue; }
-  }
-  throw {message:'Gagal bikin kode member, coba lagi.'};
-}
-async function getMemberByCode(code){
-  code=(code||'').trim().replace(/\D/g,'');
-  if(!code) return null;
-  try{
-    const cSnap=await getDoc(doc(db,'memberCodes',code));
-    if(!cSnap.exists()) return null;
-    return await getMemberByUid(cSnap.data().uid);
-  }catch(e){ return null; }
-}
 const EARN_PER_POINT = 4000;   // Rp per 1 poin
 async function awardPoints(uid, nominal){
   uid=(uid||'').trim(); nominal=Math.max(0, Math.floor(Number(nominal)||0));
@@ -754,6 +726,23 @@ async function avgTransactionStats(fromMs, toMs){
   return { overall:{ avg: totalCount?Math.round(totalNominal/totalCount):0, count:totalCount, total:totalNominal }, byOutlet:rows };
 }
 var MONTHS_ID=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+async function listInactiveMembersPaged(opts){
+  if(!(await isAdmin())) return { items:[], hasMore:false, cursor:null };
+  opts=opts||{};
+  const days=opts.days||30;
+  const cutoff=new Date(Date.now()-days*86400000);
+  try{
+    let constraints=[where('lastTxnAt','<',cutoff), orderBy('lastTxnAt','asc')];
+    if(opts.outletNames && opts.outletNames.length) constraints.unshift(where('homeOutlet','in',opts.outletNames.slice(0,30)));
+    if(opts.cursor) constraints.push(startAfter(opts.cursor));
+    constraints.push(limit(10));
+    const snap=await getDocs(query(collection(db,'users'), ...constraints));
+    const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ uid:d.id, name:x.name||'', phone:x.phone||'', homeOutlet:x.homeOutlet||'', lastTxnAt:(x.lastTxnAt&&x.lastTxnAt.seconds)?x.lastTxnAt.seconds*1000:0 }); });
+    const lastDoc=snap.docs.length?snap.docs[snap.docs.length-1]:null;
+    return { items:arr, hasMore:snap.docs.length===10, cursor:lastDoc };
+  }catch(e){ console.error('listInactiveMembersPaged gagal:', e); return { items:[], hasMore:false, cursor:null, error:(e&&e.message)||String(e) }; }
+}
 async function membersByMonth(monthsBack, outletNames){
   if(!(await isAdmin())) return { rows:[], error:'' };
   monthsBack=monthsBack||12;
@@ -1108,10 +1097,7 @@ mcBk.innerHTML = `<div class="oo-card" style="position:relative;text-align:cente
   <div class="rw-pts" id="mcPts">🪙 0 poin</div>
   <div id="mcQR" style="width:200px;height:200px;margin:6px auto 8px;background:#fff;border:2px solid #F1E4CC;border-radius:14px;display:flex;align-items:center;justify-content:center"></div>
   <div class="oo-mini">Tunjukkan QR ini ke kasir buat dapat poin tiap belanja.</div>
-  <div style="margin-top:10px;padding:10px;background:#FFF8EC;border:1.5px dashed #E7D8BE;border-radius:12px">
-    <div class="oo-mini" style="margin-bottom:4px">Kalau QR gagal discan, kasih kode ini ke kasir:</div>
-    <div id="mcCode" style="font-weight:900;font-size:1.3rem;letter-spacing:3px;color:${CO}">••••••</div>
-  </div>
+  <div class="oo-mini" style="margin-top:6px">Kalau QR gagal discan, kasir bisa cari pakai nomor HP kamu.</div>
   <button class="oo-out" id="mcOut" style="margin-top:12px">Keluar akun</button>
 </div>`;
 function mountMc(){ if(!document.body.contains(mcBk)) document.body.appendChild(mcBk); }
@@ -1129,7 +1115,6 @@ async function openMemberCard(){
   mcBk.classList.add('show');
   try{ await ensureQRLib(); box.innerHTML=''; new QRCode(box,{text:'OMAOPA:MEMBER:'+user.uid, width:188, height:188, correctLevel:QRCode.CorrectLevel.H}); }
   catch(e){ box.innerHTML='<span style="color:#C0392B;font-weight:700;font-size:.8rem">QR gagal dimuat</span>'; }
-  (async()=>{ try{ const code=await getOrCreateMemberCode(); const el=mcBk.querySelector('#mcCode'); if(el) el.textContent=code; }catch(e){} })();
 }
 
 // ====== Profil (rincian member, read-only) ======
@@ -1954,8 +1939,8 @@ window.OmaOpa = {
   submitScore, listPointLeaderboard, listScoreLeaderboard, listMyTransactions,
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
-  getMemberByUid, getOrCreateMemberCode, getMemberByCode, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, backfillLastTxnAt, backfillNameLower, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
+  getMemberByUid, awardPoints, getStaffOutlet,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, backfillLastTxnAt, backfillNameLower, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
