@@ -835,6 +835,23 @@ async function memberOutletSummary(outletNames){
     return { total:total, active:active, ok:true };
   }catch(e){ return { total:0, active:0, ok:false, error:(e&&e.message)||String(e) }; }
 }
+async function backfillAdjustOutlet(){
+  if(!(await isMaster())) throw {message:'Khusus Master.'};
+  let n=0;
+  try{
+    const snap=await getDocs(query(collection(db,'transactions'), where('kind','==','adjust')));
+    for(const d of snap.docs){
+      const x=d.data();
+      if(x.reason) continue; // record baru, udah bener
+      const oldOutletVal=x.outlet||''; // ini sebenarnya teks alasan lama, bukan outlet
+      let realOutlet='';
+      if(x.uid){ try{ const us=await getDoc(doc(db,'users',x.uid)); if(us.exists()) realOutlet=us.data().homeOutlet||''; }catch(e){} }
+      try{ await setDoc(doc(db,'transactions',d.id), { outlet:realOutlet, reason:oldOutletVal||'Penyesuaian admin' }, {merge:true}); n++; }catch(e){}
+    }
+  }catch(e){}
+  logAudit('backfill_adjust_outlet', 'Migrasi outlet riwayat adjust poin lama ('+n+' record terupdate).');
+  return { count:n };
+}
 async function backfillNameLower(){
   if(!(await isMaster())) throw {message:'Khusus Master.'};
   let n=0;
@@ -1957,7 +1974,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, listAdjustHistory, backfillLastTxnAt, backfillNameLower, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, listAdjustHistory, backfillLastTxnAt, backfillNameLower, backfillAdjustOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
