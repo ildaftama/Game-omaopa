@@ -106,7 +106,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=168"></script>
+<script type="module" src="core-omaopa.js?v=170"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -532,6 +532,13 @@
 
   async function renderPengaturan(){
     if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
+    var mOutletOpts2='<option value="">— semua outlet —</option>'
+      +'<option value="__metavest">🏢 Semua Metavest</option>'
+      +'<option value="__area1">🗺️ Area 1</option>'
+      +'<option value="__area2">🗺️ Area 2</option>'
+      +'<option value="__area3">🗺️ Area 3</option>'
+      +'<option value="__kronggahan">🏢 Kronggahan</option>'
+      +(window.OMA_OUTLETS||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,''); return '<option>'+esc(n)+'</option>'; }).join('');
     tabEl.innerHTML='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
       +(masterEdit?('<div class="card"><div class="nm">🔄 Migrasi status "aktif" member</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: hitung tanggal transaksi terakhir tiap member dari riwayat lama, biar filter "Member aktif (30 hari)" di tab Member langsung akurat (bukan nunggu transaksi baru). Aman dijalankan berkali-kali.</div><button class="btn sec" id="bfBtn">Jalankan migrasi</button><div id="bfMsg"></div></div>'):'')
       +(masterEdit?('<div class="card"><div class="nm">🔎 Migrasi pencarian nama member</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: siapin index nama (huruf kecil) buat member lama, biar pencarian nama di Blast/fitur lain jadi akurat (sebelumnya cuma nemu kalau kebetulan ada di 30 data pertama). Member baru otomatis kesiapin sendiri pas daftar. Aman dijalankan berkali-kali.</div><button class="btn sec" id="nlBtn">Jalankan migrasi</button><div id="nlMsg"></div></div>'):'')
@@ -539,6 +546,13 @@
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="auPer"><button class="btn sm sec aup" data-m="1">1 bulan</button><button class="btn sm sec aup" data-m="2">2 bulan</button><button class="btn sm sec aup" data-m="3">3 bulan</button><button class="btn sm sec aup" data-m="6">6 bulan</button><button class="btn sm sec aup" data-m="12">12 bulan</button></div>'
       +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:.8rem"><input type="date" id="auFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="auTo" style="flex:1;min-width:0"><button class="btn sm" id="auGo">OK</button></div>'
       +'<div id="auWrap" class="muted">Pilih periode di atas untuk melihat riwayat tindakan.</div></div>'
+      +'<div class="card"><div class="nm">📋 Riwayat Adjust Poin</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Khusus penyesuaian poin manual (bukan dari belanja) — siapa yang diadjust, berapa, alasan, outlet member, dan siapa admin yang ngadjust.</div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="date" id="ajFrom" style="flex:1;min-width:0"><span>—</span><input type="date" id="ajTo" style="flex:1;min-width:0"></div>'
+      +'<select id="ajOutlet">'+mOutletOpts2+'</select>'
+      +'<button class="btn sm" id="ajGo" style="margin-top:0">Tampilkan</button>'
+      +'<div id="ajWrap" class="muted" style="margin-top:8px">Pilih filter (opsional) lalu klik Tampilkan.</div>'
+      +'<div id="ajPager" style="display:none;align-items:center;gap:8px;margin-top:10px"><button class="btn sm sec" id="ajPrev" style="margin:0;width:auto">‹ Sebelumnya</button><div id="ajPageLabel" class="muted grow" style="text-align:center;font-weight:800"></div><button class="btn sm sec" id="ajNext" style="margin:0;width:auto">Berikutnya ›</button></div>'
+      +'</div>'
       +(masterEdit?('<div class="card" style="border-color:#F3C2C2"><div class="nm" style="color:#C0392B">⚠️ Zona berbahaya — Hapus data (khusus Master)</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Semua tindakan di bawah ini <b>permanen & tidak bisa dibatalkan</b>. Pilih data satu per satu (centang), atau cari berdasarkan rentang tanggal lalu pilih semua hasilnya.</div>'
         +'<div class="nm" style="margin-top:4px">🗑️ 1. Hapus transaksi kasir</div><div class="muted" style="font-size:.76rem;margin:4px 0 9px">Cari & pilih transaksi tertentu untuk dihapus.</div>'
         +'<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="dtOutlet" placeholder="Filter outlet (opsional)" style="flex:1;min-width:140px"><input type="date" id="dtFrom" style="flex:1;min-width:120px"><input type="date" id="dtTo" style="flex:1;min-width:120px"></div>'
@@ -735,6 +749,66 @@
     var _auFrom='', _auTo='';
     var aup=document.querySelectorAll('#auPer .aup'); Array.prototype.forEach.call(aup,function(b){ b.onclick=function(){ Array.prototype.forEach.call(aup,function(x){ x.className='btn sm sec aup'; }); b.className='btn sm aup'; var d=new Date(); d.setMonth(d.getMonth()-Number(b.dataset.m)); _auFrom=d.toISOString().slice(0,10); _auTo=''; document.getElementById('auFrom').value=''; document.getElementById('auTo').value=''; loadAuditLog(_auFrom,_auTo); }; });
     var _aug=document.getElementById('auGo'); if(_aug) _aug.onclick=function(){ _auFrom=document.getElementById('auFrom').value; _auTo=document.getElementById('auTo').value; if(_auFrom||_auTo){ Array.prototype.forEach.call(aup,function(x){ x.className='btn sm sec aup'; }); loadAuditLog(_auFrom,_auTo); } };
+
+    var _ajPageIndex=0, _ajPageCursors=[null], _ajPageCache=[], _ajStaffNames=null;
+    async function ajResolveStaffNames(){
+      if(_ajStaffNames) return _ajStaffNames;
+      _ajStaffNames={};
+      try{ var list=await O.listStaff(); list.forEach(function(s){ _ajStaffNames[s.uid]=s.name||s.outlet||s.uid; }); }catch(e){}
+      return _ajStaffNames;
+    }
+    function updateAjPager(){
+      var pager=document.getElementById('ajPager'); if(!pager) return;
+      var prevBtn=document.getElementById('ajPrev'), nextBtn=document.getElementById('ajNext'), label=document.getElementById('ajPageLabel');
+      prevBtn.disabled=_ajPageIndex===0;
+      nextBtn.disabled=!_ajPageCache._hasMore;
+      label.textContent='Halaman '+(_ajPageIndex+1);
+      pager.style.display=(_ajPageIndex>0 || _ajPageCache._hasMore || (_ajPageCache[_ajPageIndex]&&_ajPageCache[_ajPageIndex].length)) ? 'flex' : 'none';
+    }
+    async function renderAjList(items){
+      var box=document.getElementById('ajWrap'); if(!box) return;
+      if(!items.length && _ajPageIndex===0){ box.innerHTML='<div class="muted">Gak ada riwayat adjust poin di filter ini.</div>'; return; }
+      if(!items.length){ box.innerHTML='<div class="muted">Gak ada lagi di halaman ini.</div>'; return; }
+      var staffNames=await ajResolveStaffNames();
+      box.innerHTML=items.map(function(a){
+        var tgl=a.createdAt?new Date(a.createdAt).toLocaleString('id-ID'):'-';
+        var staffNm=staffNames[a.staffUid]||a.staffUid||'-';
+        var sign=a.points>=0?'+':''; var color=a.points>=0?'#2E7D32':'#C0392B';
+        return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px">'
+          +'<div class="nm" style="font-size:.86rem">'+esc(a.name||'(tanpa nama)')+' <b style="color:'+color+'">'+sign+a.points+' poin</b></div>'
+          +'<div class="sub">'+esc(a.reason||'-')+'</div>'
+          +'<div class="sub">'+esc(a.outlet||'-')+' · oleh '+esc(staffNm)+' · '+tgl+'</div>'
+          +'</div></div>';
+      }).join('');
+    }
+    async function loadAdjustHistory(mode){
+      var box=document.getElementById('ajWrap'); var pager=document.getElementById('ajPager'); if(!box) return;
+      if(mode==='next'){ _ajPageIndex++; }
+      else if(mode==='prev'){ _ajPageIndex=Math.max(0,_ajPageIndex-1); }
+      else { _ajPageIndex=0; _ajPageCursors=[null]; _ajPageCache=[]; }
+      var from=document.getElementById('ajFrom').value, to=document.getElementById('ajTo').value;
+      var selOutlet=document.getElementById('ajOutlet').value;
+      var names=null;
+      if(selOutlet){ if(selOutlet.indexOf('__')===0){ await ensureOam(); var all=(window.OMA_OUTLETS||[]).map(function(o){return (o.name||'').replace(/^Oma Opa Cakery\s*/i,'');}); names=all.filter(function(n){ return O.matchOutletKey(n, selOutlet); }); } else { names=[selOutlet]; } }
+      var filterKey=from+'|'+to+'|'+selOutlet;
+      if(_ajPageCache._filterKey!==filterKey){ _ajPageIndex=0; _ajPageCursors=[null]; _ajPageCache=[]; _ajPageCache._filterKey=filterKey; }
+      if(_ajPageCache[_ajPageIndex]){ await renderAjList(_ajPageCache[_ajPageIndex]); updateAjPager(); return; }
+      box.innerHTML='<div class="muted">Memuat…</div>'; pager.style.display='none';
+      var opts={ cursor:_ajPageCursors[_ajPageIndex] };
+      if(from) opts.fromMs=new Date(from+'T00:00:00').getTime();
+      if(to) opts.toMs=new Date(to+'T23:59:59').getTime();
+      if(names) opts.outletNames=names;
+      var res={items:[],hasMore:false,cursor:null}; try{ res=await O.listAdjustHistory(opts); }catch(e){}
+      _ajPageCache[_ajPageIndex]=res.items||[];
+      if(res.cursor) _ajPageCursors[_ajPageIndex+1]=res.cursor;
+      _ajPageCache._hasMore=res.hasMore;
+      if(res.error){ box.innerHTML='<div class="res bad">Gagal ambil data: '+esc(res.error)+'<br>Kalau ada link "create index" (cek juga browser console/F12), klik → Create → tunggu 1-2 menit lalu coba lagi.</div>'; pager.style.display='none'; return; }
+      await renderAjList(_ajPageCache[_ajPageIndex]);
+      updateAjPager();
+    }
+    var ajGoBtn=document.getElementById('ajGo'); if(ajGoBtn) ajGoBtn.onclick=function(){ loadAdjustHistory('reset'); };
+    var ajPrevBtn=document.getElementById('ajPrev'); if(ajPrevBtn) ajPrevBtn.onclick=function(){ loadAdjustHistory('prev'); };
+    var ajNextBtn=document.getElementById('ajNext'); if(ajNextBtn) ajNextBtn.onclick=function(){ loadAdjustHistory('next'); };
   }
   async function loadMessages(){
     var w=document.getElementById('msgWrap'); if(!w) return; w.classList.remove('muted');

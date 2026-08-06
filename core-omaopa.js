@@ -726,6 +726,23 @@ async function avgTransactionStats(fromMs, toMs){
   return { overall:{ avg: totalCount?Math.round(totalNominal/totalCount):0, count:totalCount, total:totalNominal }, byOutlet:rows };
 }
 var MONTHS_ID=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+async function listAdjustHistory(opts){
+  if(!(await isAdmin())) return { items:[], hasMore:false, cursor:null };
+  opts=opts||{};
+  try{
+    let constraints=[where('kind','==','adjust'), orderBy('createdAt','desc')];
+    if(opts.fromMs) constraints.push(where('createdAt','>=', new Date(opts.fromMs)));
+    if(opts.toMs) constraints.push(where('createdAt','<=', new Date(opts.toMs)));
+    if(opts.outletNames && opts.outletNames.length) constraints.push(where('outlet','in', opts.outletNames.slice(0,30)));
+    if(opts.cursor) constraints.push(startAfter(opts.cursor));
+    constraints.push(limit(10));
+    const snap=await getDocs(query(collection(db,'transactions'), ...constraints));
+    const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, uid:x.uid||'', name:x.name||'', points:x.points||0, outlet:x.outlet||'', reason:x.reason||'', staffUid:x.staffUid||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    const lastDoc=snap.docs.length?snap.docs[snap.docs.length-1]:null;
+    return { items:arr, hasMore:snap.docs.length===10, cursor:lastDoc };
+  }catch(e){ console.error('listAdjustHistory gagal:', e); return { items:[], hasMore:false, cursor:null, error:(e&&e.message)||String(e) }; }
+}
 async function listInactiveMembersPaged(opts){
   if(!(await isAdmin())) return { items:[], hasMore:false, cursor:null };
   opts=opts||{};
@@ -1389,15 +1406,15 @@ async function adminAdjustPoints(uid, delta, reason){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   if(!uid) throw {message:'Member belum dipilih.'};
   if(!delta) throw {message:'Jumlah poin tidak boleh 0.'};
-  const uref=doc(db,'users',uid); let newTotal=0, mname='', applied=0;
+  const uref=doc(db,'users',uid); let newTotal=0, mname='', applied=0, mOutlet='';
   await runTransaction(db, async(tx)=>{
     const us=await tx.get(uref); if(!us.exists()) throw {message:'Member tidak ditemukan.'};
-    const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||'';
+    const d=us.data(); const cur=(typeof d.points==='number')?d.points:0; mname=d.name||''; mOutlet=d.homeOutlet||'';
     newTotal=Math.max(0, cur+delta); applied=newTotal-cur;
     tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
     tx.set(doc(db,'leaderboard',uid), { name:mname, points:newTotal, updatedAt:serverTimestamp() },{merge:true});
     const tref=doc(collection(db,'transactions'));
-    tx.set(tref,{ uid:uid, name:mname, nominal:0, points:applied, outlet:(reason||'Penyesuaian admin'), kind:'adjust', staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
+    tx.set(tref,{ uid:uid, name:mname, nominal:0, points:applied, outlet:mOutlet, reason:(reason||'Penyesuaian admin'), kind:'adjust', staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
   });
   logAudit('adjust_poin', 'Member '+(mname||uid)+' '+(applied>=0?'+':'')+applied+' poin (jadi '+newTotal+'). Alasan: '+(reason||'-'));
   return { newTotal:newTotal, applied:applied, name:mname };
@@ -1940,7 +1957,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, backfillLastTxnAt, backfillNameLower, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, listAdjustHistory, backfillLastTxnAt, backfillNameLower, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
