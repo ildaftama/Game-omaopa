@@ -726,6 +726,21 @@ async function avgTransactionStats(fromMs, toMs){
   return { overall:{ avg: totalCount?Math.round(totalNominal/totalCount):0, count:totalCount, total:totalNominal }, byOutlet:rows };
 }
 var MONTHS_ID=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+async function listMemberTransactionsPaged(uid, opts){
+  if(!(await isAdmin())) return { items:[], hasMore:false, cursor:null };
+  uid=(uid||'').trim(); if(!uid) return { items:[], hasMore:false, cursor:null };
+  opts=opts||{};
+  try{
+    let constraints=[where('uid','==',uid), orderBy('createdAt','desc')];
+    if(opts.cursor) constraints.push(startAfter(opts.cursor));
+    constraints.push(limit(10));
+    const snap=await getDocs(query(collection(db,'transactions'), ...constraints));
+    const arr=[];
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, nominal:x.nominal||0, points:x.points||0, outlet:x.outlet||'', kind:x.kind||'', reason:x.reason||'', staffUid:x.staffUid||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    const lastDoc=snap.docs.length?snap.docs[snap.docs.length-1]:null;
+    return { items:arr, hasMore:snap.docs.length===10, cursor:lastDoc };
+  }catch(e){ console.error('listMemberTransactionsPaged gagal:', e); return { items:[], hasMore:false, cursor:null, error:(e&&e.message)||String(e) }; }
+}
 async function listAdjustHistory(opts){
   if(!(await isAdmin())) return { items:[], hasMore:false, cursor:null };
   opts=opts||{};
@@ -1974,7 +1989,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, listAdjustHistory, backfillLastTxnAt, backfillNameLower, backfillAdjustOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, listAdjustHistory, listMemberTransactionsPaged, backfillLastTxnAt, backfillNameLower, backfillAdjustOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,

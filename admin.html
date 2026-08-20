@@ -106,7 +106,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=171"></script>
+<script type="module" src="core-omaopa.js?v=172"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -1168,6 +1168,15 @@
         +'<div style="margin-top:16px;padding-top:12px;border-top:1px dashed #E7D7B6"><label>Peran & akses</label>'        +'<div class="sub" style="margin-bottom:7px">Status sekarang: <b>'+roleLbl+'</b></div>'        +'<input id="rlOut" placeholder="Outlet (untuk Kasir/Admin)" value="'+esc(roleOut)+'">'        +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">'        +'<button class="btn sm sec" id="rlKasir">Jadikan Kasir</button>'        +'<button class="btn sm sec" id="rlAdmin">Jadikan Admin</button>'        +'<button class="btn sm sec" id="rlSuper">Jadikan Admin Utama</button>'        +(masterEdit?'<button class="btn sm sec" id="rlMaster">Jadikan Master</button>':'')        +(st?'<button class="btn sm red" id="rlNone">Jadikan Member biasa</button>':'')        +'</div></div>'        +(masterEdit?('<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E7D7B6"><button class="btn" id="delMemBtn" style="background:#7a0b0b;border-color:#7a0b0b;color:#fff">🗑️ Hapus akun member ini</button></div>'):'')
         ) : '<div class="res warn" style="margin-top:10px">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengubah poin & skor.</div>')
       +'<div style="margin-top:16px" class="nm">Voucher member ini</div>'+vhtml
+      +'<div style="margin-top:16px" class="nm">Riwayat Transaksi</div>'
+      +'<div id="mtxList" class="muted" style="margin-top:6px">Memuat…</div>'
+      +'<div id="mtxPager" style="display:none;align-items:center;gap:8px;margin-top:10px"><button class="btn sm sec" id="mtxPrev" style="margin:0;width:auto">‹ Sebelumnya</button><div id="mtxPageLabel" class="muted grow" style="text-align:center;font-weight:800"></div><button class="btn sm sec" id="mtxNext" style="margin:0;width:auto">Berikutnya ›</button></div>'
+      +(masterEdit?(
+        '<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E7D7B6"><div class="nm" style="font-size:.88rem">🔧 Adjust poin dari sini (khusus Master)</div>'
+        +'<input id="mtxAdjDelta" inputmode="numeric" placeholder="cth: 10 atau -5" style="margin-top:6px">'
+        +'<input id="mtxAdjReason" placeholder="Alasan (tampil di rekap)" style="margin-top:6px">'
+        +'<button class="btn sec" id="mtxAdjBtn" style="margin-top:6px">Terapkan</button><div id="mtxAdjMsg"></div></div>'
+      ):'')
       +'<div id="mmsg"></div></div>';
     function run(fn,ok){ if(busy) return; busy=true; var msg=document.getElementById('mmsg'); msg.innerHTML='<div class="muted" style="margin-top:10px">Memproses…</div>';
       Promise.resolve().then(fn).then(function(){ busy=false; msg.innerHTML='<div class="res ok">✓ '+ok+'</div>'; MEMBERS=null; openMember(uid); })
@@ -1187,6 +1196,65 @@
       var rpBtn=document.getElementById('rpBtn'); if(rpBtn) rpBtn.onclick=function(){ if(busy) return; var msg=document.getElementById('mmsg'); var pin=(document.getElementById('rpv').value||'').trim(); if(!/^\d{6}$/.test(pin)){ msg.innerHTML='<div class="res bad" style="margin-top:10px">PIN harus 6 angka.</div>'; return; } if(!confirm('Reset PIN member ini jadi '+pin+'? Pastikan kamu kasih ke member yang benar.')) return; busy=true; msg.innerHTML='<div class="muted" style="margin-top:10px">Mereset PIN…</div>'; Promise.resolve().then(function(){ return O.adminResetPin(uid, pin); }).then(function(){ busy=false; msg.innerHTML='<div class="res ok" style="margin-top:10px">✓ PIN direset jadi <b style="font-size:1.15rem">'+pin+'</b><br>Kasih PIN ini ke member via WA, lalu minta dia ganti sendiri di menu Profil ya.</div>'; }).catch(function(e){ busy=false; msg.innerHTML='<div class="res bad" style="margin-top:10px">Gagal: '+esc((e&&e.message)||'')+'</div>'; }); };
       var delBtn=document.getElementById('delMemBtn'); if(delBtn) delBtn.onclick=function(){ if(busy) return; var nm=(m.name||'member ini'); if(!confirm('HAPUS akun "'+nm+'"?\n\nAkun & login-nya dihapus PERMANEN. Poin & riwayat tidak bisa dikembalikan.')) return; if(!confirm('Yakin banget mau hapus "'+nm+'"? Ini permanen.')) return; var msg=document.getElementById('mmsg'); busy=true; msg.innerHTML='<div class="muted" style="margin-top:10px">Menghapus akun…</div>'; Promise.resolve().then(function(){ return O.adminDeleteMember(uid); }).then(function(){ busy=false; MEMBERS=null; alert('Akun "'+nm+'" sudah dihapus.'); memReset(); renderMember(); }).catch(function(e){ busy=false; msg.innerHTML='<div class="res bad" style="margin-top:10px">Gagal: '+esc((e&&e.message)||'')+'</div>'; }); };
     }
+    if(masterEdit){
+      var mtxAdjBtn=document.getElementById('mtxAdjBtn'); if(mtxAdjBtn) mtxAdjBtn.onclick=function(){
+        if(busy) return;
+        var msg=document.getElementById('mtxAdjMsg'); msg.innerHTML='';
+        var delta=parseInt(document.getElementById('mtxAdjDelta').value||'0',10)||0;
+        if(!delta){ msg.innerHTML='<div class="res bad">Isi jumlah poin dulu.</div>'; return; }
+        busy=true; this.disabled=true; this.textContent='Memproses…';
+        var reason=document.getElementById('mtxAdjReason').value;
+        Promise.resolve().then(function(){ return O.adminAdjustPoints(uid, delta, reason); }).then(function(r){
+          msg.innerHTML='<div class="res ok">✓ Poin sekarang: '+r.newTotal+'.</div>';
+          busy=false; MEMBERS=null; openMember(uid);
+        }).catch(function(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; busy=false; mtxAdjBtn.disabled=false; mtxAdjBtn.textContent='Terapkan'; });
+      };
+    }
+    var _mtxPageIndex=0, _mtxPageCursors=[null], _mtxPageCache=[], _mtxStaffNames=null;
+    async function mtxResolveStaffNames(){
+      if(_mtxStaffNames) return _mtxStaffNames;
+      _mtxStaffNames={}; try{ var list=await O.listStaff(); list.forEach(function(s){ _mtxStaffNames[s.uid]=s.name||s.outlet||s.uid; }); }catch(e){}
+      return _mtxStaffNames;
+    }
+    function updateMtxPager(){
+      var pager=document.getElementById('mtxPager'); if(!pager) return;
+      var prevBtn=document.getElementById('mtxPrev'), nextBtn=document.getElementById('mtxNext'), label=document.getElementById('mtxPageLabel');
+      prevBtn.disabled=_mtxPageIndex===0; nextBtn.disabled=!_mtxPageCache._hasMore;
+      label.textContent='Halaman '+(_mtxPageIndex+1);
+      pager.style.display=(_mtxPageIndex>0 || _mtxPageCache._hasMore || (_mtxPageCache[_mtxPageIndex]&&_mtxPageCache[_mtxPageIndex].length)) ? 'flex' : 'none';
+    }
+    async function loadMtx(mode){
+      var box=document.getElementById('mtxList'); if(!box) return;
+      if(mode==='next'){ _mtxPageIndex++; } else if(mode==='prev'){ _mtxPageIndex=Math.max(0,_mtxPageIndex-1); }
+      if(_mtxPageCache[_mtxPageIndex]){ await renderMtx(_mtxPageCache[_mtxPageIndex]); updateMtxPager(); return; }
+      box.innerHTML='<div class="muted">Memuat…</div>';
+      var res={items:[],hasMore:false,cursor:null}; try{ res=await O.listMemberTransactionsPaged(uid, {cursor:_mtxPageCursors[_mtxPageIndex]}); }catch(e){}
+      _mtxPageCache[_mtxPageIndex]=res.items||[];
+      if(res.cursor) _mtxPageCursors[_mtxPageIndex+1]=res.cursor;
+      _mtxPageCache._hasMore=res.hasMore;
+      if(res.error){ box.innerHTML='<div class="res bad">Gagal ambil data: '+esc(res.error)+'</div>'; return; }
+      await renderMtx(_mtxPageCache[_mtxPageIndex]);
+      updateMtxPager();
+    }
+    async function renderMtx(items){
+      var box=document.getElementById('mtxList'); if(!box) return;
+      if(!items.length && _mtxPageIndex===0){ box.innerHTML='<div class="muted">Belum ada transaksi.</div>'; return; }
+      if(!items.length){ box.innerHTML='<div class="muted">Gak ada lagi di halaman ini.</div>'; return; }
+      var staffNames=await mtxResolveStaffNames();
+      var KIND_LBL={'':'Belanja (scan kasir)', order:'Pesanan web', bonus:'Bonus', referral:'Referral', adjust:'Adjust admin'};
+      box.innerHTML=items.map(function(t){
+        var tgl=t.createdAt?new Date(t.createdAt).toLocaleString('id-ID'):'-';
+        var staffNm=t.staffUid?(staffNames[t.staffUid]||t.staffUid):'-';
+        return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px">'
+          +'<div class="nm" style="font-size:.84rem">'+esc(KIND_LBL[t.kind]||t.kind||'-')+(t.nominal?(' · '+rp(t.nominal)):'')+' <b style="color:'+(t.points>=0?'#2E7D32':'#C0392B')+'">'+(t.points>=0?'+':'')+t.points+' poin</b></div>'
+          +(t.reason?('<div class="sub">'+esc(t.reason)+'</div>'):'')
+          +'<div class="sub">'+esc(t.outlet||'-')+' · oleh '+esc(staffNm)+' · '+tgl+'</div>'
+          +'</div></div>';
+      }).join('');
+    }
+    var mtxPrevBtn=document.getElementById('mtxPrev'); if(mtxPrevBtn) mtxPrevBtn.onclick=function(){ loadMtx('prev'); };
+    var mtxNextBtn=document.getElementById('mtxNext'); if(mtxNextBtn) mtxNextBtn.onclick=function(){ loadMtx('next'); };
+    loadMtx();
   }
   async function doVoucher(code){
     var out=document.getElementById('vout'); if(!out) return; code=(code||'').trim().toUpperCase();
