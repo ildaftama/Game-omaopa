@@ -1548,7 +1548,7 @@ async function listMenu(){
     const snap=await getDocs(query(collection(db,'menu'), orderBy('cat'), orderBy('name')));
     const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, cat:x.cat||'Lainnya', name:x.name||'', price:x.price||0, desc:x.desc||'', img:x.imageUrl||'', avail:x.avail!==false }); });
     return arr;
-  }catch(e){ console.error('listMenu gagal:', e); return []; }
+  }catch(e){ console.error('listMenu gagal:', e); const err=new Error((e&&e.message)||String(e)); err.isMenuListError=true; throw err; }
 }
 async function saveMenuItem(id, data, imageBlob){
   if(!(await isSuper())) throw {message:'Khusus admin utama.'};

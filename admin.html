@@ -107,7 +107,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=173"></script>
+<script type="module" src="core-omaopa.js?v=174"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -869,7 +869,10 @@
   }
   async function loadMenuList(){
     var box=document.getElementById('mnList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
-    var arr=[]; try{ arr=await O.listMenu(); }catch(e){}
+    var arr=[]; try{ arr=await O.listMenu(); }catch(e){
+      box.innerHTML='<div class="res bad">Gagal ambil data menu: '+esc((e&&e.message)||'')+'<br>Kalau ada link "create index" di pesan itu (cek juga browser console/F12), klik → Create → tunggu 1-2 menit lalu klik ↻ di atas.</div>';
+      return;
+    }
     if(!arr.length){ box.innerHTML='<div class="muted">Belum ada menu. Jalankan migrasi di atas, atau tambah manual.</div>'; return; }
     var cats=[]; arr.forEach(function(m){ if(cats.indexOf(m.cat)<0) cats.push(m.cat); });
     box.innerHTML=cats.map(function(cat){
