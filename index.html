@@ -332,7 +332,7 @@
 
 <script src="menu-data.js?v=69"></script>
 <script src="outlets-data.js?v=69"></script>
-<script type="module" src="core-omaopa.js?v=169"></script>
+<script type="module" src="core-omaopa.js?v=173"></script>
 <script>
   try{ var _ci=document.getElementById('coin'); if(_ci) _ci.textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){}
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -528,8 +528,9 @@
       try{ window.location.href=waUrl; }catch(e){}
     }
     function refreshOutlets(){ try{ if(window.OmaOpa&&window.OmaOpa.listPublicOutlets){ window.OmaOpa.listPublicOutlets().then(function(a){ if(a&&a.length){ OUTLETS=a; if(view==='form') renderForm(); } }).catch(function(){}); } }catch(e){} }
+    function refreshMenu(){ try{ if(window.OmaOpa&&window.OmaOpa.listMenu){ window.OmaOpa.listMenu().then(function(a){ if(a&&a.length){ MENU=a; if(view==='list') render(); } }).catch(function(){}); } }catch(e){} }
     function loadMyVouchers(){ myVouchers=[]; try{ if(window.OmaOpa&&window.OmaOpa.getUser&&window.OmaOpa.getUser()&&window.OmaOpa.listVouchers){ window.OmaOpa.listVouchers().then(function(list){ myVouchers=(list||[]).filter(function(v){return v&&(v.status==='aktif'||!v.status)&&(v.discType==='percent'||v.discType==='freeitem');}); if(view==='form') renderForm(); }).catch(function(){}); } }catch(e){} }
-    function open(){ if(!bk) build(); view='list'; selVoucher=null; render(); bk.classList.add('show'); refreshOutlets(); loadMyVouchers(); }
+    function open(){ if(!bk) build(); view='list'; selVoucher=null; render(); bk.classList.add('show'); refreshOutlets(); refreshMenu(); loadMyVouchers(); }
     function close(){ if(bk) bk.classList.remove('show'); }
     window.openCart=open;
   })();

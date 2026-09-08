@@ -98,6 +98,7 @@
       <button data-tab="pesanan">🧾 Pesanan</button>
       <button data-tab="blast">📢 Blast</button>
       <button data-tab="pengaturan">⚙️ Pengaturan</button>
+      <button data-tab="menu">🍰 Menu</button>
     </div>
     <div id="tab"></div>
   </div>
@@ -106,11 +107,13 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=172"></script>
+<script type="module" src="core-omaopa.js?v=173"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
   var tab='home', busy=false, segFilter=null, canEdit=false, masterEdit=false, sPage=0;
+  var _menuCache=[];
+  async function ensureMenuCache(force){ if(force || !_menuCache.length){ try{ _menuCache=await O.listMenu(); }catch(e){} } return _menuCache; }
   var MEMBERS=null, TXN=null; // cache
   var memStack=[null], memPage=0; // paginasi member (cursor)
   var curOf='baru', curOrders=[], OUTLETS_CACHE=[];
@@ -148,7 +151,7 @@
   document.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){
     tab=b.getAttribute('data-tab'); document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.remove('on'); }); b.classList.add('on'); render();
   }; });
-  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, pengaturan:renderPengaturan}[tab]||renderHome)(); }
+  function render(){ ({home:renderHome, member:renderMember, outlet:renderOutlet, staff:renderStaff, reward:renderReward, promo:renderPromo, analitik:renderAnalitik, pesanan:renderPesanan, blast:renderBlast, pengaturan:renderPengaturan, menu:renderMenuTab}[tab]||renderHome)(); }
   function setActiveTab(name){ tab=name; document.querySelectorAll('.tabs button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-tab')===name); }); }
   function applySegment(field,val){ segFilter={field:field, value:val}; setActiveTab('member'); render(); }
 
@@ -383,7 +386,7 @@
 
       document.getElementById('bVoucherChk').onchange=function(){ document.getElementById('bVoucherBody').style.display=this.checked?'block':'none'; };
       var bvFI=document.getElementById('bvFreeItem');
-      bvFI.innerHTML='<option value="">— pilih item —</option>'+(window.OMA_MENU||[]).map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>';}).join('');
+      ensureMenuCache().then(function(mc){ bvFI.innerHTML='<option value="">— pilih item —</option>'+mc.map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>';}).join(''); });
       document.getElementById('bvType').onchange=function(){
         var t=this.value;
         document.getElementById('bvValueWrap').style.display = (t==='freeitem') ? 'none' : 'block';
@@ -442,7 +445,7 @@
           voucherConfig={ title:vTitle, expiresAt:new Date(vTo+'T23:59:59') };
           if(vType==='freeitem'){
             var fid=document.getElementById('bvFreeItem').value;
-            var mi=(window.OMA_MENU||[]).find(function(m){return m.id===fid;});
+            var mi=_menuCache.find(function(m){return m.id===fid;});
             if(!fid){ msg.innerHTML='<div class="res bad">Pilih item gratisnya dulu.</div>'; return; }
             voucherConfig.discType='freeitem'; voucherConfig.freeItemId=fid; voucherConfig.freeItemName=mi?((mi.cat?mi.cat+' — ':'')+mi.name):''; voucherConfig.freeItemPrice=mi?mi.price:0;
             voucherDesc='🎁 Voucher: '+vTitle+' (gratis '+(voucherConfig.freeItemName||'item')+')';
@@ -817,6 +820,106 @@
     var ajGoBtn=document.getElementById('ajGo'); if(ajGoBtn) ajGoBtn.onclick=function(){ loadAdjustHistory('reset'); };
     var ajPrevBtn=document.getElementById('ajPrev'); if(ajPrevBtn) ajPrevBtn.onclick=function(){ loadAdjustHistory('prev'); };
     var ajNextBtn=document.getElementById('ajNext'); if(ajNextBtn) ajNextBtn.onclick=function(){ loadAdjustHistory('next'); };
+  }
+  async function renderMenuTab(){
+    if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
+    tabEl.innerHTML='<div class="card"><div class="nm">🔄 Migrasi Menu dari File Lama</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: pindahin semua data menu dari menu-data.js (file lama) ke sini. Aman dijalankan berkali-kali — ID dipertahankan, data yang sama gak bakal dobel.</div><button class="btn sec" id="mnMigrateBtn">Jalankan Migrasi</button><div id="mnMigrateMsg"></div></div>'
+      +'<div class="card"><div class="nm">➕ Tambah Menu Baru</div>'
+      +'<label>Kategori</label><input id="mnCat" placeholder="misal: Ogura Cheese">'
+      +'<label>Nama</label><input id="mnName" placeholder="misal: Polos">'
+      +'<label>Harga (Rp)</label><input id="mnPrice" type="number" inputmode="numeric">'
+      +'<label>Deskripsi (opsional)</label><input id="mnDesc">'
+      +'<label>Foto (opsional)</label><input type="file" id="mnImage" accept="image/*"><div id="mnImagePreview" style="margin-top:8px"></div>'
+      +'<button class="btn" id="mnAddBtn" style="margin-top:8px">＋ Tambah Menu</button><div id="mnAddMsg"></div></div>'
+      +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">🍰 Daftar Menu</div><button class="btn sm sec" id="mnReload">↻</button></div><div id="mnList" class="muted">Memuat…</div></div>';
+    document.getElementById('mnMigrateBtn').onclick=async function(){
+      if(busy) return;
+      var srcMenu=window.OMA_MENU||[];
+      if(!srcMenu.length){ alert('window.OMA_MENU kosong/gak kemuat. Pastikan menu-data.js masih ke-load di halaman ini.'); return; }
+      if(!confirm('Migrasi '+srcMenu.length+' menu dari file lama? Ini bakal upload semua foto ke server, bisa makan waktu beberapa menit — jangan tutup halaman.')) return;
+      busy=true; this.disabled=true; this.textContent='Migrasi jalan…'; var m=document.getElementById('mnMigrateMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Memproses '+srcMenu.length+' menu, jangan tutup halaman…</div>';
+      try{ var r=await O.migrateMenuFromStatic(srcMenu); m.innerHTML='<div class="res ok">✓ Selesai. '+r.count+' menu berhasil dimigrasi'+(r.fail?(' ('+r.fail+' gagal)'):'')+'.</div>'; loadMenuList(); }
+      catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; this.textContent='Jalankan Migrasi'; busy=false;
+    };
+    var mnImgBlob=null;
+    document.getElementById('mnImage').onchange=function(){
+      var f=this.files&&this.files[0]; var prev=document.getElementById('mnImagePreview');
+      if(!f){ mnImgBlob=null; prev.innerHTML=''; return; }
+      if(f.size>5*1024*1024){ alert('Ukuran foto maksimal 5MB.'); this.value=''; mnImgBlob=null; prev.innerHTML=''; return; }
+      mnImgBlob=f; prev.innerHTML='<img src="'+URL.createObjectURL(f)+'" style="max-width:120px;border-radius:10px;border:2px solid #E7D8BE">';
+    };
+    document.getElementById('mnAddBtn').onclick=async function(){
+      if(busy) return;
+      var msg=document.getElementById('mnAddMsg'); msg.innerHTML='';
+      var cat=(document.getElementById('mnCat').value||'').trim(), name=(document.getElementById('mnName').value||'').trim();
+      var price=parseInt(document.getElementById('mnPrice').value||'0',10)||0;
+      if(!cat||!name){ msg.innerHTML='<div class="res bad">Isi kategori & nama dulu.</div>'; return; }
+      busy=true; this.disabled=true; this.textContent='Menyimpan…';
+      try{
+        await O.saveMenuItem(null, { cat:cat, name:name, price:price, desc:document.getElementById('mnDesc').value, avail:true }, mnImgBlob);
+        msg.innerHTML='<div class="res ok">✓ Menu ditambahkan.</div>';
+        document.getElementById('mnCat').value=''; document.getElementById('mnName').value=''; document.getElementById('mnPrice').value=''; document.getElementById('mnDesc').value=''; document.getElementById('mnImage').value=''; document.getElementById('mnImagePreview').innerHTML=''; mnImgBlob=null;
+        loadMenuList();
+      }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      this.disabled=false; this.textContent='＋ Tambah Menu'; busy=false;
+    };
+    document.getElementById('mnReload').onclick=function(){ loadMenuList(); };
+    loadMenuList();
+  }
+  async function loadMenuList(){
+    var box=document.getElementById('mnList'); if(!box) return; box.innerHTML='<div class="muted">Memuat…</div>';
+    var arr=[]; try{ arr=await O.listMenu(); }catch(e){}
+    if(!arr.length){ box.innerHTML='<div class="muted">Belum ada menu. Jalankan migrasi di atas, atau tambah manual.</div>'; return; }
+    var cats=[]; arr.forEach(function(m){ if(cats.indexOf(m.cat)<0) cats.push(m.cat); });
+    box.innerHTML=cats.map(function(cat){
+      var items=arr.filter(function(m){ return m.cat===cat; });
+      return '<div class="area-h">'+esc(cat)+'</div>'+items.map(function(m){
+        return '<div class="row"><div class="grow"><div class="nm" style="font-size:.86rem">'+esc(m.name)+(m.avail?'':' <span class="tag off">HABIS</span>')+'</div><div class="sub">'+rp(m.price)+(m.desc?(' · '+esc(m.desc)):'')+'</div></div>'
+          +'<button class="btn sm sec" data-mnedit="'+esc(m.id)+'">⚙️</button></div>';
+      }).join('');
+    }).join('');
+    box.querySelectorAll('[data-mnedit]').forEach(function(b){ b.onclick=function(){ var m=arr.find(function(x){return x.id===b.getAttribute('data-mnedit');}); if(m) openMenuEdit(m); }; });
+  }
+  function openMenuEdit(m){
+    var bk=document.createElement('div');
+    bk.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px';
+    bk.innerHTML='<div style="background:#fff;border-radius:16px;padding:18px;max-width:380px;width:100%;max-height:90vh;overflow:auto">'
+      +'<div style="font-weight:800;color:var(--coklat);margin-bottom:10px">⚙️ Edit Menu</div>'
+      +(m.img?('<img src="'+esc(m.img)+'" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;margin-bottom:10px">'):'')
+      +'<label>Kategori</label><input id="meCat" value="'+esc(m.cat)+'">'
+      +'<label>Nama</label><input id="meName" value="'+esc(m.name)+'">'
+      +'<label>Harga (Rp)</label><input id="mePrice" type="number" value="'+m.price+'">'
+      +'<label>Deskripsi</label><input id="meDesc" value="'+esc(m.desc||'')+'">'
+      +'<label>Ganti Foto (opsional)</label><input type="file" id="meImage" accept="image/*">'
+      +'<label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="meAvail" style="width:auto"'+(m.avail?' checked':'')+'> Tersedia (uncek kalau lagi habis)</label>'
+      +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="meSaveBtn" style="flex:1">💾 Simpan</button><button class="btn sec" id="meCancelBtn" style="flex:1">Batal</button></div>'
+      +'<button class="btn red" id="meDelBtn" style="margin-top:8px">🗑 Hapus Menu Ini</button>'
+      +'</div>';
+    document.body.appendChild(bk);
+    var meImgBlob=null;
+    document.getElementById('meImage').onchange=function(){ var f=this.files&&this.files[0]; if(f&&f.size>5*1024*1024){ alert('Ukuran foto maksimal 5MB.'); this.value=''; return; } meImgBlob=f||null; };
+    function shut(){ bk.remove(); }
+    bk.onclick=function(e){ if(e.target===bk) shut(); };
+    bk.querySelector('#meCancelBtn').onclick=shut;
+    bk.querySelector('#meSaveBtn').onclick=async function(){
+      if(busy) return;
+      var cat=(bk.querySelector('#meCat').value||'').trim(), name=(bk.querySelector('#meName').value||'').trim();
+      if(!cat||!name){ alert('Kategori & nama wajib diisi.'); return; }
+      busy=true; this.disabled=true; this.textContent='Menyimpan…';
+      try{
+        await O.saveMenuItem(m.id, { cat:cat, name:name, price:parseInt(bk.querySelector('#mePrice').value||'0',10)||0, desc:bk.querySelector('#meDesc').value, avail:bk.querySelector('#meAvail').checked, imageUrl:m.img }, meImgBlob);
+        shut(); loadMenuList();
+      }catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; this.textContent='💾 Simpan'; }
+      busy=false;
+    };
+    bk.querySelector('#meDelBtn').onclick=async function(){
+      if(busy) return; if(!confirm('Hapus menu "'+m.name+'" permanen?')) return;
+      busy=true; this.disabled=true;
+      try{ await O.deleteMenuItem(m.id); shut(); loadMenuList(); }
+      catch(e){ alert((e&&e.message)||'Gagal'); this.disabled=false; }
+      busy=false;
+    };
   }
   async function loadMessages(){
     var w=document.getElementById('msgWrap'); if(!w) return; w.classList.remove('muted');
@@ -1548,7 +1651,7 @@
   function openOrderEdit(id){
     var o=null; for(var i=0;i<curOrders.length;i++){ if(curOrders[i].id===id){ o=curOrders[i]; break; } }
     if(!o){ alert('Pesanan tidak ditemukan, muat ulang dulu.'); return; }
-    var MENU=window.OMA_MENU||[];
+    var MENU=_menuCache.length?_menuCache:(window.OMA_MENU||[]);
     var items=(o.items||[]).map(function(it){ return { id:it.id||'', cat:it.cat||'', name:it.name||'', price:Number(it.price)||0, qty:Number(it.qty)||0 }; });
     var ov=document.getElementById('oEditOv');
     if(!ov){ ov=document.createElement('div'); ov.id='oEditOv';
@@ -1837,13 +1940,16 @@
       +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Harga poin</label><input id="rC" inputmode="numeric" placeholder="cth: 150"></div><div style="flex:1"><label>Stok (limit)</label><input id="rL" inputmode="numeric" placeholder="cth: 100"></div></div>'
       +'<label>Jenis voucher (buat dipakai di transaksi CS)</label><select id="rDT"><option value="none">Tidak ada</option><option value="percent">Diskon persen (%)</option><option value="freeitem">Item gratis</option></select>'
       +'<div style="display:flex;gap:8px"><div style="flex:1"><label>Nilai % (kalau persen)</label><input id="rDV" inputmode="numeric" placeholder="cth: 15"></div><div style="flex:1"><label>Maks potongan Rp (opsional)</label><input id="rDM" inputmode="numeric" placeholder="cth: 50000"></div></div>'
-      +'<label>Item gratis (kalau item)</label><select id="rFI"><option value="">— pilih —</option>'+(window.OMA_MENU||[]).map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>';}).join('')+'</select>'
+      +'<label>Item gratis (kalau item)</label><select id="rFI"><option value="">— pilih —</option></select>'
       +'<button class="btn" id="rAdd">＋ Tambah reward</button><div id="rMsg"></div></div>') : '<div class="res warn">👁️ Mode lihat-saja — hanya Admin Utama yang bisa mengelola reward.</div>')
       +'<div class="card"><div class="row" style="border:none;padding:0 0 8px"><div class="grow nm">Daftar reward</div><button class="btn sm sec" id="rReload">↻</button></div><div id="rList"><div class="muted">Memuat…</div></div></div>';
-    if(canEdit){ document.getElementById('rAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('rMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+    if(canEdit){
+      var rFISel=document.getElementById('rFI');
+      ensureMenuCache().then(function(mc){ rFISel.innerHTML='<option value="">— pilih —</option>'+mc.map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>';}).join(''); });
+      document.getElementById('rAdd').onclick=async function(){ if(busy)return; var _eid=this.dataset.editId||null; busy=true; var msg=document.getElementById('rMsg'); msg.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
       try{ var _dt=document.getElementById('rDT').value; var _pl={ title:document.getElementById('rT').value, note:document.getElementById('rN').value, cost:document.getElementById('rC').value, limit:document.getElementById('rL').value, active:true, discType:_dt };
         if(_dt==='percent'){ _pl.discValue=document.getElementById('rDV').value; _pl.discMax=document.getElementById('rDM').value; }
-        if(_dt==='freeitem'){ var _fid=document.getElementById('rFI').value; var _mi=(window.OMA_MENU||[]).find(function(m){return m.id===_fid;}); _pl.freeItemId=_fid; _pl.freeItemName=_mi?((_mi.cat?_mi.cat+' — ':'')+_mi.name):''; _pl.freeItemPrice=_mi?_mi.price:0; }
+        if(_dt==='freeitem'){ var _fid=document.getElementById('rFI').value; var _mi=_menuCache.find(function(m){return m.id===_fid;}); _pl.freeItemId=_fid; _pl.freeItemName=_mi?((_mi.cat?_mi.cat+' — ':'')+_mi.name):''; _pl.freeItemPrice=_mi?_mi.price:0; }
         await O.saveReward(_eid,_pl);
         msg.innerHTML='<div class="res ok">✓ '+(_eid?'Reward diperbarui.':'Reward ditambahkan.')+'</div>'; resetRewardForm(); loadRewards();
       }catch(e){ msg.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; } busy=false; }; }

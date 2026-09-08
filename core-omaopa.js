@@ -1542,6 +1542,58 @@ function parseMapsLatLng(input){
   return null;
 }
 function buildMapsLink(lat,lng){ return 'https://www.google.com/maps/search/?api=1&query='+lat+'%2C'+lng; }
+// ---- Menu produk (dipakai buat item gratis reward & menu pesan online) ----
+async function listMenu(){
+  try{
+    const snap=await getDocs(query(collection(db,'menu'), orderBy('cat'), orderBy('name')));
+    const arr=[]; snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, cat:x.cat||'Lainnya', name:x.name||'', price:x.price||0, desc:x.desc||'', img:x.imageUrl||'', avail:x.avail!==false }); });
+    return arr;
+  }catch(e){ console.error('listMenu gagal:', e); return []; }
+}
+async function saveMenuItem(id, data, imageBlob){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  const d=data||{};
+  if(!(d.name||'').trim()) throw {message:'Nama menu wajib diisi.'};
+  if(!(d.cat||'').trim()) throw {message:'Kategori wajib diisi.'};
+  const isNew=!id;
+  const ref=id? doc(db,'menu',id) : doc(collection(db,'menu'));
+  let imageUrl=d.imageUrl||'';
+  if(imageBlob){
+    const sref=storageRef(storage, 'menu-images/'+ref.id+'.jpg');
+    await uploadBytes(sref, imageBlob, {contentType:'image/jpeg'});
+    imageUrl=await getDownloadURL(sref);
+  }
+  await setDoc(ref, {
+    cat:d.cat.trim(), name:d.name.trim(), price:Math.max(0,Math.floor(Number(d.price)||0)), desc:(d.desc||'').trim(),
+    imageUrl:imageUrl, avail:d.avail!==false, updatedAt:serverTimestamp()
+  }, {merge:true});
+  return { id:ref.id, isNew:isNew };
+}
+async function deleteMenuItem(id){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  if(!id) throw {message:'ID kosong.'};
+  await deleteDoc(doc(db,'menu',id));
+}
+function dataURLtoBlob(dataurl){
+  const arr=dataurl.split(','); const mimeMatch=arr[0].match(/:(.*?);/); const mime=mimeMatch?mimeMatch[1]:'image/jpeg';
+  const bstr=atob(arr[1]); let n=bstr.length; const u8=new Uint8Array(n);
+  while(n--){ u8[n]=bstr.charCodeAt(n); }
+  return new Blob([u8],{type:mime});
+}
+async function migrateMenuFromStatic(staticItems){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  let n=0, fail=0;
+  for(const it of (staticItems||[])){
+    try{
+      let blob=null;
+      if(it.img && typeof it.img==='string' && it.img.indexOf('data:image')===0){ blob=dataURLtoBlob(it.img); }
+      await saveMenuItem(it.id||null, { cat:it.cat, name:it.name, price:it.price, desc:it.desc, avail:it.avail }, blob);
+      n++;
+    }catch(e){ fail++; console.error('migrate menu item gagal:', it, e); }
+  }
+  logAudit('migrate_menu', 'Migrasi menu dari file statis ke Firestore ('+n+' berhasil, '+fail+' gagal).');
+  return { count:n, fail:fail };
+}
 async function listOutlets(){
   try{ const snap=await getDocs(collection(db,'outlets')); const arr=[];
     snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, name:x.name||'', area:x.area||'Lainnya', maps:x.maps||'', lat:(typeof x.lat==='number'?x.lat:null), lng:(typeof x.lng==='number'?x.lng:null), internalOnly:x.internalOnly===true, active:x.active!==false }); });
@@ -1989,7 +2041,7 @@ window.OmaOpa = {
   redeem, listVouchers, listRewardsPublic,
   isStaff, findVoucher, markVoucherUsed,
   getMemberByUid, awardPoints, getStaffOutlet,
-  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, listAdjustHistory, listMemberTransactionsPaged, backfillLastTxnAt, backfillNameLower, backfillAdjustOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
+  getStaffInfo, listTransactions, listUsedVouchers, repeatRateByOutlet, avgTransactionStats, memberOutletSummary, membersByMonth, omzetByMonth, listInactiveMembersPaged, listAdjustHistory, listMemberTransactionsPaged, listMenu, saveMenuItem, deleteMenuItem, migrateMenuFromStatic, backfillLastTxnAt, backfillNameLower, backfillAdjustOutlet, trackVisit, startPresence, getOnlineCount, getTrafficStats, listAudit, adminDeleteTransactions,
   isAdmin, isSuper, isMaster, isHRD, getMemberByPhone, listMembers, listMembersPage, getMemberScore,
   adminAdjustPoints, adminSetPoints, adminSetScore, adminResetPoints, adminClearTransactions, deleteTransaction,
   listOutlets, listPublicOutlets, addOutlet, updateOutlet, deleteOutlet, seedOutlets, parseMapsLatLng, buildMapsLink,
