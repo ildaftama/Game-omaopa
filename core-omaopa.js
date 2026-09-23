@@ -900,16 +900,30 @@ async function repeatRateByOutlet(months){
   const cutoff=(function(){ const d=new Date(); d.setMonth(d.getMonth()-months); return d.getTime(); })();
   const validKeys={}; (window.OMA_OUTLETS||[]).forEach(o=>{ if(o&&o.name){ const k=o.name.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim(); if(k) validKeys[k]=o.name; } });
   let txs=[];
-  try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ uid:x.uid||'', outlet:(x.outlet||'').trim(), kind:x.kind||'', ts:ts }); }); }catch(e){ return []; }
+  try{ const snap=await getDocs(collection(db,'transactions')); snap.forEach(d=>{ const x=d.data(); const ts=(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0; txs.push({ uid:x.uid||'', outlet:(x.outlet||'').trim(), kind:x.kind||'', ts:ts }); }); }catch(e){ return { byOutlet:[], byGroup:[] }; }
   const byOutlet={};
+  const byGroup={ area1:{}, area2:{}, area3:{}, kronggahan:{} };
   txs.forEach(t=>{ if(t.ts<cutoff) return; if(!t.uid) return; if(t.kind==='referral' || t.kind==='bonus') return; const o=t.outlet; if(!o) return;
     const key=o.toLowerCase().replace(/^oma opa cakery\s*/i,'').replace(/\s+/g,' ').trim();
     if(!validKeys[key]) return;
-    if(!byOutlet[key]) byOutlet[key]={ name:validKeys[key], m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1; });
+    if(!byOutlet[key]) byOutlet[key]={ name:validKeys[key], m:{} }; byOutlet[key].m[t.uid]=(byOutlet[key].m[t.uid]||0)+1;
+    const g=outletGroup(validKeys[key]);
+    if(g && byGroup[g]){ byGroup[g][t.uid]=(byGroup[g][t.uid]||0)+1; }
+  });
   const rows=[];
   Object.keys(byOutlet).forEach(k=>{ const g=byOutlet[k]; const m=g.m; const uids=Object.keys(m); const total=uids.length; const repeat=uids.filter(u=>m[u]>=2).length; const visits=uids.reduce((s,u)=>s+m[u],0); rows.push({ outlet:g.name, totalMembers:total, repeatMembers:repeat, visits:visits, rate:(total?(repeat/total):0) }); });
   rows.sort((a,b)=>b.totalMembers-a.totalMembers);
-  return rows;
+  const GROUP_LABEL={ area1:'Area 1 · Jogja·Klaten·Magelang', area2:'Area 2 · Solo Raya', area3:'Area 3 · Semarang·Salatiga', kronggahan:'Kronggahan' };
+  const groupRows=[];
+  ['area1','area2','area3','kronggahan'].forEach(gk=>{
+    const m=byGroup[gk]; const uids=Object.keys(m); const total=uids.length; const repeat=uids.filter(u=>m[u]>=2).length; const visits=uids.reduce((s,u)=>s+m[u],0);
+    groupRows.push({ outlet:GROUP_LABEL[gk], key:gk, totalMembers:total, repeatMembers:repeat, visits:visits, rate:(total?(repeat/total):0) });
+  });
+  const metaM={}; ['area1','area2','area3'].forEach(gk=>{ Object.keys(byGroup[gk]).forEach(u=>{ metaM[u]=(metaM[u]||0)+byGroup[gk][u]; }); });
+  const metaUids=Object.keys(metaM); const metaTotal=metaUids.length; const metaRepeat=metaUids.filter(u=>metaM[u]>=2).length; const metaVisits=metaUids.reduce((s,u)=>s+metaM[u],0);
+  groupRows.push({ outlet:'Metavest (Area 1+2+3)', key:'metavest', totalMembers:metaTotal, repeatMembers:metaRepeat, visits:metaVisits, rate:(metaTotal?(metaRepeat/metaTotal):0) });
+  groupRows.sort((a,b)=>b.totalMembers-a.totalMembers);
+  return { byOutlet:rows, byGroup:groupRows };
 }
 // ===== Traffic & Online (Firestore-only, rollup harian) =====
 function _today(){ return _ymd(new Date()); }
