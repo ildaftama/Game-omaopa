@@ -12,9 +12,9 @@
    script.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&loading=async&callback=radarGoogleMapsReady&v=weekly&language=id&region=ID';script.async=true;document.head.appendChild(script);
   }).catch(e=>{loading=null;throw e;});return loading;
  }
- window.gm_authFailure=()=>{message('Akses Google Maps gagal. Periksa API key, pembatasan domain, dan billing.');$('#google-traffic-map').hidden=true;$('#google-traffic-load').disabled=false;};
+ window.gm_authFailure=()=>{message('Peta lalu lintas belum bisa dibuka. Hubungi pengelola untuk memeriksa koneksinya.');$('#google-traffic-map').hidden=true;$('#google-traffic-load').disabled=false;};
  $('#google-traffic-load').onclick=async()=>{
-  const key=String(window.RADAR_GOOGLE_MAPS_KEY||'').trim();if(!key){message('Belum terhubung. Aktifkan Google Maps Platform untuk menampilkan trafik di sini.');return;}
+  const key=String(window.RADAR_GOOGLE_MAPS_KEY||'').trim();if(!key){message('Peta lalu lintas belum terhubung. Kamu bisa membuka lokasi outlet di Google Maps.');return;}
   const button=$('#google-traffic-load');button.disabled=true;message('Memuat Google Maps…');
   try{await load(key);const {Map,TrafficLayer,Circle}=await google.maps.importLibrary('maps');$('#google-traffic-map').hidden=false;
    if(!googleMap){const o=selected();googleMap=new Map($('#google-traffic-map'),{center:{lat:o.lat,lng:o.lon},zoom:15,mapTypeControl:false,streetViewControl:false,fullscreenControl:true});point=new Circle({map:googleMap,center:{lat:o.lat,lng:o.lon},radius:25,fillColor:'#5a3017',fillOpacity:1,strokeColor:'#ffffff',strokeWeight:2});trafficLayer=new TrafficLayer({autoRefresh:true});trafficLayer.setMap(googleMap);}
