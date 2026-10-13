@@ -4,7 +4,7 @@ Halaman publik: https://omaopa.fun/forecast/
 
 Peta, penduduk, demografi, kegiatan, wisata, lalu lintas dan Analisa dapat dibuka tanpa login. Tidak ada form penambahan data manual.
 
-Analisa per outlet memakai laporan ESB Daily Sales Summary By Branch, Net Sales Total. Ekspor 15 Juni–12 Oktober 2026 berisi 3.358 catatan dan telah dicocokkan dengan total ekspor. Pilihan 1/2/3 bulan dihitung sampai 12 Oktober; 28 hari sebelumnya digunakan untuk pembanding. Sebanyak 26 lokasi KMZ sudah cocok dengan nama ESB. Jebres dan Magelang masih menunggu kepastian padanan lokasi; Pleburan tidak dipasangkan ke KMZ. Hari hilang tidak dianggap nol.
+Analisa per outlet memakai laporan ESB Daily Sales Summary By Branch, Net Sales Total. Ekspor 15 Juni–12 Oktober 2026 berisi 3.358 catatan dan telah dicocokkan dengan total ekspor. Pilihan 1/2/3 bulan dihitung sampai 12 Oktober; 28 hari sebelumnya digunakan untuk pembanding. Sebanyak 28 lokasi KMZ sudah cocok dengan nama ESB. Pemilik mengonfirmasi Jebres = UNS dan Magelang = Pemuda, Magelang pada 13 Oktober 2026. Pleburan tidak dipasangkan ke KMZ. Hari hilang tidak dianggap nol.
 
 Data omzet mentah tidak berada di repository ini. Halaman hanya memuat ringkasan persentase dan indeks. Arsip awal disimpan lokal secara privat; integrasi penyimpanan Firebase disiapkan tetapi penarikan ESB belum aktif. Koneksi ESB memerlukan GitHub Secrets; jadwal otomatis belum diatur.
 
