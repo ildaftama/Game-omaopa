@@ -7,3 +7,7 @@ Peta, penduduk, demografi, kegiatan, wisata, lalu lintas dan Analisa dapat dibuk
 Analisa awal menggunakan 91 hari Net Sales gabungan dari laporan keuangan harian, 13 Juli–11 Oktober 2026. Dua belas Oktober belum terisi. Terdapat 11 kegiatan historis dengan tautan resmi. Persentase perubahan membandingkan hari sejenis, bukan bukti pengaruh kegiatan pada outlet tertentu. Omzet harian per outlet dan arsip lalu lintas belum tersedia.
 
 Data omzet mentah tidak berada di repository ini. Halaman hanya memuat ringkasan persentase dan indeks. Penyimpanan ESB harian tetap privat di Firebase. Koneksi ESB memerlukan GitHub Secrets; jadwal otomatis belum diatur.
+
+Pembanding tambahan berasal dari 28 hari sebelum periode. Cuplikan delapan titik jalan Surakarta disimpan pada 13 Oktober 2026; waktu pengukuran sumber tidak tersedia, belum dipetakan ke outlet, dan tidak digunakan sebagai riwayat tiga bulan.
+
+Cuplikan Semarang berisi hitungan mobil dan motor di 37 ruas, berlabel hari ini pada sumber. Belum ada arsip tanggal terdahulu atau pencocokan radius outlet. Hitungan tidak dijumlahkan antar ruas.
