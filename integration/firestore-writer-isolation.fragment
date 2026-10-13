@@ -1,0 +1,12 @@
+// Insert this function inside match /databases/{database}/documents.
+// Replace PLACEHOLDER_SYNC_UID with the same writer UID used by Radar rules.
+function notRadarSyncAccount() {
+  return request.auth == null || request.auth.uid != 'PLACEHOLDER_SYNC_UID';
+}
+// Existing non-Radar permissions must also exclude the dedicated writer.
+// For EACH existing allow condition in other collections, wrap its expression:
+// Before: allow read, write: if EXISTING_CONDITION;
+// After:  allow read, write: if notRadarSyncAccount() && (EXISTING_CONDITION);
+// Preserve the original condition, including its grouping and line breaks.
+// Do NOT apply this guard to the new radarSalesDays writer rule.
+// Validate all other users retain their original access before publishing.

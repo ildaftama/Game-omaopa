@@ -1,0 +1,23 @@
+// Merge INSIDE match /databases/{database}/documents in existing rules.
+// Replace PLACEHOLDER_SYNC_UID with the dedicated Firebase Authentication user UID.
+// Readers are allowlisted manually in Firebase Console: radarReaders/{uid}, enabled:true.
+// Do not replace existing application rules with this fragment.
+match /radarSalesDays/{date} {
+  allow read: if request.auth != null
+    && exists(/databases/$(database)/documents/radarReaders/$(request.auth.uid))
+    && get(/databases/$(database)/documents/radarReaders/$(request.auth.uid)).data.enabled == true;
+  allow create, update: if request.auth != null
+    && request.auth.uid == 'PLACEHOLDER_SYNC_UID'
+    && request.resource.data.keys().hasOnly(['schemaVersion','date','source','metric','syncedAt','outletCount','rows'])
+    && request.resource.data.date == date
+    && request.resource.data.schemaVersion == 1
+    && request.resource.data.metric == 'paymentAmount'
+    && request.resource.data.rows is list
+    && request.resource.data.outletCount == request.resource.data.rows.size()
+    && request.resource.data.outletCount > 0
+    && request.resource.data.outletCount <= 150;
+  allow delete: if false;
+}
+match /radarReaders/{uid} {
+  allow read, write: if false;
+}
