@@ -55,3 +55,13 @@ analyse-history.mjs membaca data privat dan historical-events.json, kemudian men
 Uji kode: enam pengujian mencakup kalender, penarikan dan penyimpanan, laporan kosong, pengulangan tanggal, kegagalan sebagian, pembanding hari sejenis, data hilang dan tidak keluarnya nominal ke ringkasan publik. Uji ini memakai data buatan. Penarikan ESB/Firebase langsung melalui GitHub masih menunggu pengisian Secrets.
 
 Sumber teknis: [ESB](https://developers.esb.co.id/esb-core/), [TrafficLayer Google](https://developers.google.com/maps/documentation/javascript/examples/layer-traffic), [lapisan peta Google](https://developers.google.com/maps/documentation/javascript/layers), [aturan Firebase](https://firebase.google.com/docs/firestore/security/rules-conditions), [GitHub Secrets](https://docs.github.com/en/actions/concepts/security/secrets).
+
+## Analisa harian per outlet — 13 Oktober 2026
+
+Laporan ESB Daily Sales Summary By Branch sudah diekspor lewat Chrome untuk 15 Juni–12 Oktober 2026. Arsip privat berisi 3.358 catatan dengan metrik Net Sales Total, telah dicocokkan dengan total ekspor. Data ini berbeda dari hasil API sales-payment-summary; jangan saling menggantikan metrik.
+
+`analyse-branches.mjs` menghasilkan ringkasan per outlet, pilihan 1/2/3 bulan, kategori kuartil, indeks omzet dan perubahan saat kegiatan. Masukan privat: `{ metric, source, sourceUrl, toDate, records: [{ branch, date, amount }] }`. Opsional berkas padanan nama menggunakan nama cabang huruf kecil tanpa spasi sebagai kunci dan ID outlet KMZ sebagai nilai. Jangan menebak padanan nama. Masukan dan XLSX ESB tidak boleh masuk repository publik.
+
+Jalankan `node integration/analyse-branches.mjs PATH_JSON_PRIVAT [PATH_ALIAS_JSON]`, lalu `node --test integration/analyse-branches.test.mjs`. Kategori memerlukan sedikitnya 90% hari tercatat; hari hilang tidak dianggap nol. Pembanding kegiatan minimal dua hari sejenis untuk setiap tanggal kegiatan. Empat pengujian mencakup data hilang/nol, beberapa hari kegiatan, nama tak dikenal/duplikasi dan keluaran tanpa nominal.
+
+Trafik lama 2016–2024 tetap terpisah; belum ada pasangan trafik dengan omzet pada tanggal yang sama. Arsip privat masih lokal, belum tersinkron otomatis ke Firebase. Jadwal penarikan belum diatur.
