@@ -4,7 +4,15 @@ on:
     inputs:
       sales_date:
         description: Tanggal penjualan (YYYY-MM-DD)
-        required: true
+        required: false
+        type: string
+      date_from:
+        description: Awal penarikan historis (opsional, YYYY-MM-DD)
+        required: false
+        type: string
+      date_to:
+        description: Akhir penarikan historis (opsional, maksimal 93 hari)
+        required: false
         type: string
 permissions:
   contents: read
@@ -14,7 +22,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,9 +31,20 @@ jobs:
       - name: Ambil dan simpan laporan
         env:
           SALES_DATE: ${{ inputs.sales_date }}
+          DATE_FROM: ${{ inputs.date_from }}
+          DATE_TO: ${{ inputs.date_to }}
           ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
           ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
           FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
           FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
           FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
-        run: node integration/esb-sync.mjs "$SALES_DATE"
+        run: |
+          if [ -n "$DATE_FROM" ] || [ -n "$DATE_TO" ]; then
+            if [ -n "$SALES_DATE" ]; then
+              echo "Isi satu tanggal atau rentang historis, jangan keduanya."
+              exit 1
+            fi
+            node integration/esb-backfill.mjs "$DATE_FROM" "$DATE_TO"
+          else
+            node integration/esb-sync.mjs "$SALES_DATE"
+          fi
