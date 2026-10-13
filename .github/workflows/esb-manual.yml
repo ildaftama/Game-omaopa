@@ -1,0 +1,31 @@
+name: Tarik laporan ESB manual
+on:
+  workflow_dispatch:
+    inputs:
+      sales_date:
+        description: Tanggal penjualan (YYYY-MM-DD)
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: esb-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ambil dan simpan laporan
+        env:
+          SALES_DATE: ${{ inputs.sales_date }}
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+          FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
+          FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: node integration/esb-sync.mjs "$SALES_DATE"
