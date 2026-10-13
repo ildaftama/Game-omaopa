@@ -59,9 +59,9 @@ Laporan privat berada di `radarSalesDays/YYYY-MM-DD`. Angka asli tidak disalin k
 ## Batas tahap ini
 
 - Jadwal otomatis belum ditambahkan.
-- Aturan Firebase dan izin baca admin sudah aktif. GitHub Secrets belum diisi dan paket perubahan belum diunggah ke repository.
+- Aturan Firebase dan izin baca admin sudah aktif. Berkas Forecast, kode integrasi, dan workflow manual sudah diunggah ke repository melalui Chrome. GitHub Secrets belum diisi.
 - API ESB mengembalikan 28 outlet pada tanggal uji; peta KMZ berisi 30 lokasi milik perusahaan. Selisih perlu dicocokkan berdasarkan kode outlet, status operasional, dan tanggal; tidak diasumsikan nol atau otomatis digabung berdasarkan kemiripan nama.
 - Belum ada korelasi event/traffic maupun estimasi forecast. Riwayat pembayaran yang sudah tervalidasi menjadi dasar tahap berikutnya.
-- Kode penyimpanan diuji dengan simulasi berhasil, respons kosong, data salah, dan kegagalan layanan. Penarikan end-to-end berikutnya memerlukan unggahan paket serta pengisian GitHub Secrets oleh pemilik.
+- Kode penyimpanan diuji dengan simulasi berhasil, respons kosong, data salah, dan kegagalan layanan. Penarikan end-to-end berikutnya memerlukan pengisian GitHub Secrets oleh pemilik. Halaman terbit sudah diuji: login website terbaca dan akses Firestore berhasil membaca status laporan yang belum tersedia.
 
 Sumber teknis: [ESB API](https://developers.esb.co.id/esb-core/), [aturan Firestore](https://firebase.google.com/docs/firestore/security/rules-conditions), [GitHub Secrets](https://docs.github.com/en/actions/concepts/security/secrets).
