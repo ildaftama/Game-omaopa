@@ -48,6 +48,8 @@ Pada uji API 12 Oktober 2026 terdapat 28 outlet, sedangkan KMZ memiliki 30 lokas
 
 ## Pembaruan ringkasan
 
+Cuplikan awal jalan telah disimpan lokal pada 13 Oktober 2026: 8 titik kecepatan Surakarta dan 37 ruas pencacahan mobil/motor Semarang. Waktu pengukuran sumber tidak tersedia dan titik belum dipetakan ke radius outlet. Data ini disimpan terpisah dari arsip historis outlet, tidak dipakai untuk analisa Juli–12 Oktober. Halaman publik menampilkan cuplikan bertanggal, bukan koneksi langsung. Arsip tanggal terdahulu belum ditemukan pada kedua tampilan publik. Sumber: [Dishub Surakarta](https://ccroom-dishub.surakarta.go.id/index.php/info-lalin), [SITIS Semarang](https://www.dashboard.dishub.semarangkota.go.id/ivss_dashboard.php).
+
 analyse-history.mjs membaca data privat dan historical-events.json, kemudian menghasilkan analysis-data.js tanpa nominal. Format sumber yang saat ini didukung adalah netSales dengan cakupan all-outlets-ledger. Data per outlet memerlukan pencocokan dan perhitungan terpisah sebelum dipublikasikan. Perubahan sumber harus diperiksa sebelum ringkasan baru diunggah melalui Chrome.
 
 Uji kode: enam pengujian mencakup kalender, penarikan dan penyimpanan, laporan kosong, pengulangan tanggal, kegagalan sebagian, pembanding hari sejenis, data hilang dan tidak keluarnya nominal ke ringkasan publik. Uji ini memakai data buatan. Penarikan ESB/Firebase langsung melalui GitHub masih menunggu pengisian Secrets.
