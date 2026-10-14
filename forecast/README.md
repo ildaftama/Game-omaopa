@@ -34,6 +34,8 @@ UI berwarna navy/putih, ringkasan Kesimpulan di atas, rincian perbandingan dan s
 
 Halaman kini dibuka pada satu outlet dan mengingat pilihan terakhir di perangkat. Ringkasan menunjukkan kekuatan outlet, penggerak penjualan, calon penguat laba, hubungan kegiatan, dan dua fokus kerja. Tab Produk, Kegiatan & omzet, SWOT, dan Sekitar outlet menampilkan rincian secara terpisah. Tidak ada tabel seluruh outlet pada tampilan awal.
 
-Profil dan SWOT mencakup 28 outlet. Produk memakai September 2026 dari sumber perhitungan PERFORMA OUTLET. Peringkat penjualan memakai rupiah, bukan jumlah box; cakupan hanya produk utama tercatat. Peringkat laba sementara dihitung penjualan dikurangi HPP dan waste tercatat, belum biaya operasional. Tanggal tanpa baris waste belum diasumsikan nihil. Nominal produk dan catatan mentah tetap di arsip privat.
+Profil dan SWOT mencakup 28 outlet. Produk memakai September 2026 dari sumber perhitungan PERFORMA OUTLET. Peringkat penjualan memakai rupiah, bukan jumlah box; cakupan hanya produk utama tercatat. peringkat laba dihitung penjualan dikurangi HPP dan waste tercatat, belum biaya operasional. Pemilik mengonfirmasi tanggal kosong setelah H+3 berarti waste nol. Nominal produk dan catatan mentah tetap di arsip privat.
 
 Rumus sumber untuk Cisfon Classic Keju tidak cocok dengan judul kolom waste. Pengolah memakai kolom produk yang benar; audit Gajah Raya cocok pada sembilan produk lain. Selisih itu tidak mengubah produk peringkat pertama Gajah Raya. Spreadsheet asli tidak diubah.
+
+Aturan waste dikonfirmasi pemilik 14 Oktober 2026: kosong setelah H+3 = nol. `waste-policy.test.mjs` memeriksa batas H+2/H+3 serta nilai aktual nol dan non-nol.
