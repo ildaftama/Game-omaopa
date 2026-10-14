@@ -131,5 +131,6 @@
   ['#date-from','#date-to','#category-filter','#event-outlet'].forEach(s=>$(s).addEventListener('change',renderEvents));
   all('[data-close]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog').close()));
   $('#sources-open').addEventListener('click',()=>$('#source-dialog').showModal());
+  window.ForecastNavigation={selectOutlet,setView,relevant,relation};
   renderOutlets();renderDetail();renderEvents();renderTourism();renderSources();initMap();
 })();

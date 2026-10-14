@@ -29,3 +29,11 @@ Pembaruan 14 Oktober 2026: 14 kegiatan historis, termasuk wisuda UPN Juli/Septem
 Pembanding sekarang hanya mengecualikan kegiatan yang terkait outlet yang dianalisis. Karena itu persentase diperbarui dari versi 13 Oktober. Kesimpulan pola berulang memerlukan setidaknya 3 kegiatan sejenis, seluruh perubahan positif, tetap positif dengan median pembanding, dan tanpa agenda bersamaan yang tercatat. Ini aturan penyaringan deskriptif, bukan uji kausal atau prediksi stok.
 
 UI berwarna navy/putih, ringkasan Kesimpulan di atas, rincian perbandingan dan sumber dalam bagian yang dapat dibuka. Wisuda AMIKOM 24 Oktober ditambahkan pada agenda Nusa Indah; data omzet berakhir 12 Oktober sehingga kegiatan mendatang belum dianalisis.
+
+## Panduan per outlet — 14 Oktober 2026
+
+Halaman kini dibuka pada satu outlet dan mengingat pilihan terakhir di perangkat. Ringkasan menunjukkan kekuatan outlet, penggerak penjualan, calon penguat laba, hubungan kegiatan, dan dua fokus kerja. Tab Produk, Kegiatan & omzet, SWOT, dan Sekitar outlet menampilkan rincian secara terpisah. Tidak ada tabel seluruh outlet pada tampilan awal.
+
+Profil dan SWOT mencakup 28 outlet. Produk memakai September 2026 dari sumber perhitungan PERFORMA OUTLET. Peringkat penjualan memakai rupiah, bukan jumlah box; cakupan hanya produk utama tercatat. Peringkat laba sementara dihitung penjualan dikurangi HPP dan waste tercatat, belum biaya operasional. Tanggal tanpa baris waste belum diasumsikan nihil. Nominal produk dan catatan mentah tetap di arsip privat.
+
+Rumus sumber untuk Cisfon Classic Keju tidak cocok dengan judul kolom waste. Pengolah memakai kolom produk yang benar; audit Gajah Raya cocok pada sembilan produk lain. Selisih itu tidak mengubah produk peringkat pertama Gajah Raya. Spreadsheet asli tidak diubah.
