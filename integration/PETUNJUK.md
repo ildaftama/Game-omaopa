@@ -73,3 +73,13 @@ Trafik lama 2016–2024 tetap terpisah; belum ada pasangan trafik dengan omzet p
 `medianBaselineChange` menguji perubahan dengan median pembanding. `patterns` hanya menyebut pola berulang bila minimal tiga acara sejenis semuanya positif pada kedua pembanding dan tidak bertabrakan dengan agenda terkait lain yang tercatat. Median perubahan acara menjadi angka ringkasan; tidak menyatakan efek kausal atau rekomendasi kenaikan stok sebesar persentase itu. Periksa promo, libur dan stok sebelum penggunaan operasional.
 
 Alias Jebres/UNS dan Magelang/Pemuda, Magelang dikonfirmasi pemilik. Kaitan Nusa Indah/UII/UPN/AMIKOM dikonfirmasi pemilik; lokasi acara dicantumkan terpisah. Jalankan `node --test integration/analyse-branches.test.mjs` sebelum penerbitan. Data mentah dan arsip harian tidak boleh masuk repository publik.
+
+## Profil dan produk per outlet
+
+`node integration/import-outlet-intelligence.mjs SOURCE_JSON WASTE_JSON [PRIVATE_AUDIT_JSON]`
+
+Masukan adalah arsip privat pembacaan Google Sheets yang memuat tab profil/SWOT/tindakan, performa bulanan, COGS September dan harga waste, serta data WASTE September terpisah. Skrip menghasilkan `forecast/outlet-intelligence-data.js` berisi ringkasan dan peringkat tanpa nominal. Jika diminta, audit nominal hanya ditulis ke path privat yang diberikan. Jangan memasukkan masukan atau audit ke repository publik.
+
+Peringkat penjualan berdasarkan nilai, bukan volume. PnL produk = penjualan − HPP − waste tercatat; belum laba bersih outlet. Hari tanpa baris waste tidak cukup untuk membuktikan waste nol, sehingga label sementara tetap dipakai. Kolom waste dikenali per produk secara tepat; Classic Keju tidak menggunakan kecocokan teks 'classic keju' yang tidak ada pada judul kolom sumber. Sembilan hasil lain Gajah Raya cocok dengan dashboard; perbedaan Classic Keju tercatat di audit lokal. File sumber tidak diedit.
+
+SWOT adalah observasi kualitatif dengan tanggal yang tidak tersedia; jangan menyamakan dengan demografi penduduk atau bukti sebab-akibat omzet. Angka dan produk pada ringkasan mengikuti outlet terpilih.
