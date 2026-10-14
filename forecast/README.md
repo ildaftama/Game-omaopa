@@ -23,3 +23,9 @@ Nama/geometri jalan © OpenStreetMap contributors, ODbL. Tautan sumber survei ad
 Tampilan dibuka pada Analisa: kategori omzet, indeks, perbandingan kegiatan per outlet dan acuan trafik. Data trafik lama tetap terpisah dari penjualan 2026. Kategori berdasarkan kuartil rata-rata omzet harian dengan kelengkapan minimal 90%; bukan ukuran jumlah pelanggan. Semua nominal harian tetap privat.
 
 Pengolahan ulang: `node integration/analyse-branches.mjs PATH_JSON_PRIVAT [PATH_ALIAS_JSON]`. Jangan simpan masukan privat atau XLSX ESB dalam repository. Jalankan `node --test integration/analyse-branches.test.mjs` sebelum menerbitkan ringkasan.
+
+Pembaruan 14 Oktober 2026: 14 kegiatan historis, termasuk wisuda UPN Juli/September, wisuda UII Agustus untuk Nusa Indah, dan AMIKOM Career Days Juli. Hubungan Nusa Indah dengan UII, UPN dan AMIKOM berasal dari konfirmasi pemilik; tidak disamakan dengan lokasi venue atau bukti pelanggan datang dari kampus.
+
+Pembanding sekarang hanya mengecualikan kegiatan yang terkait outlet yang dianalisis. Karena itu persentase diperbarui dari versi 13 Oktober. Kesimpulan pola berulang memerlukan setidaknya 3 kegiatan sejenis, seluruh perubahan positif, tetap positif dengan median pembanding, dan tanpa agenda bersamaan yang tercatat. Ini aturan penyaringan deskriptif, bukan uji kausal atau prediksi stok.
+
+UI berwarna navy/putih, ringkasan Kesimpulan di atas, rincian perbandingan dan sumber dalam bagian yang dapat dibuka. Wisuda AMIKOM 24 Oktober ditambahkan pada agenda Nusa Indah; data omzet berakhir 12 Oktober sehingga kegiatan mendatang belum dianalisis.
