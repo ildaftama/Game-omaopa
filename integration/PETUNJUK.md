@@ -65,3 +65,11 @@ Laporan ESB Daily Sales Summary By Branch sudah diekspor lewat Chrome untuk 15 J
 Jalankan `node integration/analyse-branches.mjs PATH_JSON_PRIVAT [PATH_ALIAS_JSON]`, lalu `node --test integration/analyse-branches.test.mjs`. Kategori memerlukan sedikitnya 90% hari tercatat; hari hilang tidak dianggap nol. Pembanding kegiatan minimal dua hari sejenis untuk setiap tanggal kegiatan. Empat pengujian mencakup data hilang/nol, beberapa hari kegiatan, nama tak dikenal/duplikasi dan keluaran tanpa nominal.
 
 Trafik lama 2016–2024 tetap terpisah; belum ada pasangan trafik dengan omzet pada tanggal yang sama. Arsip privat masih lokal, belum tersinkron otomatis ke Firebase. Jadwal penarikan belum diatur.
+
+## Pembaruan metode 14 Oktober 2026
+
+`analyse-branches.mjs` schema 3 mengecualikan tanggal agenda per outlet, bukan seluruh agenda di kota lain. Riwayat UII 27–28 Juni dikeluarkan hanya dari pembanding Jakal UII dan Nusa Indah. Setiap hari acara membutuhkan minimal dua hari sejenis dari empat minggu sebelumnya, lalu perubahan acara beberapa hari dihitung terhadap jumlah nilai harapan harian.
+
+`medianBaselineChange` menguji perubahan dengan median pembanding. `patterns` hanya menyebut pola berulang bila minimal tiga acara sejenis semuanya positif pada kedua pembanding dan tidak bertabrakan dengan agenda terkait lain yang tercatat. Median perubahan acara menjadi angka ringkasan; tidak menyatakan efek kausal atau rekomendasi kenaikan stok sebesar persentase itu. Periksa promo, libur dan stok sebelum penggunaan operasional.
+
+Alias Jebres/UNS dan Magelang/Pemuda, Magelang dikonfirmasi pemilik. Kaitan Nusa Indah/UII/UPN/AMIKOM dikonfirmasi pemilik; lokasi acara dicantumkan terpisah. Jalankan `node --test integration/analyse-branches.test.mjs` sebelum penerbitan. Data mentah dan arsip harian tidak boleh masuk repository publik.
