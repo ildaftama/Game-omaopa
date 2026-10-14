@@ -80,6 +80,8 @@ Alias Jebres/UNS dan Magelang/Pemuda, Magelang dikonfirmasi pemilik. Kaitan Nusa
 
 Masukan adalah arsip privat pembacaan Google Sheets yang memuat tab profil/SWOT/tindakan, performa bulanan, COGS September dan harga waste, serta data WASTE September terpisah. Skrip menghasilkan `forecast/outlet-intelligence-data.js` berisi ringkasan dan peringkat tanpa nominal. Jika diminta, audit nominal hanya ditulis ke path privat yang diberikan. Jangan memasukkan masukan atau audit ke repository publik.
 
-Peringkat penjualan berdasarkan nilai, bukan volume. PnL produk = penjualan − HPP − waste tercatat; belum laba bersih outlet. Hari tanpa baris waste tidak cukup untuk membuktikan waste nol, sehingga label sementara tetap dipakai. Kolom waste dikenali per produk secara tepat; Classic Keju tidak menggunakan kecocokan teks 'classic keju' yang tidak ada pada judul kolom sumber. Sembilan hasil lain Gajah Raya cocok dengan dashboard; perbedaan Classic Keju tercatat di audit lokal. File sumber tidak diedit.
+Peringkat penjualan berdasarkan nilai, bukan volume. PnL produk = penjualan − HPP − waste tercatat; belum laba bersih outlet. Aturan pemilik: tanggal kosong setelah H+3 berarti waste nol; tanggal yang belum H+3 tetap belum lengkap. September sudah lengkap menurut aturan ini. Kolom waste dikenali per produk secara tepat; Classic Keju tidak menggunakan kecocokan teks 'classic keju' yang tidak ada pada judul kolom sumber. Sembilan hasil lain Gajah Raya cocok dengan dashboard; perbedaan Classic Keju tercatat di audit lokal. File sumber tidak diedit.
 
 SWOT adalah observasi kualitatif dengan tanggal yang tidak tersedia; jangan menyamakan dengan demografi penduduk atau bukti sebab-akibat omzet. Angka dan produk pada ringkasan mengikuti outlet terpilih.
+
+Aturan waste dikonfirmasi pemilik 14 Oktober 2026: kosong setelah H+3 = nol. `waste-policy.test.mjs` memeriksa batas H+2/H+3 serta nilai aktual nol dan non-nol.
