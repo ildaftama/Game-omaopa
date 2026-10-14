@@ -40,7 +40,7 @@
     const n=inRadius(e,o),d=distance(e,o);
     if(n>0)return `Lokasi dalam area ${n} · ±${nf.format(n*400)} m`;
     if(d!==null)return `Di luar area 1.200 m · ${d.toLocaleString('id-ID',{maximumFractionDigits:1})} km garis lurus`;
-    return e.outletHint?'Terkait kampus · jarak venue belum tersedia':e.local?'Informasi tim outlet · jarak belum tersedia':'Agenda wilayah';
+    return (e.outletHint||e.outletHints?.length)?'Terkait kampus · jarak venue belum tersedia':e.local?'Informasi tim outlet · jarak belum tersedia':'Agenda wilayah';
   }
   function renderOutlets(){
     const q=$('#outlet-search').value.toLocaleLowerCase('id'),region=$('#region-filter').value;
@@ -98,7 +98,7 @@
     $('#agenda-count').textContent=events().length;
     if(from&&to&&from>to){$('#agenda-summary').textContent='Tanggal akhir harus sama atau setelah tanggal awal.';$('#event-list').replaceChildren();return;}
     const filtered=events().filter(e=>(!from||e.end>=from)&&(!to||e.start<=to)&&(!cat||(cat==='Event'?!['Akademik','Lokal','Hari jadi'].includes(e.category):e.category===cat))&&(!outlet||relevant(e,outlet)));
-    $('#agenda-summary').textContent=`${filtered.length} kegiatan${outlet?' terkait '+outlet.name:''} · sumber diperiksa 13 Oktober 2026`;
+    $('#agenda-summary').textContent=`${filtered.length} kegiatan${outlet?' terkait '+outlet.name:''} · kalender diperbarui ${date(insights.updatedAt)}`;
     $('#event-list').innerHTML=filtered.length?filtered.map(e=>{
       const candidates=outlets.filter(o=>relevant(e,o));
       const nearby=outlets.filter(o=>inRadius(e,o)>0);
