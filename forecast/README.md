@@ -43,3 +43,10 @@ Aturan waste dikonfirmasi pemilik 14 Oktober 2026: kosong setelah H+3 = nol. `wa
 ## Forecast per produk — 16 Oktober 2026
 
 Tab Forecast menyediakan dasar penjualan harian dalam satuan sumber, hasil uji metode, evaluasi prediksi sebelumnya, dan kelengkapan data. Stok 28 outlet/13 produk sampai 13 Oktober; rekap sampai 15 Oktober. Data merupakan snapshot, bukan live. Baseline belum merupakan perintah produksi/kiriman. Sumber privat tidak disertakan; hanya ringkasan serta estimasi turunan yang diterbitkan.
+## Ringkasan harian semua outlet (16 Oktober 2026)
+
+Pilih **Semua outlet** pada pemilih outlet dan **Semua produk** di Forecast. Ringkasan menampilkan estimasi omzet tercakup, jumlah dalam pcs/boks terpisah, dan rincian produk yang dapat dibuka per outlet. Produk tanpa pembanding yang cukup tidak dianggap nol. Cisfon Kurma dikeluarkan sesuai arahan pemilik.
+
+Harga Malmil/Ogura harus dihasilkan oleh `integration/lk-esb-prices.mjs`: omzet kelompok di LK September dibagi jumlah pcs kelompok dari API ESB pada outlet dan 30 tanggal September yang sama. Jangan memakai omzet ESB, harga polos, atau omzet COGS untuk menggantikan omzet LK. Cheese/Chocolate memakai rata-rata kelompok karena LK tidak memisahkan rasa. Mini memakai Rp57.000/9 pcs; Cisfon lain memakai harga rekap. Token, kredensial, transaksi dan nilai LK tetap di arsip privat, tidak dimasukkan repository.
+
+Forecast kuantitas masih berasal dari laporan stok harian terverifikasi sampai 13 Oktober. Ringkasan omzet belum diuji balik dalam rupiah, belum menyesuaikan perubahan topping, dan bukan instruksi kiriman otomatis. Jadwal penarikan belum diaktifkan.
