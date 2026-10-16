@@ -1,5 +1,13 @@
 # Forecast Oma Opa
 
+## Uji omzet dan kegiatan — 16 Oktober 2026
+
+`revenue-validation.mjs` menguji sembilan metode pada Net Sales Total ESB. Pemilihan metode memakai 1–14 September; pemeriksaan memakai 15 September–12 Oktober. Prediksi numerik hanya menggunakan tanggal sebelumnya. Metode terpilih per outlet adalah campuran 50% median weekday/50% rata-rata tujuh hari: WAPE 22,27%, dibanding median 22,96% pada 783 pasangan. Metode total jaringan dipilih terpisah: median weekday, WAPE 7,38% pada 27 hari lengkap. Jangan memilih weighted weekday 6,53% dari hasil pemeriksaan lalu menyebutnya pemenang uji buta; metode itu belum terpilih sebelum periode pemeriksaan.
+
+Ini simulasi retrospektif, bukan uji prospektif baru. Satu tanggal-outlet tidak tersedia sehingga total jaringan tanggal itu tidak dihitung. Hasil 1–3% belum tercapai secara konsisten. Kalender yang dikumpulkan belakangan hanya diuji sebagai eksplorasi; waktu publikasi sebelum target belum dibuktikan untuk semua sumber. Pengali acara memakai outlet/keluarga yang sama dan minimal dua kejadian sebelumnya, diperkecil dan dibatasi 30%; belum diterapkan pada stok. Wisuda UNNES memperkecil kekurangan prediksi dari 59,8% menjadi 47,7% pada satu acara uji dan masih jauh dari memadai. Tidak menyatakan dampak kausal.
+
+Ringkasan publik `revenue-validation-data.js` hanya berisi persentase, jumlah hari uji, dan tanggal/kegiatan; tidak ada nominal atau pasangan uji mentah. `revenue-validation.js` menampilkan hasil dalam bagian tertutup. Pengingat kegiatan kini muncul juga pada pilihan semua produk/semua outlet. Prediksi jumlah produk, harga dan prediksi terkunci 4 Oktober tetap sama. Uji numerik mencakup larangan data masa depan, pemilihan metode sebelum holdout, kelengkapan jaringan, nol dan pemetaan kegiatan ke outlet.
+
 ## Jadwal harian aktif — 16 Oktober 2026
 
 Workflow Pembaruan ESB harian dijadwalkan pukul 00.00 WIB setiap hari (cron 17.00 UTC). esb-daily.mjs menghitung hari sebelumnya dalam Asia/Jakarta, termasuk pergantian bulan dan tahun. Run workflow tanpa tanggal menguji jalur harian yang sama; tanggal atau rentang eksplisit tetap tersedia. Antrean GitHub dapat menunda waktu mulai, dan workflow publik dinonaktifkan GitHub setelah 60 hari tanpa aktivitas repository. Periksa Actions bila data tidak bertambah.

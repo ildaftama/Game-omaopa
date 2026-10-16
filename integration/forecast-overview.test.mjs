@@ -24,3 +24,10 @@ test('high error and sparse validation remain visible and do not silently remove
  assert.match(m.rows[0].products[0].review,/Selisih besar/);assert.match(m.rows[0].products[1].review,/Hari uji/);assert.equal(m.rows[0].products[2].review,null);
  const past=summarize(data,['a'],'__all__','2026-10-17','2026-10-18',{outlets:{}});assert.equal(past.reviewCount,0);
 });
+test('target-date events appear for the matching outlet in the all-product plan',()=>{
+ ctx.window.INSIGHT_DATA={events:[{title:'Graduation A',start:'2026-10-17',end:'2026-10-17',outletHint:'A',source:'https://example.org/a'},{title:'Other outlet',start:'2026-10-17',end:'2026-10-17',outletHint:'B'},{title:'Future A',start:'2026-10-24',end:'2026-10-24',outletHint:'A'}]};
+ const data={outlets:{a:{name:'A',products:[product('Mini Ogura - Cheese',9)]}}},m=summarize(data,['a'],'__all__','2026-10-17','2026-10-16',{outlets:{}});
+ assert.equal(m.rows[0].events.length,1);assert.equal(m.rows[0].events[0].title,'Graduation A');assert.equal(m.revenue,57000);
+ assert.match(ctx.window.ForecastOverview.render(m,false),/Graduation A/);assert.match(ctx.window.ForecastOverview.render(m,true),/ada kegiatan/);
+ delete ctx.window.INSIGHT_DATA;
+});
