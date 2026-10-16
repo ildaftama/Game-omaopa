@@ -1,11 +1,17 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {validDate,normalize,run} from './esb-sync.mjs';
+import {validDate,normalize,run,firebaseFailure} from './esb-sync.mjs';
 test('calendar validation and aggregate preserves zero and negative adjustments',()=>{
   assert.equal(validDate('2026-02-30'),false);assert.equal(validDate('2026-13-01'),false);assert.equal(validDate('2026-10-12'),true);
   assert.deepEqual(normalize([{branchCode:'A',branchName:'Outlet A',salesDate:'2026-10-12',payments:[{paymentAmount:100,paymentCount:2},{paymentAmount:-10,paymentCount:1}]}],'2026-10-12'),[{branchCode:'A',outlet:'Outlet A',totalPayment:90,paymentCount:3}]);
   assert.throws(()=>normalize([{branchCode:'A',branchName:'A',salesDate:'2026-10-11',payments:[]}],'2026-10-12'));
   assert.throws(()=>normalize([{branchCode:'A',branchName:'A',salesDate:'2026-10-12',payments:[{paymentAmount:'bad',paymentCount:1}]}],'2026-10-12'));
+});
+test('Firebase login is tested first, once; failures stop before ESB reads or database writes',async()=>{
+ const original=global.fetch,calls=[],env={ESB_USERNAME:'u',ESB_PASSWORD:'secret-esb',FIREBASE_SYNC_EMAIL:'a@example.test',FIREBASE_SYNC_PASSWORD:'secret-firebase',FIREBASE_WEB_API_KEY:'key'};
+ global.fetch=async(url)=>{calls.push(url);return{ok:false,status:400,json:async()=>({error:{message:'INVALID_LOGIN_CREDENTIALS'}})};};
+ try{await assert.rejects(run('2026-10-15',env),/Email atau kata sandi/);assert.equal(calls.length,1);assert.ok(calls[0].includes('identitytoolkit'));}finally{global.fetch=original;}
+ assert.ok(!firebaseFailure(400,{error:{message:'secret-firebase'}}).includes('secret-firebase'));assert.match(firebaseFailure(400,{error:{message:'EMAIL_NOT_FOUND'}}),/belum ditemukan/);
 });
 test('complete sync writes only normalized data to deterministic date document; empty response preserves old data',async()=>{
   const original=global.fetch, calls=[];
