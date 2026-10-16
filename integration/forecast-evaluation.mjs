@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {pathToFileURL} from 'node:url';
 import {wastePeriodComplete} from './waste-policy.mjs';
+import {evaluateSeries,aggregateValidation} from './demand-validation.mjs';
 const DAY=86400000;
 const norm=s=>String(s??'').trim().toLowerCase().replace(/\s/g,'');
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
@@ -97,7 +98,7 @@ export function parseProducts(sources,aliases){
 export function buildEvaluation(tracking,stock,profiles,asOf='2026-10-16'){
  const aliases=Object.fromEntries(Object.entries(profiles.outlets).map(([id,o])=>[norm(o.name),id]));
  Object.assign(aliases,{jakal:'jakal-uii',gajah:'gajah-raya',magelang:'pemuda-magelang',muntilan:'muntilann',jebres:'uns',makamhaji:'makamhaji'});
- const t=parseTracking(tracking,aliases,asOf),q=parseProducts(stock,aliases),outlets={};
+ const t=parseTracking(tracking,aliases,asOf),q=parseProducts(stock,aliases),outlets={},validationGroups=[];
  const months=[['2026-08','Agustus 2026',31],['2026-09','September 2026',30],['2026-10','1–15 Oktober 2026',15]];
  for(const [id,profile]of Object.entries(profiles.outlets).filter(([,o])=>o.hasProfile)){
   const rows=t.rows.filter(r=>r.id===id),issues=t.issues.filter(r=>r.id===id),products=q.series.filter(r=>r.id===id),productIssues=q.issues.filter(r=>r.id===id);
@@ -111,11 +112,14 @@ export function buildEvaluation(tracking,stock,profiles,asOf='2026-10-16'){
    const rs=products.filter(r=>r.product===name),bad=productIssues.filter(r=>r.product===name),avg=rs.length?sum(rs.map(r=>r.quantity))/rs.length:0;
    const weekdays=[1,2,3,4,5,6,0].map(day=>{const pool=rs.filter(r=>dayOf(r.date)===day);return{day,days:pool.length,index:pool.length>=3&&avg>0?round(100*sum(pool.map(r=>r.quantity))/pool.length/avg):null};});
    if(new Set(rs.map(r=>r.unit)).size>1)throw Error('Product unit changed');
-   return{name,unit:rs[0]?.unit??null,through:rs.map(r=>r.date).sort().at(-1)??null,days:rs.length,activeDays:rs.filter(r=>r.quantity>0).length,excludedDays:bad.length,zeroClosingDays:rs.filter(r=>r.zeroClosing).length,weekdays,backtest:backtest(rs),plans:Array.from({length:7},(_,i)=>baseline(rs,shift(asOf,i+1))),issues:bad};
+   const checked=evaluateSeries(rs);
+   if(name!=='Cisfon - Kurma')validationGroups.push({id,name,unit:rs[0]?.unit??null,validation:checked});
+   const validation={days:checked.days,from:checked.pairs[0]?.date??null,to:checked.pairs.at(-1)?.date??null,medianWape:round(checked.median.wape),previousWape:round(checked.previous.wape),bias:round(checked.median.bias),minimumSamples:3};
+   return{name,unit:rs[0]?.unit??null,through:rs.map(r=>r.date).sort().at(-1)??null,days:rs.length,activeDays:rs.filter(r=>r.quantity>0).length,excludedDays:bad.length,zeroClosingDays:rs.filter(r=>r.zeroClosing).length,weekdays,backtest:backtest(rs),validation,plans:Array.from({length:7},(_,i)=>baseline(rs,shift(asOf,i+1))),issues:bad};
   });
   outlets[id]={name:profile.name,periods,products:byProduct,stockThrough:products.map(r=>r.date).sort().at(-1)??null,trackingThrough:'2026-10-15',status:'trial-baseline'};
  }
- return {public:{schemaVersion:1,updatedAt:asOf,scope:'Rekap Malmil & Ogura; stok harian 13 jenis produk utama',stockMetric:'Penjualan bersih dalam satuan produk',stockMetricConfirmed:true,stockMetricConfirmedAt:'2026-10-16',operationalForecastReady:false,outlets},private:{tracking:t,stock:q}};
+ return {public:{schemaVersion:2,updatedAt:asOf,scope:'Rekap Malmil & Ogura; stok harian 13 jenis produk utama',stockMetric:'Penjualan bersih dalam satuan produk',stockMetricConfirmed:true,stockMetricConfirmedAt:'2026-10-16',operationalForecastReady:false,validationSummary:aggregateValidation(validationGroups),outlets},private:{tracking:t,stock:q,validation:validationGroups}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const [trackingFile,stockFile,privateOutput]=process.argv.slice(2);if(!trackingFile||!stockFile||!privateOutput)throw Error('Required: tracking JSON, stock JSON, private audit path');

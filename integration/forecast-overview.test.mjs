@@ -12,3 +12,8 @@ test('unknown price and missing/stale forecast are excluded, observed zero remai
  const m=summarize(data,['a'],'__all__','2026-10-17','2026-10-16',{outlets:{}});assert.equal(m.expected,4);assert.equal(m.ready,2);assert.equal(m.priced,1);assert.equal(m.revenue,0);assert.equal(m.complete,false);
  const past=summarize(data,['a'],'__all__','2026-10-17','2026-10-18',{outlets:{}});assert.equal(past.revenue,null);assert.equal(past.ready,0);
 });
+test('a zero median with positive historical sales is not presented as a stock-zero recommendation',()=>{
+ const p={...product('Mini Ogura - Cheese',0),activeDays:8,validation:{days:10,medianWape:120}};
+ const data={outlets:{a:{name:'A',products:[p]}}},m=summarize(data,['a'],'__all__','2026-10-17','2026-10-16',{outlets:{}});
+ assert.equal(m.rows[0].products[0].quantity,0);assert.match(m.rows[0].products[0].review,/bukan saran stok nol/);assert.equal(m.rows[0].products[0].validation.days,10);
+});

@@ -1,5 +1,17 @@
 # Forecast Oma Opa
 
+## Validasi, pesanan, dan waste ESB — 16 Oktober 2026
+
+`demand-validation.mjs` menguji median tiga/empat weekday sebelumnya, minggu sebelumnya, dan pemilihan metode dari hasil sebelum target. Minimum tiga pembanding sama dengan metode rencana; median dibulatkan seperti rencana. Metode adaptif tidak diterapkan karena hasil keseluruhan lebih buruk. WAPE pcs/boks dihitung terpisah; bukan persentase akurasi, uji omzet rupiah atau jaminan permintaan. Output publik hanya ringkasan, tanpa baris uji mentah.
+
+Pemilik mengonfirmasi pesanan bertanggal pengambilan, sudah termasuk LK, Mini per pcs, dan sebagian langsung melalui pabrik. Rekap CS gabungan tidak dikurangkan dari 28 outlet tanpa pembagian sumber/outlet. `orders-policy.mjs` menahan pengurangan bila cakupan/kelengkapan belum cocok, menolak duplikat, memisahkan pabrik, dan tidak memakai konfirmasi setelah cutoff. Prediksi uji 4 Oktober tetap dikunci.
+
+`esb-waste-audit.mjs JOURNAL_ROWS_JSON LK_JSON PRIVATE_AUDIT_JSON` menghasilkan `forecast/waste-esb-summary-data.js`. September diperiksa pada 28 outlet: 1.886 baris Product/Cake/Pcs/Authorized dengan Purpose Waste Cake; sembilan baris kategori lain dipisahkan. Persentase = HPP waste / Net Sales LK outlet dan bulan yang sama. Periode tanggal jurnal berbeda dari tanggal produksi. Sampel dalam Waste Cake tetap mengikuti sumber. Nominal, HPP dan catatan jurnal tetap privat. Peringkat laba produk masih memakai rekap September sampai pencocokan per produk selesai.
+
+`esb-client.mjs` menyimpan token dalam memori, login dari pengaturan rahasia, memperbarui token sekali setelah 401, membatasi percobaan gangguan sementara, dan memeriksa kelengkapan halaman. `esb-sync.mjs` memakai klien ini. Uji data buatan lulus; koneksi akun produksi dengan GitHub Secrets belum diverifikasi. Sesi login web berbeda dari token API. Jangan simpan kredensial dalam kode atau log. Workflow tetap manual, tanpa jadwal baru. `sales-payment-summary` tetap metrik pembayaran, bukan Net Sales atau jumlah kue.
+
+Jalankan `node --test integration/*.test.mjs`. Sumber dan rekonsiliasi mentah tetap privat.
+
 Halaman publik: https://omaopa.fun/forecast/
 
 Peta, penduduk, kegiatan, wisata, lalu lintas dan tab Analisa terbuka tanpa login. Form penambahan kegiatan, estimasi wisata, pengamatan lalu lintas, impor dan ekspor manual sudah dihapus. Halaman admin dan login website utama tidak diubah.

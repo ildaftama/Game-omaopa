@@ -1,4 +1,5 @@
 import { pathToFileURL } from 'node:url';
+import {createEsbClient} from './esb-client.mjs';
 const PROJECT = 'oma-opa-game';
 export function validDate(s) {
   const d = new Date(s + 'T00:00:00Z');
@@ -34,11 +35,9 @@ async function request(url, options={}) {
 export async function run(date, env=process.env) {
   if (!validDate(date)) throw Error('Tanggal harus YYYY-MM-DD dan valid.');
   for (const key of ['ESB_USERNAME','ESB_PASSWORD','FIREBASE_SYNC_EMAIL','FIREBASE_SYNC_PASSWORD','FIREBASE_WEB_API_KEY']) if (!env[key]) throw Error('Pengaturan integrasi belum lengkap: '+key);
-  const login = await request('https://services.esb.co.id/core/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:env.ESB_USERNAME,password:env.ESB_PASSWORD})});
-  const token = login.result?.accessToken;
-  if (typeof token !== 'string' || !token) throw Error('Login ESB belum berhasil.');
-  const report = await request('https://services.esb.co.id/core/report/sales-payment-summary?salesDate='+date,{headers:{Authorization:'Bearer '+token}});
-  const rows = normalize(report.result,date);
+  const client=createEsbClient({username:env.ESB_USERNAME,password:env.ESB_PASSWORD});
+  let result;try{result=await client.report('sales-payment-summary',{salesDate:date});}finally{client.close();}
+  const rows = normalize(result,date);
   // Empty results need investigation; preserve an existing report rather than overwrite it.
   if (!rows.length) throw Error('ESB tidak mengembalikan outlet. Data lama dipertahankan.');
   const auth = await request('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+encodeURIComponent(env.FIREBASE_WEB_API_KEY),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:env.FIREBASE_SYNC_EMAIL,password:env.FIREBASE_SYNC_PASSWORD,returnSecureToken:true})});
