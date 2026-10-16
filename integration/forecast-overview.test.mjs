@@ -31,3 +31,10 @@ test('target-date events appear for the matching outlet in the all-product plan'
  assert.match(ctx.window.ForecastOverview.render(m,false),/Graduation A/);assert.match(ctx.window.ForecastOverview.render(m,true),/ada kegiatan/);
  delete ctx.window.INSIGHT_DATA;
 });
+
+test('forecast display omits ambiguous mixed-unit totals while preserving SKU quantities and revenue',()=>{
+ const data={outlets:{a:{name:'A',products:[product('Mini Ogura - Cheese',9),product('Cisfon - Keju',2,'boks')]}}};
+ const m=summarize(data,['a'],'__all__','2026-10-17','2026-10-16',{outlets:{}});
+ assert.equal(m.revenue,123000);assert.equal(m.units.boks,2);
+ for(const all of [true,false]){const html=ctx.window.ForecastOverview.render(m,all);assert.doesNotMatch(html,/boks|forecast-outlet-units|PERKIRAAN TERJUAL/);assert.match(html,/Cisfon - Keju/);}
+});

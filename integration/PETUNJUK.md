@@ -1,5 +1,13 @@
 # Forecast Oma Opa
 
+## Tampilan ringkas dan grafik 2026 — 16 Oktober 2026
+
+Satuan boks dan total campuran satuan dihapus dari tampilan forecast. Satuan asli tetap ada di data perhitungan, sehingga jumlah, harga, serta forecast terkunci tidak berubah. Tren omzet menggantikan perbandingan antar tahun di tampilan. Penelitian tren/musim tetap disimpan sebagai riwayat analisis.
+
+`revenue-trend.mjs` membaca Omset Real dari blok sumber yang secara eksplisit berlabel tanpa mini cisfon dan tanpa pesanan. Seri mencakup Malmil/Ogura, 1 Juli–15 Oktober 2026. Januari–Juni belum berhasil dibaca, Mini/Cisfon tidak diikutkan. Grafik gabungan hanya memakai tanggal ketika 28 outlet tersedia; data kosong tidak diganti nol dan garis terputus pada tanggal yang tidak lengkap. Bulanan menampilkan rata-rata harian pada tanggal tersedia, bukan total bulan parsial yang dapat terlihat turun hanya karena jumlah harinya lebih sedikit. Selisih antara Omset Real dan penjumlahan keluarga produk disimpan privat untuk rekonsiliasi, tanpa mengubah nilai Omset Real sumber.
+
+Status metode: forecast jumlah yang aktif tetap median maksimal empat hari sejenis dalam 28 hari terakhir, minimal tiga pembanding. Kandidat perbaikan, pemisahan pesanan, penanganan kehabisan stok, dan pengaruh kegiatan belum seluruhnya diterapkan. Mengubah tampilan atau padanan nama tidak sama dengan mengganti metode produksi. Model kandidat tidak otomatis dipilih dari hasil periode pemeriksaan. Data uji dan rincian pengembangan disimpan terpisah dari tampilan tim outlet.
+
 ## Prioritas hari biasa, tren dan musim — 16 Oktober 2026
 
 Pemilik mengonfirmasi 30 outlet baru lengkap Juli 2024; Pleburan dan Borobudur tutup sementara mulai Februari 2026. `seasonality.mjs` memisahkan penutupan, bulan pembukaan parsial dan data kosong. Rata-rata harian dihitung dari omzet / hari kalender, bukan rumus Omzet/Day pada sumber. Perbandingan sebanding dimulai Agustus 2024. Pemilik mengonfirmasi Tlogosari = Chiffon Gajah/Gajah Raya, Masjid Riyadh = Borobudur, dan Banyumanik = Pleburan. Padanan terpusat pada CONFIRMED_HISTORICAL_ALIASES; nama sumber tetap dipertahankan untuk audit dan duplikat bulan ditolak. Perbandingan aktif kini lengkap 28 outlet.
