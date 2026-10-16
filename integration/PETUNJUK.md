@@ -1,5 +1,15 @@
 # Forecast Oma Opa
 
+## Prioritas hari biasa, tren dan musim — 16 Oktober 2026
+
+Pemilik mengonfirmasi 30 outlet baru lengkap Juli 2024; Pleburan dan Borobudur tutup sementara mulai Februari 2026. `seasonality.mjs` memisahkan penutupan, bulan pembukaan parsial dan data kosong. Rata-rata harian dihitung dari omzet / hari kalender, bukan rumus Omzet/Day pada sumber. Perbandingan sebanding dimulai Agustus 2024. Padanan Tlogosari/Gajah Raya dan Masjid Riyadh/Borobudur belum dikonfirmasi; keduanya tidak disamakan otomatis. Perbandingan aktif 2024–2026 sementara mencakup 27 outlet; Gajah Raya tetap mempunyai data 2026 tersendiri dan seluruh forecast produk tetap mencakup 28 outlet.
+
+Data bulanan dari OUTLET 2024/2025/2026 disimpan privat. Pada 27 outlet sebanding: Agustus–Desember 2025 vs 2024 −18,26%; Januari–September 2026 vs 2025 −9,24%; Agustus–September 2025 vs 2024 −24,27% dan periode sama 2026 vs 2025 −2,22%. Periode antar perbandingan berbeda; jangan menganggap penurunan tahunan konstan atau menyamakan dampak penutupan dengan low season.
+
+Tujuh metode bulanan dipilih pada Januari–Maret 2026 dan diperiksa April–September. Campuran 50% median tiga rata-rata harian bulanan terbaru dan 50% bulan sama tahun lalu yang disesuaikan median YoY tiga bulan terbaru memberi WAPE 13,28%, dibanding 15,70% pada 168 pasangan yang sama. Ini hasil bulanan, bukan harian atau SKU. Penyesuaian bulanan pada uji hari tanpa kegiatan tercatat justru mengubah WAPE jaringan 6,84% ke 6,93% (23 hari); per outlet 22,59% ke 22,72% (776 pasangan). Tidak diterapkan ke stok harian; hindari menghitung penurunan dua kali. Asumsi pelaporan bulanan 15 hari setelah akhir bulan belum merupakan bukti riwayat publikasi asli.
+
+Pola bulan menghapus tren log rata-rata omzet harian; minimum 24 bulan aktif dan dua observasi tiap bulan kalender. Indeks median residual bulanan dinormalkan secara geometris menjadi 100. Ramai minimal 110 dan arah observasi sejalan, sepi maksimal 90, data berlawanan ditandai berubah-ubah. Pola mencampur pengaruh harga, libur, Lebaran dan kegiatan; tidak membuktikan sebab atau pengali stok tetap. Ringkasan persentase/indeks ada di `seasonality-data.js`; nominal tetap privat. Menu Forecast → Tren & musim menampilkan ringkasan terpisah agar rencana harian tetap fokus.
+
 ## Uji omzet dan kegiatan — 16 Oktober 2026
 
 `revenue-validation.mjs` menguji sembilan metode pada Net Sales Total ESB. Pemilihan metode memakai 1–14 September; pemeriksaan memakai 15 September–12 Oktober. Prediksi numerik hanya menggunakan tanggal sebelumnya. Metode terpilih per outlet adalah campuran 50% median weekday/50% rata-rata tujuh hari: WAPE 22,27%, dibanding median 22,96% pada 783 pasangan. Metode total jaringan dipilih terpisah: median weekday, WAPE 7,38% pada 27 hari lengkap. Jangan memilih weighted weekday 6,53% dari hasil pemeriksaan lalu menyebutnya pemenang uji buta; metode itu belum terpilih sebelum periode pemeriksaan.
