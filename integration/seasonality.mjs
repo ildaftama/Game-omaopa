@@ -7,7 +7,10 @@ export const median=xs=>{const a=xs.slice().sort((x,y)=>x-y);return a.length?(a[
 const value=c=>c?.effectiveValue?.numberValue??c?.effectiveValue?.stringValue??null;
 const colName=n=>{let s='';for(n++;n>0;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};
 export const norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9]/g,'');
+// Outlet identities confirmed by the owner on 16 October 2026.
+export const CONFIRMED_HISTORICAL_ALIASES=Object.freeze({tlogosari:'gajah-raya',chiffongajah:'gajah-raya',cisfongajahraya:'gajah-raya',chiffongajahraya:'gajah-raya',masjidriyadh:'borobudur',borobudur:'borobudur',banyumanik:'pleburan',pleburan:'pleburan'});
 export function parseMonthly(sources,aliases,{through='2026-09',closures={pleburan:'2026-02',borobudur:'2026-02'}}={}){
+ aliases={...aliases,...CONFIRMED_HISTORICAL_ALIASES};
  const rows=[],issues=[],seen=new Set();
  for(const source of sources)for(const sheet of source.sheets){
   const year=Number(sheet.properties.title.match(/^OUTLET (\d{4})$/)?.[1]);if(!year)throw Error('Unexpected source sheet');
