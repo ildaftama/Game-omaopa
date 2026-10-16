@@ -39,3 +39,7 @@ Profil dan SWOT mencakup 28 outlet. Produk memakai September 2026 dari sumber pe
 Rumus sumber untuk Cisfon Classic Keju tidak cocok dengan judul kolom waste. Pengolah memakai kolom produk yang benar; audit Gajah Raya cocok pada sembilan produk lain. Selisih itu tidak mengubah produk peringkat pertama Gajah Raya. Spreadsheet asli tidak diubah.
 
 Aturan waste dikonfirmasi pemilik 14 Oktober 2026: kosong setelah H+3 = nol. `waste-policy.test.mjs` memeriksa batas H+2/H+3 serta nilai aktual nol dan non-nol.
+
+## Forecast per produk — 16 Oktober 2026
+
+Tab Forecast menyediakan dasar penjualan harian dalam satuan sumber, hasil uji metode, evaluasi prediksi sebelumnya, dan kelengkapan data. Stok 28 outlet/13 produk sampai 13 Oktober; rekap sampai 15 Oktober. Data merupakan snapshot, bukan live. Baseline belum merupakan perintah produksi/kiriman. Sumber privat tidak disertakan; hanya ringkasan serta estimasi turunan yang diterbitkan.
