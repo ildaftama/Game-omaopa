@@ -1,5 +1,13 @@
 # Forecast Oma Opa
 
+## Jadwal harian aktif — 16 Oktober 2026
+
+Workflow Pembaruan ESB harian dijadwalkan pukul 00.00 WIB setiap hari (cron 17.00 UTC). esb-daily.mjs menghitung hari sebelumnya dalam Asia/Jakarta, termasuk pergantian bulan dan tahun. Run workflow tanpa tanggal menguji jalur harian yang sama; tanggal atau rentang eksplisit tetap tersedia. Antrean GitHub dapat menunda waktu mulai, dan workflow publik dinonaktifkan GitHub setelah 60 hari tanpa aktivitas repository. Periksa Actions bila data tidak bertambah.
+
+Kelima Secrets sudah tersimpan. Uji produksi 16 Oktober berhasil login Firebase, membaca ESB, dan menyimpan laporan 15 Oktober tanpa mengganti kata sandi. Jadwal ini mengarsipkan laporan pembayaran ESB secara privat; belum memperbarui jumlah kue, harga LK, waste, kegiatan, atau rencana forecast publik otomatis. Bagian di bawah adalah riwayat tahap pembangunan; status jadwal terbaru mengikuti bagian ini.
+
+Uji tambahan memakai September untuk pemilihan kandidat, lalu 1–13 Oktober untuk pemeriksaan terpisah. Campuran 50% median weekday dan 50% rata-rata tujuh hari terpilih untuk pcs: WAPE September 35,28% menjadi 33,08%, Oktober 32,27% menjadi 31,70% (2.289 pasangan). Perbaikan hanya pada 18/28 outlet; bootstrap 5.000 sampel berkelompok outlet memberi kisaran perbaikan −0,34 sampai 1,35 poin persentase. Bukti belum cukup konsisten, jadi model produksi tetap median. Boks juga tetap median. Sampel pembanding harus memiliki minimal lima hari dalam tujuh hari terakhir; angka ini tidak langsung dibandingkan dengan validasi utama yang cakupannya berbeda. Prediksi terkunci 4 Oktober tidak diubah. UI menandai forecast yang perlu ditinjau tanpa menghapus jumlah atau mengubahnya menjadi instruksi stok.
+
 ## Validasi, pesanan, dan waste ESB — 16 Oktober 2026
 
 `demand-validation.mjs` menguji median tiga/empat weekday sebelumnya, minggu sebelumnya, dan pemilihan metode dari hasil sebelum target. Minimum tiga pembanding sama dengan metode rencana; median dibulatkan seperti rencana. Metode adaptif tidak diterapkan karena hasil keseluruhan lebih buruk. WAPE pcs/boks dihitung terpisah; bukan persentase akurasi, uji omzet rupiah atau jaminan permintaan. Output publik hanya ringkasan, tanpa baris uji mentah.

@@ -17,3 +17,10 @@ test('a zero median with positive historical sales is not presented as a stock-z
  const data={outlets:{a:{name:'A',products:[p]}}},m=summarize(data,['a'],'__all__','2026-10-17','2026-10-16',{outlets:{}});
  assert.equal(m.rows[0].products[0].quantity,0);assert.match(m.rows[0].products[0].review,/bukan saran stok nol/);assert.equal(m.rows[0].products[0].validation.days,10);
 });
+test('high error and sparse validation remain visible and do not silently remove estimated sales',()=>{
+ const data={outlets:{a:{name:'A',products:[{...product('Mini Ogura - Cheese',9),validation:{days:20,medianWape:70}},{...product('Cisfon - Keju',2,'boks'),validation:{days:5,medianWape:10}},{...product('Mini Ogura - Choco',9),validation:{days:20,medianWape:20}}]}}};
+ const m=summarize(data,['a'],'__all__','2026-10-17','2026-10-16',{outlets:{}});
+ assert.equal(m.reviewCount,2);assert.equal(m.revenue,180000);assert.equal(m.ready,3);
+ assert.match(m.rows[0].products[0].review,/Selisih besar/);assert.match(m.rows[0].products[1].review,/Hari uji/);assert.equal(m.rows[0].products[2].review,null);
+ const past=summarize(data,['a'],'__all__','2026-10-17','2026-10-18',{outlets:{}});assert.equal(past.reviewCount,0);
+});
