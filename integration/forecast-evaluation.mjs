@@ -111,7 +111,7 @@ export function buildEvaluation(tracking,stock,profiles,asOf='2026-10-16'){
    const rs=products.filter(r=>r.product===name),bad=productIssues.filter(r=>r.product===name),avg=rs.length?sum(rs.map(r=>r.quantity))/rs.length:0;
    const weekdays=[1,2,3,4,5,6,0].map(day=>{const pool=rs.filter(r=>dayOf(r.date)===day);return{day,days:pool.length,index:pool.length>=3&&avg>0?round(100*sum(pool.map(r=>r.quantity))/pool.length/avg):null};});
    if(new Set(rs.map(r=>r.unit)).size>1)throw Error('Product unit changed');
-   return{name,unit:rs[0]?.unit??null,days:rs.length,activeDays:rs.filter(r=>r.quantity>0).length,excludedDays:bad.length,zeroClosingDays:rs.filter(r=>r.zeroClosing).length,weekdays,backtest:backtest(rs),plans:Array.from({length:7},(_,i)=>baseline(rs,shift(asOf,i+1))),issues:bad};
+   return{name,unit:rs[0]?.unit??null,through:rs.map(r=>r.date).sort().at(-1)??null,days:rs.length,activeDays:rs.filter(r=>r.quantity>0).length,excludedDays:bad.length,zeroClosingDays:rs.filter(r=>r.zeroClosing).length,weekdays,backtest:backtest(rs),plans:Array.from({length:7},(_,i)=>baseline(rs,shift(asOf,i+1))),issues:bad};
   });
   outlets[id]={name:profile.name,periods,products:byProduct,stockThrough:products.map(r=>r.date).sort().at(-1)??null,trackingThrough:'2026-10-15',status:'trial-baseline'};
  }
