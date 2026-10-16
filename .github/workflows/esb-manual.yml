@@ -1,9 +1,12 @@
-name: Tarik laporan ESB manual
+name: Pembaruan ESB harian
 on:
+  schedule:
+    # 17.00 UTC = 00.00 WIB (Asia/Jakarta), setiap hari.
+    - cron: '0 17 * * *'
   workflow_dispatch:
     inputs:
       sales_date:
-        description: Tanggal penjualan (YYYY-MM-DD)
+        description: Tanggal penjualan (YYYY-MM-DD, kosong = kemarin WIB)
         required: false
         type: string
       date_from:
@@ -45,6 +48,8 @@ jobs:
               exit 1
             fi
             node integration/esb-backfill.mjs "$DATE_FROM" "$DATE_TO"
-          else
+          elif [ -n "$SALES_DATE" ]; then
             node integration/esb-sync.mjs "$SALES_DATE"
+          else
+            node integration/esb-daily.mjs
           fi
