@@ -1,0 +1,14 @@
+import fs from 'node:fs';import vm from 'node:vm';import test from 'node:test';import assert from 'node:assert/strict';
+const ctx={window:{}};vm.runInNewContext(fs.readFileSync(new URL('../forecast/forecast-overview.js',import.meta.url),'utf8'),ctx);const summarize=ctx.window.ForecastOverview.summarize;
+const product=(name,quantity,unit='pcs',through='2026-10-13')=>({name,unit,through,plans:[{date:'2026-10-17',central:quantity}]});
+test('all outlets sums SKU revenue at observed prices; excludes Kurma and keeps units separate',()=>{
+ const data={outlets:{a:{name:'A',products:[product('Ogura Cheese',10),product('Mini Ogura - Cheese',9),product('Cisfon - Keju',2,'boks'),product('Cisfon - Kurma',99,'boks')]},b:{name:'B',products:[product('Ogura Cheese',5)]}}};
+ const prices={outlets:{a:{'Ogura Cheese':{price:41000,method:'outlet-observed'}},b:{'Ogura Cheese':{price:42000,method:'network-estimate'}}}};
+ const m=summarize(data,['a','b'],'__all__','2026-10-17','2026-10-16',prices);
+ assert.equal(m.revenue,410000+57000+66000+210000);assert.equal(m.expected,4);assert.equal(m.units.pcs,24);assert.equal(m.units.boks,2);assert.equal(m.complete,true);assert.equal(m.estimatedPriceOutlets[0],'B');
+});
+test('unknown price and missing/stale forecast are excluded, observed zero remains valid',()=>{
+ const data={outlets:{a:{name:'A',products:[product('Ogura Cheese',10),product('Malmil Cheese',null),product('Cisfon - Keju',3,'boks','2026-09-01'),product('Mini Ogura - Cheese',0)]}}};
+ const m=summarize(data,['a'],'__all__','2026-10-17','2026-10-16',{outlets:{}});assert.equal(m.expected,4);assert.equal(m.ready,2);assert.equal(m.priced,1);assert.equal(m.revenue,0);assert.equal(m.complete,false);
+ const past=summarize(data,['a'],'__all__','2026-10-17','2026-10-18',{outlets:{}});assert.equal(past.revenue,null);assert.equal(past.ready,0);
+});
