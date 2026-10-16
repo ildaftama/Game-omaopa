@@ -85,3 +85,11 @@ Peringkat penjualan berdasarkan nilai, bukan volume. PnL produk = penjualan − 
 SWOT adalah observasi kualitatif dengan tanggal yang tidak tersedia; jangan menyamakan dengan demografi penduduk atau bukti sebab-akibat omzet. Angka dan produk pada ringkasan mengikuti outlet terpilih.
 
 Aturan waste dikonfirmasi pemilik 14 Oktober 2026: kosong setelah H+3 = nol. `waste-policy.test.mjs` memeriksa batas H+2/H+3 serta nilai aktual nol dan non-nol.
+
+## Evaluasi forecast — 16 Oktober 2026
+
+Jalankan `node integration/forecast-evaluation.mjs TRACKING_JSON STOCK_SOURCES_JSON PRIVATE_AUDIT_JSON`, lalu `node --test integration/forecast-evaluation.test.mjs`. Masukan adalah snapshot privat Google Sheets; jangan unggah ke GitHub. Generator membaca header per hari, bukan mengasumsikan lebar kolom selalu sama. Rekap yang tidak cocok dengan Malmil + Ogura dan stok negatif/tidak seimbang dipisahkan. Output publik: `forecast/forecast-evaluation-data.js`.
+
+Import ini snapshot September–13 Oktober untuk stok, Agustus–15 Oktober untuk rekap; bukan penarikan otomatis. Tanggal as-of 16 Oktober, tanggal rencana 17–23 Oktober. Jangan mengganti tanggal tanpa menyegarkan sumber. Pemilik mengonfirmasi Terpakai Real sebagai jumlah terjual bersih pada 16 Oktober. Raw, audit, dan nominal hanya tersimpan privat.
+
+Baseline memakai median maksimal empat weekday sejenis dalam 28 hari, minimal tiga pengamatan. Rentang Q25–Q75 hanya kisaran historis. Backtest berjalan menggunakan data sebelum target, minimal dua pengamatan dan pembanding last-week pada hari yang sama. Hari valid nol tidak dihapus. Public UI menahan angka ketika tanggal lewat atau sumber lebih dari tujuh hari. Tidak ada pembelian API, perubahan jadwal, atau forecast kiriman otomatis. Umur simpan tiap produk, stok saat ini, pesanan dan lead time masih diperlukan. Efek kegiatan dan traffic belum menjadi pengali angka stok.
