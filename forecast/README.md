@@ -1,5 +1,11 @@
 # Forecast Outlet Oma Opa
 
+Pembaruan 16 Oktober: forecast menampilkan selisih historis per produk, dengan minimal tiga hari sejenis sebelumnya dan pasangan tanggal uji yang sama. Angka nol dari median bukan rekomendasi stok nol bila produk pernah terjual. Metode adaptif diuji dan tidak diterapkan karena hasil keseluruhannya lebih buruk.
+
+Waste kue September di Performa dan Ringkasan kini memakai jurnal ESB berstatus Authorized, kategori Product/Cake, tujuan Waste Cake, dibagi Net Sales LK outlet yang sama. Angka mengikuti tanggal jurnal, bukan tanggal produksi. Peringkat laba produk tetap memakai rekap lama sampai pencocokan per produk selesai.
+
+Pesanan CS mengikuti tanggal pengambilan, sudah masuk LK, dan Mini dihitung per pcs. Sebagian pesanan melalui pabrik. Rekap gabungan belum dialokasikan ke outlet sehingga tidak ditambahkan atau dikurangkan secara sembarang dari forecast outlet. Koneksi otomatis dan jadwal penarikan belum aktif.
+
 Halaman publik: https://omaopa.fun/forecast/
 
 Peta, penduduk, demografi, kegiatan, wisata, lalu lintas dan Analisa dapat dibuka tanpa login. Tidak ada form penambahan data manual.
