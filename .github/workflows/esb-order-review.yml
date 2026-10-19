@@ -1,0 +1,32 @@
+name: Pemeriksaan nota ESB privat
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: esb-private-order-review
+  cancel-in-progress: false
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Periksa keamanan pengolah
+        run: node --test integration/esb-private-review.test.mjs
+      - name: Ambil nota dan enkripsi hasil
+        env:
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+        run: node integration/esb-private-review.mjs
+      - name: Simpan hasil terenkripsi saja
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nota-esb-terenkripsi
+          path: private-review-out/esb-review.encrypted.json
+          if-no-files-found: ignore
+          retention-days: 1
