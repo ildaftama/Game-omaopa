@@ -9,7 +9,7 @@ window.ForecastSourceCloud={status:'Memuat pengaturan tim…',save:async()=>{thr
   const app=getApps().some(a=>a.name==='[DEFAULT]')?getApp():initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
   const db=getFirestore(app),auth=getAuth(app);await new Promise(resolve=>{const off=onAuthStateChanged(auth,()=>{off();resolve();});});
   const ref=doc(db,'settings','forecastSources');
-  try{const s=await getDoc(ref);if(s.exists()){const d=s.data().config;if(d?.schemaVersion===1&&Array.isArray(d.sources)&&d.sources.every(s=>window.SourceSettings.validLink(s.url)))window.DATA_SOURCES=d;}}catch{/* Original configuration remains usable offline or if settings reads are restricted. */}
+  try{const s=await getDoc(ref);if(s.exists()){const d=s.data().config;if(d?.schemaVersion===1&&Array.isArray(d.sources)&&d.sources.every(s=>window.SourceSettings.validLink(s.url)))window.DATA_SOURCES={...d,sources:window.DATA_SOURCES.sources.map(s=>d.sources.find(x=>x.key===s.key)||s)};}}catch{/* Original configuration remains usable offline or if settings reads are restricted. */}
   window.ForecastSourceCloud.status=auth.currentUser?'Memakai sesi pengelola website. Izin penyimpanan diperiksa saat menyimpan.':'Untuk menyimpan bagi tim, masuk sebagai pengelola di website utama, lalu buka kembali halaman ini.';
   window.ForecastSourceCloud.save=async config=>{
    if(!auth.currentUser)throw Error('Masuk sebagai pengelola di omaopa.fun terlebih dahulu, lalu buka kembali halaman ini. Melihat data tidak memerlukan login.');

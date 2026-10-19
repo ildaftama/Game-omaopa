@@ -28,6 +28,17 @@
       "key": "swot",
       "label": "SWOT outlet",
       "url": "https://docs.google.com/spreadsheets/d/1QzXR1Lw0ICZBS02ziGWDZKWmJbIW4P9wmf_-w4sSrmg/edit"
+    },
+    {
+      "key": "revenue2025",
+      "label": "Omzet bulanan 2025",
+      "url": "https://docs.google.com/spreadsheets/d/1SPdqjMqkGFdxExsk2UX4GGzaLuTNhyeQRX3BuIwGQKs/edit",
+      "tab": "OUTLET 2025"
+    },
+    {
+      "key": "ledger2025",
+      "label": "LK harian 2025",
+      "url": "https://docs.google.com/spreadsheets/d/1ZKVAWbTanBhiY1HcV_Djj47bXG9zD17ikj4awGX_oiI/edit"
     }
   ]
 }
