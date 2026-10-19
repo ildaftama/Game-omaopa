@@ -19,7 +19,7 @@ async function run(){
  const manifest=JSON.parse(fs.readFileSync(new URL('./esb-net-sales-request.json',import.meta.url),'utf8'));
  if(manifest.jobs.length>30||!manifest.jobs.length)throw Error('Batas sampel terlampaui.');
  const client=createEsbClient({username:process.env.ESB_USERNAME,password:process.env.ESB_PASSWORD});
- const results=[];const payments=[];
+ const results=[];const payments=[];const profitLoss=[];
  try{
   for(const j of manifest.jobs){
    if(!Number.isSafeInteger(j.branchID)||!/^2025-01-(01|15|31)$/.test(j.salesDate))throw Error('Sampel tidak valid.');
@@ -28,12 +28,15 @@ async function run(){
     results.push({...j,complete:true,count:report.count,groups:summarize(report.rows,j.salesDate,j.branchName)});
    }catch{results.push({...j,complete:false});}
   }
-  for(const date of [...new Set(manifest.jobs.map(j=>j.salesDate))]){
+  for(let day=0;day<365;day++){
+   const date=new Date(Date.UTC(2025,0,1+day)).toISOString().slice(0,10);
    payments.push({date,rows:await client.report('sales-payment-summary',{salesDate:date})});
   }
+  try{profitLoss.push({branchID:31,month:1,report:await client.report('profit-loss/daily-in-month',{year:'2025',month:'1',branchIDs:'31',flagShowZeroValue:'true'})});}
+  catch(error){profitLoss.push({branchID:31,month:1,error:String(error.message).match(/HTTP \d{3}/)?.[0]||'unavailable'});}
  }finally{client.close();}
  fs.mkdirSync('private-net-sales',{recursive:true});
- fs.writeFileSync('private-net-sales/sample.encrypted.json',JSON.stringify(seal({requestId:manifest.requestId,results,payments},manifest.publicKey)));
+ fs.writeFileSync('private-net-sales/sample.encrypted.json',JSON.stringify(seal({requestId:manifest.requestId,results,payments,profitLoss},manifest.publicKey)));
  console.log('Sampel selesai: '+results.filter(r=>r.complete).length+'/'+results.length+'. Hasil hanya disimpan terenkripsi.');
  if(results.some(r=>!r.complete))process.exitCode=1;
 }

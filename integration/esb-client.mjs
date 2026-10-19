@@ -1,5 +1,5 @@
 const BASE='https://services.esb.co.id/core/';
-const REPORTS=new Set(['stock-movement','sales-menu-cogs','sales-payment-summary']);
+const REPORTS=new Set(['stock-movement','sales-menu-cogs','sales-payment-summary','profit-loss/daily-in-month']);
 export function createEsbClient({username,password,fetcher=fetch,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
  let token=null;
  async function request(path,options){
