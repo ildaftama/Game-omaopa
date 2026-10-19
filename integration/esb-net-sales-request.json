@@ -1,66 +1,157 @@
 {
-  "jobs": [
+  "branches": [
     {
-      "branchName": "Ambarawa",
-      "salesDate": "2025-01-01",
-      "branchID": 31
+      "branchID": 31,
+      "branchCode": "OCA",
+      "branchName": "Ambarawa"
     },
     {
-      "branchName": "Ambarawa",
-      "salesDate": "2025-01-15",
-      "branchID": 31
+      "branchID": 5,
+      "branchCode": "OOC3",
+      "branchName": "Borobudur"
     },
     {
-      "branchName": "Ambarawa",
-      "salesDate": "2025-01-31",
-      "branchID": 31
+      "branchID": 16,
+      "branchCode": "BYL",
+      "branchName": "Boyolali"
     },
     {
-      "branchName": "Laweyan",
-      "salesDate": "2025-01-01",
-      "branchID": 30
+      "branchID": 14,
+      "branchCode": "TGS",
+      "branchName": "Chiffon Gajah Raya"
     },
     {
-      "branchName": "Laweyan",
-      "salesDate": "2025-01-15",
-      "branchID": 30
+      "branchID": 7,
+      "branchCode": "OOG",
+      "branchName": "Godean"
     },
     {
-      "branchName": "Laweyan",
-      "salesDate": "2025-01-31",
-      "branchID": 30
+      "branchID": 6,
+      "branchCode": "OOUII",
+      "branchName": "Jakal UII"
     },
     {
-      "branchName": "Nusa Indah",
-      "salesDate": "2025-01-01",
-      "branchID": 10
+      "branchID": 4,
+      "branchCode": "OOC2",
+      "branchName": "Jebres"
     },
     {
-      "branchName": "Nusa Indah",
-      "salesDate": "2025-01-15",
-      "branchID": 10
+      "branchID": 24,
+      "branchCode": "KRGA",
+      "branchName": "Karanganyar"
     },
     {
-      "branchName": "Nusa Indah",
-      "salesDate": "2025-01-31",
-      "branchID": 10
+      "branchID": 30,
+      "branchCode": "OCL",
+      "branchName": "Laweyan"
     },
     {
-      "branchName": "UNNES",
-      "salesDate": "2025-01-01",
-      "branchID": 15
+      "branchID": 17,
+      "branchCode": "MGL",
+      "branchName": "Magelang"
     },
     {
-      "branchName": "UNNES",
-      "salesDate": "2025-01-15",
-      "branchID": 15
+      "branchID": 2,
+      "branchCode": "OOC",
+      "branchName": "Makam Haji"
     },
     {
-      "branchName": "UNNES",
-      "salesDate": "2025-01-31",
-      "branchID": 15
+      "branchID": 13,
+      "branchCode": "MERB",
+      "branchName": "MERBABU Klaten"
+    },
+    {
+      "branchID": 3,
+      "branchCode": "OOC1",
+      "branchName": "Muhammadiyah Surakarta"
+    },
+    {
+      "branchID": 28,
+      "branchCode": "MTLN",
+      "branchName": "Muntilan"
+    },
+    {
+      "branchID": 21,
+      "branchCode": "NGY",
+      "branchName": "Ngaliyan"
+    },
+    {
+      "branchID": 10,
+      "branchCode": "OOJW",
+      "branchName": "Nusa Indah"
+    },
+    {
+      "branchID": 27,
+      "branchCode": "NSKN",
+      "branchName": "Nusukan"
+    },
+    {
+      "branchID": 22,
+      "branchCode": "BYMN",
+      "branchName": "Pleburan"
+    },
+    {
+      "branchID": 11,
+      "branchCode": "OORK",
+      "branchName": "Rajawali Klaten"
+    },
+    {
+      "branchID": 26,
+      "branchCode": "SMPGN",
+      "branchName": "Sampangan"
+    },
+    {
+      "branchID": 23,
+      "branchCode": "SRG",
+      "branchName": "Sragen"
+    },
+    {
+      "branchID": 25,
+      "branchCode": "OOSH",
+      "branchName": "Sukoharjo"
+    },
+    {
+      "branchID": 9,
+      "branchCode": "OOTJ",
+      "branchName": "Tajem"
+    },
+    {
+      "branchID": 29,
+      "branchCode": "TMGG",
+      "branchName": "Temanggung"
+    },
+    {
+      "branchID": 19,
+      "branchCode": "UDNS",
+      "branchName": "UDINUS"
+    },
+    {
+      "branchID": 12,
+      "branchCode": "UKSW",
+      "branchName": "UKSW"
+    },
+    {
+      "branchID": 8,
+      "branchCode": "OOCB",
+      "branchName": "UMY"
+    },
+    {
+      "branchID": 18,
+      "branchCode": "UNDP",
+      "branchName": "UNDIP"
+    },
+    {
+      "branchID": 20,
+      "branchCode": "UNMS",
+      "branchName": "UNIMUS"
+    },
+    {
+      "branchID": 15,
+      "branchCode": "UNNS",
+      "branchName": "UNNES"
     }
   ],
-  "requestId": "net-sales-2025-sample-v1",
-  "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAoM/WS2zNGZz5H/AqX5+C\nLABkK7QXP+UMlFUBZD6xV3vKZjA1yR3g4cBASolABxw8NO/p4StDmd9GF14Aoare\nEUMeFO/vcjFScgxP1fmIz3UrFCr2VIVerHJUzeFin9ORTYr5J07IvO8TQUV4SU2I\nh+0fgkCHPybja1hdE9K4LyolO5v7dj8rkjyQITvGRjFJ51p4of3ruFkKo2Vdd/C4\nOrHGHSxBQvBiJlwg1JpMEE4NjcKrmyPfTTfYEPutnDmJjC/lP0jGfnp4pG68RQzq\nZyko59INSp57Yll4xqbLXIGBS1pn8+mq+tWeKAtxPHteG39T8261da3MlfyO4bVG\nGEJeUnJCBzXQXULiTLdau8AsxBS1NT2s5fk35MI9lp7LfFfBcZ1ilFCUt4Uj0mlM\n8g3wRIASsBlimzmQiUdjpsIeahdvQpVwf6aJdyJG37YaNa4HekBpnDRWw6s1SdOr\nH+DR7RSg/GTVoJ2jkeKRK3RI2diMNRjcxGAYmRkQPss/AgMBAAE=\n-----END PUBLIC KEY-----\n"
+  "mode": "retail-net-2025",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAoM/WS2zNGZz5H/AqX5+C\nLABkK7QXP+UMlFUBZD6xV3vKZjA1yR3g4cBASolABxw8NO/p4StDmd9GF14Aoare\nEUMeFO/vcjFScgxP1fmIz3UrFCr2VIVerHJUzeFin9ORTYr5J07IvO8TQUV4SU2I\nh+0fgkCHPybja1hdE9K4LyolO5v7dj8rkjyQITvGRjFJ51p4of3ruFkKo2Vdd/C4\nOrHGHSxBQvBiJlwg1JpMEE4NjcKrmyPfTTfYEPutnDmJjC/lP0jGfnp4pG68RQzq\nZyko59INSp57Yll4xqbLXIGBS1pn8+mq+tWeKAtxPHteG39T8261da3MlfyO4bVG\nGEJeUnJCBzXQXULiTLdau8AsxBS1NT2s5fk35MI9lp7LfFfBcZ1ilFCUt4Uj0mlM\n8g3wRIASsBlimzmQiUdjpsIeahdvQpVwf6aJdyJG37YaNa4HekBpnDRWw6s1SdOr\nH+DR7RSg/GTVoJ2jkeKRK3RI2diMNRjcxGAYmRkQPss/AgMBAAE=\n-----END PUBLIC KEY-----\n",
+  "requestId": "retail-net-2025-v1"
 }

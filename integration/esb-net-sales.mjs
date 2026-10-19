@@ -17,6 +17,23 @@ export function summarize(rows,date,branchName){
 }
 async function run(){
  const manifest=JSON.parse(fs.readFileSync(new URL('./esb-net-sales-request.json',import.meta.url),'utf8'));
+ if(manifest.mode==='retail-net-2025'){
+  if(manifest.branches.length!==30||new Set(manifest.branches.map(b=>b.branchID)).size!==30||manifest.branches.some(b=>!Number.isSafeInteger(b.branchID)||b.branchID<2||b.branchID>31))throw Error('Cakupan outlet tidak valid.');
+  const client=createEsbClient({username:process.env.ESB_USERNAME,password:process.env.ESB_PASSWORD});
+  const jobs=manifest.branches.flatMap(b=>Array.from({length:12},(_,m)=>({...b,year:'2025',month:m+1})));const results=[];let cursor=0;
+  function checkpoint(){fs.mkdirSync('private-net-sales',{recursive:true});fs.writeFileSync('private-net-sales/retail-2025.encrypted.json',JSON.stringify(seal({requestId:manifest.requestId,results},manifest.publicKey)));}
+  async function worker(){while(cursor<jobs.length){const j=jobs[cursor++];try{
+   const report=await client.report('profit-loss/daily-in-month',{year:j.year,month:String(j.month),branchIDs:String(j.branchID),flagShowZeroValue:'true'});
+   if(!report.summaries?.netSales||!Array.isArray(report.sales))throw Error('Format tidak lengkap.');
+   results.push({...j,complete:true,netSales:report.summaries.netSales,sales:report.sales,discounts:report.discounts,headers:report.dynamicHeaders});
+  }catch(error){results.push({...j,complete:false,error:String(error.message).match(/HTTP \d{3}/)?.[0]||'unavailable'});}
+  if(results.length%30===0){checkpoint();console.log('Laporan bulan-outlet diperiksa: '+results.length+'/'+jobs.length);}
+  }}
+  try{await Promise.all([worker(),worker()]);}finally{client.close();checkpoint();}
+  console.log('Lengkap: '+results.filter(r=>r.complete).length+'/'+jobs.length+'. Hasil terenkripsi.');
+  if(results.some(r=>!r.complete))process.exitCode=1;
+  return;
+ }
  if(manifest.jobs.length>30||!manifest.jobs.length)throw Error('Batas sampel terlampaui.');
  const client=createEsbClient({username:process.env.ESB_USERNAME,password:process.env.ESB_PASSWORD});
  const results=[];const payments=[];const profitLoss=[];
