@@ -76,3 +76,11 @@ Pilih **Semua outlet** pada pemilih outlet dan **Semua produk** di Forecast. Rin
 Harga Malmil/Ogura harus dihasilkan oleh `integration/lk-esb-prices.mjs`: omzet kelompok di LK September dibagi jumlah pcs kelompok dari API ESB pada outlet dan 30 tanggal September yang sama. Jangan memakai omzet ESB, harga polos, atau omzet COGS untuk menggantikan omzet LK. Cheese/Chocolate memakai rata-rata kelompok karena LK tidak memisahkan rasa. Mini memakai Rp57.000/9 pcs; Cisfon lain memakai harga rekap. Token, kredensial, transaksi dan nilai LK tetap di arsip privat, tidak dimasukkan repository.
 
 Forecast kuantitas masih berasal dari laporan stok harian terverifikasi sampai 13 Oktober. Ringkasan omzet belum diuji balik dalam rupiah, belum menyesuaikan perubahan topping, dan bukan instruksi kiriman otomatis. Jadwal penarikan belum diaktifkan.
+
+## Tampilan analisis dan histori — 19 Oktober 2026
+
+Tab Pesanan merangkum frekuensi dan jumlah per produk/outlet/tanggal pengambilan; data pribadi dan catatan nota tidak diterbitkan. Tab Produk mendukung gabungan 28 outlet dengan peringkat berbobot nilai penjualan dan laba, bukan rata-rata peringkat outlet. Grafik menyediakan tahun, bulan, persentase perubahan kalender dan garis tipis; tahun tanpa data menampilkan keadaan kosong. Memilih bulan memfokuskan hari dalam bulan itu.
+
+Histori memisahkan arsip rencana 16/19 Oktober dari simulasi median yang dihitung belakangan. Realisasi sampai 18 Oktober diperiksa hanya pada pasangan SKU, outlet dan tanggal yang sama. Versi rencana disimpan di database privat forecast-learning.sqlite dan tidak ditimpa. WAPE dihitung terpisah Reguler/Mini dan Chiffon; realisasi kosong tidak diubah menjadi nol. Jangan menyebut 100−WAPE sebagai akurasi.
+
+Sumber awal ada di data-sources.json dan data-sources.js. Tab Sumber data membaca pengaturan bersama settings/forecastSources menggunakan sesi dan izin Firebase yang sudah ada; tidak memperluas aturan atau membuat akses tulis publik. Hanya pengelola utama dapat menyimpan. Jika sesi/izin belum tersedia, tampilkan kegagalan yang jelas serta unduhan konfigurasi, jangan menyatakan tersimpan. Penggantian link tidak otomatis mengimpor atau memvalidasi ulang tabel; impor pesanan/produk belum terjadwal. Arsip omzet ESB tetap 00.00 WIB.

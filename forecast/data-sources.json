@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-19",
+  "sources": [
+    {
+      "key": "orders",
+      "label": "Pesanan harian",
+      "url": "https://docs.google.com/spreadsheets/d/18Y4gP7-TfS3xgOpjYKBji4gQJGc1lkEvUZrbUaAze0c/edit",
+      "tab": "PESANAN",
+      "startRow": 5577
+    },
+    {
+      "key": "ledger",
+      "label": "Omzet LK",
+      "url": "https://docs.google.com/spreadsheets/d/11IWHBRMhpor6rG0DiRTAXjZwFi9y7-YW-hitcx6Qwgs/edit"
+    },
+    {
+      "key": "forecast",
+      "label": "Rekap forecast harian",
+      "url": "https://docs.google.com/spreadsheets/d/1tRZashxaaRB38iTxEwhikDhlW3VlCVqm9TIms-cT-5k/edit"
+    },
+    {
+      "key": "performance",
+      "label": "Performa & laba produk",
+      "url": "https://docs.google.com/spreadsheets/d/1BCOmfxG4XTVDwjjNsgiygjal9Iw_VLb-6UYk0t88BoI/edit"
+    },
+    {
+      "key": "swot",
+      "label": "SWOT outlet",
+      "url": "https://docs.google.com/spreadsheets/d/1QzXR1Lw0ICZBS02ziGWDZKWmJbIW4P9wmf_-w4sSrmg/edit"
+    }
+  ]
+}
