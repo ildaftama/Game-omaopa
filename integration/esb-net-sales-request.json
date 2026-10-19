@@ -1,0 +1,66 @@
+{
+  "jobs": [
+    {
+      "branchName": "Ambarawa",
+      "salesDate": "2025-01-01",
+      "branchID": 31
+    },
+    {
+      "branchName": "Ambarawa",
+      "salesDate": "2025-01-15",
+      "branchID": 31
+    },
+    {
+      "branchName": "Ambarawa",
+      "salesDate": "2025-01-31",
+      "branchID": 31
+    },
+    {
+      "branchName": "Laweyan",
+      "salesDate": "2025-01-01",
+      "branchID": 30
+    },
+    {
+      "branchName": "Laweyan",
+      "salesDate": "2025-01-15",
+      "branchID": 30
+    },
+    {
+      "branchName": "Laweyan",
+      "salesDate": "2025-01-31",
+      "branchID": 30
+    },
+    {
+      "branchName": "Nusa Indah",
+      "salesDate": "2025-01-01",
+      "branchID": 10
+    },
+    {
+      "branchName": "Nusa Indah",
+      "salesDate": "2025-01-15",
+      "branchID": 10
+    },
+    {
+      "branchName": "Nusa Indah",
+      "salesDate": "2025-01-31",
+      "branchID": 10
+    },
+    {
+      "branchName": "UNNES",
+      "salesDate": "2025-01-01",
+      "branchID": 15
+    },
+    {
+      "branchName": "UNNES",
+      "salesDate": "2025-01-15",
+      "branchID": 15
+    },
+    {
+      "branchName": "UNNES",
+      "salesDate": "2025-01-31",
+      "branchID": 15
+    }
+  ],
+  "requestId": "net-sales-2025-sample-v1",
+  "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAoM/WS2zNGZz5H/AqX5+C\nLABkK7QXP+UMlFUBZD6xV3vKZjA1yR3g4cBASolABxw8NO/p4StDmd9GF14Aoare\nEUMeFO/vcjFScgxP1fmIz3UrFCr2VIVerHJUzeFin9ORTYr5J07IvO8TQUV4SU2I\nh+0fgkCHPybja1hdE9K4LyolO5v7dj8rkjyQITvGRjFJ51p4of3ruFkKo2Vdd/C4\nOrHGHSxBQvBiJlwg1JpMEE4NjcKrmyPfTTfYEPutnDmJjC/lP0jGfnp4pG68RQzq\nZyko59INSp57Yll4xqbLXIGBS1pn8+mq+tWeKAtxPHteG39T8261da3MlfyO4bVG\nGEJeUnJCBzXQXULiTLdau8AsxBS1NT2s5fk35MI9lp7LfFfBcZ1ilFCUt4Uj0mlM\n8g3wRIASsBlimzmQiUdjpsIeahdvQpVwf6aJdyJG37YaNa4HekBpnDRWw6s1SdOr\nH+DR7RSg/GTVoJ2jkeKRK3RI2diMNRjcxGAYmRkQPss/AgMBAAE=\n-----END PUBLIC KEY-----\n"
+}
