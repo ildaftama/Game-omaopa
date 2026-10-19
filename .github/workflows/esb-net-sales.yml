@@ -1,0 +1,32 @@
+name: Pencocokan omzet ESB 2025
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: esb-net-sales
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Uji pengolah
+        run: node --test integration/esb-net-sales.test.mjs integration/esb-private-review.test.mjs
+      - name: Cocokkan sampel dan enkripsi
+        env:
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+        run: node integration/esb-net-sales.mjs
+      - name: Simpan hasil terenkripsi
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pencocokan-omzet-terenkripsi
+          path: private-net-sales/*.encrypted.json
+          if-no-files-found: ignore
+          retention-days: 1
