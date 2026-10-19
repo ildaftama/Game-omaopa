@@ -1,5 +1,23 @@
 # Forecast Outlet Oma Opa
 
+## Status terkini — 19 Oktober 2026
+
+Halaman publik: https://omaopa.fun/forecast/. Pilih **Semua outlet** dan **Semua produk** untuk ringkasan; rincian dibuka per outlet.
+
+Jumlah terjual diperbarui sampai 18 Oktober pada 28 outlet; rencana 20–26 Oktober. Metode mengurangi pesanan dari riwayat pembanding, mencari pola penjualan umum, kemudian menambahkan pesanan tercatat satu kali pada tanggal pengambilan. Jika jumlah atau pembanding belum jelas, dipakai median total tanpa tambahan pesanan. Mini satu kemasan sembilan pcs, mix tiga per rasa. Pengeluaran internal, pesanan pabrik dan ongkir dipisahkan. Forecast masih perkiraan penjualan, belum instruksi kiriman.
+
+Pemilihan metode memakai 22–30 September, uji terpisah 1–13 Oktober. WAPE jumlah kue reguler/Mini 32,18% → 29,07%; Chiffon 78,78% → 51,21%. Catatan pesanan dibaca belakangan: ini simulasi retrospektif, belum membuktikan akurasi prospektif atau omzet. Prediksi lama yang dikunci tidak diubah. Kegiatan dan lalu lintas belum menjadi pengali otomatis.
+
+Tren omzet tanpa pesanan kini mencakup seluruh omzet sumber, bukan hanya Malmil/Ogura. Gabungan memakai LK, pilihan outlet memakai laporan omzet outlet; sumber bisa memiliki selisih pencatatan. Sebanyak 141 dari 287 hari gabungan Januari–15 Oktober dapat dipisahkan dengan aman. Hari belum jelas tetap jeda. Rata-rata bulan memerlukan lima hari valid dan belum mewakili seluruh bulan. Nilai negatif diskon yang salah tanda pada rumus LK dikoreksi hanya dalam salinan analisis; spreadsheet sumber tidak diubah.
+
+Arsip omzet ESB dijadwalkan setiap **00.00 WIB**. Jumlah produk, pesanan, LK, waste dan hasil forecast halaman ini **belum ikut otomatis diperbarui**. Periksa tanggal snapshot. Produk/laba dan waste masih memakai September; analisa kegiatan memakai omzet sampai 12 Oktober.
+
+Kontak pelanggan, catatan asli, transaksi, nota, kredensial dan database tetap privat. Halaman publik hanya memuat ringkasan, harga turunan, forecast dan titik grafik yang diizinkan. Pengujian: `node --test integration/*.test.mjs`. Panduan pengolah ada di `integration/PETUNJUK.md`.
+
+## Arsip catatan rilis sebelum 19 Oktober
+
+Status jadwal, cakupan, dan metode pada catatan lama berikut digantikan oleh status terkini di atas.
+
 Pembaruan 16 Oktober: forecast menampilkan selisih historis per produk, dengan minimal tiga hari sejenis sebelumnya dan pasangan tanggal uji yang sama. Angka nol dari median bukan rekomendasi stok nol bila produk pernah terjual. Metode adaptif diuji dan tidak diterapkan karena hasil keseluruhannya lebih buruk.
 
 Waste kue September di Performa dan Ringkasan kini memakai jurnal ESB berstatus Authorized, kategori Product/Cake, tujuan Waste Cake, dibagi Net Sales LK outlet yang sama. Angka mengikuti tanggal jurnal, bukan tanggal produksi. Peringkat laba produk tetap memakai rekap lama sampai pencocokan per produk selesai.

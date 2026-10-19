@@ -1,5 +1,7 @@
 'use strict';
 window.RevenueValidation={render(id){
+ const current=window.FORECAST_EVALUATION?.methodEvaluation;
+ if(current){const fmt=n=>n.toLocaleString('id-ID',{maximumFractionDigits:1})+'%';return `<details class="workspace-details"><summary>Hasil uji metode · 1–13 Oktober</summary><p>Ringkasan lintas outlet, berdasarkan jumlah terjual. Lebih kecil berarti selisih lebih rendah.</p><div class="table-wrap"><table class="snapshot-table"><thead><tr><th>Kelompok</th><th>Sebelumnya</th><th>Pisahkan pesanan</th></tr></thead><tbody>${Object.entries(current.groups).map(([key,g])=>`<tr><td>${key==='chiffon'?'Chiffon':'Kue reguler & Mini'}</td><td>${fmt(g.before)}</td><td>${fmt(g.after)}</td></tr>`).join('')}</tbody></table></div><p>Metode dipilih memakai 22–30 September, lalu diuji pada 1–13 Oktober. Catatan pesanan dibaca belakangan, sehingga ini uji historis dan belum membuktikan akurasi hari mendatang. Angka ini mengukur jumlah kue, belum kesalahan estimasi omzet.</p><p>Target selisih 1–3% belum tercapai. Kegiatan dan lalu lintas belum otomatis mengubah forecast. Penjualan saat stok habis juga dapat lebih rendah dari permintaan sebenarnya.</p></details>`;}
  const d=window.REVENUE_VALIDATION;if(!d)return '';
  const fmt=x=>x==null?'—':x.toLocaleString('id-ID',{maximumFractionDigits:1})+'%';
  const o=d.outlets[id],metric=o?o.baseline:d.network;
