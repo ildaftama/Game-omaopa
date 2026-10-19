@@ -40,14 +40,20 @@ async function request(url, options={}) {
   }
   return r.json();
 }
-export async function run(date, env=process.env) {
-  if (!validDate(date)) throw Error('Tanggal harus YYYY-MM-DD dan valid.');
+export function createSyncSession(env=process.env) {
   for (const key of ['ESB_USERNAME','ESB_PASSWORD','FIREBASE_SYNC_EMAIL','FIREBASE_SYNC_PASSWORD','FIREBASE_WEB_API_KEY']) if (!env[key]) throw Error('Pengaturan integrasi belum lengkap: '+key);
-  const auth = await request('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+encodeURIComponent(env.FIREBASE_WEB_API_KEY),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:env.FIREBASE_SYNC_EMAIL,password:env.FIREBASE_SYNC_PASSWORD,returnSecureToken:true})});
-  if (!auth.idToken) throw Error('Login penyimpanan belum berhasil.');
-  console.log('Login Firebase berhasil.');
   const client=createEsbClient({username:env.ESB_USERNAME,password:env.ESB_PASSWORD});
-  let result;try{result=await client.report('sales-payment-summary',{salesDate:date});}finally{client.close();}
+  let auth=null, expiresAt=0, closed=false;
+  async function sync(date) {
+  if(closed)throw Error('Sesi penarikan sudah ditutup.');
+  if (!validDate(date)) throw Error('Tanggal harus YYYY-MM-DD dan valid.');
+  if(!auth || Date.now()>=expiresAt){
+  auth = await request('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+encodeURIComponent(env.FIREBASE_WEB_API_KEY),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:env.FIREBASE_SYNC_EMAIL,password:env.FIREBASE_SYNC_PASSWORD,returnSecureToken:true})});
+  if (!auth.idToken) throw Error('Login penyimpanan belum berhasil.');
+  expiresAt=Date.now()+Math.max(60,(Number(auth.expiresIn)||3600)-120)*1000;
+  console.log('Login Firebase berhasil.');
+  }
+  const result=await client.report('sales-payment-summary',{salesDate:date});
   const rows = normalize(result,date);
   // Empty results need investigation; preserve an existing report rather than overwrite it.
   if (!rows.length) throw Error('ESB tidak mengembalikan outlet. Data lama dipertahankan.');
@@ -57,6 +63,13 @@ export async function run(date, env=process.env) {
   await request(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/radarSalesDays/${date}`,{method:'PATCH',headers:{Authorization:'Bearer '+auth.idToken,'Content-Type':'application/json'},body:JSON.stringify({fields})});
   console.log('Selesai: '+date+', '+rows.length+' outlet tersimpan.');
   return record;
+  }
+  return {sync,close(){closed=true;auth=null;client.close();}};
+}
+export async function run(date, env=process.env) {
+  if (!validDate(date)) throw Error('Tanggal harus YYYY-MM-DD dan valid.');
+  const session=createSyncSession(env);
+  try{return await session.sync(date);}finally{session.close();}
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   run(process.argv[2]).catch(error=>{console.error(error.message);console.error('Penarikan belum dinyatakan berhasil.');process.exitCode=1;});

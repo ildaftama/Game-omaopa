@@ -1,6 +1,24 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {validDate,normalize,run,firebaseFailure} from './esb-sync.mjs';
+import {validDate,normalize,run,firebaseFailure,createSyncSession} from './esb-sync.mjs';
+test('historical session reuses both logins across dates and cannot run after close',async()=>{
+ const original=global.fetch,calls=[];
+ const env={ESB_USERNAME:'u',ESB_PASSWORD:'p',FIREBASE_SYNC_EMAIL:'test@example.test',FIREBASE_SYNC_PASSWORD:'p',FIREBASE_WEB_API_KEY:'key'};
+ global.fetch=async(url,options)=>{
+  calls.push(url);let body={};
+  if(url.includes('identitytoolkit'))body={idToken:'private-test',expiresIn:'3600'};
+  else if(url.endsWith('auth/login'))body={result:{accessToken:'private-test'}};
+  else if(url.includes('/report/'))body={result:[{branchCode:'A',branchName:'A',salesDate:new URL(url).searchParams.get('salesDate'),payments:[]}]};
+  return {ok:true,status:200,json:async()=>body};
+ };
+ const session=createSyncSession(env);
+ try{for(const date of ['2025-02-20','2025-02-21','2025-02-22'])await session.sync(date);
+ assert.equal(calls.filter(x=>x.includes('identitytoolkit')).length,1);
+ assert.equal(calls.filter(x=>x.endsWith('auth/login')).length,1);
+ assert.equal(calls.filter(x=>x.includes('/documents/')).length,3);
+ session.close();await assert.rejects(session.sync('2025-02-23'),/ditutup/);
+ }finally{session.close();global.fetch=original;}
+});
 test('calendar validation and aggregate preserves zero and negative adjustments',()=>{
   assert.equal(validDate('2026-02-30'),false);assert.equal(validDate('2026-13-01'),false);assert.equal(validDate('2026-10-12'),true);
   assert.deepEqual(normalize([{branchCode:'A',branchName:'Outlet A',salesDate:'2026-10-12',payments:[{paymentAmount:100,paymentCount:2},{paymentAmount:-10,paymentCount:1}]}],'2026-10-12'),[{branchCode:'A',outlet:'Outlet A',totalPayment:90,paymentCount:3}]);

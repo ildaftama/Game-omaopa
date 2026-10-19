@@ -1,4 +1,4 @@
-import {run,validDate} from './esb-sync.mjs';
+import {run,validDate,createSyncSession} from './esb-sync.mjs';
 import {pathToFileURL} from 'node:url';
 export function range(from,to){
  if(!validDate(from)||!validDate(to)||from>to)throw Error('Rentang tanggal tidak valid.');
@@ -10,7 +10,15 @@ export function range(from,to){
 export async function backfill(from,to,env=process.env,sync=run){
  const dates=range(from,to),failed=[];let saved=0;
  if(sync===run)for(const key of ['ESB_USERNAME','ESB_PASSWORD','FIREBASE_SYNC_EMAIL','FIREBASE_SYNC_PASSWORD','FIREBASE_WEB_API_KEY'])if(!env[key])throw Error('Pengaturan integrasi belum lengkap.');
- for(const date of dates){try{await sync(date,env);saved++;}catch{failed.push(date);console.error('Belum tersimpan: '+date+'. Data lama tetap dipertahankan.');}}
+ const session=sync===run?createSyncSession(env):null;
+ try{for(const date of dates){try{await (session?session.sync(date):sync(date,env));saved++;}catch(error){failed.push(date);console.error('Belum tersimpan: '+date+'. Data lama tetap dipertahankan.');
+ // Only allow known, non-sensitive diagnostics in public workflow logs.
+ const message=String(error?.message||'');
+ const http=message.match(/^(Login API ESB gagal|Laporan ESB gagal|Penyimpanan Firebase gagal|Login Firebase gagal) \(HTTP \d{3}\)/);
+ if(http)console.error(http[0]);
+ else if(message.startsWith('Koneksi layanan Firebase'))console.error('Koneksi penyimpanan gagal.');
+ else console.error('Laporan atau koneksi belum valid.');
+ }}}finally{session?.close();}
  console.log('Hasil penarikan: '+saved+'/'+dates.length+' hari tersimpan.');
  if(failed.length)throw Error('Ada tanggal yang belum berhasil. Jalankan ulang rentang tersebut setelah pengaturan diperbaiki.');
  return {saved,total:dates.length};
