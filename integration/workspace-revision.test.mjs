@@ -16,10 +16,17 @@ test('source links accept Google Sheets only; reject executable URLs and lookali
 });
 test('history retains actual zero, pending null, and archived October18 plans',()=>{
  const c=context();run(c,'forecast-history-data.js');const d=c.window.FORECAST_HISTORY;
- assert.ok(d.rows.some(r=>r[0]==='2026-10-18'&&r[5]==='archive'&&r[4]!==null));assert.ok(d.rows.some(r=>r[0]==='2026-10-20'&&r[5]==='archive'&&r[4]===null));assert.ok(d.rows.some(r=>r[4]===0));assert.ok(d.rows.filter(r=>r[5]==='archive').every(r=>r[6]<r[0]));
+ assert.ok(d.rows.some(r=>r[0]==='2026-10-18'&&r[5]==='archive'&&r[4]!==null));assert.ok(d.rows.some(r=>r[0]==='2026-10-20'&&r[5]==='archive'&&r[4]===null));assert.ok(d.rows.some(r=>r[4]===0));assert.ok(d.rows.some(r=>r[3]===null&&r[5]==='archive'));assert.equal(d.rows.filter(r=>r[0]==='2026-10-18'&&r[5]==='archive'&&r[7]==='regular').length,196);assert.ok(d.rows.filter(r=>r[5]==='archive').every(r=>r[6]<r[0]));
 });
 test('published order summary contains aggregates only, and network product shares are weighted from money',()=>{
  const c=context();run(c,'orders-summary-data.js');run(c,'network-products-data.js');const d=c.window.ORDERS_SUMMARY;
  assert.ok(d.daily.length>7000);assert.ok(d.daily.every(r=>r.length===5&&r[3]>0&&r[4]>0));assert.ok(d.days.every(r=>r.length===5));assert.ok(!/sourceRow|bookingDate|phone|customer|receipt|paymentKind/.test(JSON.stringify(d)));
  const ps=c.window.NETWORK_PRODUCTS.products;assert.ok(Math.abs(ps.reduce((s,p)=>s+p.salesShare,0)-100)<.5);assert.ok(ps.every((p,i)=>p.salesRank===i+1));
+});
+test('2025 monthly actuals render for all current outlets without inventing daily values or offering 2024',()=>{
+ const c=context();run(c,'revenue-trend-data.js');run(c,'revenue-trend-2025.js');run(c,'seasonality-panel.js');const p=c.window.SeasonalityPanel,d=c.window.REVENUE_TREND_2025;
+ assert.equal(Object.keys(d.total.outlets).length,28);assert.equal(d.total.network.monthly.length,12);assert.ok(d.total.network.monthly.every(m=>m.amount!==null));assert.ok(Object.values(d.total.outlets).every(o=>o.monthly.length===12&&o.monthly.every(p=>p.amount!==null)&&o.daily.every(p=>p.amount===null)));
+ p.change({target:{id:'trend-year',value:'2025'}});const html=p.render('nusa-indah');assert.match(html,/Omzet termasuk pesanan/);assert.match(html,/12 bulan tersedia/);assert.ok(!/<option[^>]*>2024<\/option>/.test(html));
+ p.change({target:{id:'trend-month',value:'09'}});assert.doesNotThrow(()=>p.render('nusa-indah'));assert.equal((p.render('nusa-indah').match(/<circle /g)||[]).length,0);
+ assert.equal(d.total.network.daily.filter(r=>r.amount!==null).length,180);assert.ok(d.walkIn.network.daily.filter(r=>r.amount!==null).length<180);
 });
