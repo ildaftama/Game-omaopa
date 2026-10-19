@@ -15,7 +15,7 @@ export function seal(value,publicKey){
 }
 export async function collect(jobs,client){
  validateJobs(jobs);const results=[];let cursor=0;
- async function worker(){while(cursor<jobs.length){const job=jobs[cursor++];try{const r=await client.pages('sales-menu-cogs',{branchID:String(job.branchID),salesDate:job.salesDate,salesMenuCogsType:'Standard',showMenuPackage:'0'});if(r.rows.some(x=>x.salesDate!==job.salesDate||job.branchName&&x.branchName!==job.branchName))throw Error('Identitas tanggal/cabang laporan tidak cocok.');results.push({...job,...r});}catch{results.push({...job,complete:false,error:'Laporan tanggal/cabang ini belum berhasil dibaca.'});}}}
+ async function worker(){while(cursor<jobs.length){const job=jobs[cursor++];try{const r=await client.pages('sales-menu-cogs',{branchID:String(job.branchID),salesDate:job.salesDate,salesMenuCogsType:'Standard',showMenuPackage:'1'});if(r.rows.some(x=>x.salesDate!==job.salesDate||job.branchName&&x.branchName!==job.branchName))throw Error('Identitas tanggal/cabang laporan tidak cocok.');results.push({...job,view:'with-package-detail',...r});}catch{results.push({...job,complete:false,error:'Laporan tanggal/cabang ini belum berhasil dibaca.'});}}}
  await Promise.all([worker(),worker()]);return results;
 }
 async function run(){

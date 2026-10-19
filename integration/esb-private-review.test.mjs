@@ -10,6 +10,6 @@ test('only local private key decrypts authenticated, compressed report; cipherte
  const broken=Buffer.from(s.data,'base64');broken[0]^=1;const bad=crypto.createDecipheriv('aes-256-gcm',key,Buffer.from(s.iv,'base64'));bad.setAuthTag(Buffer.from(s.tag,'base64'));bad.update(broken);assert.throws(()=>bad.final());
 });
 test('failed or mismatched days stay incomplete; successful pages retain their original counts',async()=>{
- const jobs=[{branchID:1,salesDate:'2026-01-01'},{branchID:2,salesDate:'2026-01-01'}],client={pages:async(n,p)=>p.branchID==='1'?{complete:true,count:1,rows:[{salesDate:p.salesDate}]}:{complete:true,count:1,rows:[{salesDate:'2026-01-02'}]}};
+ const jobs=[{branchID:1,salesDate:'2026-01-01'},{branchID:2,salesDate:'2026-01-01'}],client={pages:async(n,p)=>{assert.equal(p.showMenuPackage,'1');return p.branchID==='1'?{complete:true,count:1,rows:[{salesDate:p.salesDate}]}:{complete:true,count:1,rows:[{salesDate:'2026-01-02'}]};}};
  const result=await collect(jobs,client);assert.equal(result.filter(r=>r.complete).length,1);assert.equal(result.find(r=>r.branchID===1).count,1);
 });
