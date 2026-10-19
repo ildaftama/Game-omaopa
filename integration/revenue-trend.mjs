@@ -35,3 +35,27 @@ export function buildRevenueTrend(sources,aliases,profiles,{asOf='2026-10-16'}={
  const outlets=Object.fromEntries(ids.map(id=>[id,{name:profiles[id].name,...summarize(records.filter(r=>r.id===id))}]));
  return {public:{year:2026,metric:'Malmil & Ogura, without orders, per source scope',from:first,through,coverageLabel:first?`${Number(first.slice(8))} ${names[Number(first.slice(5,7))-1]}–${Number(through.slice(8))} ${names[Number(through.slice(5,7))-1]} 2026`:'Belum tersedia',network:summarize(networkRows),outlets},private:{records,issues,completeNetworkDays:networkRows.length}};
 }
+
+// Input is the audited private ledger split. No receipt text, customer data or
+// unverified residual can enter the public chart.
+export function buildValidatedRevenueTrend(history,profiles,{minimumMonthlyDays=5}={}){
+ const names=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+ const summarize=rows=>{
+  const rs=rows.toSorted((a,b)=>a.date.localeCompare(b.date));
+  if(new Set(rs.map(r=>r.date)).size!==rs.length)throw Error('Duplicate chart date');
+  const start=rs[0]?.date,end=rs.at(-1)?.date,daily=[],map=new Map(rs.map(r=>[r.date,r]));
+  if(start)for(let date=start;date<=end;date=new Date(Date.parse(date+'T00:00:00Z')+864e5).toISOString().slice(0,10)){
+   const p=map.get(date),value=p?.walkIn;
+   if(value!==null&&value!==undefined&&(!Number.isFinite(value)||value<0||p.reasons?.length))throw Error('Unverified residual');
+   daily.push({date,label:date,amount:value??null});
+  }
+  const monthly=names.slice(0,end?Number(end.slice(5,7)):0).map((label,i)=>{
+   const month='2026-'+String(i+1).padStart(2,'0'),observed=rs.filter(r=>r.date.startsWith(month)),valid=observed.filter(r=>r.walkIn!==null);
+   return {month,label,calendarDays:new Date(Date.UTC(2026,i+1,0)).getUTCDate(),days:valid.length,observedDays:observed.length,amount:valid.length>=minimumMonthlyDays?valid.reduce((s,r)=>s+r.walkIn,0)/valid.length:null};
+  });
+  return {from:start??null,through:end??null,validDays:daily.filter(r=>r.amount!==null).length,observedDays:rs.length,daily,monthly};
+ };
+ const network={name:'Gabungan outlet',sourceLabel:'LK harian · omzet bersih',...summarize(history.network)};
+ const outlets=Object.fromEntries(Object.entries(profiles).map(([id,o])=>[id,{name:o.name,sourceLabel:'Laporan omzet bersih outlet',...summarize(history.outlets.filter(r=>r.id===id))}]));
+ return {schemaVersion:2,year:2026,updatedAt:'2026-10-19',metric:'Net sales minus validated destination-outlet cake orders; excludes shipping and non-sale adjustments',minimumMonthlyDays,coverageLabel:'2026 · sesuai ketersediaan data terverifikasi',network,outlets};
+}
