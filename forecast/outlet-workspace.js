@@ -6,7 +6,7 @@ const pct=n=>n==null?'—':(n>0?'+':'')+n.toLocaleString('id-ID',{maximumFractio
 const decimal=n=>n==null?'—':n.toLocaleString('id-ID',{maximumFractionDigits:1})+'%';
 const date=s=>new Date(s+'T12:00:00+07:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
 const list=Object.entries(data.outlets).filter(([id,o])=>o.hasProfile).sort((a,b)=>a[1].name.localeCompare(b[1].name));
-let selected='nusa-indah',focus='summary',period='3',lastOutlet='nusa-indah';try{const saved=localStorage.getItem('forecast-outlet');if(saved==='__all__'||list.some(([id])=>id===saved))selected=saved;}catch{}
+let selected='nusa-indah',focus='forecast',period='3',lastOutlet='nusa-indah';try{const saved=localStorage.getItem('forecast-outlet');if(saved==='__all__'||list.some(([id])=>id===saved))selected=saved;}catch{}
 const outlet=()=>data.outlets[selected==='__all__'?lastOutlet:selected],periodData=()=>analysis.periods[period];
 const events=()=>periodData().events.filter(e=>e.outletIds.includes(selected)&&e.scope!=='agenda-wilayah');
 const patterns=()=>periodData().patterns.filter(g=>g.id===selected);
@@ -25,7 +25,7 @@ $('#workspace-outlet').addEventListener('change',e=>{selected=e.target.value;if(
 document.querySelectorAll('[data-focus]').forEach(b=>b.addEventListener('click',()=>{focus=b.dataset.focus;if(selected==='__all__'&&!['summary','forecast','products','pcs','orders','history','sources'].includes(focus)){selected=lastOutlet;$('#workspace-outlet').value=selected;sync();}render();}));
 $('#workspace-content').addEventListener('click',e=>{if(window.PcsPanels.click(e)){render();return;}if(window.SourceSettings.click(e))return;if(window.DataPanels.click(e)){render();return;}if(window.ForecastWorkspace.click(e)){render();return;}const go=e.target.closest('[data-go]'),open=e.target.closest('[data-open]');if(go){focus=go.dataset.go;render();}if(open){sync();nav.setView(open.dataset.open);$('#workspace-back').hidden=false;}});
 $('#workspace-content').addEventListener('change',e=>{if(window.PcsPanels.change(e)||window.DataPanels.change(e)||window.ForecastWorkspace.change(e)){render();return;}if(e.target.id==='focus-period'){period=e.target.value;render();}});
-$('#workspace-back').addEventListener('click',()=>{focus='summary';render();});
+$('#workspace-back').addEventListener('click',()=>{focus='forecast';render();});
 if(!window.RADAR_GOOGLE_MAPS_KEY)document.querySelector('.google-traffic-card').hidden=true;
 $('#workspace-content').addEventListener('submit',e=>{if(e.target.id==='source-settings-form')window.SourceSettings.submit(e);});
 $('#workspace-content').addEventListener('mouseover',e=>window.SeasonalityPanel.inspect(e,selected));

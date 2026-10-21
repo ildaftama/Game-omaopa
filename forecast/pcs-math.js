@@ -24,6 +24,15 @@
    const pre=new Map((sales?.days||[]).map(r=>[r.date+'|'+r.id,r]));
    return dates.map(date=>{let value=0,valid=0;for(const id of ids){const r=pre.get(date+'|'+id),q=r?.qty?.[product];if(r?.complete&&Number.isSafeInteger(q)&&q>=0&&(!(product>=4&&product<=6)||(r.mappingVersion||1)>=2)){value+=q;valid++;}}return{date,value:valid?value:null,valid,expected:ids.length,complete:valid===ids.length};});
   },
+  partition(sales,orders,ids,product,dates){
+   const total=this.sold(sales,ids,product,dates),retail=this.pure(sales,orders,ids,product,dates);
+   return dates.map((date,i)=>{
+    const t=total[i],r=retail[i],complete=t.complete&&r.complete;
+    // Both components use the same date/outlet/product population as the total.
+    // Sheet orders not proven to be in this POS population cannot be forced into it.
+    return {date,total:{...t,value:t.complete?t.value:null},retail:{...r,value:complete?r.value:null,complete},orders:{...r,value:complete?t.value-r.value:null,complete}};
+   });
+  },
   group(rows,key){const map=new Map();for(const r of rows){const k=key(r),g=map.get(k)||{date:k,value:null,valid:0,expected:0,complete:true,reasons:{}};if(r.value!==null)g.value=(g.value??0)+r.value;g.valid+=r.valid;g.expected+=r.expected;g.complete=g.complete&&r.complete;map.set(k,g);}return [...map.values()];},
   ordered(orders,ids,product,dates){
    const pre=new Map((orders?.days||[]).map(r=>[r.date+'|'+r.id,r])),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]);
