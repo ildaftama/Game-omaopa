@@ -1,0 +1,68 @@
+name: Pulihkan laporan PCS yang belum lengkap
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pcs-orders-publication
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Periksa aturan hitung dan laporan nol
+        run: node --test integration/pcs-sales.test.mjs integration/pcs-math.test.mjs
+      - name: Tarik ulang hanya laporan yang belum lengkap
+        env:
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+        run: node integration/pcs-repair.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pcs-dipulihkan
+          path: forecast/pcs-sales.json
+          retention-days: 2
+  publish:
+    needs: collect
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: pcs-dipulihkan
+          path: .pcs-repair
+      - name: Simpan rekap yang sudah diperiksa
+        run: |
+          cp .pcs-repair/pcs-sales.json forecast/pcs-sales.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- forecast/pcs-sales.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Pulihkan laporan PCS historis yang belum lengkap'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          rm -rf .pcs-repair
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
