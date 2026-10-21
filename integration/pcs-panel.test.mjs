@@ -1,10 +1,11 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';import{createRequire}from'node:module';
 const math=createRequire(import.meta.url)('../forecast/pcs-math.js');
-async function setup(width=1400){
- const dates=['2025-08-01','2026-08-01','2026-08-02'],qty=n=>Array(12).fill(n);
+async function setup(width=1400,extraDates=[]){
+ const dates=['2025-08-01','2026-08-01','2026-08-02',...extraDates],qty=n=>Array(12).fill(n);
  const sales={schemaVersion:1,outletIds:['a','b'],days:dates.flatMap(date=>[{date,id:'a',qty:qty(20),complete:true},...(date==='2026-08-02'?[]:[{date,id:'b',qty:qty(30),complete:true}])])};
  const orders={schemaVersion:1,coveredDates:dates,days:dates.flatMap(date=>[{date,id:'a',qty:qty(2)},{date,id:'b',qty:qty(3)}])};
- const window={PcsMath:math,innerWidth:width,dispatchEvent(){}},context=vm.createContext({window,fetch:async url=>({ok:true,json:async()=>url==='pcs-sales.json'?sales:orders}),Intl,Date,Event,console});
+ class Clock extends Date{constructor(...args){super(...(args.length?args:['2026-10-21T02:00:00Z']));}}
+ const window={PcsMath:math,innerWidth:width,dispatchEvent(){}},context=vm.createContext({window,fetch:async url=>({ok:true,json:async()=>url==='pcs-sales.json'?sales:orders}),Intl,Date:Clock,Event,console});
  vm.runInContext(fs.readFileSync(new URL('../forecast/pcs-panel.js',import.meta.url),'utf8'),context);await new Promise(r=>setImmediate(r));return window.PcsPanels;
 }
 test('overview is one total chart, preserves variant choices, and never turns missing months into zeros',async()=>{
@@ -19,4 +20,9 @@ test('month and product navigation keep the same SKU and distinguish partial tot
 test('orders also use a single total chart and product selection; narrow screens keep readable tick spacing',async()=>{
  const p=await setup(390);let html=p.orders('__all__');assert.equal((html.match(/role="img"/g)||[]).length,1);assert.match(html,/Grafik jumlah kue pesanan/);assert.match(html,/Termasuk pesanan mendatang/);assert.match(html,/viewBox="0 0 302 300"/);
  p.change({target:{id:'pcso-month',value:'08'}});p.change({target:{id:'pcso-product',value:'11'}});html=p.orders('__all__');assert.match(html,/pcs-tag">Lite Keju/);assert.match(html,/>10 <small>PCS/);assert.match(html,/1 Agustus/);
+});
+test('a fully matched month-to-date is still labelled as an unfinished monthly total',async()=>{
+ const p=await setup(1400,Array.from({length:20},(_,i)=>'2026-10-'+String(i+1).padStart(2,'0')));p.change({target:{id:'pcs-product',value:'7'}});
+ assert.match(p.render('__all__'),/Oktober: 900 PCS · sebagian data/);assert.match(p.render('__all__'),/Data s.d. 20 Oktober/);
+ p.change({target:{id:'pcs-month',value:'10'}});assert.match(p.render('__all__'),/Data s.d. 20 Oktober/);assert.match(p.render('__all__'),/>900 <small>PCS<\/small>/);
 });
