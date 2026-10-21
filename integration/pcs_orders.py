@@ -57,9 +57,13 @@ def text_core(text,family,flavor):
     for line in text.lower().splitlines():
         if family not in line or 'mini' in line:continue
         if re.match(r'\s*[*_ -]*(topping|harga|catatan|note|keterangan|total)\b',line):continue
-        if not re.search(flavor,line):
-            if not re.search(r'cheese|keju|\bcis\b|choco(?:late)?|coklat|cokelat|\bcho\b',line):return None
-            continue
+        # Base flavor follows the cake family. A chocolate topping on a cheese
+        # cake is not a chocolate cake; never match flavor anywhere in the line.
+        base=re.search(r'\b'+family+r'\s+(cheese|chesee|ches|keju|cis|choco(?:late)?|coklat|cokelat|cho)\b',line)
+        if not base:return None
+        base_flavor='cheese'if base[1]in ['cheese','chesee','ches','keju','cis']else'choco'
+        wanted='cheese'if 'cheese'in flavor else'choco'
+        if base_flavor!=wanted:continue
         if re.search(r'\b(free|gratis)\b',line):continue
         mentioned=True
         # Explicit quantity only, never price / average price.
@@ -73,6 +77,22 @@ def text_core(text,family,flavor):
         else:return None
     return sum(found)if found else None if mentioned else 0
 
+def text_chiffon(text):
+    result=[0]*5;found=False
+    for line in text.lower().splitlines():
+        if not re.search(r'chiff?on|cis[fs]on',line)or'mini'in line:continue
+        if re.match(r'\s*[*_ -]*(total|harga|catatan|note|keterangan)\b',line):continue
+        found=True;lite='lite'in line;extra=bool(re.search(r'\b(extra|ekstra|double)\b',line))
+        kind=3 if lite and extra else 4 if lite and re.search(r'keju|cheese',line)else 1 if extra else 2 if 'butter'in line else 0 if re.search(r'keju|cheese',line)else None
+        head=re.split(r'@|[�×]|\s[xX]\s|\brp\b|[=:]',line)[0]
+        # Parenthesized, leading, or trailing written PCS; no monetary division.
+        numbers=re.findall(r'(?<![\d.,])(\d{1,3})(?![\d.,])',head)
+        q=int(numbers[0])if len(numbers)==1 else None
+        if kind is None or q is None:
+            for i in ([3,4]if lite else[0,1,2]):result[i]=None
+        elif result[kind]is not None:result[kind]+=q
+    return result if found else None
+
 def quantities(r):
     q=[val(r,c)for c in range(4,10)];text=str(val(r,3)or'');result=[]
     for i in range(4):
@@ -85,7 +105,10 @@ def quantities(r):
         if explicit:m=mini(explicit[0],lines)
     result.extend([m['composition'].get(k,0)for k in ['cheese','choco','durian']]if m and m.get('composition')and sum(m['composition'].values())==m['quantity']else[None]*3 if m or 'mini'in text.lower()else[0]*3)
     c=chiffon(q[5])
-    result.extend([c['products'].get(k,0)for k in PRODUCTS[7:]]if c and c.get('complete')else[None]*5 if c or re.search(r'chiff?on|cis[fs]on',text,re.I)else[0]*5)
+    if c and c.get('complete'):result.extend(c['products'].get(k,0)for k in PRODUCTS[7:])
+    else:
+        written=text_chiffon(text)
+        result.extend(written if written is not None else[None]*5 if c else[0]*5)
     return result
 
 def aggregate(rows,reviews=None):

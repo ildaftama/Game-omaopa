@@ -18,4 +18,14 @@ class OrdersTest(unittest.TestCase):
         r['3']['value']='Malmil untuk acara';r['7']['value']=None;self.assertIsNone(quantities(r)[2]);self.assertIsNone(quantities(r)[3])
     def test_unallocated_blocks_date(self):
         a=aggregate([row(5577,46023,destination='Tidak diketahui')]);self.assertTrue(a['blockedDates'])
+    def test_topping_does_not_change_cake_flavor(self):
+        r=row(5577,46023,text='Malmil Cheese Topping Choco 2 @ 20.000',qty=2);r['7']['value']=None
+        self.assertEqual(quantities(r)[:4],[0,0,2,0])
+        r=row(5577,46023,text='Malmil Choco Topping Cheese 1 @ 20.000',qty=None);r['7']['value']=1
+        self.assertEqual(quantities(r)[:4],[0,0,0,1])
+    def test_chiffon_variants_recovered_only_from_written_count(self):
+        r=row(5577,46023,text='Chiffon Klasik Extra Keju (2) @35.000\nCisfon Klasik Keju 1 @34.000');r['9']={'value':'2 kls ec 1 kls'}
+        self.assertEqual(quantities(r)[7:],[1,2,0,0,0])
+        r['3']['value']='Chiffon Lite (2) @17.000';r['9']['value']='2 lite'
+        self.assertEqual(quantities(r)[7:],[0,0,0,None,None])
 if __name__=='__main__':unittest.main()
