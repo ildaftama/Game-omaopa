@@ -5,7 +5,8 @@ async function setup(width=1400,extraDates=[]){
  const sales={schemaVersion:1,outletIds:['a','b'],days:dates.flatMap(date=>[{date,id:'a',qty:qty(20),complete:true},...(date==='2026-08-02'?[]:[{date,id:'b',qty:qty(30),complete:true}])])};
  const orders={schemaVersion:1,coveredDates:dates,days:dates.flatMap(date=>[{date,id:'a',qty:qty(2)},{date,id:'b',qty:qty(3)}])};
  class Clock extends Date{constructor(...args){super(...(args.length?args:['2026-10-21T02:00:00Z']));}}
- const window={PcsMath:math,innerWidth:width,dispatchEvent(){}},context=vm.createContext({window,fetch:async url=>({ok:true,json:async()=>url==='pcs-sales.json'?sales:orders}),Intl,Date:Clock,Event,console});
+ const window={PcsMath:math,innerWidth:width,dispatchEvent(){}},context=vm.createContext({window,fetch:async url=>({ok:true,json:async()=>url==='pcs-sales.json'?sales:orders}),document:{getElementById:()=>null},Intl,Date:Clock,Event,console});
+ vm.runInContext(fs.readFileSync(new URL('../forecast/pcs-compare.js',import.meta.url),'utf8'),context);
  vm.runInContext(fs.readFileSync(new URL('../forecast/pcs-panel.js',import.meta.url),'utf8'),context);await new Promise(r=>setImmediate(r));return window.PcsPanels;
 }
 test('overview is one total chart, preserves variant choices, and never turns missing months into zeros',async()=>{
@@ -25,4 +26,9 @@ test('a fully matched month-to-date is still labelled as an unfinished monthly t
  const p=await setup(1400,Array.from({length:20},(_,i)=>'2026-10-'+String(i+1).padStart(2,'0')));p.change({target:{id:'pcs-product',value:'7'}});
  assert.match(p.render('__all__'),/Oktober: 900 PCS · sebagian data/);assert.match(p.render('__all__'),/Data s.d. 20 Oktober/);
  p.change({target:{id:'pcs-month',value:'10'}});assert.match(p.render('__all__'),/Data s.d. 20 Oktober/);assert.match(p.render('__all__'),/>900 <small>PCS<\/small>/);
+});
+test('comparison mode is available beside the trend without changing the other tab',async()=>{
+ const p=await setup(),mode=value=>({target:{closest:s=>s==='[data-pcs-mode]'?{dataset:{pcsKind:'sales',pcsMode:value}}:null}});
+ assert.equal(p.click(mode('compare')),true);assert.match(p.render('__all__'),/Atur perbandingan/);assert.match(p.render('__all__'),/Bandingkan jenis penjualan/);assert.match(p.orders('__all__'),/Tren pesanan/);
+ p.click(mode('trend'));assert.match(p.render('__all__'),/Tren penjualan kue/);assert.ok(!p.render('__all__').includes('Atur perbandingan'));
 });
