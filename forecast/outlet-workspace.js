@@ -24,7 +24,6 @@ $('#workspace-outlet').innerHTML='<option value="__all__">Semua outlet</option>'
 $('#workspace-outlet').addEventListener('change',e=>{selected=e.target.value;if(selected==='__all__'){if(!['summary','forecast','products','pcs','orders','history','sources'].includes(focus))focus='forecast';try{localStorage.setItem('forecast-outlet',selected);}catch{}render();return;}lastOutlet=selected;try{localStorage.setItem('forecast-outlet',selected);}catch{}sync();render();});
 document.querySelectorAll('[data-focus]').forEach(b=>b.addEventListener('click',()=>{focus=b.dataset.focus;if(selected==='__all__'&&!['summary','forecast','products','pcs','orders','history','sources'].includes(focus)){selected=lastOutlet;$('#workspace-outlet').value=selected;sync();}render();}));
 $('#workspace-content').addEventListener('click',e=>{if(window.PcsPanels.click(e)){render();return;}if(window.SourceSettings.click(e))return;if(window.DataPanels.click(e)){render();return;}if(window.ForecastWorkspace.click(e)){render();return;}const go=e.target.closest('[data-go]'),open=e.target.closest('[data-open]');if(go){focus=go.dataset.go;render();}if(open){sync();nav.setView(open.dataset.open);$('#workspace-back').hidden=false;}});
-$('#workspace-content').addEventListener('input',e=>window.PcsPanels.input(e));
 $('#workspace-content').addEventListener('change',e=>{if(window.PcsPanels.change(e)||window.DataPanels.change(e)||window.ForecastWorkspace.change(e)){render();return;}if(e.target.id==='focus-period'){period=e.target.value;render();}});
 $('#workspace-back').addEventListener('click',()=>{focus='summary';render();});
 if(!window.RADAR_GOOGLE_MAPS_KEY)document.querySelector('.google-traffic-card').hidden=true;
@@ -33,6 +32,7 @@ $('#workspace-content').addEventListener('mouseover',e=>window.SeasonalityPanel.
 $('#workspace-content').addEventListener('focusin',e=>window.SeasonalityPanel.inspect(e,selected));
 $('#workspace-content').addEventListener('mouseover',e=>window.PcsPanels.inspect(e));
 $('#workspace-content').addEventListener('focusin',e=>window.PcsPanels.inspect(e));
+window.addEventListener('pcs-selection-changed',()=>{if(['pcs','orders'].includes(focus))render();});
 window.addEventListener('pcs-data-loaded',()=>{if(['pcs','orders'].includes(focus))render();});
 window.addEventListener('forecast-sources-loaded',()=>{if(focus==='sources')render();});
 $('#sources-open').addEventListener('click',()=>{document.getElementById('source-dialog').close();focus='sources';render();});
