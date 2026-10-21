@@ -1,0 +1,64 @@
+// Merge INSIDE match /databases/{database}/documents. Keep all existing rules.
+// Existing staff accounts share plans; anonymous users have no access to plans.
+function forecastStaff() {
+  return request.auth != null
+    && exists(/databases/$(database)/documents/staff/$(request.auth.uid));
+}
+function forecastQuantity(q) { return q is int && q >= 0 && q <= 10000; }
+function forecastQuantities(a) {
+  return a is list && a.size() == 12
+    && forecastQuantity(a[0]) && forecastQuantity(a[1])
+    && forecastQuantity(a[2]) && forecastQuantity(a[3])
+    && forecastQuantity(a[4]) && forecastQuantity(a[5])
+    && forecastQuantity(a[6]) && forecastQuantity(a[7])
+    && forecastQuantity(a[8]) && forecastQuantity(a[9])
+    && forecastQuantity(a[10]) && forecastQuantity(a[11]);
+}
+function forecastActive(a) {
+  return a is list && a.size() == 12
+    && a[0] is bool && a[1] is bool && a[2] is bool && a[3] is bool
+    && a[4] is bool && a[5] is bool && a[6] is bool && a[7] is bool
+    && a[8] is bool && a[9] is bool && a[10] is bool && a[11] is bool;
+}
+function forecastPlan(p, d) {
+  return p is map
+    && p.keys().hasOnly(['date','outlet','active','regular','orders','note','prices','recommendations','method','cutoff'])
+    && p.date == d.date && p.outlet == d.outlet
+    && forecastActive(p.active) && forecastQuantities(p.regular) && forecastQuantities(p.orders)
+    && p.note is string && p.note.size() <= 500
+    && p.prices is list && p.prices.size() == 12
+    && p.recommendations is list && p.recommendations.size() == 12
+    && p.method == 'weekday-median-trend-v1';
+}
+function forecastRecord(d, key) {
+  return d.keys().hasOnly(['schemaVersion','date','outlet','revision','plan','baseline','firstSavedAt','savedAt','savedBy'])
+    && d.schemaVersion == 1 && d.revision is int && d.revision >= 1
+    && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && d.outlet in ['ambarawa','boyolali','gajah-raya','godean','jakal-uii','karanganyar','laweyan','makamhaji','merbabu','muntilann','ngaliyan','nusa-indah','nusukan','pemuda-magelang','rajawali','sampangan','sragen','sukoharjo','tajem','temanggung','udinus','uksw','ums','umy','undip','unimus','unnes','uns']
+    && key == d.date + '_' + d.outlet
+    && d.savedBy == request.auth.uid && d.savedAt == request.time
+    && d.firstSavedAt is timestamp && forecastPlan(d.plan,d) && forecastPlan(d.baseline,d);
+}
+match /forecastPlans/{key} {
+  allow read: if forecastStaff();
+  allow create: if forecastStaff() && forecastRecord(request.resource.data,key)
+    && request.resource.data.revision == 1
+    && request.resource.data.firstSavedAt == request.time
+    && request.resource.data.baseline == request.resource.data.plan
+    && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/1).data == request.resource.data;
+  allow update: if forecastStaff() && forecastRecord(request.resource.data,key)
+    && request.resource.data.date == resource.data.date
+    && request.resource.data.outlet == resource.data.outlet
+    && request.resource.data.revision == resource.data.revision + 1
+    && request.resource.data.baseline == resource.data.baseline
+    && request.resource.data.firstSavedAt == resource.data.firstSavedAt
+    && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/$(string(request.resource.data.revision))).data == request.resource.data;
+  allow delete: if false;
+  match /revisions/{revision} {
+    allow read: if forecastStaff();
+    allow create: if forecastStaff() && forecastRecord(request.resource.data,key)
+      && revision == string(request.resource.data.revision)
+      && getAfter(/databases/$(database)/documents/forecastPlans/$(key)).data == request.resource.data;
+    allow update, delete: if false;
+  }
+}
