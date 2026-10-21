@@ -32,7 +32,7 @@ jobs:
           python-version: '3.12'
       - name: Periksa perhitungan PCS
         run: |
-          node --test integration/pcs-sales.test.mjs integration/pcs-math.test.mjs
+          node --test integration/pcs-sales.test.mjs integration/pcs-math.test.mjs integration/pcs-panel.test.mjs
           python -m unittest discover -s integration -p test_pcs_orders.py
       - name: Baca link sumber yang disimpan tim
         run: node integration/pcs-source.mjs
