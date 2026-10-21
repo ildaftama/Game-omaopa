@@ -33,7 +33,37 @@
     return {date,total:{...t,value:t.complete?t.value:null},retail:{...r,value:complete?r.value:null,complete},orders:{...r,value:complete?t.value-r.value:null,complete}};
    });
   },
-  group(rows,key){const map=new Map();for(const r of rows){const k=key(r),g=map.get(k)||{date:k,value:null,valid:0,expected:0,complete:true,reasons:{}};if(r.value!==null)g.value=(g.value??0)+r.value;g.valid+=r.valid;g.expected+=r.expected;g.complete=g.complete&&r.complete;map.set(k,g);}return [...map.values()];},
+  estimatedPartition(sales,orders,ids,product,dates){
+   const sold=new Map((sales?.days||[]).map(r=>[r.date+'|'+r.id,r])),pre=new Map((orders?.days||[]).map(r=>[r.date+'|'+r.id,r])),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]),history=new Map();
+   const integer=q=>Number.isSafeInteger(q)&&q>=0;
+   for(const s of sales?.days||[]){
+    const q=pre.get(s.date+'|'+s.id)?.qty?.[product],total=s.qty?.[product];
+    if(s.complete&&covered.has(s.date)&&!blocked.has(s.date)&&integer(q)&&q>0&&integer(total)&&total>0&&q<=total){const a=history.get(s.id)||[];a.push({date:s.date,ratio:q/total});history.set(s.id,a);}
+   }
+   function previousShare(id,date){
+    const since=new Date(date+'T00:00:00Z');since.setUTCDate(since.getUTCDate()-56);
+    // Prior dates only: no future sales/order information enters a historical estimate.
+    const a=(history.get(id)||[]).filter(r=>r.date<date&&r.date>=since.toISOString().slice(0,10)).map(r=>r.ratio).sort((a,b)=>a-b);
+    return a.length?(a[Math.floor((a.length-1)/2)]+a[Math.floor(a.length/2)])/2:null;
+   }
+   return dates.map(date=>{
+    let total=0,ordered=0,valid=0,estimated=false;const methods={confirmed:0,sheet:0,capped:0,history:0,knownOnly:0},reasons={};
+    for(const id of ids){
+     const s=sold.get(date+'|'+id),o=pre.get(date+'|'+id),n=s?.qty?.[product];
+     if(!s?.complete||!integer(n)||(product>=4&&product<=6&&(s.mappingVersion||1)<2)){reasons.sales=(reasons.sales||0)+1;continue;}
+     const known=integer(o?.knownQty?.[product])?o.knownQty[product]:0,q=covered.has(date)&&!blocked.has(date)?(o?o.qty?.[product]:0):null,matched=o?.esbMatchedQty?.[product];let candidate,method;
+     if(integer(q)&&integer(matched)&&matched<=q&&matched<=n){candidate=matched;method='confirmed';}
+     else if(integer(q)){candidate=q;method=q===0?'confirmed':'sheet';}
+     else{const share=previousShare(id,date);candidate=Math.max(known,share===null?known:Math.round(n*share));method=share===null?'knownOnly':'history';}
+     // This is an explicitly estimated POS allocation, never a change to the CS source.
+     if(candidate>n){candidate=n;method='capped';}
+     methods[method]++;estimated=estimated||method!=='confirmed';total+=n;ordered+=candidate;valid++;
+    }
+    const complete=valid===ids.length,base={date,valid,expected:ids.length,complete,reasons};
+    return {date,methods,total:{...base,value:complete?total:null},orders:{...base,value:complete?ordered:null,estimated,methods},retail:{...base,value:complete?total-ordered:null,estimated,methods}};
+   });
+  },
+  group(rows,key){const map=new Map();for(const r of rows){const k=key(r),g=map.get(k)||{date:k,value:null,valid:0,expected:0,complete:true,reasons:{}};if(r.value!==null)g.value=(g.value??0)+r.value;g.valid+=r.valid;g.expected+=r.expected;g.complete=g.complete&&r.complete;if(r.estimated)g.estimated=true;map.set(k,g);}return [...map.values()];},
   ordered(orders,ids,product,dates){
    const pre=new Map((orders?.days||[]).map(r=>[r.date+'|'+r.id,r])),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]);
    return dates.map(date=>{let value=0,valid=0,known=false;
