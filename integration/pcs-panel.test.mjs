@@ -31,9 +31,11 @@ test('missing source rows cannot turn a partial monthly sum into a reported tota
  const p=await setup({gap:true});p.render('__all__');change(p,'pcs-month','08');let html=p.render('__all__');assert.match(html,/<strong>— <small>PCS/);assert.match(html,/2 Agustus<\/td><td>—<\/td>/);
  change(p,'pcs-month','all');html=p.render('__all__');assert.ok(!html.includes('data-pcs-point="Malmil Cheese · Total penjualan · Agustus'));assert.match(html,/Agustus<\/td><td>—<\/td>/);
 });
-test('unmatched CS orders leave both POS components unconfirmed while retaining the genuine total',async()=>{
+test('available sheet orders render both estimated components instead of blanking every month',async()=>{
  const p=await setup({unmatched:true});p.render('__all__');change(p,'pcs-month','08');assert.match(p.render('__all__'),/>3\.100 <small>PCS/);
- for(const m of ['retail','orders']){mode(p,m);let html=p.render('__all__');assert.match(html,/<strong>— <small>PCS/);assert.match(html,/2 Agustus<\/td><td>—<\/td>/);change(p,'pcs-month','all');html=p.render('__all__');assert.match(html,/Agustus<\/td><td>—<\/td>/);assert.match(html,/Pemisahan pesanan belum lengkap/);change(p,'pcs-month','08');}
+ mode(p,'retail');let html=p.render('__all__');assert.match(html,/>2\.790 <small>PCS/);assert.match(html,/Estimasi/);assert.match(html,/2 Agustus<\/td><td>45<\/td>/);
+ mode(p,'orders');html=p.render('__all__');assert.match(html,/>310 <small>PCS/);assert.match(html,/2 Agustus<\/td><td>5<\/td>/);
+ change(p,'pcs-month','all');html=p.render('__all__');assert.match(html,/Agustus<\/td><td>155<\/td>/);assert.match(html,/data-pcs-point="Malmil Cheese.*Pesanan.*Agustus/);
 });
 test('raw CS reference is clearly separated and never added to another sales mode',async()=>{
  const p=await setup({width:390,unmatched:true});p.render('__all__');change(p,'pcso-month','08');let html=p.orders('__all__');assert.match(html,/Rekap pesanan/);assert.match(html,/Sheet PESANAN/);assert.match(html,/>310 <small>PCS/);assert.ok(!html.includes('type="radio"'));assert.match(html,/viewBox="0 0 302 300"/);
