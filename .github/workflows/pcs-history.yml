@@ -1,0 +1,145 @@
+name: Lengkapi histori PCS
+on:
+  workflow_dispatch:
+    inputs:
+      month_from:
+        description: Bulan awal (YYYY-MM)
+        default: '2025-01'
+        required: true
+        type: string
+      month_to:
+        description: Bulan akhir (YYYY-MM)
+        default: '2026-06'
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: pcs-history-backfill
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      months: ${{ steps.months.outputs.months }}
+    steps:
+      - id: months
+        env:
+          MONTH_FROM: ${{ inputs.month_from }}
+          MONTH_TO: ${{ inputs.month_to }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const from=process.env.MONTH_FROM,to=process.env.MONTH_TO;
+          for(const s of [from,to])if(!/^202[56]-(0[1-9]|1[0-2])$/.test(s))throw Error('Gunakan bulan 2025 atau 2026.');
+          if(from>to)throw Error('Rentang terbalik.');
+          const months=[];
+          for(let d=new Date(from+'-01T00:00:00Z');d.toISOString().slice(0,7)<=to;d.setUTCMonth(d.getUTCMonth()+1))months.push(d.toISOString().slice(0,7));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'months='+JSON.stringify(months)+'\n');
+          JS
+  collect:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        month: ${{ fromJSON(needs.prepare.outputs.months) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ambil satu bulan per produk dari API ESB
+        env:
+          MONTH: ${{ matrix.month }}
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {collect,range,mergeSales} from './integration/pcs-sales.mjs';
+          import {createEsbClient} from './integration/esb-client.mjs';
+          const month=process.env.MONTH,from=month+'-01',end=new Date(from+'T00:00:00Z');
+          end.setUTCMonth(end.getUTCMonth()+1);end.setUTCDate(0);
+          const yesterday=new Date(Date.now()-86400000),fmt=d=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+          const to=[end.toISOString().slice(0,10),fmt(yesterday)].sort()[0];
+          if(to<from)throw Error('Bulan belum selesai dimulai.');
+          const config=JSON.parse(fs.readFileSync('integration/pcs-branches.json','utf8'));
+          const client=createEsbClient({username:process.env.ESB_USERNAME,password:process.env.ESB_PASSWORD});
+          let results;try{results=await collect(config.branches,range(from,to),client);}finally{client.close();}
+          const snapshot=mergeSales(null,results);
+          snapshot.requested={from,to,reports:results.length,complete:results.filter(r=>r.complete).length};
+          fs.mkdirSync('.pcs-history',{recursive:true});
+          fs.writeFileSync('.pcs-history/'+month+'.json',JSON.stringify(snapshot));
+          console.log(month+': '+snapshot.requested.complete+'/'+results.length+' laporan terbaca.');
+          if(snapshot.failed.length)console.log('::warning::Sebagian laporan perlu ditarik ulang; bukan dianggap nol.');
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pcs-history-${{ matrix.month }}
+          path: .pcs-history/*.json
+          retention-days: 7
+          include-hidden-files: true
+  publish:
+    needs: collect
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pcs-orders-publication
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pcs-history-*
+          path: .pcs-history
+          merge-multiple: true
+      - name: Gabungkan histori tanpa menimpa pembaruan harian
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {mergeSales} from './integration/pcs-sales.mjs';
+          const path='forecast/pcs-sales.json',current=JSON.parse(fs.readFileSync(path,'utf8'));
+          const files=fs.readdirSync('.pcs-history').filter(f=>f.endsWith('.json')).sort();
+          if(!files.length)throw Error('Belum ada rekap historis.');
+          const snapshots=files.map(f=>JSON.parse(fs.readFileSync('.pcs-history/'+f,'utf8')));
+          // Current complete snapshots win if daily refresh has run in the meantime.
+          const merged=mergeSales(null,[...snapshots.flatMap(s=>s.days),...current.days]);
+          const valid=new Set(merged.days.map(r=>r.date+'|'+r.id));
+          merged.failed=[...new Map([...snapshots.flatMap(s=>s.failed||[]),...(current.failed||[])].filter(r=>!valid.has(r.date+'|'+r.id)).map(r=>[r.date+'|'+r.id,r])).values()];
+          const history=new Map((current.history||[]).map(r=>[r.from.slice(0,7),r]));
+          for(const s of snapshots)history.set(s.requested.from.slice(0,7),s.requested);
+          merged.history=[...history.values()].sort((a,b)=>a.from.localeCompare(b.from));
+          fs.writeFileSync(path,JSON.stringify(merged));
+          console.log('Histori tersedia: '+merged.days.length+' tanggal-outlet. Laporan belum terbaca: '+merged.failed.length+'.');
+          JS
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- forecast/pcs-sales.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Lengkapi histori PCS per outlet dan produk'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          rm -rf .pcs-history
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+      - name: Terbitkan histori
+        id: deployment
+        uses: actions/deploy-pages@v4
