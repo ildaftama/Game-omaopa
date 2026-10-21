@@ -16,6 +16,17 @@
    });
   },
   group(rows,key){const map=new Map();for(const r of rows){const k=key(r),g=map.get(k)||{date:k,value:null,valid:0,expected:0,complete:true,reasons:{}};if(r.value!==null)g.value=(g.value??0)+r.value;g.valid+=r.valid;g.expected+=r.expected;g.complete=g.complete&&r.complete;map.set(k,g);}return [...map.values()];},
+  ordered(orders,ids,product,dates){
+   const pre=new Map((orders?.days||[]).map(r=>[r.date+'|'+r.id,r])),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]);
+   return dates.map(date=>{let value=0,valid=0,known=false;
+    if(!covered.has(date))return{date,value:null,valid:0,expected:ids.length,complete:false};
+    for(const id of ids){const row=pre.get(date+'|'+id),q=row?row.qty[product]:0;
+     if(Number.isSafeInteger(q)&&q>=0){value+=q;valid++;known=true;}
+     else if(Number.isSafeInteger(row?.knownQty?.[product])&&row.knownQty[product]>0){value+=row.knownQty[product];known=true;}
+    }
+    return{date,value:known?value:null,valid,expected:ids.length,complete:valid===ids.length&&!blocked.has(date)};
+   });
+  },
   change(current,previous){return current?.complete&&previous?.complete&&previous.value>0?(current.value-previous.value)/previous.value*100:null;}
  };
  if(typeof module!=='undefined'&&module.exports)module.exports=core;else root.PcsMath=core;
