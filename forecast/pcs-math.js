@@ -3,13 +3,14 @@
 (function(root){
  const core={
   pure(sales,orders,ids,product,dates){
+   const products=[...new Set(Array.isArray(product)?product:[product])];
    const sold=new Map((sales?.days||[]).map(r=>[r.date+'|'+r.id,r])),pre=new Map((orders?.days||[]).map(r=>[r.date+'|'+r.id,r])),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]);
    return dates.map(date=>{let value=0,valid=0,reasons={};
-    for(const id of ids){const k=date+'|'+id,s=sold.get(k),o=pre.get(k),q=o?o.qty[product]:0;let reason=null;
-     if(!s?.complete||!Number.isSafeInteger(s.qty?.[product]))reason='sales';
-     else if(!covered.has(date)||blocked.has(date)||q===null||q===undefined)reason='orders';
-     else if(q>s.qty[product])reason='mismatch';
-     if(reason)reasons[reason]=(reasons[reason]||0)+1;else{value+=s.qty[product]-q;valid++;}
+    for(const id of ids){const k=date+'|'+id,s=sold.get(k),o=pre.get(k),qs=products.map(p=>o?o.qty[p]:0);let reason=null;
+     if(!s?.complete||products.some(p=>!Number.isSafeInteger(s.qty?.[p])||s.qty[p]<0))reason='sales';
+     else if(!covered.has(date)||blocked.has(date)||qs.some(q=>!Number.isSafeInteger(q)||q<0))reason='orders';
+     else if(products.some((p,i)=>qs[i]>s.qty[p]))reason='mismatch';
+     if(reason)reasons[reason]=(reasons[reason]||0)+1;else{value+=products.reduce((sum,p,i)=>sum+s.qty[p]-qs[i],0);valid++;}
     }
     return {date,value:valid?value:null,valid,expected:ids.length,complete:valid===ids.length,reasons};
    });
