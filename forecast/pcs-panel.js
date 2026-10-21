@@ -16,7 +16,7 @@ window.PcsPanels=(()=>{
  function combine(series){return(series[0]?.daily||[]).map((r,i)=>{const rs=series.map(s=>s.daily[i]);return {date:r.date,value:rs.some(v=>v.value!==null)?rs.reduce((n,v)=>n+(v.value??0),0):null,valid:rs.reduce((n,v)=>n+v.valid,0),expected:rs.reduce((n,v)=>n+v.expected,0),complete:rs.every(v=>v.complete)};});}
  function strict(row){return {...row,value:row.complete?row.value:null};}
  function build(id,kind){
-  const s=states[kind],selected=ids(id),ds=dates(s.year,kind==='orders').filter(d=>s.month==='all'||d.slice(5,7)===s.month),series=[];
+  const s=states[kind],selected=ids(id),covered=new Set(orders.coveredDates||[]),ds=dates(s.year,kind==='orders').filter(d=>(kind!=='orders'||d<today()||covered.has(d))&&(s.month==='all'||d.slice(5,7)===s.month)),series=[];
   if(selected.length)for(const p of products(kind).filter(p=>s.products.includes(p))){
    const raw=kind==='orders'?window.PcsMath.ordered(orders,selected,p,ds):window.PcsMath.partition(sales,orders,selected,p,ds).map(r=>r[s.mode==='sales'?'total':s.mode]);
    const daily=raw.map(strict),rows=(s.month==='all'?window.PcsMath.group(daily,r=>r.date.slice(0,7)):daily).map(strict);
