@@ -59,7 +59,7 @@ function forecastRecord(d, key) {
     && d.outlet in ['ambarawa','boyolali','gajah-raya','godean','jakal-uii','karanganyar','laweyan','makamhaji','merbabu','muntilann','ngaliyan','nusa-indah','nusukan','pemuda-magelang','rajawali','sampangan','sragen','sukoharjo','tajem','temanggung','udinus','uksw','ums','umy','undip','unimus','unnes','uns']
     && key == d.date + '_' + d.outlet
     && d.savedBy == request.auth.uid && d.savedAt == request.time
-    && d.firstSavedAt is timestamp && forecastPlan(d.plan,d) && forecastPlan(d.baseline,d);
+    && d.firstSavedAt is timestamp && forecastPlan(d.plan,d);
 }
 match /forecastPlans/{key} {
   allow read: if forecastStaff();
@@ -78,7 +78,11 @@ match /forecastPlans/{key} {
   allow delete: if false;
   match /revisions/{revision} {
     allow read: if forecastStaff();
-    allow create: if forecastStaff() && forecastRecord(request.resource.data,key)
+    // The matching parent is validated above in the same atomic write.
+    // Avoid evaluating the entire 12-SKU payload twice for one revision.
+    allow create: if forecastStaff()
+      && request.resource.data.savedBy == request.auth.uid
+      && request.resource.data.savedAt == request.time
       && revision == string(request.resource.data.revision)
       && getAfter(/databases/$(database)/documents/forecastPlans/$(key)).data == request.resource.data;
     allow update, delete: if false;
