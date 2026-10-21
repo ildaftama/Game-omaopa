@@ -10,7 +10,7 @@ function setup(){
  return {cmp,data,click,field,render:()=>cmp.render(data)};
 }
 test('default compares retail and preorders from matched PCS, excluding factory orders',()=>{
- const t=setup(),html=t.render();assert.match(html,/Bandingkan jenis penjualan/);assert.match(html,/2 produk · 2 outlet · Agu, Sep 2026/);assert.equal((html.match(/stroke-width="1.3"/g)||[]).length,2);assert.match(html,/>270 <small>PCS \*/);assert.match(html,/>30 <small>PCS \*/);assert.ok(!html.includes('>0 PCS'));
+ const t=setup(),html=t.render();assert.match(html,/Bandingkan jenis penjualan/);assert.match(html,/Malmil Cheese \+ Malmil Choco · Outlet A \+ Outlet B · Agu, Sep 2026/);assert.equal((html.match(/stroke-width="1.3"/g)||[]).length,2);assert.match(html,/>270 <small>PCS \*/);assert.match(html,/>30 <small>PCS \*/);assert.ok(!html.includes('>0 PCS'));
 });
 test('multi-product, outlet and channel choices form distinct labelled curves without a Cartesian explosion',()=>{
  const t=setup();t.render();t.click('data-cmp-config',{cmpConfig:'products'});t.field('by','products');t.click('data-cmp-apply');let html=t.render();assert.match(html,/Malmil Cheese · Tanpa pesanan/);assert.match(html,/Malmil Choco · Pesanan/);assert.equal((html.match(/stroke-width="1.3"/g)||[]).length,4);
