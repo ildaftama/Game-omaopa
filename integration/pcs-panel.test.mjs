@@ -6,29 +6,32 @@ async function setup(width=1400,extraDates=[]){
  const orders={schemaVersion:1,coveredDates:dates,days:dates.flatMap(date=>[{date,id:'a',qty:qty(2)},{date,id:'b',qty:qty(3)}])};
  class Clock extends Date{constructor(...args){super(...(args.length?args:['2026-10-21T02:00:00Z']));}}
  const window={PcsMath:math,innerWidth:width,dispatchEvent(){}},context=vm.createContext({window,fetch:async url=>({ok:true,json:async()=>url==='pcs-sales.json'?sales:orders}),document:{getElementById:()=>null},Intl,Date:Clock,Event,console});
- vm.runInContext(fs.readFileSync(new URL('../forecast/pcs-compare.js',import.meta.url),'utf8'),context);
  vm.runInContext(fs.readFileSync(new URL('../forecast/pcs-panel.js',import.meta.url),'utf8'),context);await new Promise(r=>setImmediate(r));return window.PcsPanels;
 }
-test('overview is one total chart, preserves variant choices, and never turns missing months into zeros',async()=>{
- const p=await setup(),html=p.render('__all__');assert.equal((html.match(/role="img"/g)||[]).length,1);assert.match(html,/Semua produk · total/);assert.match(html,/Chiffon Classic Keju/);assert.match(html,/Chiffon Classic Ekstra Keju/);assert.match(html,/Lite Keju/);assert.match(html,/Lite Ekstra Keju/);assert.match(html,/Chiffon Butter/);assert.match(html,/>567 <small>PCS/);assert.match(html,/Januari<\/td><td>—<\/td><td>Belum tersedia/);assert.ok(!html.includes('5 produk paling banyak'));
- p.change({target:{id:'pcs-year',value:'2025'}});assert.match(p.render('__all__'),/>405 <small>PCS/);
+const change=(p,id,value)=>p.change({target:{id,value}}),toggle=(p,id,checked)=>p.change({target:{id,checked}});
+const action=(p,key,kind='sales')=>p.click({target:{closest:s=>s===`[data-pcs-${key}]`?{dataset:{[key==='all'?'pcsAll':'pcsNone']:kind}}:null}});
+test('two products start on one chart; switching off a product removes its curve and quantities',async()=>{
+ const p=await setup();let html=p.render('__all__');assert.equal((html.match(/role="img"/g)||[]).length,1);assert.match(html,/>126 <small>PCS \*/);assert.match(html,/data-pcs-point="Malmil Cheese/);assert.match(html,/data-pcs-point="Malmil Choco/);
+ assert.equal(toggle(p,'pcs-product-3',false),true);html=p.render('__all__');assert.match(html,/>63 <small>PCS \*/);assert.ok(!html.includes('data-pcs-point="Malmil Choco'));assert.match(html,/role="switch" id="pcs-product-3" >/);
+ toggle(p,'pcs-product-3',true);assert.match(p.render('__all__'),/>126 <small>PCS \*/);assert.ok(!html.includes('Atur perbandingan'));
 });
-test('month and product navigation keep the same SKU and distinguish partial totals',async()=>{
- const p=await setup();p.change({target:{id:'pcs-month',value:'08'}});p.change({target:{id:'pcs-product',value:'7'}});let html=p.render('__all__');assert.match(html,/>63 <small>PCS \*/);assert.match(html,/Harian · Agustus/);assert.match(html,/Garis putus-putus/);assert.match(html,/fill="transparent"/);assert.match(html,/stroke-width="1.2"/);
- assert.equal(p.click({target:{closest:s=>s==='[data-pcs-pick]'?{dataset:{pcsKind:'sales',pcsPick:'8'}}:null}}),true);assert.match(p.render('__all__'),/pcs-tag">Chiffon Classic Ekstra Keju/);
- assert.equal(p.click({target:{closest:s=>s==='[data-pcs-month]'?{dataset:{pcsKind:'sales',pcsMonth:'09'}}:null}}),true);assert.match(p.render('__all__'),/Data periode ini belum tersedia/);
+test('outlet selection sums only chosen outlets, deduplicates values, and never treats no selection as all',async()=>{
+ const p=await setup();p.render('__all__');change(p,'pcs-month','08');p.setOutlets(['a','a','invalid']);let html=p.render('__all__');assert.match(html,/>72 <small>PCS \*/);assert.match(html,/pcs-tag">a<\/span>/);
+ p.setOutlets(['b']);html=p.render('__all__');assert.match(html,/>54 <small>PCS \*/);assert.match(html,/2 Agustus<\/td><td>—<\/td>/);
+ p.setOutlets(['a','b']);assert.match(p.render('__all__'),/>126 <small>PCS \*/);p.setOutlets([]);html=p.render('__all__');assert.match(html,/Pilih outlet di atas/);assert.ok(!html.includes('role="img"'));
 });
-test('orders also use a single total chart and product selection; narrow screens keep readable tick spacing',async()=>{
- const p=await setup(390);let html=p.orders('__all__');assert.equal((html.match(/role="img"/g)||[]).length,1);assert.match(html,/Grafik jumlah kue pesanan/);assert.match(html,/Termasuk pesanan mendatang/);assert.match(html,/viewBox="0 0 302 300"/);
- p.change({target:{id:'pcso-month',value:'08'}});p.change({target:{id:'pcso-product',value:'11'}});html=p.orders('__all__');assert.match(html,/pcs-tag">Lite Keju/);assert.match(html,/>10 <small>PCS/);assert.match(html,/1 Agustus/);
+test('all and hide-all actions preserve separate variant toggles and provide a way back from an empty chart',async()=>{
+ const p=await setup();p.render('__all__');action(p,'none');let html=p.render('__all__');assert.match(html,/Aktifkan produk di bawah/);assert.ok(!html.includes('role="img"'));action(p,'all');html=p.render('__all__');assert.match(html,/>567 <small>PCS \*/);for(const label of ['Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Lite Keju','Lite Ekstra Keju','Chiffon Butter'])assert.ok(html.includes(label));
 });
-test('a fully matched month-to-date is still labelled as an unfinished monthly total',async()=>{
- const p=await setup(1400,Array.from({length:20},(_,i)=>'2026-10-'+String(i+1).padStart(2,'0')));p.change({target:{id:'pcs-product',value:'7'}});
- assert.match(p.render('__all__'),/Oktober: 900 PCS · sebagian data/);assert.match(p.render('__all__'),/Data s.d. 20 Oktober/);
- p.change({target:{id:'pcs-month',value:'10'}});assert.match(p.render('__all__'),/Data s.d. 20 Oktober/);assert.match(p.render('__all__'),/>900 <small>PCS<\/small>/);
+test('sales and preorders can share the graph with distinct line styles; switching sources off is safe',async()=>{
+ const p=await setup();p.render('__all__');change(p,'pcs-month','08');toggle(p,'pcs-type-orders',true);let html=p.render('__all__');assert.match(html,/Penjualan & pesanan/);assert.match(html,/>146 <small>PCS \*/);assert.match(html,/stroke-dasharray="7 4"/);
+ toggle(p,'pcs-type-retail',false);html=p.render('__all__');assert.match(html,/>20 <small>PCS \*/);assert.ok(!html.includes('data-pcs-point="Malmil Cheese · Tanpa pesanan'));
+ toggle(p,'pcs-type-orders',false);assert.match(p.render('__all__'),/Aktifkan jenis penjualan/);
 });
-test('comparison mode is available beside the trend without changing the other tab',async()=>{
- const p=await setup(),mode=value=>({target:{closest:s=>s==='[data-pcs-mode]'?{dataset:{pcsKind:'sales',pcsMode:value}}:null}});
- assert.equal(p.click(mode('compare')),true);assert.match(p.render('__all__'),/Atur perbandingan/);assert.match(p.render('__all__'),/Bandingkan jenis penjualan/);assert.match(p.orders('__all__'),/Tren pesanan/);
- p.click(mode('trend'));assert.match(p.render('__all__'),/Tren penjualan kue/);assert.ok(!p.render('__all__').includes('Atur perbandingan'));
+test('orders keep their own product switches and period; the yearly view leaves unavailable months blank',async()=>{
+ const p=await setup(390);p.render('__all__');change(p,'pcs-year','2025');assert.match(p.render('__all__'),/>90 <small>PCS \*/);assert.match(p.render('__all__'),/Januari<\/td><td>—<\/td>/);
+ action(p,'none','orders');toggle(p,'pcso-product-11',true);change(p,'pcso-month','08');let html=p.orders('__all__');assert.match(html,/Harian · Agustus 2026/);assert.match(html,/>10 <small>PCS \*/);assert.match(html,/viewBox="0 0 302 300"/);assert.ok(!html.includes('data-pcs-point="Malmil Cheese'));assert.match(p.render('__all__'),/Tren bulanan 2025/);
+});
+test('month to date remains partial in the annual view while fully matched daily values are valid',async()=>{
+ const p=await setup(1400,Array.from({length:20},(_,i)=>'2026-10-'+String(i+1).padStart(2,'0')));let html=p.render('__all__');assert.match(html,/Oktober: 900 PCS · sebagian data/);change(p,'pcs-month','10');html=p.render('__all__');assert.match(html,/>1\.800 <small>PCS<\/small>/);assert.match(html,/Penjualan s.d. 20 Oktober/);assert.match(html,/stroke-width="1.2"/);
 });
