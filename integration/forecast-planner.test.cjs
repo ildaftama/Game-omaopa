@@ -18,5 +18,7 @@ test('missing prices stay missing, target cannot use later price periods',()=>{
 });
 test('monitoring preserves original plan, excludes late plans and respects missing actuals',()=>{
  const baseline={active:arrays(false),regular:arrays(0),orders:arrays(0)};baseline.active[2]=true;baseline.regular[2]=15;const record={outlet:'a',date:'2026-10-21',firstSavedAt:'2026-10-20T14:00:00Z',baseline,plan:{regular:arrays(999)}};
- const c=model.compare(record,sales,orders);assert.equal(c.planned,15);assert.equal(c.actual,15);assert.equal(c.wape,0);assert.equal(model.compare({...record,firstSavedAt:'2026-10-21T01:00:00+07:00'},sales,orders).wape,null);assert.equal(model.compare({...record,outlet:'missing'},sales,orders).actual,null);
+ const oneSales={...sales,days:sales.days.map(r=>({...r,qty:r.qty.map((v,p)=>p===2?v:0)}))},oneOrders={...orders,days:orders.days.map(r=>({...r,qty:r.qty.map((v,p)=>p===2?v:0)}))};
+ const c=model.compare(record,oneSales,oneOrders);assert.equal(c.planned,15);assert.equal(c.actual,15);assert.equal(c.wape,0);assert.equal(model.compare({...record,firstSavedAt:'2026-10-21T01:00:00+07:00'},oneSales,oneOrders).wape,null);assert.equal(model.compare({...record,outlet:'missing'},sales,orders).actual,null);
+ const all=model.compare(record,sales,orders);assert.equal(all.actual,180);assert.equal(all.absolute,165);assert.ok(all.wape>90,'Unselected products must not hide actual sales or inflate accuracy');
 });

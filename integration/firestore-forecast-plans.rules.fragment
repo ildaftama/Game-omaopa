@@ -1,8 +1,30 @@
 // Merge INSIDE match /databases/{database}/documents. Keep all existing rules.
-// Existing staff accounts share plans; anonymous users have no access to plans.
+// Admin, Admin Utama and Master have access by default.
+// Other existing staff require an explicit forecast-only grant from Admin Utama/Master.
+function forecastManager() {
+  return request.auth != null
+    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+    && (get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('super',false) == true
+      || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true);
+}
 function forecastStaff() {
   return request.auth != null
-    && exists(/databases/$(database)/documents/staff/$(request.auth.uid));
+    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+    && (forecastManager()
+      || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('admin',false) == true
+      || (exists(/databases/$(database)/documents/forecastAccess/$(request.auth.uid))
+        && get(/databases/$(database)/documents/forecastAccess/$(request.auth.uid)).data.enabled == true));
+}
+match /forecastAccess/{uid} {
+  allow get: if request.auth != null && (request.auth.uid == uid || forecastManager());
+  allow list: if forecastManager();
+  allow create, update: if forecastManager()
+    && exists(/databases/$(database)/documents/staff/$(uid))
+    && request.resource.data.keys().hasOnly(['enabled','updatedAt','updatedBy'])
+    && request.resource.data.enabled is bool
+    && request.resource.data.updatedBy == request.auth.uid
+    && request.resource.data.updatedAt == request.time;
+  allow delete: if false;
 }
 function forecastQuantity(q) { return q is int && q >= 0 && q <= 10000; }
 function forecastQuantities(a) {
