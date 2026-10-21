@@ -11,6 +11,11 @@ test('mapping and source validation fail safely on new cake types or foreign row
  assert.throws(()=>summarize([row('Malmil Cheese',1,{salesDate:'2026-09-02'})],job),/berbeda/);
  assert.throws(()=>summarize([row('Malmil Cheese',1.5)],job),/valid/);
 });
+test('old Cisfon menu names join the corresponding Chiffon variant without merging variants',()=>{
+ for(const [name,index]of [['Cisfon - Keju',7],['Cisfon - Ekstra Keju',8],['Cisfon - Butter',9],['Cisfon Lite - Keju',11],['Cisfon Lite - Ekstra Keju',10],['Paket Hantaran - Cisfon Classic Ekstra Keju',8]])assert.equal(sku(name),index,name);
+ const a=summarize([row('Cisfon - Keju',2),row('Chiffon Classic Keju',3),row('Cisfon - Ekstra Keju',4)],job);
+ assert.equal(a.qty[7],5);assert.equal(a.qty[8],4);
+});
 test('failed or empty refresh preserves an existing snapshot, valid data replaces it',async()=>{
  const old={days:[{id:'test',date:job.date,qty:[20],complete:true}]};
  assert.equal(mergeSales(old,[{id:'test',date:job.date,complete:false}]).days[0].qty[0],20);

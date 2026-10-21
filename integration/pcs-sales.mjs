@@ -3,9 +3,14 @@ import {pathToFileURL} from 'node:url';
 import {createEsbClient} from './esb-client.mjs';
 
 export const PRODUCTS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Mini Ogura - Cheese','Mini Ogura - Choco','Mini Ogura - Durian','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter','Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju'];
-export const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Keju','Chiffon Ekstra','Chiffon Butter','Chiffon Lite Ekstra','Chiffon Lite Keju'];
+export const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju'];
 export function sku(name){
- const n=String(name).trim().toLowerCase().replace(/\s+/g,' ');
+ let n=String(name).trim().toLowerCase().replace(/\s+/g,' ').replace(/\bcisfon\b/g,'chiffon');
+ // Legacy Cisfon labels and current Chiffon labels refer to the same SKU.
+ n=n.replace(/^(paket hantaran - )?chiffon\s*-\s*/,(_,prefix='')=>prefix+'chiffon ')
+     .replace(/\bchiffon lite\s*-\s*/,'chiffon lite ').replace(/\bextra keju\b/g,'ekstra keju');
+ n=n.replace(/\bchiffon (keju|ekstra keju|butter|buttermilk)$/,'chiffon classic $1')
+     .replace(/\bchiffon classic butter$/,'chiffon classic buttermilk');
  let m=n.match(/^(?:paket oleh-oleh |paket cemal-cemil )?(ogura|malmil) (cheese|choco|chocolate)$/);
  if(m)return (m[1]==='ogura'?0:2)+(m[2]==='cheese'?0:1);
  m=n.match(/^mini satuan - (cheese|coklat|durian)$/);if(m)return 4+['cheese','coklat','durian'].indexOf(m[1]);
@@ -23,7 +28,7 @@ export function summarize(rows,{date,branchName}){
   const p=sku(r.menuName);
   if(p===null){
    // Toppings, packaging and add-ons never create an additional cake.
-   if(/^(?:paket .*(?:malmil|ogura|chiffon)|(?:malmil|ogura|chiffon classic|chiffon lite)\b)/i.test(r.menuName))unknownCake++;
+   if(/^(?:paket .*(?:malmil|ogura|chiffon|cisfon)|(?:malmil|ogura|chiffon|cisfon)\b)/i.test(r.menuName))unknownCake++;
    continue;
   }
   if(!Number.isSafeInteger(r.qty)||r.qty<0||!Number.isFinite(r.total)||!Number.isFinite(r.discountTotal))throw Error('Jumlah produk ESB tidak valid.');
