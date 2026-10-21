@@ -8,6 +8,9 @@ FLAVOR=r'(cheese|choco|durian)'
 @lru_cache(maxsize=8192)
 def clean(text):
  s=str(text or '').lower().replace('\u2060','').replace('\u200b','').replace('\xa0',' ')
+ s=re.sub(r'\bminimix\b','mini mix',s)
+ s=re.sub(r'\boghura\b','ogura',s)
+ s=re.sub(r'\b(?:choclate|chocoate)\b','choco',s)
  for pattern,repl in [(r'\bmmchis\b','malmil cheese'),(r'\bmmcho\b','malmil choco'),(r'\bochis\b','ogura cheese'),(r'\bocho\b','ogura choco'),(r'\b(?:chiff?on|chiff?fon|chiff?en|cisf[fo]n|cisffon|chisfon|chesfon|chesfoon|cisofn|cisfom|cifon|ciffon|chifon|chifron)\b','chiffon'),(r'\b(?:chesee|chees|chesse|chese|cheeze|cheze|chess|keju|ches|cis)\b','cheese'),(r'\b(?:chocholate|chocho|chocolate|cocho|choklat|cokelat|coklat|cok|cho|coco|co)\b','choco'),(r'\b(?:dur|duren)\b','durian'),(r'\b(?:ekstra|ektra|exstra|ekst|extra|extre|extrq|double|ext|ex|ec)\b','extra'),(r'\b(?:klasik|klasik|klasik|klas|classic|clsc|kls|ks|biasa|reguler|regular|reg)\b','classic')]:s=re.sub(pattern,repl,s)
  s=re.sub(r'\b(cheese|choco)\s+(malmil|ogura)\b',r'\2 \1',s)
  return s
@@ -17,7 +20,7 @@ def item_lines(text,family=None):
   line=re.sub(r'^\s*(?:\d+[.)]\s*|[-*•_~]+\s*)','',raw).strip()
   if not re.search(FAMILY,line):continue
   if family and not re.search(r'\b'+family+r'\b',line):continue
-  if re.search(r'\b(?:plastik|minta|ucapan|dipotong|potong|catatan|catetan|keterangan|nota|gambar|contoh|packing|kemasan|kotak|dus kosong)\b',line):continue
+  if re.search(r'\b(?:plastik|minta|ucapan|tulisan|dipotong|potong|catatan|catetan|keterangan|nota|gambar|contoh|packing|kemasan|kotak|dus kosong)\b',line):continue
   if re.match(r'(?:pe|note|harga|topping|toping|total|sub\s*total|ongkir|free|gratis|bonus)\b',line):continue
   if re.search(r'\b(?:malmil|ogura|chiffon)\s+produksi\b',line):continue
   line=re.sub(r'\(\s*produksi[^)]*\)','',line)
@@ -171,7 +174,7 @@ def mini_cell(cell,text):
   tail=re.split(r'\bmini\b',line,maxsplit=1)[-1]
   flavor_names=set(re.findall(FLAVOR,tail))
   if flavor_names=={'cheese','choco'} and not re.search(r'\bpcs?\b',line):values=[q*4,q*5,0] # Owner-confirmed two-flavor box.
-  elif 'mix'in tail and len(flavor_names)in [0,3] and not re.search(r'\bpcs?\b',line):values=[q*3]*3
+  elif (('mix'in tail and len(flavor_names)in [0,3])or not flavor_names) and not re.search(r'\bpcs?\b',line):values=[q*3]*3 # Owner: unnamed Mini Ogura is standard mix too.
   elif len(flavor_names)==1:
    explicit_pc=bool(re.search(r'\bpcs?\b',line))
    explicit_box=bool(re.search(r'\b(?:box|boks|pack|pac|pak)\b',line))

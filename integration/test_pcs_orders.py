@@ -71,4 +71,7 @@ class OrdersTest(unittest.TestCase):
         self.assertEqual(outlet('NGALIYAN16.00 prnjualan masuk UKSW')[1],'uksw')
         r=row(5577,46023,destination='Tidak diketahui');a=aggregate([r],{fingerprint(r):{'excludeFromOutlet':True}})
         self.assertFalse(a['blockedDates']);self.assertEqual(a['excludedRecords'],1)
+    def test_bare_mini_ogura_is_owner_confirmed_mix_box(self):
+        for text,expected in [('Mini Ogura 3 box',[9,9,9]),('Mini Ogura 1 Rp 56.000',[3,3,3]),('Minimix x 1 = Rp. 56.000',[3,3,3])]:
+            r=row(5577,46023,text=text,qty=0);self.assertEqual(quantities(r)[4:7],expected)
 if __name__=='__main__':unittest.main()

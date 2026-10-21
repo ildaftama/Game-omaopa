@@ -54,7 +54,9 @@ export function zeroSalesDay(report,day){
   if(!Array.isArray(periods))return false;
   const values=periods.filter(p=>p.key===day);
   if(values.length!==1||!Number.isFinite(values[0].value)||values[0].value<0)return false;
-  total+=values[0].value;
+  // The ledger also lists stock-transfer postings as revenue. These are not POS cake sales.
+  // Keep validating their access/value, but do not turn a transfer-only day into missing PCS.
+  if(String(row.description||'').trim().toLowerCase()!=='penjualan - transfer')total+=values[0].value;
  }
  return total===0;
 }
