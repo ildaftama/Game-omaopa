@@ -1,0 +1,2 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),policy=require('../forecast/forecast-role-policy.js');
+test('only explicit Admin / Admin Utama / Master roles can enter; a staff grant is not an entrance role',()=>{for(const r of [null,{}, {hrd:true},{enabled:true},{admin:'true'},{master:1}])assert.equal(policy.allowed(r),false);for(const r of [{admin:true},{super:true},{master:true}])assert.equal(policy.allowed(r),true);assert.equal(policy.manager({admin:true}),false);assert.equal(policy.manager({master:true}),true);});

@@ -5,7 +5,7 @@ async function setup({width=1400,gap=false,unmatched=false}={}){
  const sales={schemaVersion:1,outletIds:['a','b'],days:dates.flatMap(date=>[{date,id:'a',qty:qty(20),mappingVersion:2,complete:true},...(gap&&date==='2026-08-02'?[]:[{date,id:'b',qty:qty(30),mappingVersion:2,complete:true}])])};
  const orders={schemaVersion:1,coveredDates:dates,days:dates.flatMap(date=>[{date,id:'a',qty:qty(2),esbMatchedQty:qty(2)},{date,id:'b',qty:qty(3),...(unmatched&&date==='2026-08-02'?{}:{esbMatchedQty:qty(3)})},{date,id:'__factory__',qty:qty(100)}])};
  class Clock extends Date{constructor(...args){super(...(args.length?args:['2026-10-21T02:00:00Z']));}}
- const window={PcsMath:math,innerWidth:width,dispatchEvent(){}},context=vm.createContext({window,fetch:async url=>({ok:true,json:async()=>url==='pcs-sales.json'?sales:orders}),document:{getElementById:()=>null},Intl,Date:Clock,Event,console});
+ const window={PcsMath:math,ForecastSecureData:{"pcs-sales.json":sales,"pcs-orders.json":orders},innerWidth:width,dispatchEvent(){}},context=vm.createContext({window,fetch:async url=>({ok:true,json:async()=>url==='pcs-sales.json'?sales:orders}),document:{getElementById:()=>null},Intl,Date:Clock,Event,console});
  vm.runInContext(fs.readFileSync(new URL('../forecast/pcs-panel.js',import.meta.url),'utf8'),context);await new Promise(r=>setImmediate(r));return window.PcsPanels;
 }
 const change=(p,id,value)=>p.change({target:{id,value}}),toggle=(p,id,checked)=>p.change({target:{id,checked}}),mode=(p,m)=>toggle(p,'pcs-type-'+m,true);

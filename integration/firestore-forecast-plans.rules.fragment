@@ -1,6 +1,6 @@
 // Merge INSIDE match /databases/{database}/documents. Keep all existing rules.
 // Admin, Admin Utama and Master have access by default.
-// Other existing staff require an explicit forecast-only grant from Admin Utama/Master.
+// Ordinary staff and old forecast-only grants do not grant access.
 function forecastManager() {
   return request.auth != null
     && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
@@ -12,19 +12,22 @@ function forecastStaff() {
     && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
     && (forecastManager()
       || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('admin',false) == true
-      || (exists(/databases/$(database)/documents/forecastAccess/$(request.auth.uid))
-        && get(/databases/$(database)/documents/forecastAccess/$(request.auth.uid)).data.enabled == true));
+);
 }
 match /forecastAccess/{uid} {
-  allow get: if request.auth != null && (request.auth.uid == uid || forecastManager());
-  allow list: if forecastManager();
-  allow create, update: if forecastManager()
-    && exists(/databases/$(database)/documents/staff/$(uid))
-    && request.resource.data.keys().hasOnly(['enabled','updatedAt','updatedBy'])
-    && request.resource.data.enabled is bool
-    && request.resource.data.updatedBy == request.auth.uid
-    && request.resource.data.updatedAt == request.time;
-  allow delete: if false;
+  allow read: if forecastManager();
+  allow write: if false;
+}
+function forecastReference(d, key) {
+  return forecastManager() && d.schemaVersion == 2
+    && d.updatedAt == request.time && d.updatedBy == request.auth.uid
+    && d.sha256 is string && d.sha256.matches('^[a-f0-9]{64}$')
+    && ((key == 'reference_current' && d.kind == 'reference-manifest'
+      && d.keys().hasOnly(['schemaVersion','kind','chunks','sha256','updatedAt','updatedBy'])
+      && d.chunks is list && d.chunks.size() > 0 && d.chunks.size() <= 10)
+    || (key.matches('^reference_[a-f0-9]{16}_[0-9]$') && d.kind == 'reference-chunk'
+      && d.keys().hasOnly(['schemaVersion','kind','payload','sha256','updatedAt','updatedBy'])
+      && d.payload is string && d.payload.size() <= 700000));
 }
 function forecastQuantity(q) { return q is int && q >= 0 && q <= 10000; }
 function forecastQuantities(a) {
@@ -50,7 +53,7 @@ function forecastPlan(p, d) {
     && p.note is string && p.note.size() <= 500
     && p.prices is list && p.prices.size() == 12
     && p.recommendations is list && p.recommendations.size() == 12
-    && p.method == 'weekday-median-trend-v1';
+    && p.method in ['weekday-median-trend-v1','pcs-pooled-locked-v2'];
 }
 function forecastRecord(d, key) {
   return d.keys().hasOnly(['schemaVersion','date','outlet','revision','plan','baseline','firstSavedAt','savedAt','savedBy'])
@@ -63,18 +66,18 @@ function forecastRecord(d, key) {
 }
 match /forecastPlans/{key} {
   allow read: if forecastStaff();
-  allow create: if forecastStaff() && forecastRecord(request.resource.data,key)
+  allow create: if forecastReference(request.resource.data,key) || (forecastStaff() && forecastRecord(request.resource.data,key)
     && request.resource.data.revision == 1
     && request.resource.data.firstSavedAt == request.time
     && request.resource.data.baseline == request.resource.data.plan
-    && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/1).data == request.resource.data;
-  allow update: if forecastStaff() && forecastRecord(request.resource.data,key)
+    && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/1).data == request.resource.data);
+  allow update: if forecastReference(request.resource.data,key) || (forecastStaff() && forecastRecord(request.resource.data,key)
     && request.resource.data.date == resource.data.date
     && request.resource.data.outlet == resource.data.outlet
     && request.resource.data.revision == resource.data.revision + 1
     && request.resource.data.baseline == resource.data.baseline
     && request.resource.data.firstSavedAt == resource.data.firstSavedAt
-    && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/$(string(request.resource.data.revision))).data == request.resource.data;
+    && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/$(string(request.resource.data.revision))).data == request.resource.data);
   allow delete: if false;
   match /revisions/{revision} {
     allow read: if forecastStaff();
