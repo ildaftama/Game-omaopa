@@ -10,6 +10,9 @@
  const indices=new WeakMap();
  function scoped(source,id,from,to){if(!source)return {days:[]};let index=indices.get(source);if(!index){index=new Map();for(const r of source.days||[]){if(!index.has(r.id))index.set(r.id,[]);index.get(r.id).push(r);}indices.set(source,index);}return {...source,days:(index.get(id)||[]).filter(r=>r.date>=from&&r.date<=to)};}
  function recommend(sales,orders,id,target){
+  const snapshot=root.ForecastStudy?.recommendations;
+  if(snapshot){const i=snapshot.ids.indexOf(id),qty=snapshot.dates[target]?.[i];return names.map((name,p)=>{const central=qty?.[p]??null,delta=central===null?null:Math.max(1,Math.ceil(central*snapshot.tolerance));return {name,central,low:central===null?null:Math.max(0,central-delta),high:central===null?null:central+delta,samples:0,through:snapshot.through,estimated:true,method:snapshot.method,tolerance:true,uncertainty80Pcs:snapshot.validationAbsolute80Pcs[p]};});}
+
   sales=scoped(sales,id,shift(target,-112),shift(target,-1));orders=scoped(orders,id,shift(target,-112),shift(target,-1));
   const from=shift(target,-56),dates=[...new Set((sales?.days||[]).filter(r=>r.id===id&&r.date>=from&&r.date<target).map(r=>r.date))].sort();
   return names.map((name,p)=>{
