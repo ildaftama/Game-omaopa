@@ -27,3 +27,11 @@ test('daily refresh preserves history coverage and resolves only successfully re
  const old={history:[{from:'2025-01-01',to:'2025-01-31'}],failed:[{date:'2025-01-01',id:'a'},{date:'2025-01-02',id:'b'}],days:[]};
  const merged=mergeSales(old,[{date:'2025-01-01',id:'a',qty:[1],complete:true}]);assert.deepEqual(merged.history,old.history);assert.deepEqual(merged.failed,[{date:'2025-01-02',id:'b'}]);
 });
+
+test('an empty product report needs explicit zero sales ledger evidence, never missing or netted values',async()=>{
+ const {zeroSalesDay}=await import('./pcs-sales.mjs');
+ const ledger=v=>({sales:[{hasViewAccess:true,details:[{periods:[{key:'01',value:v}]}]}]});
+ assert.equal(zeroSalesDay(ledger(0),'01'),true);assert.equal(zeroSalesDay(ledger(100),'01'),false);assert.equal(zeroSalesDay(ledger(null),'01'),false);assert.equal(zeroSalesDay(ledger(0),'02'),false);assert.equal(zeroSalesDay({sales:[]},'01'),false);assert.equal(zeroSalesDay({sales:[{hasViewAccess:false,details:[{periods:[{key:'01',value:0}]}]}]},'01'),false);
+ const results=await collect([{id:'test',branchName:job.branchName,branchID:1}],[job.date],{pages:async()=>({complete:true,count:0,rows:[]}),report:async()=>ledger(0)});assert.equal(results[0].complete,true);assert.equal(results[0].qty.reduce((a,b)=>a+b,0),0);assert.equal(results[0].verifiedZero,'empty-menu-and-zero-sales-ledger');
+ const failed=await collect([{id:'test',branchName:job.branchName,branchID:1}],[job.date],{pages:async()=>({complete:true,count:0,rows:[]}),report:async()=>ledger(1)});assert.equal(failed[0].complete,false);assert.equal(failed[0].reason,'empty-unverified');
+});
