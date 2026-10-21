@@ -3,7 +3,7 @@ const math=createRequire(import.meta.url)('../forecast/pcs-math.js');
 function setup(){
  class Clock extends Date{constructor(...args){super(...(args.length?args:['2026-10-21T02:00:00Z']));}}
  const dates=['2026-08-01','2026-08-02','2026-09-01'],qty=n=>Array(12).fill(n),labels=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju'];
- const sales={outletIds:['a','b'],days:dates.flatMap(date=>[{date,id:'a',qty:qty(20),complete:true},{date,id:'b',qty:qty(30),complete:true}])},orders={coveredDates:dates,days:dates.flatMap(date=>[{date,id:'a',qty:qty(2)},{date,id:'b',qty:qty(3)},{date,id:'__factory__',qty:qty(100)}])};
+ const sales={outletIds:['a','b'],days:dates.flatMap(date=>[{date,id:'a',qty:qty(20),complete:true},{date,id:'b',qty:qty(30),complete:true}])},orders={coveredDates:dates,days:dates.flatMap(date=>[{date,id:'a',qty:qty(2),esbMatchedQty:qty(2)},{date,id:'b',qty:qty(3),esbMatchedQty:qty(3)},{date,id:'__factory__',qty:qty(100)}])};
  const window={PcsMath:math,innerWidth:1100,OUTLET_INTELLIGENCE:{outlets:{a:{name:'Outlet A'},b:{name:'Outlet B'}}}},context=vm.createContext({window,document:{getElementById:()=>null},Intl,Date:Clock});
  vm.runInContext(fs.readFileSync(new URL('../forecast/pcs-compare.js',import.meta.url),'utf8'),context);
  const cmp=window.PcsCompare,data={sales,orders,labels,outletId:'__all__',year:'2026',month:'all',product:'all'},click=(attr,dataset={})=>cmp.click({target:{closest:s=>s===`[${attr}]`?{dataset}:null}}),field=(k,v,checked)=>cmp.change({target:{dataset:{cmpField:k},value:v,checked}});

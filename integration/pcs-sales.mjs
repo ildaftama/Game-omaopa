@@ -7,6 +7,7 @@ export const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco'
 export const MAPPING_VERSION=2;
 export function sku(name){
  let n=String(name).trim().toLowerCase().replace(/\s+/g,' ').replace(/\bcisfon\b/g,'chiffon');
+ n=n.replace(/^(ogura (?:cheese|choco)) promo kartini$/,'$1').replace(/^(chiffon classic (?:keju|ekstra keju|buttermilk)) go gajah raya$/,'$1');
  // Legacy Cisfon labels and current Chiffon labels refer to the same SKU.
  n=n.replace(/^(paket hantaran - )?chiffon\s*-\s*/,(_,prefix='')=>prefix+'chiffon ')
      .replace(/\bchiffon lite\s*-\s*/,'chiffon lite ').replace(/\bextra keju\b/g,'ekstra keju');
@@ -26,7 +27,7 @@ export function summarize(rows,{date,branchName}){
   if(r.salesDate!==date||r.branchName!==branchName)throw Error('Tanggal atau outlet ESB berbeda.');
   if(r.salesType!=='Sales'||r.rowType==='PACKAGE_COMPONENT')continue;
   if(!['ALACARTE','PACKAGE_HEADER'].includes(r.rowType))throw Error('Jenis baris ESB belum dikenali.');
-  const p=sku(r.menuName),mix=/^mini ogura filling mix$/i.test(String(r.menuName).trim()),parts=mix?[[4,3],[5,3],[6,3]]:p===null?null:[[p,1]];
+  const p=sku(r.menuName),box=String(r.menuName).trim().toLowerCase(),miniBoxes={'mini ogura filling mix':[[4,3],[5,3],[6,3]],'mini ogura filling chocolate':[[5,9]],'mini ogura filling choco & cheese':[[4,4],[5,5]]},parts=miniBoxes[box]||(p===null?null:[[p,1]]);
   if(!parts){
    // Toppings, packaging and add-ons never create an additional cake.
    if(/^(?:paket .*(?:malmil|ogura|chiffon|cisfon)|(?:malmil|ogura|chiffon|cisfon|mini ogura|mini satuan)\b)/i.test(r.menuName)&&!/^(?:cisfon|chiffon)\s*(?:-\s*|classic\s+)?kurma$/i.test(r.menuName)){unknownCake++;unmappedMenus.add(r.menuName);}
