@@ -4,6 +4,7 @@ import {createEsbClient} from './esb-client.mjs';
 
 export const PRODUCTS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Mini Ogura - Cheese','Mini Ogura - Choco','Mini Ogura - Durian','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter','Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju'];
 export const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju'];
+export const MAPPING_VERSION=2;
 export function sku(name){
  let n=String(name).trim().toLowerCase().replace(/\s+/g,' ').replace(/\bcisfon\b/g,'chiffon');
  // Legacy Cisfon labels and current Chiffon labels refer to the same SKU.
@@ -11,7 +12,7 @@ export function sku(name){
      .replace(/\bchiffon lite\s*-\s*/,'chiffon lite ').replace(/\bextra keju\b/g,'ekstra keju');
  n=n.replace(/\bchiffon (keju|ekstra keju|butter|buttermilk)$/,'chiffon classic $1')
      .replace(/\bchiffon classic butter$/,'chiffon classic buttermilk');
- let m=n.match(/^(?:paket oleh-oleh |paket cemal-cemil )?(ogura|malmil) (cheese|choco|chocolate)$/);
+ let m=n.match(/^(?:paket oleh-oleh |paket cemal-cemil )?(ogura|malmil) (cheese|choco|chocolate)(?:\s*-\s*(?:topping|toping|polos)\b.*)?$/);
  if(m)return (m[1]==='ogura'?0:2)+(m[2]==='cheese'?0:1);
  m=n.match(/^mini satuan - (cheese|coklat|durian)$/);if(m)return 4+['cheese','coklat','durian'].indexOf(m[1]);
  m=n.match(/^(?:paket hantaran - )?chiffon (classic|lite) (ekstra keju|keju|buttermilk)$/);
@@ -20,24 +21,23 @@ export function sku(name){
 }
 export function summarize(rows,{date,branchName}){
  if(!Array.isArray(rows))throw Error('Format rincian ESB tidak sesuai.');
- const qty=PRODUCTS.map(()=>0),free=PRODUCTS.map(()=>0);let unknownCake=0;
+ const qty=PRODUCTS.map(()=>0),free=PRODUCTS.map(()=>0);let unknownCake=0;const unmappedMenus=new Set();
  for(const r of rows){
   if(r.salesDate!==date||r.branchName!==branchName)throw Error('Tanggal atau outlet ESB berbeda.');
   if(r.salesType!=='Sales'||r.rowType==='PACKAGE_COMPONENT')continue;
   if(!['ALACARTE','PACKAGE_HEADER'].includes(r.rowType))throw Error('Jenis baris ESB belum dikenali.');
-  const p=sku(r.menuName);
-  if(p===null){
+  const p=sku(r.menuName),mix=/^mini ogura filling mix$/i.test(String(r.menuName).trim()),parts=mix?[[4,3],[5,3],[6,3]]:p===null?null:[[p,1]];
+  if(!parts){
    // Toppings, packaging and add-ons never create an additional cake.
-   if(/^(?:paket .*(?:malmil|ogura|chiffon|cisfon)|(?:malmil|ogura|chiffon|cisfon)\b)/i.test(r.menuName)&&!/^(?:cisfon|chiffon)\s*(?:-\s*|classic\s+)?kurma$/i.test(r.menuName))unknownCake++;
+   if(/^(?:paket .*(?:malmil|ogura|chiffon|cisfon)|(?:malmil|ogura|chiffon|cisfon|mini ogura|mini satuan)\b)/i.test(r.menuName)&&!/^(?:cisfon|chiffon)\s*(?:-\s*|classic\s+)?kurma$/i.test(r.menuName)){unknownCake++;unmappedMenus.add(r.menuName);}
    continue;
   }
   if(!Number.isSafeInteger(r.qty)||r.qty<0||!Number.isFinite(r.total)||!Number.isFinite(r.discountTotal))throw Error('Jumlah produk ESB tidak valid.');
   // Monetary fields classify fully complimentary lines only; never derive PCS from prices.
-  if(r.total-r.discountTotal<=0){free[p]+=r.qty;continue;}
-  qty[p]+=r.qty;
+  for(const [index,multiplier]of parts)(r.total-r.discountTotal<=0?free:qty)[index]+=r.qty*multiplier;
  }
- if(unknownCake)throw Error('Ada nama menu kue baru yang perlu dipetakan.');
- return {qty,free};
+ if(unknownCake)throw Object.assign(Error('Ada nama menu kue baru yang perlu dipetakan.'),{unmappedMenus:[...unmappedMenus]});
+ return {qty,free,mappingVersion:MAPPING_VERSION};
 }
 export function range(from,to){
  const dates=[];
@@ -70,9 +70,9 @@ export async function collectJobs(jobs,client){
   if(!report.complete)throw Error('Laporan belum lengkap.');
   if(!report.rows.length){
    if(report.count!==0||!await verifiedZero(job))throw Error('Laporan kosong belum terkonfirmasi.');
-   results.push({date:job.date,id:job.id,qty:PRODUCTS.map(()=>0),free:PRODUCTS.map(()=>0),complete:true,verifiedZero:'empty-menu-and-zero-sales-ledger'});
+   results.push({date:job.date,id:job.id,qty:PRODUCTS.map(()=>0),free:PRODUCTS.map(()=>0),mappingVersion:MAPPING_VERSION,complete:true,verifiedZero:'empty-menu-and-zero-sales-ledger'});
   }else results.push({date:job.date,id:job.id,...summarize(report.rows,job),complete:true});
- }catch(error){results.push({date:job.date,id:job.id,complete:false,reason:/menu kue baru/.test(error.message)?'unmapped-menu':/kosong/.test(error.message)?'empty-unverified':String(error.message).match(/HTTP \d{3}/)?.[0]||'unavailable'});}
+ }catch(error){results.push({date:job.date,id:job.id,complete:false,reason:/menu kue baru/.test(error.message)?'unmapped-menu':/kosong/.test(error.message)?'empty-unverified':String(error.message).match(/HTTP \d{3}/)?.[0]||'unavailable',...(error.unmappedMenus?{unmappedMenus:error.unmappedMenus}:{})});}
  if(results.length%28===0)console.log('Laporan outlet diperiksa: '+results.length+'/'+jobs.length);
  }}
  await Promise.all([worker(),worker()]);return results;
@@ -80,7 +80,7 @@ export async function collectJobs(jobs,client){
 export async function collect(branches,dates,client){return collectJobs(dates.flatMap(date=>branches.map(b=>({...b,date}))),client);}
 export function mergeSales(previous,results){
  const map=new Map((previous?.days||[]).map(r=>[r.date+'|'+r.id,r]));
- for(const r of results)if(r.complete)map.set(r.date+'|'+r.id,r);
+ for(const r of results)if(r.complete){const key=r.date+'|'+r.id,old=map.get(key);if(!old||(r.mappingVersion||1)>=(old.mappingVersion||1))map.set(key,r);}
  const failed=[...new Map([...(previous?.failed||[]),...results.filter(r=>!r.complete)].filter(r=>!map.has(r.date+'|'+r.id)).map(r=>[r.date+'|'+r.id,{date:r.date,id:r.id,...(r.reason?{reason:r.reason}:{})}])).values()];
  return {schemaVersion:1,products:PRODUCTS,labels:LABELS,outletIds:[...new Set([...(previous?.outletIds||[]),...results.map(r=>r.id)])].sort(),updatedAt:new Date().toISOString(),days:[...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)),failed,...(previous?.history?{history:previous.history}:{})};
 }

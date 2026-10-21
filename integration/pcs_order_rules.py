@@ -34,7 +34,7 @@ def one_typo(a,b):
     return any(long[:i]+long[i+1:]==short for i in range(len(long)))
 
 def outlet(text):
-    s=str(text or '').lower()
+    s=str(text or '').lower().replace('prnjualan','penjualan')
     revenue=re.search(r'\b(?:penjualan\s+masuk|masuk\s+(?:penjualan|om[sz]et)|om[sz]et)\s+([a-z ]+?)(?=\s+kue\b|\s+di\b|\d|$)',s)
     if revenue:
         key=norm(revenue[1])
@@ -52,13 +52,13 @@ def outlet(text):
     if len(found)>1:return 'unallocated',None,'multiple-outlets'
     for a,k in PROVISIONAL.items():
         if a in tokens:return 'unallocated',k,'alias-needs-confirmation'
-    prefix=re.split(r'\b\d{1,2}[.:,]\d{2}\b',s)[0].strip(' *:-')
+    prefix=re.sub(r'\d.*$','',s).strip(' *:-.')
     if prefix in REVIEWED_SPELLINGS:return 'outlet',REVIEWED_SPELLINGS[prefix],'reviewed-unique-outlet-spelling'
     attached=re.sub(r'\d.*$','',s).strip()
     if attached=='sampangann':return 'outlet','sampangan','reviewed-unique-outlet-spelling'
     compact=norm(prefix)
     if len(compact)>=4:
-        candidates={k for a,k in ALIASES.items()if len(a)>=4 and one_typo(compact,a)}
+        candidates={k for a,k in ALIASES.items()if len(a)>=4 and a!='udimus' and one_typo(compact,a)}
         if len(candidates)==1:return 'outlet',next(iter(candidates)),'unique-one-character-typo'
     return 'unallocated',None,'unmapped-destination'
 

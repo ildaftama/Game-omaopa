@@ -37,3 +37,8 @@ test('an empty product report needs explicit zero sales ledger evidence, never m
 });
 
 test('owner-excluded Kurma menus do not suppress all other product counts on a historical day',()=>{const r=summarize([row('Chiffon Classic Kurma',7),row('Cisfon - Kurma',1),row('Malmil Cheese',4)],job);assert.equal(r.qty[2],4);assert.equal(r.qty.reduce((a,b)=>a+b,0),4);});
+
+test('legacy complete topped cake menus count their base once, without counting topping components',()=>{assert.equal(sku('Ogura Choco - Topping Halfmix Choco Greentea'),1);assert.equal(sku('Malmil Cheese - Topping Full Choco'),2);const r=summarize([row('Ogura Choco - Topping Halfmix Choco Greentea',6),row('Topping Full Greentea Ogura',6,{rowType:'PACKAGE_COMPONENT'})],job);assert.equal(r.qty[1],6);assert.equal(r.qty.reduce((a,b)=>a+b,0),6);});
+
+test('legacy Mini mix box is nine pieces, separated by flavor; complimentary boxes stay out of sales',()=>{const r=summarize([row('Mini Ogura Filling Mix',2),row('Mini Satuan - Cheese',4),row('Mini Ogura Filling Mix',1,{discountTotal:13000})],job);assert.deepEqual(r.qty.slice(4,7),[10,6,6]);assert.deepEqual(r.free.slice(4,7),[3,3,3]);assert.equal(r.mappingVersion,2);assert.throws(()=>summarize([row('Mini Ogura New Flavor')],job),/menu/);});
+test('new menu mapping survives a history merge with an older complete snapshot',()=>{const r=mergeSales(null,[{...job,qty:[3],complete:true,mappingVersion:2},{...job,qty:[0],complete:true}]);assert.equal(r.days[0].qty[0],3);});

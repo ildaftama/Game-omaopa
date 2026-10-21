@@ -3,7 +3,7 @@ const math=createRequire(import.meta.url)('../forecast/pcs-math.js');
 async function setup(width=1400,extraDates=[]){
  const dates=['2025-08-01','2026-08-01','2026-08-02',...extraDates],qty=n=>Array(12).fill(n);
  const sales={schemaVersion:1,outletIds:['a','b'],days:dates.flatMap(date=>[{date,id:'a',qty:qty(20),complete:true},...(date==='2026-08-02'?[]:[{date,id:'b',qty:qty(30),complete:true}])])};
- const orders={schemaVersion:1,coveredDates:dates,days:dates.flatMap(date=>[{date,id:'a',qty:qty(2)},{date,id:'b',qty:qty(3)}])};
+ const orders={schemaVersion:1,coveredDates:dates,days:dates.flatMap(date=>[{date,id:'a',qty:qty(2),esbMatchedQty:qty(2)},{date,id:'b',qty:qty(3),esbMatchedQty:qty(3)}])};
  class Clock extends Date{constructor(...args){super(...(args.length?args:['2026-10-21T02:00:00Z']));}}
  const window={PcsMath:math,innerWidth:width,dispatchEvent(){}},context=vm.createContext({window,fetch:async url=>({ok:true,json:async()=>url==='pcs-sales.json'?sales:orders}),document:{getElementById:()=>null},Intl,Date:Clock,Event,console});
  vm.runInContext(fs.readFileSync(new URL('../forecast/pcs-panel.js',import.meta.url),'utf8'),context);await new Promise(r=>setImmediate(r));return window.PcsPanels;

@@ -67,6 +67,8 @@ class OrdersTest(unittest.TestCase):
         self.assertEqual(outlet('Ngaliyan penjualan masuk UKSW')[1],'uksw')
         self.assertEqual(outlet('UKSW omset Merbabu')[1],'merbabu')
         self.assertEqual(outlet('udimus')[1],'udinus')
+        self.assertEqual(outlet('uimus16.0')[1],'unimus')
+        self.assertEqual(outlet('NGALIYAN16.00 prnjualan masuk UKSW')[1],'uksw')
         r=row(5577,46023,destination='Tidak diketahui');a=aggregate([r],{fingerprint(r):{'excludeFromOutlet':True}})
         self.assertFalse(a['blockedDates']);self.assertEqual(a['excludedRecords'],1)
 if __name__=='__main__':unittest.main()
