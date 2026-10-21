@@ -59,7 +59,8 @@ export async function collect(branches,dates,client){
 export function mergeSales(previous,results){
  const map=new Map((previous?.days||[]).map(r=>[r.date+'|'+r.id,r]));
  for(const r of results)if(r.complete)map.set(r.date+'|'+r.id,r);
- return {schemaVersion:1,products:PRODUCTS,labels:LABELS,outletIds:[...new Set([...(previous?.outletIds||[]),...results.map(r=>r.id)])].sort(),updatedAt:new Date().toISOString(),days:[...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)),failed:results.filter(r=>!r.complete).map(r=>({date:r.date,id:r.id}))};
+ const failed=[...new Map([...(previous?.failed||[]),...results.filter(r=>!r.complete)].filter(r=>!map.has(r.date+'|'+r.id)).map(r=>[r.date+'|'+r.id,{date:r.date,id:r.id}])).values()];
+ return {schemaVersion:1,products:PRODUCTS,labels:LABELS,outletIds:[...new Set([...(previous?.outletIds||[]),...results.map(r=>r.id)])].sort(),updatedAt:new Date().toISOString(),days:[...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)),failed,...(previous?.history?{history:previous.history}:{})};
 }
 async function main(){
  const config=JSON.parse(fs.readFileSync('integration/pcs-branches.json','utf8'));

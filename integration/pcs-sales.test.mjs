@@ -23,3 +23,7 @@ test('failed or empty refresh preserves an existing snapshot, valid data replace
  assert.equal(mergeSales(old,[{id:'test',date:job.date,qty:[21],complete:true}]).days[0].qty[0],21);
 });
 test('date range has calendar validation and bounded history',()=>{assert.equal(range('2026-09-01','2026-09-30').length,30);assert.throws(()=>range('2026-02-30','2026-03-01'));assert.throws(()=>range('2026-01-01','2026-10-01'));});
+test('daily refresh preserves history coverage and resolves only successfully recovered gaps',()=>{
+ const old={history:[{from:'2025-01-01',to:'2025-01-31'}],failed:[{date:'2025-01-01',id:'a'},{date:'2025-01-02',id:'b'}],days:[]};
+ const merged=mergeSales(old,[{date:'2025-01-01',id:'a',qty:[1],complete:true}]);assert.deepEqual(merged.history,old.history);assert.deepEqual(merged.failed,[{date:'2025-01-02',id:'b'}]);
+});
