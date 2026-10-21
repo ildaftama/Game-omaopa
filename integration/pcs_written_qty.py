@@ -9,6 +9,9 @@ FLAVOR=r'(cheese|choco|durian)'
 def clean(text):
  s=str(text or '').lower().replace('\u2060','').replace('\u200b','').replace('\xa0',' ')
  s=re.sub(r'\bminimix\b','mini mix',s)
+ s=re.sub(r'\bminiogura\b','mini ogura',s)
+ s=re.sub(r'\bpax\b','pack',s)
+ s=re.sub(r'(\d)[.,]\s+(\d{3})\b',r'\1.\2',s)
  s=re.sub(r'\boghura\b','ogura',s)
  s=re.sub(r'\b(?:choclate|chocoate)\b','choco',s)
  for pattern,repl in [(r'\bmmchis\b','malmil cheese'),(r'\bmmcho\b','malmil choco'),(r'\bochis\b','ogura cheese'),(r'\bocho\b','ogura choco'),(r'\b(?:chiff?on|chiff?fon|chiff?en|cisf[fo]n|cisffon|chisfon|chesfon|chesfoon|cisofn|cisfom|cifon|ciffon|chifon|chifron)\b','chiffon'),(r'\b(?:chesee|chees|chesse|chese|cheeze|cheze|chess|keju|ches|cis)\b','cheese'),(r'\b(?:chocholate|chocho|chocolate|cocho|choklat|cokelat|coklat|cok|cho|coco|co)\b','choco'),(r'\b(?:dur|duren)\b','durian'),(r'\b(?:ekstra|ektra|exstra|ekst|extra|extre|extrq|double|ext|ex|ec)\b','extra'),(r'\b(?:klasik|klasik|klasik|klas|classic|clsc|kls|ks|biasa|reguler|regular|reg)\b','classic')]:s=re.sub(pattern,repl,s)
@@ -177,7 +180,7 @@ def mini_cell(cell,text):
   elif (('mix'in tail and len(flavor_names)in [0,3])or not flavor_names) and not re.search(r'\bpcs?\b',line):values=[q*3]*3 # Owner: unnamed Mini Ogura is standard mix too.
   elif len(flavor_names)==1:
    explicit_pc=bool(re.search(r'\bpcs?\b',line))
-   explicit_box=bool(re.search(r'\b(?:box|boks|pack|pac|pak)\b',line))
+   explicit_box=bool(re.search(r'\b(?:box|boks|pack|pac|pak|full|filling|feeling|semua)\b|\bmini ogura\b',line))
    # A numeric source-column quantity is owner-confirmed box notation unless PCS is written.
    numeric_column=bool(re.fullmatch(r'\s*\d+\s*',s))
    if not(explicit_pc or explicit_box or numeric_column):return None
