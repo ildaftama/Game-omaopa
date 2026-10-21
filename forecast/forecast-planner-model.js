@@ -41,7 +41,8 @@
  function compare(record,sales,orders){
   sales=scoped(sales,record.outlet,shift(record.date,-56),record.date);orders=scoped(orders,record.outlet,shift(record.date,-56),record.date);
   const plan=record.baseline,first=record.firstSavedAt?.toDate?record.firstSavedAt.toDate():new Date(record.firstSavedAt),eligible=Number.isFinite(+first)&&first<new Date(record.date+'T00:00:00+07:00');
-  const selected=plan.active.map((v,p)=>v?p:null).filter(p=>p!==null),rows=selected.map(p=>{const r=math.estimatedPartition(sales,orders,[record.outlet],p,[record.date])[0];return{p,name:names[p],planned:plan.regular[p],actual:r.retail.value,totalActual:r.total.value,estimated:r.retail.estimated,complete:r.retail.complete};});
+  // Inactive variants are zero forecasts, not permission to omit their actual sales.
+  const rows=names.map((name,p)=>{const r=math.estimatedPartition(sales,orders,[record.outlet],p,[record.date])[0];return{p,name,planned:plan.active[p]?plan.regular[p]:0,actual:r.retail.value,totalActual:r.total.value,estimated:r.retail.estimated,complete:r.retail.complete};});
   const complete=rows.length>0&&rows.every(r=>r.complete),actual=complete?total(rows.map(r=>r.actual)):null,planned=total(rows.map(r=>r.planned)),absolute=complete?total(rows.map(r=>Math.abs(r.planned-r.actual))):null;
   return {rows,eligible,complete,actual,planned,absolute,wape:eligible&&complete&&actual>0?absolute/actual*100:null};
  }
