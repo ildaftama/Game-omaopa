@@ -3,6 +3,7 @@ import collections,datetime as dt,hashlib,io,json,posixpath,re,sys,urllib.reques
 from pathlib import Path
 import xml.etree.ElementTree as ET
 from pcs_order_rules import date_header,resolve_date,outlet,mini,chiffon
+from pcs_written_qty import core as written_core, chiffon_cell, chiffon_text, mini_cell, clean, item_lines, count
 
 PRODUCTS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Mini Ogura - Cheese','Mini Ogura - Choco','Mini Ogura - Durian','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter','Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju']
 NS={'s':'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
@@ -94,20 +95,34 @@ def text_chiffon(text):
     return result if found else None
 
 def quantities(r):
-    q=[val(r,c)for c in range(4,10)];text=str(val(r,3)or'');result=[]
+    q=[val(r,c)for c in range(4,10)];q=[None if isinstance(v,str)and not v.strip()else v for v in q];text=str(val(r,3)or'');result=[]
+    normalized=clean(text)
+    # Repair an unambiguous wrong quantity column using the written cake family.
+    if q[4]is None and q[5]is not None and 'mini'in normalized and 'chiffon'not in normalized:
+        if isinstance(q[5],(int,float))or re.search(r'mix|durian|full\s+(?:cheese|choco)',clean(q[5])):q[4],q[5]=q[5],None
+    elif q[5]is None and isinstance(q[4],str)and re.search(r'chiffon|classic|lite|butter',clean(q[4]))and 'mini'not in normalized:q[4],q[5]=None,q[4]
     for i in range(4):
-        n=integer(q[i]);family='ogura'if i<2 else'malmil';flavor=r'cheese|keju|\bcis\b'if i%2==0 else r'choco(?:late)?|coklat|cokelat|\bcho\b'
-        result.append(n if n is not None else text_core(text,family,flavor))
+        n=integer(q[i]);family='ogura'if i<2 else'malmil'
+        result.append(n if n is not None else written_core(text,family)[i%2])
+    for offset,family in [(0,'ogura'),(2,'malmil')]:
+        supplied=[integer(q[offset+j])for j in range(2)];items=list(item_lines(text,family));written=[count(line,family)for line in items if 'mini'not in line]
+        if any(v is not None for v in supplied)and written and all(v is not None for v in written)and sum(written)==sum(v or 0 for v in supplied):
+            for j in range(2):
+                if supplied[j]is None and result[offset+j]is None:result[offset+j]=0
+    explicit_mini=mini_cell(q[4],text)
     m=mini(q[4],text)
     if not m and 'mini' in text.lower():
         lines='\n'.join(l for l in text.splitlines()if 'mini' in l.lower())
         explicit=re.search(r'(\d+)\s*(box|boks|pack|pac|pcs?)\b',lines,re.I)
         if explicit:m=mini(explicit[0],lines)
-    result.extend([m['composition'].get(k,0)for k in ['cheese','choco','durian']]if m and m.get('composition')and sum(m['composition'].values())==m['quantity']else[None]*3 if m or 'mini'in text.lower()else[0]*3)
+    if explicit_mini is None and isinstance(q[4],str)and len(re.findall(r'\d+',q[4]))>1:m=None
+    result.extend(explicit_mini if explicit_mini is not None else [m['composition'].get(k,0)for k in ['cheese','choco','durian']]if m and m.get('composition')and sum(m['composition'].values())==m['quantity']else[None]*3 if m or q[4]or 'mini'in text.lower()else[0]*3)
+    column_chiffon=chiffon_cell(q[5])
     c=chiffon(q[5])
-    if c and c.get('complete'):result.extend(c['products'].get(k,0)for k in PRODUCTS[7:])
+    if column_chiffon is not None:result.extend(column_chiffon)
+    elif c and c.get('complete'):result.extend(c['products'].get(k,0)for k in PRODUCTS[7:])
     else:
-        written=text_chiffon(text)
+        written=chiffon_text(text,integer(q[5]))
         result.extend(written if written is not None else[None]*5 if c else[0]*5)
     return result
 
@@ -126,8 +141,11 @@ def aggregate(rows,reviews=None):
         for r in g['orders']:
             review=reviews.get(fingerprint(r),{});text=str(val(r,3)or'');status=str(val(r,13)or'')
             non_sale=review.get('nonSale')or(bool(re.search(r'adjust.{0,25}admin|admin.{0,25}adjust|kue.{0,15}adjust|kue\s+kompensasi|adjust\s+pabrik|dibayar\s+marketing',text+' '+status,re.I))and integer(val(r,11))is None and not re.search(r'\b(lunas|dp)\b',status,re.I))
-            if non_sale:excluded+=1;continue
+            if non_sale or review.get('excludeFromOutlet'):excluded+=1;continue
             channel,oid,_=outlet(val(r,10))
+            if channel=='unallocated' and not val(r,10):
+                pickup=re.search(r'(?im)^\s*[*_ ]*outlet\s+pengambilan\s*:\s*([^\n]+)',text)
+                if pickup:channel,oid,_=outlet(pickup[1])
             if review.get('outletId'):channel='outlet';oid=review['outletId']
             if channel in ['factory','external']:excluded+=1;continue
             if channel!='outlet':blocked.add(date);unresolved+=1;continue

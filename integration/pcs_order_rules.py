@@ -18,7 +18,7 @@ ALIASES = {
  'sukoharjo':'sukoharjo','nusukan':'nusukan','laweyan':'laweyan','unnes':'unnes','undip':'undip','udinus':'udinus','unimus':'unimus',
  'ngaliyan':'ngaliyan','sampangan':'sampangan','tlogosari':'gajah-raya','gajah':'gajah-raya','gajahraya':'gajah-raya','chiffongajah':'gajah-raya',
  'ambarawa':'ambarawa','uksw':'uksw','pleburan':'pleburan','banyumanik':'pleburan','borobudur':'borobudur','masjidriyadh':'borobudur',
- 'nusin':'nusa-indah','kra':'karanganyar','outletcisfon':'gajah-raya','uii':'jakal-uii','salatiga':'uksw','umes':'ums','unms':'uns'
+ 'udimus':'udinus','kaliurang':'jakal-uii','nusin':'nusa-indah','kra':'karanganyar','outletcisfon':'gajah-raya','uii':'jakal-uii','salatiga':'uksw','umes':'ums','unms':'uns'
 }
 
 REVIEWED_SPELLINGS={'umyb':'umy','umyy':'umy','gahaj':'gajah-raya','gaahj':'gajah-raya','ambawara':'ambarawa','udinuyus':'udinus','ngalloiyan':'ngaliyan','nusa ndaj':'nusa-indah','tejam':'tajem','magenag':'pemuda-magelang'}
@@ -35,6 +35,11 @@ def one_typo(a,b):
 
 def outlet(text):
     s=str(text or '').lower()
+    revenue=re.search(r'\b(?:penjualan\s+masuk|masuk\s+(?:penjualan|om[sz]et)|om[sz]et)\s+([a-z ]+?)(?=\s+kue\b|\s+di\b|\d|$)',s)
+    if revenue:
+        key=norm(revenue[1])
+        if key in ALIASES:return 'outlet',ALIASES[key],'explicit-revenue-outlet'
+    if norm(re.sub(r'\d.*$','',s))in {'parik','pebrik','poabrik'}:return 'factory',None,'reviewed-factory-spelling'
     if re.search(r'\b(?:pabrik|pabril|pabrikl|office)\b',s): return 'factory',None,'explicit-or-reviewed-spelling'
     if re.search(r'luar\s*kota',s) and not any(re.search(r'\b'+re.escape(a)+r'\b',s) for a in ['jakal','tajem']): return 'external',None,'external-delivery'
     tokens=re.findall(r'[a-z]+',s)

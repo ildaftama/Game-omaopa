@@ -13,7 +13,7 @@ class OrdersTest(unittest.TestCase):
         r=row(5577,46023);review={fingerprint(r):{'nonSale':True}};self.assertEqual(aggregate([r],review)['excludedRecords'],1)
         r['3']['value']='Malmil Cheese (3)';self.assertEqual(aggregate([r],review)['excludedRecords'],0)
     def test_unknown_is_not_zero_and_no_price_division(self):
-        r=row(5577,46023,text='Malmil cheese untuk acara',qty=None);self.assertIsNone(quantities(r)[2])
+        r=row(5577,46023,text='Malmil cheese untuk acara',qty=None);self.assertEqual(quantities(r)[2],1)
         r['3']['value']='Malmil Cheese (7) @ 13.000';self.assertEqual(quantities(r)[2],7)
         r['3']['value']='Malmil untuk acara';r['7']['value']=None;self.assertIsNone(quantities(r)[2]);self.assertIsNone(quantities(r)[3])
     def test_unallocated_blocks_date(self):
@@ -27,5 +27,46 @@ class OrdersTest(unittest.TestCase):
         r=row(5577,46023,text='Chiffon Klasik Extra Keju (2) @35.000\nCisfon Klasik Keju 1 @34.000');r['9']={'value':'2 kls ec 1 kls'}
         self.assertEqual(quantities(r)[7:],[1,2,0,0,0])
         r['3']['value']='Chiffon Lite (2) @17.000';r['9']['value']='2 lite'
-        self.assertEqual(quantities(r)[7:],[0,0,0,None,None])
+        self.assertEqual(quantities(r)[7:],[0,0,0,0,2])
+    def test_written_quantities_and_owner_defaults(self):
+        r=row(5577,46023,text='Malmil Coklat polos 10 x12.000 =120.000',qty=None);r['7']['value']=None
+        self.assertEqual(quantities(r)[:4],[0,0,0,10])
+        r['3']['value']='2 Malmil Cheese full cheese 3 x17.000 =34.000'
+        self.assertEqual(quantities(r)[:4],[0,0,2,0])
+        r['3']['value']='1x Malmil Cheese Topping Choco (Rp20.000)'
+        self.assertEqual(quantities(r)[:4],[0,0,1,0])
+        r['3']['value']='Malmil Cheese'
+        self.assertEqual(quantities(r)[:4],[0,0,1,0])
+    def test_typo_aliases_and_lite_owner_confirmation(self):
+        r=row(5577,46023,text='2 Chisfon extra keju @33.000',qty=0);r['9']={'value':2}
+        self.assertEqual(quantities(r)[7:],[0,2,0,0,0])
+        r['3']['value']='Chiffon Lite';r['9']['value']='2 lite'
+        self.assertEqual(quantities(r)[7:],[0,0,0,0,2])
+        r['3']['value']='Cisfon 2';r['9']['value']=2
+        self.assertEqual(quantities(r)[7:],[None,None,None,0,0])
+    def test_mini_custom_composition_not_multiplied_twice(self):
+        r=row(5577,46023,text='30 box mini dengan rincian',qty=0);r['8']={'value':'84 cheese 93 cho 93 durian'}
+        self.assertEqual(quantities(r)[4:7],[84,93,93])
+        r['8']['value']='mix 6 box';r['3']['value']='Mini cheese 18\nMini choco 18\nMini durian 18\nMini mix 6 box'
+        self.assertEqual(quantities(r)[4:7],[18,18,18])
+        r['8']['value']='1 box mix 5pcs choco 5 pcs cheese';r['3']['value']='Mini mix 1 box\nMini choco 5 pcs\nMini cheese 5 pcs'
+        self.assertEqual(quantities(r)[4:7],[8,8,3])
+    def test_two_flavor_mini_box_owner_composition_and_incomplete_description(self):
+        r=row(5577,46023,text='Mini ogura cheese + choco (2) x56.000',qty=0)
+        self.assertEqual(quantities(r)[4:7],[8,10,0])
+        r['8']={'value':'11 box mix 1 box full durian 1 box isi 3 pcs cheese 6 pcs'}
+        r['3']['value']='11 box mini mix\n1 box mini full durian'
+        self.assertEqual(quantities(r)[4:7],[None,None,None])
+    def test_wrong_column_is_recovered_only_when_written_family_is_clear(self):
+        r=row(5577,46023,text='Mini mix 2 box',qty=0);r['9']={'value':'2 mix'}
+        self.assertEqual(quantities(r)[4:],[6,6,6,0,0,0,0,0])
+        r['9']['value']=None;r['8']={'value':'1 lite keju'};r['3']['value']='1x Chiffon Lite Keju'
+        self.assertEqual(quantities(r)[4:],[0,0,0,0,0,0,0,1])
+    def test_revenue_outlet_overrides_delivery_and_exclusions_remain_bound(self):
+        from pcs_order_rules import outlet
+        self.assertEqual(outlet('Ngaliyan penjualan masuk UKSW')[1],'uksw')
+        self.assertEqual(outlet('UKSW omset Merbabu')[1],'merbabu')
+        self.assertEqual(outlet('udimus')[1],'udinus')
+        r=row(5577,46023,destination='Tidak diketahui');a=aggregate([r],{fingerprint(r):{'excludeFromOutlet':True}})
+        self.assertFalse(a['blockedDates']);self.assertEqual(a['excludedRecords'],1)
 if __name__=='__main__':unittest.main()
