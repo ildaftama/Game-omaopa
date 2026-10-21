@@ -28,7 +28,7 @@ export function summarize(rows,{date,branchName}){
   const p=sku(r.menuName);
   if(p===null){
    // Toppings, packaging and add-ons never create an additional cake.
-   if(/^(?:paket .*(?:malmil|ogura|chiffon|cisfon)|(?:malmil|ogura|chiffon|cisfon)\b)/i.test(r.menuName))unknownCake++;
+   if(/^(?:paket .*(?:malmil|ogura|chiffon|cisfon)|(?:malmil|ogura|chiffon|cisfon)\b)/i.test(r.menuName)&&!/^(?:cisfon|chiffon)\s*(?:-\s*|classic\s+)?kurma$/i.test(r.menuName))unknownCake++;
    continue;
   }
   if(!Number.isSafeInteger(r.qty)||r.qty<0||!Number.isFinite(r.total)||!Number.isFinite(r.discountTotal))throw Error('Jumlah produk ESB tidak valid.');

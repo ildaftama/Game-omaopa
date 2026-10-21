@@ -35,3 +35,5 @@ test('an empty product report needs explicit zero sales ledger evidence, never m
  const results=await collect([{id:'test',branchName:job.branchName,branchID:1}],[job.date],{pages:async()=>({complete:true,count:0,rows:[]}),report:async()=>ledger(0)});assert.equal(results[0].complete,true);assert.equal(results[0].qty.reduce((a,b)=>a+b,0),0);assert.equal(results[0].verifiedZero,'empty-menu-and-zero-sales-ledger');
  const failed=await collect([{id:'test',branchName:job.branchName,branchID:1}],[job.date],{pages:async()=>({complete:true,count:0,rows:[]}),report:async()=>ledger(1)});assert.equal(failed[0].complete,false);assert.equal(failed[0].reason,'empty-unverified');
 });
+
+test('owner-excluded Kurma menus do not suppress all other product counts on a historical day',()=>{const r=summarize([row('Chiffon Classic Kurma',7),row('Cisfon - Kurma',1),row('Malmil Cheese',4)],job);assert.equal(r.qty[2],4);assert.equal(r.qty.reduce((a,b)=>a+b,0),4);});
