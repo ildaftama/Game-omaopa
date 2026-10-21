@@ -27,8 +27,34 @@ jobs:
         with:
           ref: main
       - uses: actions/configure-pages@v5
+      - name: Package website without public forecast datasets
+        run: |
+          mkdir .site-private
+          rsync -a --exclude='.git' --exclude='.github' --exclude='integration' --exclude='.site-private' --exclude='.pcs-temp' ./ .site-private/
+          rm -f -- .site-private/forecast/outlets.js
+          rm -f -- .site-private/forecast/insights.js
+          rm -f -- .site-private/forecast/population.js
+          rm -f -- .site-private/forecast/traffic-baseline-data.js
+          rm -f -- .site-private/forecast/google-maps-config.js
+          rm -f -- .site-private/forecast/analysis-data.js
+          rm -f -- .site-private/forecast/outlet-intelligence-data.js
+          rm -f -- .site-private/forecast/forecast-evaluation-data.js
+          rm -f -- .site-private/forecast/forecast-realized-prices.js
+          rm -f -- .site-private/forecast/performance-summary-data.js
+          rm -f -- .site-private/forecast/waste-esb-summary-data.js
+          rm -f -- .site-private/forecast/revenue-validation-data.js
+          rm -f -- .site-private/forecast/revenue-trend-data.js
+          rm -f -- .site-private/forecast/revenue-trend-2025.js
+          rm -f -- .site-private/forecast/data-sources.js
+          rm -f -- .site-private/forecast/orders-summary-data.js
+          rm -f -- .site-private/forecast/network-products-data.js
+          rm -f -- .site-private/forecast/forecast-history-data.js
+          rm -f -- .site-private/forecast/forecast-history-revenue-data.js
+          rm -f -- .site-private/forecast/pcs-sales.json
+          rm -f -- .site-private/forecast/pcs-orders.json
+          rm -f -- .site-private/forecast/seasonality-data.js
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: .site-private
       - uses: actions/deploy-pages@v4
         id: deployment

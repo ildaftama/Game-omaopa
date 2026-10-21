@@ -1,8 +1,6 @@
 name: Rekap PCS dan pesanan
 on:
-  schedule:
-    # Every day at 00:00 WIB; execution may queue on GitHub.
-    - cron: '0 17 * * *'
+  # Daily refresh held pending private data refresh setup.
   workflow_dispatch:
     inputs:
       date_from:
@@ -20,6 +18,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   collect:
+    if: ${{ false }} # publication held; no public financial export
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
