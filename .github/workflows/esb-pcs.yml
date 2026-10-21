@@ -1,0 +1,108 @@
+name: Rekap PCS dan pesanan
+on:
+  schedule:
+    # Every day at 00:00 WIB; execution may queue on GitHub.
+    - cron: '0 17 * * *'
+  workflow_dispatch:
+    inputs:
+      date_from:
+        description: Awal tanggal (YYYY-MM-DD, kosong = 7 hari terakhir)
+        required: false
+        type: string
+      date_to:
+        description: Akhir tanggal (YYYY-MM-DD, kosong = kemarin WIB)
+        required: false
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: pcs-orders-publication
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Periksa perhitungan PCS
+        run: |
+          node --test integration/pcs-sales.test.mjs integration/pcs-math.test.mjs
+          python -m unittest discover -s integration -p test_pcs_orders.py
+      - name: Baca link sumber yang disimpan tim
+        run: node integration/pcs-source.mjs
+      - name: Perbarui pesanan dari sheet
+        run: python integration/pcs_orders.py
+      - name: Ambil PCS produk dari API ESB
+        id: sales
+        env:
+          DATE_FROM: ${{ inputs.date_from }}
+          DATE_TO: ${{ inputs.date_to }}
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+        run: |
+          set +e
+          node integration/pcs-sales.mjs
+          result=$?
+          set -e
+          if [ "$result" -eq 2 ]; then
+            echo "::warning::Sebagian laporan belum terbaca. Snapshot sebelumnya dipertahankan untuk tanggal tersebut."
+          elif [ "$result" -ne 0 ]; then
+            exit "$result"
+          fi
+      - name: Simpan rekap agregat untuk diterbitkan
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcs-agregat
+          path: |
+            forecast/pcs-sales.json
+            forecast/pcs-orders.json
+          retention-days: 7
+  publish:
+    needs: collect
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    # Only this job receives publication permissions, never the ESB credentials.
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: pcs-agregat
+          path: .pcs-publish
+      - name: Arsipkan hanya dua rekap agregat
+        run: |
+          cp .pcs-publish/pcs-sales.json forecast/pcs-sales.json
+          cp .pcs-publish/pcs-orders.json forecast/pcs-orders.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- forecast/pcs-sales.json forecast/pcs-orders.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Perbarui rekap PCS dan pesanan'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+          rm -rf .pcs-publish
+      - uses: actions/configure-pages@v5
+      - name: Siapkan website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+      - name: Terbitkan pembaruan
+        id: deployment
+        uses: actions/deploy-pages@v4
