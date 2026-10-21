@@ -15,3 +15,18 @@ test('monthly comparison percentage is withheld when coverage differs or is inco
  assert.equal(math.change({value:50,complete:false},{value:40,complete:true}),null);
  assert.equal(math.change({value:50,complete:true},{value:40,complete:true}),25);
 });
+test('classic and lite add constituent pure PCS only for the same complete outlet/date',()=>{
+ const s={days:[{date:'2026-09-01',id:'a',qty:[0,0,0,0,0,0,0,10,20,7,8,12],complete:true}]},o={coveredDates:['2026-09-01'],days:[{date:'2026-09-01',id:'a',qty:[0,0,0,0,0,0,0,2,5,1,3,4]}]};
+ assert.equal(math.pure(s,o,['a'],[7,8],['2026-09-01'])[0].value,23);
+ assert.equal(math.pure(s,o,['a'],[10,11],['2026-09-01'])[0].value,13);
+ assert.equal(math.pure(s,o,['a'],9,['2026-09-01'])[0].value,6);
+ o.days[0].qty[8]=null;assert.equal(math.pure(s,o,['a'],[7,8],['2026-09-01'])[0].value,null);
+ o.days[0].qty[8]=21;assert.equal(math.pure(s,o,['a'],[7,8],['2026-09-01'])[0].value,null);
+});
+test('orders chart preserves zero, known partial quantities, and missing dates separately',()=>{
+ const o={coveredDates:['2026-10-01','2026-10-02'],days:[{date:'2026-10-01',id:'a',qty:[null],knownQty:[4]},{date:'2026-10-01',id:'b',qty:[3],knownQty:[3]}]};
+ const rows=math.ordered(o,['a','b'],0,['2026-10-01','2026-10-02','2026-10-03']);
+ assert.equal(rows[0].value,7);assert.equal(rows[0].complete,false);assert.equal(rows[0].valid,1);
+ assert.equal(rows[1].value,0);assert.equal(rows[1].complete,true);
+ assert.equal(rows[2].value,null);assert.equal(rows[2].complete,false);
+});
