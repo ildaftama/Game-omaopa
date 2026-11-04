@@ -1,0 +1,56 @@
+name: Sinkronisasi bundle referensi Forecast (malam)
+on:
+  schedule:
+    # 14.00 UTC = 21.00 WIB (Asia/Jakarta), setiap hari.
+    - cron: '0 14 * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: forecast-reference-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    # HOLD: tidak berjalan sampai owner mencabut baris ini. Prasyarat yang harus dicek
+    # owner dahulu: akun FIREBASE_SYNC_EMAIL punya dokumen staff/{uid} dengan super atau
+    # master = true (syarat forecastManager() di firestore-forecast-plans.rules.fragment),
+    # dan rules fragment (role forecaster, forecastBriefs, fulfillment) sudah di-deploy ke
+    # project Firestore live. Workflow ini TIDAK menyentuh forecast/pcs-sales.json atau
+    # forecast/pcs-orders.json di repo publik dan TIDAK memicu deploy GitHub Pages — ia
+    # menulis langsung ke bundle privat Firestore (forecastPlans/reference_current dan
+    # forecastBriefs/forecaster_current), terpisah dari esb-pcs.yml yang tetap HOLD.
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Baca link sumber yang disimpan tim
+        run: node integration/pcs-source.mjs
+      - name: Perbarui pesanan dari sheet
+        run: python integration/pcs_orders.py
+      - name: Ambil PCS produk dari API ESB
+        env:
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+        run: |
+          set +e
+          node integration/pcs-sales.mjs
+          result=$?
+          set -e
+          if [ "$result" -eq 2 ]; then
+            echo "::warning::Sebagian laporan belum terbaca. Snapshot sebelumnya dipertahankan untuk tanggal tersebut."
+          elif [ "$result" -ne 0 ]; then
+            exit "$result"
+          fi
+      - name: Paketkan & simpan ke bundle referensi privat (bukan file publik)
+        env:
+          FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
+          FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: node integration/pack-forecast-reference.mjs
