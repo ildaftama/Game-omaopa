@@ -14,6 +14,14 @@ function forecastStaff() {
       || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('admin',false) == true
 );
 }
+// Forecaster: can read/write forecastPlans (plan + fulfillment) only.
+// Never grants the private reference bundle, the old access-grant collection or settings.
+function forecastPlanner() {
+  return request.auth != null
+    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+    && (forecastStaff()
+      || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('forecaster',false) == true);
+}
 match /forecastAccess/{uid} {
   allow read: if forecastManager();
   allow write: if false;
@@ -45,15 +53,26 @@ function forecastActive(a) {
     && a[4] is bool && a[5] is bool && a[6] is bool && a[7] is bool
     && a[8] is bool && a[9] is bool && a[10] is bool && a[11] is bool;
 }
+// Optional manual items beyond the locked 12-SKU core (feature: forecaster adds a kue type
+// the pipeline does not recommend yet). No recommendation/buffer applies to these.
+function forecastCustomItem(it) {
+  return it is map && it.keys().hasOnly(['name','regular','orders'])
+    && it.name is string && it.name.size() >= 1 && it.name.size() <= 60
+    && forecastQuantity(it.regular) && forecastQuantity(it.orders);
+}
+function forecastCustomItems(a) {
+  return a is list && a.size() <= 20 && a.all(it, forecastCustomItem(it));
+}
 function forecastPlan(p, d) {
   return p is map
-    && p.keys().hasOnly(['date','outlet','active','regular','orders','note','prices','recommendations','method','cutoff'])
+    && p.keys().hasOnly(['date','outlet','active','regular','orders','note','prices','recommendations','method','cutoff','customItems'])
     && p.date == d.date && p.outlet == d.outlet
     && forecastActive(p.active) && forecastQuantities(p.regular) && forecastQuantities(p.orders)
     && p.note is string && p.note.size() <= 500
     && p.prices is list && p.prices.size() == 12
     && p.recommendations is list && p.recommendations.size() == 12
-    && p.method in ['weekday-median-trend-v1','pcs-pooled-locked-v2'];
+    && p.method in ['weekday-median-trend-v1','pcs-pooled-locked-v2']
+    && (!('customItems' in p) || forecastCustomItems(p.customItems));
 }
 function forecastRecord(d, key) {
   return d.keys().hasOnly(['schemaVersion','date','outlet','revision','plan','baseline','firstSavedAt','savedAt','savedBy'])
@@ -65,13 +84,13 @@ function forecastRecord(d, key) {
     && d.firstSavedAt is timestamp && forecastPlan(d.plan,d);
 }
 match /forecastPlans/{key} {
-  allow read: if forecastStaff();
-  allow create: if forecastReference(request.resource.data,key) || (forecastStaff() && forecastRecord(request.resource.data,key)
+  allow read: if forecastPlanner();
+  allow create: if forecastReference(request.resource.data,key) || (forecastPlanner() && forecastRecord(request.resource.data,key)
     && request.resource.data.revision == 1
     && request.resource.data.firstSavedAt == request.time
     && request.resource.data.baseline == request.resource.data.plan
     && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/1).data == request.resource.data);
-  allow update: if forecastReference(request.resource.data,key) || (forecastStaff() && forecastRecord(request.resource.data,key)
+  allow update: if forecastReference(request.resource.data,key) || (forecastPlanner() && forecastRecord(request.resource.data,key)
     && request.resource.data.date == resource.data.date
     && request.resource.data.outlet == resource.data.outlet
     && request.resource.data.revision == resource.data.revision + 1
@@ -80,14 +99,46 @@ match /forecastPlans/{key} {
     && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/$(string(request.resource.data.revision))).data == request.resource.data);
   allow delete: if false;
   match /revisions/{revision} {
-    allow read: if forecastStaff();
+    allow read: if forecastPlanner();
     // The matching parent is validated above in the same atomic write.
     // Avoid evaluating the entire 12-SKU payload twice for one revision.
-    allow create: if forecastStaff()
+    allow create: if forecastPlanner()
       && request.resource.data.savedBy == request.auth.uid
       && request.resource.data.savedAt == request.time
       && revision == string(request.resource.data.revision)
       && getAfter(/databases/$(database)/documents/forecastPlans/$(key)).data == request.resource.data;
     allow update, delete: if false;
   }
+  // Separate from revisions: what was actually shipped (production), recorded after the
+  // fact and possibly by someone other than the forecaster. Never perturbs plan/baseline.
+  match /fulfillment/{entry} {
+    allow read: if forecastPlanner();
+    allow create, update: if forecastPlanner() && entry == 'current'
+      && request.resource.data.keys().hasOnly(['schemaVersion','shipped','recordedAt','recordedBy','note'])
+      && request.resource.data.schemaVersion == 1
+      && forecastQuantities(request.resource.data.shipped)
+      && request.resource.data.recordedAt == request.time
+      && request.resource.data.recordedBy == request.auth.uid
+      && request.resource.data.note is string && request.resource.data.note.size() <= 500;
+    allow delete: if false;
+  }
+}
+// Lean, non-financial bundle for forecaster-only accounts: outlet/product names, events,
+// price references for the plan's own revenue estimate, research notes. No revenue trend,
+// profit, waste or evaluation globals. Packed/verified the same way as forecastReference.
+function forecastBrief(d, key) {
+  return forecastManager() && d.schemaVersion == 2
+    && d.updatedAt == request.time && d.updatedBy == request.auth.uid
+    && d.sha256 is string && d.sha256.matches('^[a-f0-9]{64}$')
+    && ((key == 'forecaster_current' && d.kind == 'forecaster-manifest'
+      && d.keys().hasOnly(['schemaVersion','kind','chunks','sha256','updatedAt','updatedBy'])
+      && d.chunks is list && d.chunks.size() > 0 && d.chunks.size() <= 10)
+    || (key.matches('^forecaster_[a-f0-9]{16}_[0-9]$') && d.kind == 'forecaster-chunk'
+      && d.keys().hasOnly(['schemaVersion','kind','payload','sha256','updatedAt','updatedBy'])
+      && d.payload is string && d.payload.size() <= 700000));
+}
+match /forecastBriefs/{key} {
+  allow read: if forecastPlanner();
+  allow create, update: if forecastBrief(request.resource.data, key);
+  allow delete: if false;
 }

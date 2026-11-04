@@ -38,18 +38,28 @@
   const rows=names.map((name,p)=>{const active=draft.active[p],a=draft.regular[p],b=draft.orders[p],regular=a===''?null:Number(a),orders=b===''?null:Number(b),valid=!active||(integer(regular)&&integer(orders)),r=recs[p];
    return {p,name,active,valid,regular:active?regular:0,orders:active?orders:0,total:valid&&active?regular+orders:0,warning:active&&integer(regular)&&r?.low!=null?(regular<r.low?'low':regular>r.high?'high':null):null};
   });
-  const active=rows.filter(r=>r.active),complete=active.length>0&&active.every(r=>r.valid),priced=active.every(r=>Number.isFinite(valuation[r.p]?.value)&&valuation[r.p].value>0);
-  return {rows,complete,regular:complete?total(rows.map(r=>r.regular)):null,orders:complete?total(rows.map(r=>r.orders)):null,pcs:complete?total(rows.map(r=>r.total)):null,revenue:complete&&priced?total(rows.map(r=>r.active?r.total*valuation[r.p].value:0)):null,warnings:rows.filter(r=>r.warning).length};
+  // Custom kue types (manual-only, no pipeline recommendation/buffer). Blank names are
+  // ignored rather than blocking the save.
+  const customItems=(draft.customItems||[]).map((it,i)=>{const name=String(it?.name||'').trim(),a=it?.regular,b=it?.orders,regular=a===''?null:Number(a),orders=b===''?null:Number(b),valid=!name||(integer(regular)&&integer(orders));
+   return {i,name,valid,regular:name&&integer(regular)?regular:0,orders:name&&integer(orders)?orders:0,total:name&&valid?(integer(regular)?regular:0)+(integer(orders)?orders:0):0};
+  });
+  const active=rows.filter(r=>r.active),complete=active.length>0&&active.every(r=>r.valid)&&customItems.every(c=>c.valid),priced=active.every(r=>Number.isFinite(valuation[r.p]?.value)&&valuation[r.p].value>0);
+  return {rows,customItems,complete,regular:complete?total(rows.map(r=>r.regular))+total(customItems.map(c=>c.regular)):null,orders:complete?total(rows.map(r=>r.orders))+total(customItems.map(c=>c.orders)):null,pcs:complete?total(rows.map(r=>r.total))+total(customItems.map(c=>c.total)):null,revenue:complete&&priced?total(rows.map(r=>r.active?r.total*valuation[r.p].value:0)):null,warnings:rows.filter(r=>r.warning).length};
  }
- function compare(record,sales,orders){
+ function compare(record,sales,orders,shipped){
   sales=scoped(sales,record.outlet,shift(record.date,-56),record.date);orders=scoped(orders,record.outlet,shift(record.date,-56),record.date);
   const plan=record.baseline,first=record.firstSavedAt?.toDate?record.firstSavedAt.toDate():new Date(record.firstSavedAt),eligible=Number.isFinite(+first)&&first<new Date(record.date+'T00:00:00+07:00');
   // Inactive variants are zero forecasts, not permission to omit their actual sales.
-  const rows=names.map((name,p)=>{const r=math.estimatedPartition(sales,orders,[record.outlet],p,[record.date])[0];return{p,name,planned:plan.active[p]?plan.regular[p]:0,actual:r.retail.value,totalActual:r.total.value,estimated:r.retail.estimated,complete:r.retail.complete};});
+  // shipped (if given) swaps the predicted side for "akurasi dengan faktor produksi" (feature
+  // #6) without touching the immutable plan/baseline used for the regular comparison.
+  const rows=names.map((name,p)=>{const r=math.estimatedPartition(sales,orders,[record.outlet],p,[record.date])[0];return{p,name,planned:plan.active[p]?plan.regular[p]:0,shipped:shipped?plan.active[p]?shipped[p]:0:null,actual:r.retail.value,totalActual:r.total.value,estimated:r.retail.estimated,complete:r.retail.complete};});
   const complete=rows.length>0&&rows.every(r=>r.complete),actual=complete?total(rows.map(r=>r.actual)):null,planned=total(rows.map(r=>r.planned)),absolute=complete?total(rows.map(r=>Math.abs(r.planned-r.actual))):null;
-  return {rows,eligible,complete,actual,planned,absolute,wape:eligible&&complete&&actual>0?absolute/actual*100:null};
+  const hasShipped=!!shipped,shippedTotal=hasShipped?total(rows.map(r=>r.shipped)):null,absoluteShipped=hasShipped&&complete?total(rows.map(r=>Math.abs(r.shipped-r.actual))):null;
+  return {rows,eligible,complete,actual,planned,absolute,wape:eligible&&complete&&actual>0?absolute/actual*100:null,hasShipped,shippedTotal,absoluteShipped,wapeShipped:hasShipped&&eligible&&complete&&actual>0?absoluteShipped/actual*100:null};
  }
- function validPlan(p){return p&&/^\d{4}-\d{2}-\d{2}$/.test(p.date)&&typeof p.outlet==='string'&&Array.isArray(p.active)&&p.active.length===12&&p.active.every(v=>typeof v==='boolean')&&['regular','orders'].every(k=>Array.isArray(p[k])&&p[k].length===12&&p[k].every(integer))&&Array.isArray(p.prices)&&p.prices.length===12&&p.prices.every(v=>v&&(v.value===null||(Number.isFinite(v.value)&&v.value>0)))&&typeof p.note==='string';}
- const api={names,integer,shift,quantile,recommend,prices,calculate,compare,validPlan};
+ function validCustomItems(a){return a===undefined||(Array.isArray(a)&&a.length<=20&&a.every(it=>it&&typeof it.name==='string'&&it.name.length>=1&&it.name.length<=60&&integer(it.regular)&&integer(it.orders)));}
+ function validPlan(p){return p&&/^\d{4}-\d{2}-\d{2}$/.test(p.date)&&typeof p.outlet==='string'&&Array.isArray(p.active)&&p.active.length===12&&p.active.every(v=>typeof v==='boolean')&&['regular','orders'].every(k=>Array.isArray(p[k])&&p[k].length===12&&p[k].every(integer))&&Array.isArray(p.prices)&&p.prices.length===12&&p.prices.every(v=>v&&(v.value===null||(Number.isFinite(v.value)&&v.value>0)))&&typeof p.note==='string'&&validCustomItems(p.customItems);}
+ function validShipped(a){return Array.isArray(a)&&a.length===12&&a.every(integer);}
+ const api={names,integer,shift,quantile,recommend,prices,calculate,compare,validPlan,validShipped};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ForecastPlanner=api;
 })(typeof window!=='undefined'?window:this);
