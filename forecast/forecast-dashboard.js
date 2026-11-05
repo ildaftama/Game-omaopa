@@ -24,7 +24,7 @@ window.ForecastDashboard=(()=>{
  function revenueTrend(outletId){
   const panels=window.PcsPanels.data(),planner=window.ForecastPlanner,cloud=window.ForecastPlanCloud;
   if(!panels.sales||!panels.orders)return null;
-  const list=outletIds(outletId,panels.sales),expected=list.length,minOutlets=Math.max(1,Math.ceil(expected*0.7));
+  const list=outletIds(outletId,panels.sales),expected=list.length;
   const byDate=new Map();
   for(const row of panels.sales.days){
    if(!list.includes(row.id))continue;
@@ -36,25 +36,44 @@ window.ForecastDashboard=(()=>{
    }
    byDate.set(row.date,e);
   }
-  // Omzet real butuh mayoritas outlet lengkap (>=70%), bukan seluruhnya — kalau butuh semua,
-  // satu outlet telat lapor saja bisa membuat seluruh hari hilang dari grafik.
-  const actualAt=date=>{const e=byDate.get(date);return e&&e.known>=minOutlets?e.sum*(expected/e.known):null;};
-  const series=[...byDate.entries()].filter(([,e])=>e.known>=minOutlets).map(([date,e])=>({date,value:e.sum*(expected/e.known)})).sort((a,b)=>a.date.localeCompare(b.date));
+  // Tanpa ambang jumlah outlet -- untuk hari yang sudah lewat, ESB adalah sumber kebenaran:
+  // kalau laporan outlet itu sudah ditarik dan lengkap, pakai apa adanya. Yang belum tertarik
+  // sama sekali (expected>known) di-skala proporsional supaya outlet yang laporannya belum
+  // sempat ditarik tidak membuat omzet hari itu kelihatan lebih kecil dari yang sebenarnya.
+  const actualAt=date=>{const e=byDate.get(date);return e&&e.known>0?e.sum*(expected/e.known):null;};
+  const series=[...byDate.entries()].filter(([,e])=>e.known>0).map(([date,e])=>({date,value:e.sum*(expected/e.known)})).sort((a,b)=>a.date.localeCompare(b.date));
   const lastActual=series.at(-1)?.date||null;
+  // Rata-rata omzet harian pada satu bulan kalender (YYYY-MM), dari riwayat ACTUAL -- dipakai
+  // untuk faktor musiman di bawah. Butuh minimal 10 hari supaya tidak goyang oleh 1-2 outlier.
+  function monthAvg(ym){const rows=series.filter(r=>r.date.slice(0,7)===ym);return rows.length>=10?median(rows.map(r=>r.value)):null;}
+  // Tanpa ini, model cuma melihat beberapa bulan terakhir dan TIDAK PERNAH tahu Desember biasa
+  // lebih ramai dari November -- itu cuma kelihatan dari pola tahun lalu. Faktor ini
+  // membandingkan bulan target vs bulan "hari ini", keduanya di tahun lalu; dibatasi 0.6x-1.8x
+  // supaya satu bulan aneh di data lama tidak membuat proyeksi melompat liar.
+  function seasonalFactor(date){
+   const targetYm=date.slice(0,7),anchorYm=today().slice(0,7);
+   if(targetYm===anchorYm)return 1;
+   const shiftYear=ym=>{const [y,m]=ym.split('-');return (Number(y)-1)+'-'+m;};
+   const t=monthAvg(shiftYear(targetYm)),a=monthAvg(shiftYear(anchorYm));
+   if(t==null||a==null||a<=0)return 1;
+   return Math.max(.6,Math.min(1.8,t/a));
+  }
   function forecastAt(date){
+   if(!series.length)return null;
    const wd=new Date(date+'T12:00:00Z').getUTCDay();
-   // Coba 56 hari dulu (konsisten dengan rekomendasi per-outlet); kalau riwayat sekitar
-   // tanggal itu tipis (mis. baru beberapa minggu data tersinkron), lebarkan ke 180 hari
-   // supaya garis prediksi tidak hilang begitu saja karena jendela terlalu sempit.
-   let win=series.filter(r=>r.date>=planner.shift(date,-56)&&r.date<date);
-   if(!win.length)win=series.filter(r=>r.date>=planner.shift(date,-180)&&r.date<date);
-   if(!win.length)return null;
-   const sameDay=win.filter(r=>new Date(r.date+'T12:00:00Z').getUTCDay()===wd).map(r=>r.value);
-   const pool=sameDay.length>=3?sameDay:win.slice(-14).map(r=>r.value);
-   if(!pool.length)return null;
-   const recent=win.filter(r=>r.date>=planner.shift(date,-14)).map(r=>r.value),prior=win.filter(r=>r.date<planner.shift(date,-14)&&r.date>=planner.shift(date,-28)).map(r=>r.value);
-   const a=median(recent),b=median(prior),trend=a!=null&&b>0?Math.max(.85,Math.min(1.15,a/b)):1;
-   return median(pool)*trend;
+   // Level jangka pendek: median omzet actual ~90 hari terakhir sebelum tanggal ini (bukan
+   // per hari-dalam-minggu dulu, supaya tidak goyah kalau sampel hari itu tipis).
+   const recentWin=series.filter(r=>r.date>=planner.shift(date,-90)&&r.date<date);
+   const baseWin=recentWin.length?recentWin:series.slice(-30);
+   if(!baseWin.length)return null;
+   const base=median(baseWin.map(r=>r.value));
+   // Faktor hari-dalam-minggu: rasio median hari ini vs median keseluruhan, dari jendela yang
+   // lebih lebar (365 hari) supaya RASIO-nya (bukan levelnya) tetap stabil walau data terbaru tipis.
+   const wideWin=series.filter(r=>r.date>=planner.shift(date,-365)&&r.date<date);
+   const wideBase=wideWin.length>=14?median(wideWin.map(r=>r.value)):base;
+   const sameDay=wideWin.filter(r=>new Date(r.date+'T12:00:00Z').getUTCDay()===wd).map(r=>r.value);
+   const weekdayFactor=sameDay.length>=3&&wideBase>0?Math.max(.5,Math.min(1.8,median(sameDay)/wideBase)):1;
+   return base*weekdayFactor*seasonalFactor(date);
   }
   // Rencana forecaster (plan baseline yang disimpan tim), bukan prediksi algoritma — supaya
   // bisa dibandingkan 3 arah: real vs prediksi saya vs rencana tim. Baseline dipakai (bukan
@@ -166,7 +185,7 @@ window.ForecastDashboard=(()=>{
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   const cutoff=trend.lastActual?new Date(trend.lastActual+'T12:00:00+07:00').toLocaleDateString('id-ID',{day:'numeric',month:'short'}):null;
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div>${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}<p class="workspace-note">${cutoff?`Data penjualan real tersedia s.d. ${cutoff}; setelah itu (termasuk hari yang sudah lewat tapi belum ada datanya) ditampilkan sebagai prediksi.`:'Belum ada data penjualan real yang lengkap untuk periode ini — seluruh garis adalah prediksi.'} Metode: median hari-sama 8 minggu + tren terbatas, sama seperti rekomendasi per-outlet. Produk sekunder (Chiffon/Mini/Lite) ikut terhitung lewat harga per-SKU.${trend.hasPlan?' Rencana tim memakai rencana awal (baseline) yang disimpan forecaster.':''}</p></article>
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div>${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}<p class="workspace-note">${cutoff?`Data penjualan real tersedia s.d. ${cutoff}; setelah itu (termasuk hari yang sudah lewat tapi belum ada datanya) ditampilkan sebagai prediksi.`:'Belum ada data penjualan real yang lengkap untuk periode ini — seluruh garis adalah prediksi.'} Metode: level 90 hari terakhir × pola hari-dalam-minggu × faktor musiman (dibanding bulan sama tahun lalu, kalau ada datanya). Produk sekunder (Chiffon/Mini/Lite) ikut terhitung lewat harga per-SKU.${trend.hasPlan?' Rencana tim memakai rencana awal (baseline) yang disimpan forecaster.':''}</p></article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
