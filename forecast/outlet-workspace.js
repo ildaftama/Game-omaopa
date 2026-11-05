@@ -35,7 +35,7 @@ $('#workspace-content').addEventListener('click',e=>{if(window.PcsPanels.click(e
 $('#workspace-content').addEventListener('input',e=>window.ForecastWorkspace.input(e));
 $('#support-open').addEventListener('click',()=>{focus=$('#support-view').value;if(selected==='__all__'&&['events','swot','area'].includes(focus)){selected=lastOutlet;$('#workspace-outlet').value=selected;sync();}render();});
 $('#support-view').addEventListener('change',e=>{focus=e.target.value;if(selected==='__all__'&&['events','swot','area'].includes(focus)){selected=lastOutlet;$('#workspace-outlet').value=selected;sync();}render();});
-$('#workspace-content').addEventListener('change',e=>{if(window.PcsStudyPanel.change(e)||window.PcsPanels.change(e)||window.DataPanels.change(e)||(focus==='reference'?window.ForecastReferenceWorkspace.change(e):window.ForecastWorkspace.change(e))){render();return;}if(e.target.id==='focus-period'){period=e.target.value;render();}});
+$('#workspace-content').addEventListener('change',e=>{if(window.PcsStudyPanel.change(e)||window.PcsPanels.change(e)||window.DataPanels.change(e)||window.ForecastDashboard.change(e)||(focus==='reference'?window.ForecastReferenceWorkspace.change(e):window.ForecastWorkspace.change(e))){render();return;}if(e.target.id==='focus-period'){period=e.target.value;render();}});
 $('#workspace-back').addEventListener('click',()=>{focus='forecast';render();});
 if(!window.RADAR_GOOGLE_MAPS_KEY)document.querySelector('.google-traffic-card').hidden=true;
 $('#workspace-content').addEventListener('submit',e=>{if(e.target.id==='source-settings-form')window.SourceSettings.submit(e);if(e.target.id==='forecast-plan-form')window.ForecastWorkspace.submit(e);});
