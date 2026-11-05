@@ -78,7 +78,11 @@ window.ForecastDashboard=(()=>{
   // Hasilnya tetap mewarisi pola hari-dalam-minggu & tren jangka pendek yang sama, cuma
   // dihitung di level total jaringan, bukan dijumlah dari 28 forecast outlet terpisah.
   function forecastAt(date){
-   const wd=d=>new Date(d+'T12:00:00Z').getUTCDay(),before=series.filter(r=>r.date<date);
+   // recommend() membatasi pool hari-sama ke 56 hari terakhir (bukan seluruh riwayat) --
+   // tanpa batas ini pool ketarik oleh data lama yang levelnya bisa beda jauh dari tren
+   // terkini (terbukti: tanpa batas, pool sampai 95 sampel dari Jan2025, prediksi jadi
+   // lebih tinggi dari omzet real beberapa hari terakhir).
+   const wd=d=>new Date(d+'T12:00:00Z').getUTCDay(),before=series.filter(r=>r.date>=planner.shift(date,-56)&&r.date<date);
    if(!before.length)return null;
    const same=before.filter(r=>wd(r.date)===wd(date)),selected=same.length>=3?same:before.slice(-14);
    if(!selected.length)return null;
