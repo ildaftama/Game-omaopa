@@ -91,7 +91,12 @@ async function main(){
  const config=JSON.parse(fs.readFileSync('integration/pcs-branches.json','utf8'));
  const yesterday=new Date(Date.now()-86400000),fmt=d=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
  const to=process.env.DATE_TO||fmt(yesterday),from=process.env.DATE_FROM||fmt(new Date(yesterday.getTime()-6*86400000));
- if(to>fmt(yesterday))throw Error('Hanya tanggal yang sudah selesai boleh ditarik.');
+ // Default: cuma tanggal yang sudah pasti selesai (kemarin atau lebih lama). ALLOW_TODAY
+ // dipakai HANYA oleh job yang sengaja menarik hari berjalan setelah outlet tutup (mis.
+ // otomasi 21:02 WIB, setelah jam tutup 21:00) -- caller itu yang menanggung risiko transaksi
+ // menit-menit terakhir terlewat; caller lain (manual/backfill) tetap seketat sebelumnya.
+ const today=fmt(new Date());
+ if(to>(process.env.ALLOW_TODAY==='1'?today:fmt(yesterday)))throw Error('Hanya tanggal yang sudah selesai boleh ditarik.');
  const client=createEsbClient({username:process.env.ESB_USERNAME,password:process.env.ESB_PASSWORD});let results;
  try{results=await collect(config.branches,range(from,to),client);}finally{client.close();}
  const path='forecast/pcs-sales.json',previous=fs.existsSync(path)?JSON.parse(fs.readFileSync(path,'utf8')):null;

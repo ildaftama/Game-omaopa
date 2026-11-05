@@ -1,8 +1,8 @@
 name: Sinkronisasi bundle referensi Forecast (malam)
 on:
   schedule:
-    # 14.00 UTC = 21.00 WIB (Asia/Jakarta), setiap hari.
-    - cron: '0 14 * * *'
+    # 14.02 UTC = 21.02 WIB (Asia/Jakarta), setiap hari -- 2 menit setelah outlet tutup (21.00).
+    - cron: '2 14 * * *'
   workflow_dispatch: {}
 permissions:
   contents: read
@@ -38,16 +38,19 @@ jobs:
         run: node integration/pack-forecast-reference.mjs prime
       - name: Perbarui pesanan dari sheet
         run: python integration/pcs_orders.py
-      - name: Ambil PCS produk dari API ESB (1 hari terakhir yang sudah selesai saja)
+      - name: Ambil PCS produk dari API ESB (hari ini saja, outlet sudah tutup)
         env:
           ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
           ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+          ALLOW_TODAY: '1'
         run: |
           # Riwayat lama sudah tersimpan (lihat langkah "Siapkan pcs-sales.json" di atas) dan
-          # digabung, bukan ditimpa -- jadi tiap malam cukup tarik 1 hari (kemarin WIB, hari
-          # yang sudah pasti selesai), bukan jendela 7 hari bawaan skrip. ~28 laporan, bukan
-          # ~196, jauh lebih cepat.
-          DAY=$(node -e "console.log(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date(Date.now()-86400000)))")
+          # digabung, bukan ditimpa -- jadi tiap malam cukup tarik 1 hari, bukan jendela 7 hari
+          # bawaan skrip. ~28 laporan, bukan ~196, jauh lebih cepat. ALLOW_TODAY=1 melonggarkan
+          # pengaman "hanya tanggal yang sudah selesai" KHUSUS job ini -- job ini sengaja jalan
+          # jam 21.02 WIB, 2 menit setelah semua outlet tutup (21.00), jadi hari itu dianggap
+          # sudah tuntas. Caller lain (manual/backfill) tetap seketat sebelumnya.
+          DAY=$(node -e "console.log(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date()))")
           echo "Tanggal ditarik: $DAY"
           set +e
           DATE_FROM="$DAY" DATE_TO="$DAY" node integration/pcs-sales.mjs

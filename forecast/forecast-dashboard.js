@@ -111,12 +111,19 @@ window.ForecastDashboard=(()=>{
   const list=outletIds(outletId,sales);if(!list.length)return '<p class="workspace-note">Pilih outlet untuk lihat cuaca.</p>';
   const t=today(),tomorrow=window.ForecastPlanner.shift(t,1);
   let map;try{map=await window.WeatherForecast.getNetwork(list,t,tomorrow);}catch{return '<p class="workspace-note">Layanan cuaca belum dapat dihubungi.</p>'+SOURCE_NOTE;}
-  const risky=[];
-  for(const [id,w] of map){if(w.error)continue;for(const d of w.days)if(d.probability!=null&&d.probability>=60)risky.push({id,date:d.date,probability:d.probability});}
-  risky.sort((a,b)=>b.probability-a.probability);
-  if(!risky.length)return '<p class="workspace-note">Tidak ada outlet dengan risiko hujan tinggi hari ini/besok.</p>'+SOURCE_NOTE;
   const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
-  return `<div class="upcoming-line-list">${risky.slice(0,8).map(r=>`<div class="upcoming-line"><b>${esc(name(r.id))}</b><span>${r.date===t?'Hari ini':'Besok'} · hujan ${r.probability}%</span></div>`).join('')}</div>${risky.length>8?`<p class="workspace-note">+${risky.length-8} outlet lain berisiko hujan.</p>`:''}${SOURCE_NOTE}`;
+  const byArea={1:[],2:[],3:[]};
+  for(const [id,w] of map){
+   const area=window.OutletResearchNotes?.area(id);if(!area)continue;
+   const d0=w.error?null:w.days.find(d=>d.date===t),d1=w.error?null:w.days.find(d=>d.date===tomorrow);
+   byArea[area].push({id,today:d0?.probability??null,tomorrow:d1?.probability??null});
+  }
+  const sections=[1,2,3].map(n=>{
+   const rows=byArea[n],maxP=Math.max(-1,...rows.flatMap(r=>[r.today,r.tomorrow]).filter(v=>v!=null)),risky=rows.filter(r=>(r.today!=null&&r.today>=60)||(r.tomorrow!=null&&r.tomorrow>=60));
+   const summary=maxP<0?'Data belum tersedia':maxP>=60?`${risky.length} outlet berisiko hujan (tertinggi ${maxP}%)`:`Aman · tertinggi ${maxP}%`;
+   return `<details class="weather-area"><summary><b>${esc(window.OutletResearchNotes.areaName(n))}</b><span class="${maxP>=60?'fp-warning':'fp-ok'}">${esc(summary)}</span></summary><div class="upcoming-line-list">${rows.sort((a,b)=>Math.max(b.today??-1,b.tomorrow??-1)-Math.max(a.today??-1,a.tomorrow??-1)).map(r=>`<div class="upcoming-line"><b>${esc(name(r.id))}</b><span>Hari ini ${r.today==null?'—':r.today+'%'} · Besok ${r.tomorrow==null?'—':r.tomorrow+'%'}</span></div>`).join('')}</div></details>`;
+  });
+  return sections.join('')+SOURCE_NOTE;
  }
 
  function eventsSoon(outletId){

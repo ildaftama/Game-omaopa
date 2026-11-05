@@ -16,5 +16,16 @@ window.OutletResearchNotes=(()=>{
   }
   return out;
  }
- return {category,notes,campusOutlets:[...campus]};
+ // Pengelompokan wilayah operasional (dikonfirmasi owner 2026-11-05), dipakai untuk ringkas
+ // cuaca per area dulu sebelum rincian per outlet. Merbabu & Rajawali dipetakan ke Area 1
+ // (Klaten) berdasarkan koordinat — namanya sendiri tidak menyebut kota.
+ const AREA_NAMES={1:'Area 1 · Jogja, Klaten, Magelang, Temanggung, Muntilan',2:'Area 2 · Solo, Boyolali, Sragen, Karanganyar, Sukoharjo',3:'Area 3 · Semarang, Salatiga, Ambarawa'};
+ const areaMap={
+  godean:1,umy:1,'jakal-uii':1,'nusa-indah':1,tajem:1,'pemuda-magelang':1,muntilann:1,temanggung:1,merbabu:1,rajawali:1,
+  boyolali:2,sragen:2,karanganyar:2,sukoharjo:2,uns:2,ums:2,makamhaji:2,nusukan:2,laweyan:2,
+  ambarawa:3,uksw:3,'gajah-raya':3,udinus:3,unnes:3,undip:3,sampangan:3,unimus:3,ngaliyan:3,
+ };
+ function area(outletId){return areaMap[outletId]||null;}
+ function areaName(n){return AREA_NAMES[n]||('Area '+n);}
+ return {category,notes,campusOutlets:[...campus],area,areaName,AREA_NAMES};
 })();
