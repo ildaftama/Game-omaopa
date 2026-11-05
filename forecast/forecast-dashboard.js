@@ -182,10 +182,16 @@ window.ForecastDashboard=(()=>{
  // digambar lebih tipis & agak transnamun DI BAWAH garis utama, supaya saat berpotongan garis
  // utama tetap terbaca jelas. Off secara default (baru 2-3 garis, bukan 6 sekaligus); nyalakan
  // lewat legend kalau mau lihat rinciannya. State tampilan tersimpan per perangkat.
+ // Garis "secondary" (murni/pesanan) dibuat putus-putus (dash) MESKI bukan garis prediksi --
+ // nilainya sering sangat dekat dengan garis utamanya (pesanan biasanya hanya beberapa persen
+ // dari total), jadi kalau cuma dibedakan lewat opacity/ketebalan, garis itu praktis tertutup
+ // total oleh garis utama yang solid di atasnya dan terlihat seperti tidak muncul sama sekali
+ // walau datanya ada (dan checkbox-nya sudah aktif). Pola putus-putus tetap kelihatan jelas
+ // walau dua garis berhimpit persis, beda dari sekadar transparansi.
  const SERIES=[
   ['actualTotal','#1f4e79',false,'Omzet real',false],
-  ['actualPure','#5aa7d6',false,'Omzet murni',true],
-  ['actualPesanan','#9b59b6',false,'Omzet pesanan',true],
+  ['actualPure','#5aa7d6',true,'Omzet murni',true],
+  ['actualPesanan','#9b59b6',true,'Omzet pesanan',true],
   ['forecastTotal','#c0392b',true,'Prediksi',false],
   ['forecastPure','#e08b3f',true,'Prediksi murni',true],
   ['plan','#2e8b57',false,'Rencana tim',false],
@@ -206,10 +212,10 @@ window.ForecastDashboard=(()=>{
   for(let i=0;i<4;i++){const v=max*i/3,yy=y(v);svg+=`<line x1="${pad.l}" x2="${w-pad.r}" y1="${yy}" y2="${yy}" stroke="#e9eef2"/><text x="${pad.l-8}" y="${yy+4}" text-anchor="end" font-size="11">${moneyShort(v)}</text>`;}
   const todayIdx=rows.findIndex(r=>r.date===trend.today);
   if(todayIdx>=0){const xx=x(todayIdx);svg+=`<line x1="${xx}" x2="${xx}" y1="${pad.t}" y2="${h-pad.b}" stroke="#8a8a8a" stroke-width="1" stroke-dasharray="3 3"/><text x="${xx}" y="${pad.t-2}" text-anchor="middle" font-size="10" fill="#8a8a8a">Hari ini</text>`;}
-  function line(key,color,dash,secondary){let d='';rows.forEach((r,i)=>{if(r[key]==null)return;d+=(d?'L':'M')+x(i)+' '+y(r[key])+' ';});return d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="${secondary?.9:1.5}" opacity="${secondary?.6:.9}" ${dash?'stroke-dasharray="5 4"':''} stroke-linecap="round" stroke-linejoin="round"/>`:'';}
+  function line(key,color,dash,secondary){let d='';rows.forEach((r,i)=>{if(r[key]==null)return;d+=(d?'L':'M')+x(i)+' '+y(r[key])+' ';});return d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="${secondary?1.1:1.5}" opacity="${secondary?.85:.9}" ${dash?'stroke-dasharray="5 4"':''} stroke-linecap="round" stroke-linejoin="round"/>`:'';}
   for(const [key,color,dash,,secondary] of drawOrder)svg+=line(key,color,dash,secondary);
   const longDate=d=>Number(d.slice(8,10))+' '+months[Number(d.slice(5,7))-1]+' '+d.slice(0,4);
-  rows.forEach((r,i)=>{for(const[key,color,,label,secondary]of drawOrder)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="${secondary?1.5:2.2}" fill="${color}" opacity="${secondary?.6:.9}" stroke="#fff" stroke-width="1"/><circle cx="${x(i)}" cy="${y(r[key])}" r="8" fill="transparent" tabindex="0" data-fd-point="${esc(label+' · '+longDate(r.date))}" data-fd-value="${Math.round(r[key])}"><title>${esc(label+' · '+longDate(r.date))}: ${money(r[key])}</title></circle>`;});
+  rows.forEach((r,i)=>{for(const[key,color,,label,secondary]of drawOrder)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="${secondary?1.7:2.2}" fill="${color}" opacity="${secondary?.85:.9}" stroke="#fff" stroke-width="1"/><circle cx="${x(i)}" cy="${y(r[key])}" r="8" fill="transparent" tabindex="0" data-fd-point="${esc(label+' · '+longDate(r.date))}" data-fd-value="${Math.round(r[key])}"><title>${esc(label+' · '+longDate(r.date))}: ${money(r[key])}</title></circle>`;});
   const step=Math.max(1,Math.ceil(n/14));rows.forEach((r,i)=>{if(i%step!==0&&i!==n-1)return;svg+=`<text x="${x(i)}" y="${h-10}" text-anchor="middle" font-size="10">${dayLabel(r.date)}${r.date.endsWith('-01')?' '+months[Number(r.date.slice(5,7))-1].slice(0,3):''}</text>`;});
   const legend=active.map(([key,color,dash,label])=>`<label class="${hidden.has(key)?'off':'on'}"><input type="checkbox" data-fd-toggle="${key}" ${hidden.has(key)?'':'checked'}><i class="${dash?'dashed':''}" style="border-color:${color}"></i>${esc(label)}</label>`).join('');
   return `<div class="pcs-chart"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik tren omzet real vs prediksi vs rencana tim">${svg}</svg></div><div class="fd-legend">${legend}</div><div class="pcs-chart-readout" aria-live="polite">Arahkan ke titik untuk lihat nominal. Klik label untuk sembunyikan/tampilkan.</div>`;
