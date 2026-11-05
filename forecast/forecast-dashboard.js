@@ -242,14 +242,58 @@ window.ForecastDashboard=(()=>{
   const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
   return [...perOutlet.entries()].map(([id,o])=>({id,name:name(id),percent:o.shipped>0?o.waste/o.shipped*100:null})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent);
  }
+ // Lost sales HARIAN dari sheet rekap tim (tab "Rekap Forecast <bulan>", kolom menit
+ // kehabisan tiap outlet tiap tanggal) -- ditarik tiap malam oleh waste-recap.mjs, bukan
+ // snapshot September lagi. Dirata-rata 7 hari terakhir, dikonversi ke % dengan rumus yang
+ // sama dengan performance-summary.mjs (menit / (hari x 12 jam buka x 60)).
+ function lostSalesByOutlet(outletId){
+  const recap=window.DAILY_RECAP_SUMMARY?.lostSalesMinutes;if(!recap)return null;
+  const planner=window.ForecastPlanner,t=today(),from=planner.shift(t,-7);
+  const byOutlet=new Map();
+  for(const [date,rows] of Object.entries(recap)){
+   if(date<from||date>t)continue;
+   for(const [id,minutes] of Object.entries(rows)){
+    if(outletId!=='__all__'&&id!==outletId)continue;
+    const o=byOutlet.get(id)||{minutes:0,days:0};o.minutes+=minutes||0;o.days++;byOutlet.set(id,o);
+   }
+  }
+  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
+  return [...byOutlet.entries()].map(([id,o])=>({id,name:name(id),percent:o.days>0?o.minutes/(o.days*12*60)*100:null})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent);
+ }
+ // Waste nominal langsung dari sheet (tab WASTE, kolom Nominal) -- angka PEMBANDING terhadap
+ // wasteByOutlet() (dikirim vs laku, dari data rencana tim) di atas. Dua sumber/metode
+ // berbeda, sengaja ditampilkan berdampingan, bukan dijumlah jadi satu angka.
+ function wasteSheetByOutlet(outletId){
+  const recap=window.DAILY_RECAP_SUMMARY?.waste;if(!recap)return null;
+  const planner=window.ForecastPlanner,t=today(),from=planner.shift(t,-7);
+  const byOutlet=new Map();
+  for(const [date,rows] of Object.entries(recap)){
+   if(date<from||date>t)continue;
+   for(const [id,entry] of Object.entries(rows)){
+    if(outletId!=='__all__'&&id!==outletId)continue;
+    byOutlet.set(id,(byOutlet.get(id)||0)+(entry.nominal||0));
+   }
+  }
+  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
+  return [...byOutlet.entries()].map(([id,nominal])=>({id,name:name(id),nominal})).filter(r=>r.nominal>0).sort((a,b)=>b.nominal-a.nominal);
+ }
+ function monthlyLostSalesFallback(){
+  const perf=window.PERFORMANCE_SUMMARY,period=perf?.latestCompletePeriod;if(!period)return null;
+  const rows=Object.entries(perf.outlets).map(([id,o])=>({id,name:o.name||id,percent:o.periods?.[period]?.estimatedLostSalesPercent})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent);
+  return rows.length?{period,rows}:null;
+ }
  function badges(outletId){
-  const waste=wasteByOutlet(outletId);
-  const perf=window.PERFORMANCE_SUMMARY,period=perf?.latestCompletePeriod;
-  const lost=period?Object.entries(perf.outlets).map(([id,o])=>({id,name:o.name||id,percent:o.periods?.[period]?.estimatedLostSalesPercent})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent).slice(0,5):[];
+  const wasteTeam=wasteByOutlet(outletId),wasteSheet=wasteSheetByOutlet(outletId),lostDaily=lostSalesByOutlet(outletId);
   const line=(r,threshold)=>`<div class="product-line"><b>${esc(r.name)}</b><span class="${r.percent>threshold?'fp-down':'fp-up'}">${r.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}%</span></div>`;
-  const wasteCard=waste==null?'':`<article class="workspace-card compact-card"><span class="micro-label">5 OUTLET WASTE TERTINGGI</span>${waste.length?waste.slice(0,5).map(r=>line(r,WASTE_THRESHOLD)).join(''):'<p class="workspace-note">Belum ada rencana 7 hari terakhir dengan data "real dikirim".</p>'}<p class="workspace-note">7 hari terakhir · ambang ${WASTE_THRESHOLD}% · dikirim vs total laku</p></article>`;
-  const lostCard=!lost.length?'':`<article class="workspace-card compact-card"><span class="micro-label">5 OUTLET LOST SALES TERTINGGI</span>${lost.map(r=>line(r,LOST_SALES_THRESHOLD)).join('')}<p class="workspace-note">${period} (bulanan, belum harian) · ambang ${LOST_SALES_THRESHOLD}%</p></article>`;
-  return wasteCard||lostCard?`<div class="product-comparison">${wasteCard}${lostCard}</div>`:'';
+  const lineMoney=r=>`<div class="product-line"><b>${esc(r.name)}</b><span>${money(r.nominal)}</span></div>`;
+  const wasteTeamCard=wasteTeam==null?'':`<article class="workspace-card compact-card"><span class="micro-label">WASTE · DIKIRIM VS LAKU (RENCANA TIM)</span>${wasteTeam.length?wasteTeam.slice(0,5).map(r=>line(r,WASTE_THRESHOLD)).join(''):'<p class="workspace-note">Belum ada rencana 7 hari terakhir dengan data "real dikirim".</p>'}<p class="workspace-note">7 hari terakhir · ambang ${WASTE_THRESHOLD}%</p></article>`;
+  const wasteSheetCard=wasteSheet==null?'':`<article class="workspace-card compact-card"><span class="micro-label">WASTE · SHEET REKAP (NOMINAL, PEMBANDING)</span>${wasteSheet.length?wasteSheet.slice(0,5).map(lineMoney).join(''):'<p class="workspace-note">Belum ada data waste 7 hari terakhir di sheet.</p>'}<p class="workspace-note">7 hari terakhir · dari tab WASTE, pembanding kartu sebelah</p></article>`;
+  const fallback=lostDaily?null:monthlyLostSalesFallback();
+  const lostRows=lostDaily?.slice(0,5)||fallback?.rows.slice(0,5)||[];
+  const lostNote=lostDaily?`7 hari terakhir · ambang ${LOST_SALES_THRESHOLD}% · dari sheet rekap`:fallback?`${fallback.period} (bulanan, belum harian) · ambang ${LOST_SALES_THRESHOLD}%`:'';
+  const lostCard=!lostRows.length?'':`<article class="workspace-card compact-card"><span class="micro-label">5 OUTLET LOST SALES TERTINGGI</span>${lostRows.map(r=>line(r,LOST_SALES_THRESHOLD)).join('')}<p class="workspace-note">${lostNote}</p></article>`;
+  const cards=[wasteTeamCard,wasteSheetCard,lostCard].filter(Boolean);
+  return cards.length?`<div class="product-comparison">${cards.join('')}</div>`:'';
  }
 
  const SOURCE_NOTE='<p class="fp-caption">Sumber: Open-Meteo (ramalan publik), probabilitas hujan maksimum per hari dari model cuaca — bukan data yang kami karang. Awal musim hujan (November) wajar menunjukkan persentase tinggi di banyak outlet sekaligus karena satu sistem hujan bisa menutupi beberapa outlet yang berdekatan.</p>';

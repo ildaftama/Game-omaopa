@@ -4,9 +4,15 @@ const finite=x=>typeof x==='number'&&Number.isFinite(x);
 const pct=(a,b)=>finite(a)&&finite(b)&&b>0?Math.round(a/b*1000)/10:null;
 const change=(a,b)=>finite(a)&&finite(b)&&b>0?Math.round((a/b-1)*1000)/10:null;
 export function estimateLostSales(minutes,days,openHours=12){if(!finite(minutes)||minutes<0||!Number.isInteger(days)||days<=0||!finite(openHours)||openHours<=0)return null;return pct(minutes,days*openHours*60);}
-export function performanceSummary(source,tracking,profiles){
+// Nama outlet di sheet rekap (PERFORMA OUTLET, tracking harian, WASTE) tidak selalu sama persis
+// dengan OUTLET_INTELLIGENCE -- alias manual dipakai bersama oleh performanceSummary() dan
+// skrip rekap harian lain (waste-recap.mjs) supaya pemetaan nama->id konsisten satu sumber.
+export function outletLookup(profiles){
  const aliases=Object.fromEntries(Object.entries(profiles.outlets).map(([id,o])=>[norm(o.name),id]));Object.assign(aliases,{jakal:'jakal-uii',gajah:'gajah-raya',magelang:'pemuda-magelang',muntilan:'muntilann',jebres:'uns',merbabuklaten:'merbabu',rajawaliklaten:'rajawali',muhammadiyahsurakarta:'ums'});
- const getId=name=>aliases[norm(name)],periods=[['Agustus','Juli','august','2026-08',31,31],['September','Agustus','september','2026-09',30,31]],outlets={};
+ return name=>aliases[norm(name)];
+}
+export function performanceSummary(source,tracking,profiles){
+ const getId=outletLookup(profiles),periods=[['Agustus','Juli','august','2026-08',31,31],['September','Agustus','september','2026-09',30,31]],outlets={};
  for(const [id,o]of Object.entries(profiles.outlets).filter(([,o])=>o.hasProfile)){
   const history=source.values.slice(1).filter(r=>getId(r[1])===id),result={};
   for(const [month,previous,trackingKey,key,days,previousDays]of periods){
