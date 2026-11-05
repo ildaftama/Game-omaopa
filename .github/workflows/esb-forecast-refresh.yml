@@ -30,15 +30,27 @@ jobs:
           python-version: '3.12'
       - name: Baca link sumber yang disimpan tim
         run: node integration/pcs-source.mjs
+      - name: Siapkan pcs-sales.json dari bundle live (basis merge, bukan snapshot repo)
+        env:
+          FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
+          FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: node integration/pack-forecast-reference.mjs prime
       - name: Perbarui pesanan dari sheet
         run: python integration/pcs_orders.py
-      - name: Ambil PCS produk dari API ESB
+      - name: Ambil PCS produk dari API ESB (1 hari terakhir yang sudah selesai saja)
         env:
           ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
           ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
         run: |
+          # Riwayat lama sudah tersimpan (lihat langkah "Siapkan pcs-sales.json" di atas) dan
+          # digabung, bukan ditimpa -- jadi tiap malam cukup tarik 1 hari (kemarin WIB, hari
+          # yang sudah pasti selesai), bukan jendela 7 hari bawaan skrip. ~28 laporan, bukan
+          # ~196, jauh lebih cepat.
+          DAY=$(node -e "console.log(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date(Date.now()-86400000)))")
+          echo "Tanggal ditarik: $DAY"
           set +e
-          node integration/pcs-sales.mjs
+          DATE_FROM="$DAY" DATE_TO="$DAY" node integration/pcs-sales.mjs
           result=$?
           set -e
           if [ "$result" -eq 2 ]; then

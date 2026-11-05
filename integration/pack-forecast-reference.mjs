@@ -105,6 +105,18 @@ export function buildLeanBundle(fullBundle) {
   const globals = Object.fromEntries(LEAN_GLOBALS.filter(k => Object.hasOwn(fullBundle.globals || {}, k)).map(k => [k, fullBundle.globals[k]]));
   return { schemaVersion: 1, globals, files: { 'pcs-sales.json': fullBundle.files['pcs-sales.json'], 'pcs-orders.json': fullBundle.files['pcs-orders.json'] } };
 }
+// Menulis pcs-sales.json dari bundle LIVE ke disk, SEBELUM pcs-sales.mjs dijalankan. Tanpa
+// ini, pcs-sales.mjs menggabungkan data ESB baru dengan file pcs-sales.json git checkout
+// (snapshot lama, bisa jauh lebih tipis dari yang sudah live di Firestore) -- riwayat yang
+// lebih lengkap di bundle live bisa "hilang" setiap kali workflow ini jalan. pcs_orders.py
+// tidak perlu di-prime karena ia menulis ulang penuh dari sheet PESANAN setiap kali.
+export async function prime(env = process.env, salesPath = 'forecast/pcs-sales.json') {
+  const { idToken } = await signIn(env);
+  const current = await fetchBundle('forecastPlans/reference_current', idToken);
+  if (!current?.files?.['pcs-sales.json']) { console.log('Belum ada bundle referensi tersimpan; pakai pcs-sales.json dari repo apa adanya.'); return; }
+  fs.writeFileSync(salesPath, JSON.stringify(current.files['pcs-sales.json']));
+  console.log('pcs-sales.json disiapkan dari bundle live sebagai basis merge (riwayat penuh dipertahankan).');
+}
 export async function run(env = process.env, salesPath = 'forecast/pcs-sales.json', ordersPath = 'forecast/pcs-orders.json') {
   const { idToken, uid } = await signIn(env);
   const current = await fetchBundle('forecastPlans/reference_current', idToken);
@@ -120,5 +132,6 @@ export async function run(env = process.env, salesPath = 'forecast/pcs-sales.jso
   return { full: packedFull.sha256, lean: packedLean.sha256 };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  run().catch(e => { console.error(e.message); console.error('Sinkronisasi bundle referensi belum berhasil.'); process.exitCode = 1; });
+  const task = process.argv[2] === 'prime' ? prime() : run();
+  task.catch(e => { console.error(e.message); console.error('Sinkronisasi bundle referensi belum berhasil.'); process.exitCode = 1; });
 }

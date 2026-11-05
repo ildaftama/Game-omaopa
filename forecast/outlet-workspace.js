@@ -41,8 +41,8 @@ if(!window.RADAR_GOOGLE_MAPS_KEY)document.querySelector('.google-traffic-card').
 $('#workspace-content').addEventListener('submit',e=>{if(e.target.id==='source-settings-form')window.SourceSettings.submit(e);if(e.target.id==='forecast-plan-form')window.ForecastWorkspace.submit(e);});
 $('#workspace-content').addEventListener('mouseover',e=>window.SeasonalityPanel.inspect(e,selected));
 $('#workspace-content').addEventListener('focusin',e=>window.SeasonalityPanel.inspect(e,selected));
-$('#workspace-content').addEventListener('mouseover',e=>window.PcsPanels.inspect(e));
-$('#workspace-content').addEventListener('focusin',e=>window.PcsPanels.inspect(e));
+$('#workspace-content').addEventListener('mouseover',e=>{window.PcsPanels.inspect(e);window.ForecastDashboard.inspect(e);});
+$('#workspace-content').addEventListener('focusin',e=>{window.PcsPanels.inspect(e);window.ForecastDashboard.inspect(e);});
 window.addEventListener('pcs-selection-changed',()=>{if(['pcs','orders'].includes(focus))render();});
 window.addEventListener('pcs-data-loaded',()=>{if(['pcs','orders','forecast','dashboard'].includes(focus))render();});
 window.addEventListener('forecast-operations-changed',()=>{if(['forecast','access','dashboard'].includes(focus))render();});

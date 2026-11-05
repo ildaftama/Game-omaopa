@@ -42,8 +42,13 @@ window.ForecastDashboard=(()=>{
   const series=[...byDate.entries()].filter(([,e])=>e.known>=minOutlets).map(([date,e])=>({date,value:e.sum*(expected/e.known)})).sort((a,b)=>a.date.localeCompare(b.date));
   const lastActual=series.at(-1)?.date||null;
   function forecastAt(date){
-   const wd=new Date(date+'T12:00:00Z').getUTCDay(),from=planner.shift(date,-56);
-   const win=series.filter(r=>r.date>=from&&r.date<date);
+   const wd=new Date(date+'T12:00:00Z').getUTCDay();
+   // Coba 56 hari dulu (konsisten dengan rekomendasi per-outlet); kalau riwayat sekitar
+   // tanggal itu tipis (mis. baru beberapa minggu data tersinkron), lebarkan ke 180 hari
+   // supaya garis prediksi tidak hilang begitu saja karena jendela terlalu sempit.
+   let win=series.filter(r=>r.date>=planner.shift(date,-56)&&r.date<date);
+   if(!win.length)win=series.filter(r=>r.date>=planner.shift(date,-180)&&r.date<date);
+   if(!win.length)return null;
    const sameDay=win.filter(r=>new Date(r.date+'T12:00:00Z').getUTCDay()===wd).map(r=>r.value);
    const pool=sameDay.length>=3?sameDay:win.slice(-14).map(r=>r.value);
    if(!pool.length)return null;
@@ -84,10 +89,11 @@ window.ForecastDashboard=(()=>{
   const series=[['actual','#276b96',false,'Real'],['forecast','#b4772e',true,'Prediksi'],['plan','#59844f',false,'Rencana tim']];
   function line(key,color,dash){let d='';rows.forEach((r,i)=>{if(r[key]==null)return;d+=(d?'L':'M')+x(i)+' '+y(r[key])+' ';});return d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="1.8" ${dash?'stroke-dasharray="6 4"':''}/>`:'';}
   for(const [key,color,dash] of series)svg+=line(key,color,dash);
-  rows.forEach((r,i)=>{for(const[key,color,,label]of series)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="7" fill="transparent" tabindex="0"><title>${esc(label+' · '+r.date)}: ${money(r[key])}</title></circle>`;});
+  const longDate=d=>Number(d.slice(8,10))+' '+months[Number(d.slice(5,7))-1]+' '+d.slice(0,4);
+  rows.forEach((r,i)=>{for(const[key,color,,label]of series)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="8" fill="transparent" tabindex="0" data-fd-point="${esc(label+' · '+longDate(r.date))}" data-fd-value="${Math.round(r[key])}"><title>${esc(label+' · '+longDate(r.date))}: ${money(r[key])}</title></circle>`;});
   const step=Math.max(1,Math.ceil(n/14));rows.forEach((r,i)=>{if(i%step!==0&&i!==n-1)return;svg+=`<text x="${x(i)}" y="${h-10}" text-anchor="middle" font-size="10">${dayLabel(r.date)}${r.date.endsWith('-01')?' '+months[Number(r.date.slice(5,7))-1].slice(0,3):''}</text>`;});
   const legend=series.filter(([key])=>rows.some(r=>r[key]!=null)).map(([,color,,label])=>`<span><i style="background:${color}"></i>${esc(label)}</span>`).join('');
-  return `<div class="pcs-chart"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik tren omzet real vs prediksi vs rencana tim">${svg}</svg></div><div class="pcs-active-legend">${legend}</div><div class="pcs-chart-readout" aria-live="polite">Arahkan ke titik untuk lihat angka tiap tanggal.</div>`;
+  return `<div class="pcs-chart"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik tren omzet real vs prediksi vs rencana tim">${svg}</svg></div><div class="pcs-active-legend">${legend}</div><div class="pcs-chart-readout" aria-live="polite">Arahkan atau fokus ke titik untuk lihat tanggal & nominal persis.</div>`;
  }
 
  function badges(){
@@ -99,16 +105,18 @@ window.ForecastDashboard=(()=>{
   return `<div class="product-comparison">${card('5 OUTLET WASTE TERTINGGI',waste,'wastePercent','%')}${card('5 OUTLET LOST SALES TERTINGGI',lost,'estimatedLostSalesPercent','%')}</div>`;
  }
 
+ const SOURCE_NOTE='<p class="fp-caption">Sumber: Open-Meteo (ramalan publik), probabilitas hujan maksimum per hari dari model cuaca — bukan data yang kami karang. Awal musim hujan (November) wajar menunjukkan persentase tinggi di banyak outlet sekaligus karena satu sistem hujan bisa menutupi beberapa outlet yang berdekatan.</p>';
  async function weatherHighlights(outletId){
   const sales=window.PcsPanels.data().sales;if(!sales)return '<p class="workspace-note">Data outlet belum termuat.</p>';
   const list=outletIds(outletId,sales);if(!list.length)return '<p class="workspace-note">Pilih outlet untuk lihat cuaca.</p>';
   const t=today(),tomorrow=window.ForecastPlanner.shift(t,1);
-  let map;try{map=await window.WeatherForecast.getNetwork(list,t,tomorrow);}catch{return '<p class="workspace-note">Layanan cuaca belum dapat dihubungi.</p>';}
+  let map;try{map=await window.WeatherForecast.getNetwork(list,t,tomorrow);}catch{return '<p class="workspace-note">Layanan cuaca belum dapat dihubungi.</p>'+SOURCE_NOTE;}
   const risky=[];
   for(const [id,w] of map){if(w.error)continue;for(const d of w.days)if(d.probability!=null&&d.probability>=60)risky.push({id,date:d.date,probability:d.probability});}
-  if(!risky.length)return '<p class="workspace-note">Tidak ada outlet dengan risiko hujan tinggi hari ini/besok.</p>';
+  risky.sort((a,b)=>b.probability-a.probability);
+  if(!risky.length)return '<p class="workspace-note">Tidak ada outlet dengan risiko hujan tinggi hari ini/besok.</p>'+SOURCE_NOTE;
   const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
-  return `<div class="upcoming-line-list">${risky.slice(0,8).map(r=>`<div class="upcoming-line"><b>${esc(name(r.id))}</b><span>${r.date===t?'Hari ini':'Besok'} · hujan ${r.probability}%</span></div>`).join('')}</div>`;
+  return `<div class="upcoming-line-list">${risky.slice(0,8).map(r=>`<div class="upcoming-line"><b>${esc(name(r.id))}</b><span>${r.date===t?'Hari ini':'Besok'} · hujan ${r.probability}%</span></div>`).join('')}</div>${risky.length>8?`<p class="workspace-note">+${risky.length-8} outlet lain berisiko hujan.</p>`:''}${SOURCE_NOTE}`;
  }
 
  function eventsSoon(outletId){
@@ -159,5 +167,6 @@ window.ForecastDashboard=(()=>{
    ${operationalSummary(outletId)}
    ${badges()}`;
  }
- return {render};
+ function inspect(e){const p=e.target.closest('[data-fd-point]');if(!p)return;const box=p.closest('.pcs-main-chart')?.querySelector('.pcs-chart-readout');if(box)box.textContent=p.dataset.fdPoint+': '+money(Number(p.dataset.fdValue));}
+ return {render,inspect};
 })();
