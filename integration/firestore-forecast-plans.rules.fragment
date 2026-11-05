@@ -26,6 +26,19 @@ match /forecastAccess/{uid} {
   allow read: if forecastManager();
   allow write: if false;
 }
+// Master harus setara Admin Utama (super) untuk pengaturan Forecast sendiri. Rules penuh
+// yang ada (lihat firestore.full.snapshot-2026-10-21.rules baris ~297) hanya mengizinkan
+// isSuper() menulis match generik settings/{id} — padahal source-cloud.js di client sudah
+// mengizinkan super ATAU master. Match spesifik di bawah ini lebih spesifik daripada
+// settings/{id} sehingga menang hanya untuk path ini; pengaturan lain (banner, HR, dst)
+// tetap Admin Utama/HRD saja seperti sebelumnya, tidak ikut melebar.
+// Tempatkan match ini SEBELUM/terpisah dari match /settings/{id} yang sudah ada, dan jangan
+// hapus match /settings/{id} itu sendiri. Pertahankan juga pembungkus notRadarSyncAccount()
+// yang sudah dipakai pada seluruh rule lain di rules penuh.
+match /settings/forecastSources {
+  allow read: if notRadarSyncAccount() && (true);
+  allow write: if notRadarSyncAccount() && (forecastManager());
+}
 function forecastReference(d, key) {
   return forecastManager() && d.schemaVersion == 2
     && d.updatedAt == request.time && d.updatedBy == request.auth.uid
