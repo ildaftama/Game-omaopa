@@ -27,12 +27,14 @@ window.ForecastDashboard=(()=>{
  // kehilangan 4 SKU inti (Malmil/Ogura, ~80% omzet) karena hargaNya jadi null. Untuk omzet
  // real, harga rata-rata terbaik yang kita tahu SEKARANG memang yang tepat dipakai, bukan
  // "harga yang berlaku saat itu" yang memang tidak kita punya datanya per hari.
- // Harga Roti Sosis/Abon/Coklat (12-14) belum dikonfirmasi owner -- null berarti PCS-nya
- // tetap terhitung di tab Penjualan PCS, tapi kontribusi rupiahnya belum masuk omzet di sini
- // sampai harga jual aslinya diberikan (lihat PRODUCT_COUNT).
- const PRICE_REFS={4:57000/9,5:57000/9,6:57000/9,7:33000,8:34000,9:34000,10:19000,11:18000,12:null,13:null,14:null};
+ // Harga Roti dari owner (2026-11-05): Sosis 6500, Abon 7000, Coklat 6000; rasa baru yang
+ // belum launching (Pisang Coklat/Coklat Keju/Vanilla) 6000 masing-masing. Varian bundling
+ // ("Bundling Roti Manis - X") dijual Rp5000 tapi dipetakan ke PRODUK YANG SAMA (lihat
+ // pcs-sales.mjs sku()) -- harga acuan di sini dibiarkan harga normal, sama seperti rata-rata
+ // box Mini (57000/9) yang juga sudah memakai satu harga acuan walau ada variasi per transaksi.
+ const PRICE_REFS={4:57000/9,5:57000/9,6:57000/9,7:33000,8:34000,9:34000,10:19000,11:18000,12:6500,13:7000,14:6000,15:6000,16:6000,17:6000};
  const PRICE_KEYS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate'];
- const PRODUCT_COUNT=15;
+ const PRODUCT_COUNT=18;
  function actualPrice(source,id,p){
   if(p<4){const v=source?.outlets?.[id]?.[PRICE_KEYS[p]]?.price;return v>0?v:null;}
   return p in PRICE_REFS?PRICE_REFS[p]:null;

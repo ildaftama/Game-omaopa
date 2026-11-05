@@ -1,12 +1,12 @@
 'use strict';
 window.PcsPanels=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),num=n=>n==null?'—':n.toLocaleString('id-ID');
- const months=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],labels=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat'];
- // Roti (12-14) sengaja TIDAK masuk targets default: digabung ke total "Semua" akan membuat
+ const months=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],labels=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Pisang Coklat','Roti Coklat Keju','Roti Vanilla'];
+ // Roti (12-17) sengaja TIDAK masuk targets default: digabung ke total "Semua" akan membuat
  // seluruh tanggal SEBELUM Roti mulai tersinkron ESB tampil "Belum lengkap" (lihat pcs-math.js
  // -- "Missing data never becomes a zero sale"), padahal 9 produk lama tetap lengkap. Tetap
  // bisa dipilih manual lewat saklar produk di bawah grafik.
- const colors=['#59844f','#805e98','#276b96','#b4772e','#3d9295','#aa6c88','#78703b','#8a5c3c','#596e88','#9e7b3d','#607c88','#5e8f79','#c2703d','#7e9c4a','#9c5b6e'],targets=[2,3,0,1,7,8,11,10,9],types={sales:'Total penjualan',retail:'Tanpa pesanan',orders:'Pesanan'};
+ const colors=['#59844f','#805e98','#276b96','#b4772e','#3d9295','#aa6c88','#78703b','#8a5c3c','#596e88','#9e7b3d','#607c88','#5e8f79','#c2703d','#7e9c4a','#9c5b6e','#a8763e','#5e7e46','#7a5e9c'],targets=[2,3,0,1,7,8,11,10,9],types={sales:'Total penjualan',retail:'Tanpa pesanan',orders:'Pesanan'};
  const states={sales:{year:'2026',month:'all',products:[2,3],mode:'sales'},orders:{year:'2026',month:'all',products:[8,2],mode:'orders'}};
  let sales=null,orders=null,error='',selectedOutlets=null,focusId='';
  const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());

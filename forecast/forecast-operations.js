@@ -9,7 +9,10 @@
  // dilewatkan lewat "Kue lain (manual)" yang sudah ada -- cocok nama persis dengan salah satu
  // preset ini untuk dibandingkan ke penjualan ESB asli (index 12-14 di pcs-sales.mjs).
  // Sengaja tidak memperluas model.names/plan schema supaya tidak menyentuh Firestore rules.
- const ROTI_PRESETS=['Roti Sosis','Roti Abon','Roti Coklat'];
+ // Rasa Pisang Coklat/Coklat Keju/Vanilla belum launching di ESB saat ini (2026-11-05) --
+ // tetap disiapkan presetnya supaya begitu live, forecaster bisa langsung pakai tanpa menunggu
+ // rilis kode baru. Saran otomatis akan tampil "data belum cukup" sampai ada penjualan nyata.
+ const ROTI_PRESETS=['Roti Sosis','Roti Abon','Roti Coklat','Roti Pisang Coklat','Roti Coklat Keju','Roti Vanilla'];
  const rotiPresetIndex=itemName=>ROTI_PRESETS.findIndex(p=>p.toLowerCase()===String(itemName||'').trim().toLowerCase());
  function rotiActual(outletId,date,flavorIdx){
   const p=12+flavorIdx,row=data().sales.days.find(r=>r.id===outletId&&r.date===date);
