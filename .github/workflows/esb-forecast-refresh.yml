@@ -11,15 +11,13 @@ concurrency:
   cancel-in-progress: false
 jobs:
   sync:
-    # HOLD: tidak berjalan sampai owner mencabut baris ini. Prasyarat yang harus dicek
-    # owner dahulu: akun FIREBASE_SYNC_EMAIL punya dokumen staff/{uid} dengan super atau
-    # master = true (syarat forecastManager() di firestore-forecast-plans.rules.fragment),
-    # dan rules fragment (role forecaster, forecastBriefs, fulfillment) sudah di-deploy ke
-    # project Firestore live. Workflow ini TIDAK menyentuh forecast/pcs-sales.json atau
-    # forecast/pcs-orders.json di repo publik dan TIDAK memicu deploy GitHub Pages — ia
-    # menulis langsung ke bundle privat Firestore (forecastPlans/reference_current dan
-    # forecastBriefs/forecaster_current), terpisah dari esb-pcs.yml yang tetap HOLD.
-    if: ${{ false }}
+    # Aktif 2026-11-05: akun FIREBASE_SYNC_EMAIL sudah punya staff/{uid}.master=true (syarat
+    # forecastManager()), dan rules (role forecaster, forecastBriefs, fulfillment,
+    # settings/forecastSources) sudah dipublikasikan ke project Firestore live. Workflow ini
+    # TIDAK menyentuh forecast/pcs-sales.json atau forecast/pcs-orders.json di repo publik dan
+    # TIDAK memicu deploy GitHub Pages — ia menulis langsung ke bundle privat Firestore
+    # (forecastPlans/reference_current dan forecastBriefs/forecaster_current), terpisah dari
+    # esb-pcs.yml yang tetap HOLD.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
