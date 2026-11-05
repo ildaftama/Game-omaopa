@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {createEsbClient} from './esb-client.mjs';
 
-export const PRODUCTS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Mini Ogura - Cheese','Mini Ogura - Choco','Mini Ogura - Durian','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter','Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju'];
-export const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju'];
-export const MAPPING_VERSION=2;
+export const PRODUCTS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Mini Ogura - Cheese','Mini Ogura - Choco','Mini Ogura - Durian','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter','Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju','Roti Sosis','Roti Abon','Roti Coklat'];
+export const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat'];
+export const MAPPING_VERSION=3;
 export function sku(name){
  let n=String(name).trim().toLowerCase().replace(/\s+/g,' ').replace(/\bcisfon\b/g,'chiffon');
  n=n.replace(/^(ogura (?:cheese|choco)) promo kartini$/,'$1').replace(/^(chiffon classic (?:keju|ekstra keju|buttermilk)) go gajah raya$/,'$1');
@@ -18,6 +18,12 @@ export function sku(name){
  m=n.match(/^mini satuan - (cheese|coklat|durian)$/);if(m)return 4+['cheese','coklat','durian'].indexOf(m[1]);
  m=n.match(/^(?:paket hantaran - )?chiffon (classic|lite) (ekstra keju|keju|buttermilk)$/);
  if(m){if(m[1]==='lite')return m[2]==='keju'?11:m[2]==='ekstra keju'?10:null;return m[2]==='keju'?7:m[2]==='ekstra keju'?8:9;}
+ // Roti manis (sosis/abon/coklat): nama pasti belum dikonfirmasi owner dari ESB, jadi pola
+ // dibuat toleran untuk urutan "roti (manis) X", "paket/bundling roti (manis) X" dan varian
+ // bundling yang masih menyebut nama rasanya. "1 pcs bundling = 1 pcs roti" (bukan box
+ // multi-isi seperti Mini Ogura Filling Mix) sehingga TIDAK pakai multiplier di summarize().
+ m=n.match(/^(?:paket |bundling )?roti (?:manis )?(sosis|abon|coklat)(?:\s+bundling)?$/);
+ if(m)return 12+['sosis','abon','coklat'].indexOf(m[1]);
  return null;
 }
 export function summarize(rows,{date,branchName}){
@@ -29,8 +35,12 @@ export function summarize(rows,{date,branchName}){
   if(!['ALACARTE','PACKAGE_HEADER'].includes(r.rowType))throw Error('Jenis baris ESB belum dikenali.');
   const p=sku(r.menuName),box=String(r.menuName).trim().toLowerCase(),miniBoxes={'mini ogura filling mix':[[4,3],[5,3],[6,3]],'mini ogura filling chocolate':[[5,9]],'mini ogura filling choco & cheese':[[4,4],[5,5]]},parts=miniBoxes[box]||(p===null?null:[[p,1]]);
   if(!parts){
-   // Toppings, packaging and add-ons never create an additional cake.
-   if(/^(?:paket .*(?:malmil|ogura|chiffon|cisfon)|(?:malmil|ogura|chiffon|cisfon|mini ogura|mini satuan)\b)/i.test(r.menuName)&&!/^(?:cisfon|chiffon)\s*(?:-\s*|classic\s+)?kurma$/i.test(r.menuName)){unknownCake++;unmappedMenus.add(r.menuName);}
+   // Toppings, packaging and add-ons never create an additional cake. Same net for "roti
+   // manis" family names (sosis/abon/coklat, termasuk varian bundling) yang belum cocok pola
+   // di sku() -- nama ESB persis belum terkonfirmasi owner, jadi lebih aman gagal keras
+   // (muncul di unmappedMenus) daripada diam-diam kehilangan omzet roti.
+   if((/^(?:paket .*(?:malmil|ogura|chiffon|cisfon)|(?:malmil|ogura|chiffon|cisfon|mini ogura|mini satuan)\b)/i.test(r.menuName)&&!/^(?:cisfon|chiffon)\s*(?:-\s*|classic\s+)?kurma$/i.test(r.menuName))
+     ||/^(?:paket .*roti|bundling.*roti|roti (?:manis\b|sosis\b|abon\b|coklat\b))/i.test(r.menuName)){unknownCake++;unmappedMenus.add(r.menuName);}
    continue;
   }
   if(!Number.isSafeInteger(r.qty)||r.qty<0||!Number.isFinite(r.total)||!Number.isFinite(r.discountTotal))throw Error('Jumlah produk ESB tidak valid.');

@@ -27,8 +27,12 @@ window.ForecastDashboard=(()=>{
  // kehilangan 4 SKU inti (Malmil/Ogura, ~80% omzet) karena hargaNya jadi null. Untuk omzet
  // real, harga rata-rata terbaik yang kita tahu SEKARANG memang yang tepat dipakai, bukan
  // "harga yang berlaku saat itu" yang memang tidak kita punya datanya per hari.
- const PRICE_REFS={4:57000/9,5:57000/9,6:57000/9,7:33000,8:34000,9:34000,10:19000,11:18000};
+ // Harga Roti Sosis/Abon/Coklat (12-14) belum dikonfirmasi owner -- null berarti PCS-nya
+ // tetap terhitung di tab Penjualan PCS, tapi kontribusi rupiahnya belum masuk omzet di sini
+ // sampai harga jual aslinya diberikan (lihat PRODUCT_COUNT).
+ const PRICE_REFS={4:57000/9,5:57000/9,6:57000/9,7:33000,8:34000,9:34000,10:19000,11:18000,12:null,13:null,14:null};
  const PRICE_KEYS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate'];
+ const PRODUCT_COUNT=15;
  function actualPrice(source,id,p){
   if(p<4){const v=source?.outlets?.[id]?.[PRICE_KEYS[p]]?.price;return v>0?v:null;}
   return p in PRICE_REFS?PRICE_REFS[p]:null;
@@ -76,7 +80,7 @@ window.ForecastDashboard=(()=>{
    if(!list.includes(row.id))continue;
    const e=byDate.get(row.date)||{sum:0,known:0};
    if(row.complete){
-    for(let p=0;p<12;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
+    for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
     e.known++;
    }
    byDate.set(row.date,e);

@@ -40,8 +40,17 @@ test('owner-excluded Kurma menus do not suppress all other product counts on a h
 
 test('legacy complete topped cake menus count their base once, without counting topping components',()=>{assert.equal(sku('Ogura Choco - Topping Halfmix Choco Greentea'),1);assert.equal(sku('Malmil Cheese - Topping Full Choco'),2);const r=summarize([row('Ogura Choco - Topping Halfmix Choco Greentea',6),row('Topping Full Greentea Ogura',6,{rowType:'PACKAGE_COMPONENT'})],job);assert.equal(r.qty[1],6);assert.equal(r.qty.reduce((a,b)=>a+b,0),6);});
 
-test('legacy Mini mix box is nine pieces, separated by flavor; complimentary boxes stay out of sales',()=>{const r=summarize([row('Mini Ogura Filling Mix',2),row('Mini Satuan - Cheese',4),row('Mini Ogura Filling Mix',1,{discountTotal:13000})],job);assert.deepEqual(r.qty.slice(4,7),[10,6,6]);assert.deepEqual(r.free.slice(4,7),[3,3,3]);assert.equal(r.mappingVersion,2);assert.throws(()=>summarize([row('Mini Ogura New Flavor')],job),/menu/);});
+test('legacy Mini mix box is nine pieces, separated by flavor; complimentary boxes stay out of sales',()=>{const r=summarize([row('Mini Ogura Filling Mix',2),row('Mini Satuan - Cheese',4),row('Mini Ogura Filling Mix',1,{discountTotal:13000})],job);assert.deepEqual(r.qty.slice(4,7),[10,6,6]);assert.deepEqual(r.free.slice(4,7),[3,3,3]);assert.equal(r.mappingVersion,3);assert.throws(()=>summarize([row('Mini Ogura New Flavor')],job),/menu/);});
 test('new menu mapping survives a history merge with an older complete snapshot',()=>{const r=mergeSales(null,[{...job,qty:[3],complete:true,mappingVersion:2},{...job,qty:[0],complete:true}]);assert.equal(r.days[0].qty[0],3);});
+
+test('roti manis (sosis/abon/coklat) maps 1:1, including a bundling variant that still names the flavor; unrecognised roti names fail loudly',()=>{
+ assert.equal(sku('Roti Sosis'),12);assert.equal(sku('Roti Abon'),13);assert.equal(sku('Roti Coklat'),14);
+ assert.equal(sku('Roti Manis Sosis'),12);assert.equal(sku('Bundling Roti Sosis'),12);assert.equal(sku('Roti Sosis Bundling'),12);assert.equal(sku('Paket Roti Manis Coklat'),14);
+ const r=summarize([row('Roti Sosis',5),row('Bundling Roti Abon',3),row('Roti Coklat',2,{discountTotal:13000*2})],job);
+ assert.deepEqual(r.qty.slice(12,15),[5,3,0]);assert.deepEqual(r.free.slice(12,15),[0,0,2]);
+ assert.throws(()=>summarize([row('Bundling Roti Manis')],job),/menu/);
+ assert.throws(()=>summarize([row('Roti Manis Keju')],job),/menu/);
+});
 
 test('transfer-only ledger postings do not create POS cake quantities',async()=>{const {zeroSalesDay}=await import('./pcs-sales.mjs');const row=(description,value)=>({description,hasViewAccess:true,details:[{periods:[{key:'04',value}]}]});assert.equal(zeroSalesDay({sales:[row('Penjualan - Makanan',0),row('Penjualan - Transfer',271700)]},'04'),true);assert.equal(zeroSalesDay({sales:[row('Penjualan - Makanan',1),row('Penjualan - Transfer',271700)]},'04'),false);});
 
