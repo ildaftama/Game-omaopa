@@ -65,7 +65,7 @@ window.ForecastDashboard=(()=>{
    return Math.max(.5,Math.min(2.2,t/a));
   }
   function forecastAt(date){return baselineLevel==null?null:baselineLevel*trendFactor*weekdayShape(date)*seasonalFactor(date);}
-  return {lastDate,forecastAt};
+  return {lastDate,baselineLevel,forecastAt};
  }
  function revenueTrend(outletId){
   const panels=window.PcsPanels.data(),planner=window.ForecastPlanner,cloud=window.ForecastPlanCloud,math=window.PcsMath;
@@ -154,22 +154,26 @@ window.ForecastDashboard=(()=>{
   })();
   const t=today(),ym=t.slice(0,7),ymNext=addMonth(ym),dates=[...monthDates(ym),...monthDates(ymNext)];
   const rows=dates.map(date=>({date,actualPure:actualPureByDate.has(date)?actualPureByDate.get(date):null,actualTotal:actualAt(date),actualPesanan:actualPesananByDate.has(date)?actualPesananByDate.get(date):null,forecastPure:forecastPureAt(date),forecastTotal:forecastTotalAt(date),plan:planAt(date)}));
-  return {rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null)};
+  // Satu angka ringkas pengganti paragraf metodologi: berapa persen pesanan biasanya menambah
+  // omzet murni, dipakai sebagai catatan singkat di bawah grafik.
+  const pesananUpliftPct=pureEngine.baselineLevel>0&&pesananEngine.baselineLevel!=null?pesananEngine.baselineLevel/pureEngine.baselineLevel*100:null;
+  return {rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct};
  }
 
- // Dua pasang murni/dengan-pesanan berbagi warna yang sama (lebih terang = murni, lebih gelap
- // = termasuk pesanan) supaya hubungannya langsung terlihat tanpa harus baca label. Pesanan
- // (real) off secara default -- nilainya kecil (~3-4% omzet) dan jarang jadi fokus utama;
- // tetap bisa dinyalakan lewat legend. State tampilan tersimpan per perangkat (localStorage).
+ // actualTotal/forecastTotal/plan = garis utama (tebal, warna pekat, selalu tampil default).
+ // Variannya (actualPure/forecastPure/actualPesanan) = elemen kelima "secondary":true --
+ // digambar lebih tipis & agak transnamun DI BAWAH garis utama, supaya saat berpotongan garis
+ // utama tetap terbaca jelas. Off secara default (baru 2-3 garis, bukan 6 sekaligus); nyalakan
+ // lewat legend kalau mau lihat rinciannya. State tampilan tersimpan per perangkat.
  const SERIES=[
-  ['actualPure','#7fb3e8',false,'Omzet murni (real)'],
-  ['actualTotal','#1f4e79',false,'Omzet real (dengan pesanan)'],
-  ['actualPesanan','#9b59b6',false,'Omzet pesanan (real)'],
-  ['forecastPure','#f0b27a',true,'Prediksi murni'],
-  ['forecastTotal','#c0392b',true,'Prediksi dengan pesanan'],
-  ['plan','#2e8b57',false,'Rencana tim'],
+  ['actualTotal','#1f4e79',false,'Omzet real',false],
+  ['actualPure','#5aa7d6',false,'Omzet murni',true],
+  ['actualPesanan','#9b59b6',false,'Omzet pesanan',true],
+  ['forecastTotal','#c0392b',true,'Prediksi',false],
+  ['forecastPure','#e08b3f',true,'Prediksi murni',true],
+  ['plan','#2e8b57',false,'Rencana tim',false],
  ];
- const HIDDEN_KEY='forecast-dashboard-hidden-series',DEFAULT_HIDDEN=['actualPesanan'];
+ const HIDDEN_KEY='forecast-dashboard-hidden-series',DEFAULT_HIDDEN=['actualPure','actualPesanan','forecastPure'];
  function loadHidden(){try{const raw=localStorage.getItem(HIDDEN_KEY);return raw?new Set(JSON.parse(raw)):new Set(DEFAULT_HIDDEN);}catch{return new Set(DEFAULT_HIDDEN);}}
  function saveHidden(set){try{localStorage.setItem(HIDDEN_KEY,JSON.stringify([...set]));}catch{}}
  let hidden=loadHidden(),lastTrend=null;
@@ -177,6 +181,7 @@ window.ForecastDashboard=(()=>{
   const rows=trend.rows,n=rows.length;
   const active=SERIES.filter(([key])=>rows.some(r=>r[key]!=null));
   const visible=active.filter(([key])=>!hidden.has(key));
+  const drawOrder=[...visible].sort((a,b)=>(a[4]===b[4]?0:a[4]?-1:1)); // secondary dulu (di bawah), utama belakangan (di atas)
   const w=Math.min(1040,Math.max(320,(window.innerWidth||1120)-88)),h=w<600?260:300,pad={l:54,r:16,t:16,b:30};
   const vals=rows.flatMap(r=>visible.map(([key])=>r[key])).filter(v=>v!=null),max=Math.max(1,...vals)*1.1;
   const x=i=>pad.l+i*(w-pad.l-pad.r)/Math.max(n-1,1),y=v=>h-pad.b-v/max*(h-pad.t-pad.b);
@@ -184,13 +189,13 @@ window.ForecastDashboard=(()=>{
   for(let i=0;i<4;i++){const v=max*i/3,yy=y(v);svg+=`<line x1="${pad.l}" x2="${w-pad.r}" y1="${yy}" y2="${yy}" stroke="#e9eef2"/><text x="${pad.l-8}" y="${yy+4}" text-anchor="end" font-size="11">${moneyShort(v)}</text>`;}
   const todayIdx=rows.findIndex(r=>r.date===trend.today);
   if(todayIdx>=0){const xx=x(todayIdx);svg+=`<line x1="${xx}" x2="${xx}" y1="${pad.t}" y2="${h-pad.b}" stroke="#8a8a8a" stroke-width="1" stroke-dasharray="3 3"/><text x="${xx}" y="${pad.t-2}" text-anchor="middle" font-size="10" fill="#8a8a8a">Hari ini</text>`;}
-  function line(key,color,dash){let d='';rows.forEach((r,i)=>{if(r[key]==null)return;d+=(d?'L':'M')+x(i)+' '+y(r[key])+' ';});return d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="2" ${dash?'stroke-dasharray="6 4"':''} stroke-linecap="round" stroke-linejoin="round"/>`:'';}
-  for(const [key,color,dash] of visible)svg+=line(key,color,dash);
+  function line(key,color,dash,secondary){let d='';rows.forEach((r,i)=>{if(r[key]==null)return;d+=(d?'L':'M')+x(i)+' '+y(r[key])+' ';});return d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="${secondary?1.4:2.4}" opacity="${secondary?.65:1}" ${dash?'stroke-dasharray="6 4"':''} stroke-linecap="round" stroke-linejoin="round"/>`:'';}
+  for(const [key,color,dash,,secondary] of drawOrder)svg+=line(key,color,dash,secondary);
   const longDate=d=>Number(d.slice(8,10))+' '+months[Number(d.slice(5,7))-1]+' '+d.slice(0,4);
-  rows.forEach((r,i)=>{for(const[key,color,,label]of visible)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="3" fill="${color}" stroke="#fff" stroke-width="1.2"/><circle cx="${x(i)}" cy="${y(r[key])}" r="8" fill="transparent" tabindex="0" data-fd-point="${esc(label+' · '+longDate(r.date))}" data-fd-value="${Math.round(r[key])}"><title>${esc(label+' · '+longDate(r.date))}: ${money(r[key])}</title></circle>`;});
+  rows.forEach((r,i)=>{for(const[key,color,,label,secondary]of drawOrder)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="${secondary?2:3}" fill="${color}" opacity="${secondary?.65:1}" stroke="#fff" stroke-width="1"/><circle cx="${x(i)}" cy="${y(r[key])}" r="8" fill="transparent" tabindex="0" data-fd-point="${esc(label+' · '+longDate(r.date))}" data-fd-value="${Math.round(r[key])}"><title>${esc(label+' · '+longDate(r.date))}: ${money(r[key])}</title></circle>`;});
   const step=Math.max(1,Math.ceil(n/14));rows.forEach((r,i)=>{if(i%step!==0&&i!==n-1)return;svg+=`<text x="${x(i)}" y="${h-10}" text-anchor="middle" font-size="10">${dayLabel(r.date)}${r.date.endsWith('-01')?' '+months[Number(r.date.slice(5,7))-1].slice(0,3):''}</text>`;});
   const legend=active.map(([key,color,dash,label])=>`<label class="${hidden.has(key)?'off':'on'}"><input type="checkbox" data-fd-toggle="${key}" ${hidden.has(key)?'':'checked'}><i class="${dash?'dashed':''}" style="border-color:${color}"></i>${esc(label)}</label>`).join('');
-  return `<div class="pcs-chart"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik tren omzet real vs prediksi vs rencana tim">${svg}</svg></div><div class="fd-legend">${legend}</div><div class="pcs-chart-readout" aria-live="polite">Arahkan atau fokus ke titik untuk lihat tanggal & nominal persis. Klik label di bawah untuk sembunyikan/tampilkan garis.</div>`;
+  return `<div class="pcs-chart"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik tren omzet real vs prediksi vs rencana tim">${svg}</svg></div><div class="fd-legend">${legend}</div><div class="pcs-chart-readout" aria-live="polite">Arahkan ke titik untuk lihat nominal. Klik label untuk sembunyikan/tampilkan.</div>`;
  }
  function change(e){
   const cb=e.target.closest?.('[data-fd-toggle]');
@@ -273,8 +278,9 @@ window.ForecastDashboard=(()=>{
   ensureWeather(outletId);
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   const cutoff=trend.lastActual?new Date(trend.lastActual+'T12:00:00+07:00').toLocaleDateString('id-ID',{day:'numeric',month:'short'}):null;
+  const uplift=trend.pesananUpliftPct!=null?`Pesanan biasanya menambah ~${trend.pesananUpliftPct.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari omzet murni (rata-rata 56 hari terakhir; untuk ~25 hari ke depan dipakai pesanan yang sudah tercatat di sheet, bukan tebakan).`:'';
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div><p class="workspace-note">${cutoff?`Data penjualan real tersedia s.d. ${cutoff}; setelah itu (termasuk hari yang sudah lewat tapi belum ada datanya) ditampilkan sebagai prediksi.`:'Belum ada data penjualan real yang lengkap untuk periode ini — seluruh garis adalah prediksi.'} <b>Murni</b> = omzet tanpa pesanan, <b>real</b> = termasuk pesanan. Omzet pesanan dipisah dari omzet murni (4 SKU inti) lewat rekonsiliasi sheet pesanan vs ESB. Prediksi murni: level 56 hari terakhir × tren jangka pendek × pola hari-dalam-minggu (180 hari) × pola musiman harian (bentuk kenaikan tanggal yang sama tahun lalu, bukan rata-rata satu bulan). Prediksi pesanan memakai pesanan yang sudah tercatat di sheet untuk ~25 hari ke depan, sisanya memakai tren; prediksi dengan pesanan = jumlah keduanya.${trend.hasPlan?' Rencana tim memakai rencana awal (baseline) yang disimpan forecaster.':''}</p></article>
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div><p class="workspace-note">${cutoff?`Data real s.d. ${cutoff}, sisanya prediksi.`:'Belum ada data real yang cukup — seluruh garis prediksi.'} ${uplift}</p></article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
