@@ -38,7 +38,7 @@ jobs:
         run: node integration/pack-forecast-reference.mjs prime
       - name: Perbarui pesanan dari sheet
         run: python integration/pcs_orders.py
-      - name: Ambil PCS produk dari API ESB (hari ini saja, outlet sudah tutup)
+      - name: Ambil PCS produk dari API ESB (hari ini saja; retry sekali 5 menit kemudian kalau ada yang gagal)
         env:
           ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
           ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
@@ -50,17 +50,33 @@ jobs:
           # pengaman "hanya tanggal yang sudah selesai" KHUSUS job ini -- job ini sengaja jalan
           # jam 21.02 WIB, 2 menit setelah semua outlet tutup (21.00), jadi hari itu dianggap
           # sudah tuntas. Caller lain (manual/backfill) tetap seketat sebelumnya.
+          #
+          # esb-client.mjs sendiri sudah retry otomatis per laporan (3x, untuk error jaringan/
+          # server sesaat). Ini lapis kedua: kalau SETELAH itu masih ada outlet yang gagal
+          # (exit code 2), tunggu 5 menit lalu tarik ulang hari yang SAMA sekali lagi (jam
+          # ~21.07 WIB) -- data yang sudah berhasil di percobaan pertama tetap tersimpan
+          # (mergeSales menggabung, tidak menimpa), cuma outlet yang gagal yang diulang lagi.
           DAY=$(node -e "console.log(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date()))")
           echo "Tanggal ditarik: $DAY"
-          set +e
-          DATE_FROM="$DAY" DATE_TO="$DAY" node integration/pcs-sales.mjs
-          result=$?
-          set -e
-          if [ "$result" -eq 2 ]; then
-            echo "::warning::Sebagian laporan belum terbaca. Snapshot sebelumnya dipertahankan untuk tanggal tersebut."
-          elif [ "$result" -ne 0 ]; then
-            exit "$result"
-          fi
+          for attempt in 1 2; do
+            set +e
+            DATE_FROM="$DAY" DATE_TO="$DAY" node integration/pcs-sales.mjs
+            result=$?
+            set -e
+            if [ "$result" -eq 0 ]; then
+              echo "Semua outlet lengkap pada percobaan ke-$attempt."
+              break
+            elif [ "$result" -eq 2 ]; then
+              if [ "$attempt" -eq 1 ]; then
+                echo "::warning::Sebagian laporan belum terbaca pada percobaan pertama. Coba lagi dalam 5 menit."
+                sleep 300
+              else
+                echo "::warning::Sebagian laporan masih belum terbaca setelah percobaan kedua. Snapshot sebelumnya dipertahankan untuk outlet tersebut."
+              fi
+            else
+              exit "$result"
+            fi
+          done
       - name: Paketkan & simpan ke bundle referensi privat (bukan file publik)
         env:
           FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
