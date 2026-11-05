@@ -36,5 +36,30 @@ window.WeatherForecast=(()=>{
   })();
   cache.set(key,promise);return promise;
  }
- return {get};
+ // Satu panggilan Open-Meteo untuk banyak outlet sekaligus (dashboard jaringan) — bukan
+ // satu request per outlet. date/dateTo harus dalam jangkauan forecast (hari ini..+16 hari).
+ async function getNetwork(outletIds,date,dateTo){
+  const to=dateTo||date,rows=outletIds.map(id=>({id,coords:outletCoords(id)})).filter(r=>r.coords);
+  if(!rows.length)return new Map();
+  const key='net|'+rows.map(r=>r.id).join(',')+'|'+date+'|'+to,cached=cache.get(key);if(cached)return cached;
+  const promise=(async()=>{
+   const lat=rows.map(r=>r.coords.lat).join(','),lon=rows.map(r=>r.coords.lon).join(',');
+   const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${to}&daily=precipitation_probability_max,precipitation_sum,temperature_2m_max,temperature_2m_min&timezone=Asia%2FJakarta`;
+   const map=new Map();
+   try{
+    const d=await fetchJson(url),list=Array.isArray(d)?d:[d];
+    rows.forEach((r,i)=>{
+     const dd=list[i]?.daily;if(!dd){map.set(r.id,{error:'Ramalan cuaca belum tersedia.'});return;}
+     const byDate=new Map(dd.time.map((t,j)=>[t,j]));
+     const days=[];for(let s=date;s<=to;s=new Date(new Date(s+'T00:00:00Z').getTime()+86400000).toISOString().slice(0,10)){
+      const j=byDate.get(s);days.push(j==null?{date:s,error:true}:{date:s,probability:dd.precipitation_probability_max[j]??null,precipitationMm:dd.precipitation_sum[j]??null,tempMax:dd.temperature_2m_max[j]??null,tempMin:dd.temperature_2m_min[j]??null});
+     }
+     map.set(r.id,{days});
+    });
+   }catch{for(const r of rows)map.set(r.id,{error:'Layanan cuaca (Open-Meteo) belum dapat dihubungi.'});}
+   return map;
+  })();
+  cache.set(key,promise);return promise;
+ }
+ return {get,getNetwork};
 })();
