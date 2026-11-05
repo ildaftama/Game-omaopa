@@ -73,15 +73,15 @@ window.ForecastDashboard=(()=>{
   function forecastAt(date){return baselineLevel==null?null:baselineLevel*trendFactor*weekdayShape(date)*seasonalFactor(date);}
   return {lastDate,baselineLevel,forecastAt};
  }
- // Omzet real GROUND-TRUTH langsung dari jumlah SEMUA baris "Sales" di laporan sales-menu-cogs
- // (lihat summarize()/netSales di integration/pcs-sales.mjs) -- sumber yang SAMA yang sudah
- // ditarik tiap hari untuk PCS, jadi tidak perlu panggilan API terpisah. Owner menemukan
- // rekonstruksi PCS x harga (dan sebelumnya laporan akuntansi "Net Sales") bisa meleset puluhan
- // juta/hari dari Net Sales POS asli -- penyebabnya kategori seperti "Promo" yang tidak masuk
- // Penjualan akuntansi tapi tetap laku. netSales di sini menjumlah SEMUA baris Sales apa pun
- // SKU/kategorinya, jadi tidak mungkin ketinggalan kategori baru. Dipakai saat tersedia untuk
- // hari itu (row.complete); kalau belum (data lama sebelum field ini ada), jatuh ke rekonstruksi
- // PCS x harga seperti sebelumnya -- bukan menghilangkan harinya.
+ // PENTING: row.netSales (dari summarize() di pcs-sales.mjs, dipaketkan 2026-11-06) SEMENTARA
+ // TIDAK dipakai di sini -- hasil backfill langsung dibandingkan ke ERP dan angkanya malah LEBIH
+ // RENDAH dari rekonstruksi PCS x harga (mis. Boyolali 5 Nov: 538.300 vs seharusnya ~714.300
+ // menurut laporan "Daily Sales Summary By Branch"), jadi netSales dari sales-menu-cogs ternyata
+ // BELUM terbukti benar -- kemungkinan ada baris yang salah ditangani (PACKAGE_COMPONENT, atau
+ // showMenuPackage=0 menyembunyikan sebagian baris). Diamkan dulu field-nya (tetap dihitung &
+ // disimpan, tidak dihapus) sampai diverifikasi ulang dengan akses ESB langsung -- Dashboard
+ // tetap pakai rekonstruksi PCS x harga (pola lama, dipahami, tidak sempurna tapi tidak salah
+ // arah) supaya tidak menampilkan angka yang malah lebih salah daripada sebelumnya.
  function revenueTrend(outletId){
   const panels=window.PcsPanels.data(),planner=window.ForecastPlanner,cloud=window.ForecastPlanCloud,math=window.PcsMath;
   if(!panels.sales||!panels.orders)return null;
@@ -91,8 +91,7 @@ window.ForecastDashboard=(()=>{
    if(!list.includes(row.id))continue;
    const e=byDate.get(row.date)||{sum:0,known:0};
    if(row.complete){
-    if(Number.isFinite(row.netSales))e.sum+=row.netSales;
-    else for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
+    for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
     e.known++;
    }
    byDate.set(row.date,e);
