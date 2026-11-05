@@ -182,7 +182,7 @@ window.ForecastDashboard=(()=>{
   const active=SERIES.filter(([key])=>rows.some(r=>r[key]!=null));
   const visible=active.filter(([key])=>!hidden.has(key));
   const drawOrder=[...visible].sort((a,b)=>(a[4]===b[4]?0:a[4]?-1:1)); // secondary dulu (di bawah), utama belakangan (di atas)
-  const w=Math.min(1040,Math.max(320,(window.innerWidth||1120)-88)),h=w<600?260:300,pad={l:54,r:16,t:16,b:30};
+  const w=Math.min(1500,Math.max(320,(window.innerWidth||1120)-88)),h=w<600?260:w<900?300:340,pad={l:54,r:16,t:16,b:30};
   const vals=rows.flatMap(r=>visible.map(([key])=>r[key])).filter(v=>v!=null),max=Math.max(1,...vals)*1.1;
   const x=i=>pad.l+i*(w-pad.l-pad.r)/Math.max(n-1,1),y=v=>h-pad.b-v/max*(h-pad.t-pad.b);
   let svg='';
