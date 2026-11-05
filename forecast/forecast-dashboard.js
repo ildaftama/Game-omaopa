@@ -69,22 +69,23 @@ window.ForecastDashboard=(()=>{
    if(t==null||a==null||a<=0)return 1;
    return Math.max(.6,Math.min(1.8,t/a));
   }
+  // Prediksi tanggal-ke-tanggal: rumus yang SAMA dengan rekomendasi per-outlet "Buat forecast"
+  // (median kuantil hari-sama + tren terbatas 0.85-1.15x, pakai planner.quantile yang sama
+  // persis) -- tapi diterapkan ke omzet JARINGAN yang sudah dihitung di atas (series), bukan
+  // dengan memanggil ulang recommend()/estimatedPartition 28x per tanggal. Sempat dicoba
+  // per-outlet sungguhan: >15 detik untuk render satu grafik karena estimatedPartition
+  // membangun ulang peta data dari nol tiap dipanggil -- terlalu lambat untuk halaman biasa.
+  // Hasilnya tetap mewarisi pola hari-dalam-minggu & tren jangka pendek yang sama, cuma
+  // dihitung di level total jaringan, bukan dijumlah dari 28 forecast outlet terpisah.
   function forecastAt(date){
-   if(!series.length)return null;
-   const wd=new Date(date+'T12:00:00Z').getUTCDay();
-   // Level jangka pendek: median omzet actual ~90 hari terakhir sebelum tanggal ini (bukan
-   // per hari-dalam-minggu dulu, supaya tidak goyah kalau sampel hari itu tipis).
-   const recentWin=series.filter(r=>r.date>=planner.shift(date,-90)&&r.date<date);
-   const baseWin=recentWin.length?recentWin:series.slice(-30);
-   if(!baseWin.length)return null;
-   const base=median(baseWin.map(r=>r.value));
-   // Faktor hari-dalam-minggu: rasio median hari ini vs median keseluruhan, dari jendela yang
-   // lebih lebar (365 hari) supaya RASIO-nya (bukan levelnya) tetap stabil walau data terbaru tipis.
-   const wideWin=series.filter(r=>r.date>=planner.shift(date,-365)&&r.date<date);
-   const wideBase=wideWin.length>=14?median(wideWin.map(r=>r.value)):base;
-   const sameDay=wideWin.filter(r=>new Date(r.date+'T12:00:00Z').getUTCDay()===wd).map(r=>r.value);
-   const weekdayFactor=sameDay.length>=3&&wideBase>0?Math.max(.5,Math.min(1.8,median(sameDay)/wideBase)):1;
-   return base*weekdayFactor*seasonalFactor(date);
+   const wd=d=>new Date(d+'T12:00:00Z').getUTCDay(),before=series.filter(r=>r.date<date);
+   if(!before.length)return null;
+   const same=before.filter(r=>wd(r.date)===wd(date)),selected=same.length>=3?same:before.slice(-14);
+   if(!selected.length)return null;
+   const recent=before.filter(r=>r.date>=planner.shift(date,-14)).map(r=>r.value),prior=before.filter(r=>r.date<planner.shift(date,-14)&&r.date>=planner.shift(date,-28)).map(r=>r.value);
+   const a=planner.quantile(recent,.5),b=planner.quantile(prior,.5),trend=a!==null&&b>0?Math.max(.85,Math.min(1.15,a/b)):1;
+   const central=planner.quantile(selected.map(r=>r.value),.5)*trend;
+   return central*seasonalFactor(date);
   }
   // Rencana forecaster (plan baseline yang disimpan tim), bukan prediksi algoritma — supaya
   // bisa dibandingkan 3 arah: real vs prediksi saya vs rencana tim. Baseline dipakai (bukan
@@ -196,7 +197,7 @@ window.ForecastDashboard=(()=>{
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   const cutoff=trend.lastActual?new Date(trend.lastActual+'T12:00:00+07:00').toLocaleDateString('id-ID',{day:'numeric',month:'short'}):null;
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div>${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}<p class="workspace-note">${cutoff?`Data penjualan real tersedia s.d. ${cutoff}; setelah itu (termasuk hari yang sudah lewat tapi belum ada datanya) ditampilkan sebagai prediksi.`:'Belum ada data penjualan real yang lengkap untuk periode ini — seluruh garis adalah prediksi.'} Metode: level 90 hari terakhir × pola hari-dalam-minggu × faktor musiman (dibanding bulan sama tahun lalu, kalau ada datanya). Produk sekunder (Chiffon/Mini/Lite) ikut terhitung lewat harga per-SKU.${trend.hasPlan?' Rencana tim memakai rencana awal (baseline) yang disimpan forecaster.':''}</p></article>
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div>${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}<p class="workspace-note">${cutoff?`Data penjualan real tersedia s.d. ${cutoff}; setelah itu (termasuk hari yang sudah lewat tapi belum ada datanya) ditampilkan sebagai prediksi.`:'Belum ada data penjualan real yang lengkap untuk periode ini — seluruh garis adalah prediksi.'} Metode: median kuantil hari-sama + tren terbatas (rumus sama dengan rekomendasi per-outlet "Buat forecast"), diterapkan ke omzet jaringan × faktor musiman (dibanding bulan sama tahun lalu, kalau ada datanya).${trend.hasPlan?' Rencana tim memakai rencana awal (baseline) yang disimpan forecaster.':''}</p></article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
