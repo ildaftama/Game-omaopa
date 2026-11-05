@@ -20,7 +20,19 @@ window.ForecastDashboard=(()=>{
  // m apa adanya (1-indeks) sudah otomatis jatuh ke bulan BERIKUTNYA — jangan ditambah lagi.
  function addMonth(ym){const [y,m]=ym.split('-').map(Number);return new Date(Date.UTC(y,m,1)).toISOString().slice(0,7);}
  function outletIds(outletId,sales){return outletId==='__all__'?(sales?.outletIds||[]):sales?.outletIds?.includes(outletId)?[outletId]:[];}
-
+ // planner.prices() sengaja menolak memakai harga rata-rata observasi untuk tanggal SEBELUM
+ // periode observasi itu sendiri (source.through<target) -- itu tepat untuk FORECAST (jangan
+ // sampai "mengintip" harga yang belum terjadi), tapi SALAH untuk menghitung omzet REAL di
+ // masa lalu: tanpa guard itu, hampir seluruh riwayat (semua tanggal sebelum cutoff harga)
+ // kehilangan 4 SKU inti (Malmil/Ogura, ~80% omzet) karena hargaNya jadi null. Untuk omzet
+ // real, harga rata-rata terbaik yang kita tahu SEKARANG memang yang tepat dipakai, bukan
+ // "harga yang berlaku saat itu" yang memang tidak kita punya datanya per hari.
+ const PRICE_REFS={4:57000/9,5:57000/9,6:57000/9,7:33000,8:34000,9:34000,10:19000,11:18000};
+ const PRICE_KEYS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate'];
+ function actualPrice(source,id,p){
+  if(p<4){const v=source?.outlets?.[id]?.[PRICE_KEYS[p]]?.price;return v>0?v:null;}
+  return p in PRICE_REFS?PRICE_REFS[p]:null;
+ }
  function revenueTrend(outletId){
   const panels=window.PcsPanels.data(),planner=window.ForecastPlanner,cloud=window.ForecastPlanCloud;
   if(!panels.sales||!panels.orders)return null;
@@ -30,8 +42,7 @@ window.ForecastDashboard=(()=>{
    if(!list.includes(row.id))continue;
    const e=byDate.get(row.date)||{sum:0,known:0};
    if(row.complete){
-    const prices=planner.prices(window.FORECAST_REALIZED_PRICES,row.id,row.date);
-    for(let p=0;p<12;p++)if(Number.isFinite(prices[p]?.value))e.sum+=(row.qty[p]||0)*prices[p].value;
+    for(let p=0;p<12;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
     e.known++;
    }
    byDate.set(row.date,e);

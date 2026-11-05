@@ -27,10 +27,17 @@ function importer(){const card=gate.querySelector('.forecast-login-card');if(!wi
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function locked(message,login=false){root.hidden=true;gate.hidden=false;gate.innerHTML=`<div class="forecast-login-card"><span class="forecast-login-brand">OMA OPA CAKERY</span><h1>Forecast</h1><p>${esc(message)}</p>${login?'<form id="forecast-login"><label>Nomor HP<input name="phone" autocomplete="username" inputmode="tel" required></label><label>PIN<input name="pin" type="password" autocomplete="current-password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required></label><button type="submit">Masuk</button><span id="forecast-login-status" role="status"></span></form>':'<button type="button" data-gate-retry>Coba lagi</button>'}${auth.currentUser?'<button class="forecast-login-secondary" type="button" data-gate-signout>Ganti akun</button>':''}<small>Khusus Admin, Admin Utama, Master, dan Forecaster.</small></div>`;}
 async function loadApp(){if(loaded)return;if(loading)return loading;loading=(async()=>{for(const tag of document.querySelectorAll('script[data-forecast-src]'))await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=tag.dataset.forecastSrc;s.onload=resolve;s.onerror=()=>reject(Error('load'));document.head.appendChild(s);});loaded=true;})();return loading;}
-onAuthStateChanged(auth,async user=>{const run=++generation;roleStop?.();root.hidden=true;gate.hidden=false;
+onAuthStateChanged(auth,async user=>{const run=++generation;
+ // Firebase bisa memanggil callback ini lebih dari sekali saat baru login (mis. hasil
+ // pemeriksaan sesi tersimpan yang telat selesai). Kalau kejadiannya user=null padahal
+ // sebelumnya sempat ada user (bukan pemuatan halaman pertama kali), tunggu sebentar lalu cek
+ // ulang auth.currentUser langsung -- kalau ternyata masih login, abaikan gema basi ini supaya
+ // tidak menampilkan form login lagi padahal baru saja berhasil masuk.
+ if(!user&&generation>1){await new Promise(r=>setTimeout(r,300));if(run!==generation)return;if(auth.currentUser)user=auth.currentUser;}
+ roleStop?.();root.hidden=true;gate.hidden=false;
  if(loaded){location.reload();return;}
  if(!user){locked('Masuk untuk membuka perencanaan dan data outlet.',true);return;}
- locked('Memeriksa akses akun…');
+ locked('Memeriksa akses akun… (memuat modul forecast, dashboard, dan cuaca — mohon tunggu)');
  try{const staff=await getDoc(doc(db,'staff',user.uid));if(run!==generation)return;const role=staff.exists()?staff.data():null;
   if(!window.ForecastRolePolicy.planner(role)){locked('Akun ini belum memiliki akses ke halaman Forecast.');return;}
   window.ForecastAuth={uid:user.uid,role};roleStop=onSnapshot(doc(db,'staff',user.uid),s=>{if(!window.ForecastRolePolicy.planner(s.exists()?s.data():null)){root.hidden=true;gate.hidden=false;locked('Akses akun ini sudah dinonaktifkan.');}},()=>{root.hidden=true;locked('Akses akun belum dapat diperiksa. Muat ulang halaman.');});
