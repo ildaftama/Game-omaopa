@@ -112,12 +112,13 @@ export function buildLeanBundle(fullBundle) {
 // (snapshot lama, bisa jauh lebih tipis dari yang sudah live di Firestore) -- riwayat yang
 // lebih lengkap di bundle live bisa "hilang" setiap kali workflow ini jalan. pcs_orders.py
 // tidak perlu di-prime karena ia menulis ulang penuh dari sheet PESANAN setiap kali.
-export async function prime(env = process.env, salesPath = 'forecast/pcs-sales.json') {
+export async function prime(env = process.env, salesPath = 'forecast/pcs-sales.json', netSalesPath = 'forecast/pcs-net-sales.json') {
   const { idToken } = await signIn(env);
   const current = await fetchBundle('forecastPlans/reference_current', idToken);
   if (!current?.files?.['pcs-sales.json']) { console.log('Belum ada bundle referensi tersimpan; pakai pcs-sales.json dari repo apa adanya.'); return; }
   fs.writeFileSync(salesPath, JSON.stringify(current.files['pcs-sales.json']));
   console.log('pcs-sales.json disiapkan dari bundle live sebagai basis merge (riwayat penuh dipertahankan).');
+  if (current.files['pcs-net-sales.json']) { fs.writeFileSync(netSalesPath, JSON.stringify(current.files['pcs-net-sales.json'])); console.log('pcs-net-sales.json disiapkan dari bundle live sebagai basis merge.'); }
 }
 // Rekap harian (waste nominal dari tab WASTE + menit lost sales dari tab "Rekap Forecast
 // <bulan>") ditarik dari sheet publik tim, bukan ESB -- kegagalan di sini TIDAK boleh
@@ -131,13 +132,16 @@ async function fetchDailyRecap(profiles) {
     return await pullDailyRecap(sheetId, profiles);
   } catch (e) { console.log('Rekap harian (waste/lost sales) belum berhasil ditarik: ' + e.message); return null; }
 }
-export async function run(env = process.env, salesPath = 'forecast/pcs-sales.json', ordersPath = 'forecast/pcs-orders.json') {
+export async function run(env = process.env, salesPath = 'forecast/pcs-sales.json', ordersPath = 'forecast/pcs-orders.json', netSalesPath = 'forecast/pcs-net-sales.json') {
   const { idToken, uid } = await signIn(env);
   const current = await fetchBundle('forecastPlans/reference_current', idToken);
   if (!current) throw Error('Belum ada bundle referensi yang tersimpan — jalankan import manual (manager) terlebih dahulu sekali.');
   const sales = JSON.parse(fs.readFileSync(salesPath, 'utf8')), orders = JSON.parse(fs.readFileSync(ordersPath, 'utf8'));
+  // Omzet real ground-truth (ledger ESB, lihat pcs-net-sales.mjs) -- opsional: file ini belum
+  // tentu ada pada repo/checkout lama, jangan gagalkan seluruh sync kalau belum ditarik.
+  const netSales = fs.existsSync(netSalesPath) ? JSON.parse(fs.readFileSync(netSalesPath, 'utf8')) : null;
   const dailyRecap = await fetchDailyRecap(current.globals?.OUTLET_INTELLIGENCE) || current.globals?.DAILY_RECAP_SUMMARY || null;
-  const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders } };
+  const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders, ...(netSales ? { 'pcs-net-sales.json': netSales } : {}) } };
   const packedFull = packBundle(full);
   await writeBundle('forecastPlans', 'reference', 'reference-manifest', 'reference-chunk', packedFull, idToken, uid);
   console.log('Bundle referensi penuh tersimpan: ' + packedFull.chunks.length + ' chunk.');

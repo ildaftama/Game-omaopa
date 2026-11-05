@@ -61,21 +61,24 @@ export function range(from,to){
  for(let d=new Date(from+'T00:00:00Z');d<=new Date(to+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+1)){dates.push(d.toISOString().slice(0,10));if(dates.length>62)throw Error('Maksimal 62 hari sekali tarik.');}
  if(!dates.length)throw Error('Rentang tanggal terbalik.');return dates;
 }
-export function zeroSalesDay(report,day){
- if(!Array.isArray(report?.sales)||!report.sales.length)return false;
+// Dipakai zeroSalesDay (verifikasi hari kosong) DAN pcs-net-sales.mjs (omzet real ground-truth
+// langsung dari ledger ESB, tidak bergantung pemetaan SKU sama sekali). {valid:false} berarti
+// laporan tidak lengkap/tidak bisa dipercaya untuk hari itu -- BUKAN "nol".
+export function dailySalesLedger(report,day){
+ if(!Array.isArray(report?.sales)||!report.sales.length)return {valid:false,total:null};
  let total=0;
  for(const row of report.sales){
-  if(row.hasViewAccess!==true||!Array.isArray(row.details)||row.details.length!==1)return false;
+  if(row.hasViewAccess!==true||!Array.isArray(row.details)||row.details.length!==1)return {valid:false,total:null};
   const periods=row.details[0]?.periods;
-  if(!Array.isArray(periods))return false;
+  if(!Array.isArray(periods))return {valid:false,total:null};
   const values=periods.filter(p=>p.key===day);
-  if(values.length!==1||!Number.isFinite(values[0].value)||values[0].value<0)return false;
-  // The ledger also lists stock-transfer postings as revenue. These are not POS cake sales.
-  // Keep validating their access/value, but do not turn a transfer-only day into missing PCS.
+  if(values.length!==1||!Number.isFinite(values[0].value)||values[0].value<0)return {valid:false,total:null};
+  // The ledger also lists stock-transfer postings as revenue. These are not real customer sales.
   if(String(row.description||'').trim().toLowerCase()!=='penjualan - transfer')total+=values[0].value;
  }
- return total===0;
+ return {valid:true,total};
 }
+export function zeroSalesDay(report,day){const r=dailySalesLedger(report,day);return r.valid&&r.total===0;}
 export async function collectJobs(jobs,client){
  const results=[],ledgers=new Map();let cursor=0;
  async function verifiedZero(job){
