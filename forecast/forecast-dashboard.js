@@ -112,9 +112,9 @@ window.ForecastDashboard=(()=>{
   const actualPureByDate=new Map(pureSeries.map(r=>[r.date,r.value])),actualPesananByDate=new Map(pesananSeries.map(r=>[r.date,r.value]));
 
   // Pesanan masa depan yang SUDAH tercatat di sheet (dipesan customer lebih dulu) dipakai
-  // langsung sebagai angka pasti, bukan ditebak lewat tren -- jauh lebih akurat untuk ~25 hari
-  // ke depan yang biasanya sudah ter-input, baru jatuh ke tren untuk tanggal yang belum ada
-  // pesanannya sama sekali.
+  // langsung sebagai angka pasti, bukan ditebak lewat tren -- seberapa jauh ke depan ini
+  // berlaku mengikuti sejauh mana sheet sudah terisi, baru jatuh ke tren untuk tanggal yang
+  // belum ada pesanannya sama sekali.
   const coveredSet=new Set(panels.orders.coveredDates||[]),blockedSet=new Set(panels.orders.blockedDates||[]);
   const ordersByKey=new Map(panels.orders.days.map(r=>[r.date+'|'+r.id,r]));
   function knownPesananAt(date){
@@ -189,10 +189,10 @@ window.ForecastDashboard=(()=>{
   for(let i=0;i<4;i++){const v=max*i/3,yy=y(v);svg+=`<line x1="${pad.l}" x2="${w-pad.r}" y1="${yy}" y2="${yy}" stroke="#e9eef2"/><text x="${pad.l-8}" y="${yy+4}" text-anchor="end" font-size="11">${moneyShort(v)}</text>`;}
   const todayIdx=rows.findIndex(r=>r.date===trend.today);
   if(todayIdx>=0){const xx=x(todayIdx);svg+=`<line x1="${xx}" x2="${xx}" y1="${pad.t}" y2="${h-pad.b}" stroke="#8a8a8a" stroke-width="1" stroke-dasharray="3 3"/><text x="${xx}" y="${pad.t-2}" text-anchor="middle" font-size="10" fill="#8a8a8a">Hari ini</text>`;}
-  function line(key,color,dash,secondary){let d='';rows.forEach((r,i)=>{if(r[key]==null)return;d+=(d?'L':'M')+x(i)+' '+y(r[key])+' ';});return d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="${secondary?1.4:2.4}" opacity="${secondary?.65:1}" ${dash?'stroke-dasharray="6 4"':''} stroke-linecap="round" stroke-linejoin="round"/>`:'';}
+  function line(key,color,dash,secondary){let d='';rows.forEach((r,i)=>{if(r[key]==null)return;d+=(d?'L':'M')+x(i)+' '+y(r[key])+' ';});return d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="${secondary?.9:1.5}" opacity="${secondary?.6:.9}" ${dash?'stroke-dasharray="5 4"':''} stroke-linecap="round" stroke-linejoin="round"/>`:'';}
   for(const [key,color,dash,,secondary] of drawOrder)svg+=line(key,color,dash,secondary);
   const longDate=d=>Number(d.slice(8,10))+' '+months[Number(d.slice(5,7))-1]+' '+d.slice(0,4);
-  rows.forEach((r,i)=>{for(const[key,color,,label,secondary]of drawOrder)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="${secondary?2:3}" fill="${color}" opacity="${secondary?.65:1}" stroke="#fff" stroke-width="1"/><circle cx="${x(i)}" cy="${y(r[key])}" r="8" fill="transparent" tabindex="0" data-fd-point="${esc(label+' · '+longDate(r.date))}" data-fd-value="${Math.round(r[key])}"><title>${esc(label+' · '+longDate(r.date))}: ${money(r[key])}</title></circle>`;});
+  rows.forEach((r,i)=>{for(const[key,color,,label,secondary]of drawOrder)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="${secondary?1.5:2.2}" fill="${color}" opacity="${secondary?.6:.9}" stroke="#fff" stroke-width="1"/><circle cx="${x(i)}" cy="${y(r[key])}" r="8" fill="transparent" tabindex="0" data-fd-point="${esc(label+' · '+longDate(r.date))}" data-fd-value="${Math.round(r[key])}"><title>${esc(label+' · '+longDate(r.date))}: ${money(r[key])}</title></circle>`;});
   const step=Math.max(1,Math.ceil(n/14));rows.forEach((r,i)=>{if(i%step!==0&&i!==n-1)return;svg+=`<text x="${x(i)}" y="${h-10}" text-anchor="middle" font-size="10">${dayLabel(r.date)}${r.date.endsWith('-01')?' '+months[Number(r.date.slice(5,7))-1].slice(0,3):''}</text>`;});
   const legend=active.map(([key,color,dash,label])=>`<label class="${hidden.has(key)?'off':'on'}"><input type="checkbox" data-fd-toggle="${key}" ${hidden.has(key)?'':'checked'}><i class="${dash?'dashed':''}" style="border-color:${color}"></i>${esc(label)}</label>`).join('');
   return `<div class="pcs-chart"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik tren omzet real vs prediksi vs rencana tim">${svg}</svg></div><div class="fd-legend">${legend}</div><div class="pcs-chart-readout" aria-live="polite">Arahkan ke titik untuk lihat nominal. Klik label untuk sembunyikan/tampilkan.</div>`;
@@ -208,13 +208,48 @@ window.ForecastDashboard=(()=>{
   return false;
  }
 
- function badges(){
-  const perf=window.PERFORMANCE_SUMMARY,period=perf?.latestCompletePeriod;if(!perf||!period)return '';
-  const rows=Object.entries(perf.outlets).map(([id,o])=>({id,name:o.name||id,p:o.periods?.[period]})).filter(r=>r.p);
-  const waste=[...rows].sort((a,b)=>(b.p.wastePercent||0)-(a.p.wastePercent||0)).slice(0,5);
-  const lost=[...rows].sort((a,b)=>(b.p.estimatedLostSalesPercent||0)-(a.p.estimatedLostSalesPercent||0)).slice(0,5);
-  const card=(title,list,field,unit)=>`<article class="workspace-card compact-card"><span class="micro-label">${title}</span>${list.map(r=>`<div class="product-line"><b>${esc(r.name)}</b><span>${num(r.p[field])}${unit}</span></div>`).join('')}<p class="workspace-note">${period} · data performa outlet</p></article>`;
-  return `<div class="product-comparison">${card('5 OUTLET WASTE TERTINGGI',waste,'wastePercent','%')}${card('5 OUTLET LOST SALES TERTINGGI',lost,'estimatedLostSalesPercent','%')}</div>`;
+ const WASTE_THRESHOLD=3.5,LOST_SALES_THRESHOLD=4.5; // Ambang dari owner.
+ const fulfillmentCache=new Map();
+ function fulfillmentFor(key){
+  if(!fulfillmentCache.has(key)){
+   fulfillmentCache.set(key,{loading:true,data:null});
+   window.ForecastPlanCloud.getFulfillment(key).then(f=>{fulfillmentCache.set(key,{loading:false,data:f});window.dispatchEvent(new Event('forecast-plans-changed'));}).catch(()=>fulfillmentCache.set(key,{loading:false,data:null}));
+  }
+  return fulfillmentCache.get(key);
+ }
+ // Waste harian (bukan angka tetap sebulan): "real dikirim" dikurangi total laku
+ // (reguler+pesanan), dijumlah per outlet dari rencana 7 hari terakhir yang sudah punya data
+ // kirim. Pakai getFulfillment() yang sama & di-cache sama seperti tab Monitoring Forecast,
+ // jadi tidak menambah beban Firestore di luar yang memang perlu.
+ function wasteByOutlet(outletId){
+  const cloud=window.ForecastPlanCloud,planner=window.ForecastPlanner;
+  if(!cloud||cloud.state!=='ready')return null;
+  const t=today(),from=planner.shift(t,-7);
+  cloud.watch?.(from,t);
+  const panels=window.PcsPanels.data();
+  if(!panels.sales||!panels.orders)return null;
+  const perOutlet=new Map();
+  for(const r of cloud.records||[]){
+   if(r.date<from||r.date>t)continue;
+   if(outletId!=='__all__'&&r.outlet!==outletId)continue;
+   const fc=fulfillmentFor(r.key);if(fc.loading||!fc.data)continue;
+   const c=window.ForecastPlanner.compare(r,panels.sales,panels.orders,fc.data.shipped);
+   if(!c.hasShipped||!c.complete)continue;
+   const o=perOutlet.get(r.outlet)||{shipped:0,waste:0};
+   o.shipped+=c.shippedTotal||0;o.waste+=c.wasteTotal||0;
+   perOutlet.set(r.outlet,o);
+  }
+  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
+  return [...perOutlet.entries()].map(([id,o])=>({id,name:name(id),percent:o.shipped>0?o.waste/o.shipped*100:null})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent);
+ }
+ function badges(outletId){
+  const waste=wasteByOutlet(outletId);
+  const perf=window.PERFORMANCE_SUMMARY,period=perf?.latestCompletePeriod;
+  const lost=period?Object.entries(perf.outlets).map(([id,o])=>({id,name:o.name||id,percent:o.periods?.[period]?.estimatedLostSalesPercent})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent).slice(0,5):[];
+  const line=(r,threshold)=>`<div class="product-line"><b>${esc(r.name)}</b><span class="${r.percent>threshold?'fp-down':'fp-up'}">${r.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}%</span></div>`;
+  const wasteCard=waste==null?'':`<article class="workspace-card compact-card"><span class="micro-label">5 OUTLET WASTE TERTINGGI</span>${waste.length?waste.slice(0,5).map(r=>line(r,WASTE_THRESHOLD)).join(''):'<p class="workspace-note">Belum ada rencana 7 hari terakhir dengan data "real dikirim".</p>'}<p class="workspace-note">7 hari terakhir · ambang ${WASTE_THRESHOLD}% · dikirim vs total laku</p></article>`;
+  const lostCard=!lost.length?'':`<article class="workspace-card compact-card"><span class="micro-label">5 OUTLET LOST SALES TERTINGGI</span>${lost.map(r=>line(r,LOST_SALES_THRESHOLD)).join('')}<p class="workspace-note">${period} (bulanan, belum harian) · ambang ${LOST_SALES_THRESHOLD}%</p></article>`;
+  return wasteCard||lostCard?`<div class="product-comparison">${wasteCard}${lostCard}</div>`:'';
  }
 
  const SOURCE_NOTE='<p class="fp-caption">Sumber: Open-Meteo (ramalan publik), probabilitas hujan maksimum per hari dari model cuaca — bukan data yang kami karang. Awal musim hujan (November) wajar menunjukkan persentase tinggi di banyak outlet sekaligus karena satu sistem hujan bisa menutupi beberapa outlet yang berdekatan.</p>';
@@ -278,15 +313,16 @@ window.ForecastDashboard=(()=>{
   ensureWeather(outletId);
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   const cutoff=trend.lastActual?new Date(trend.lastActual+'T12:00:00+07:00').toLocaleDateString('id-ID',{day:'numeric',month:'short'}):null;
-  const uplift=trend.pesananUpliftPct!=null?`Pesanan biasanya menambah ~${trend.pesananUpliftPct.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari omzet murni (rata-rata 56 hari terakhir; untuk ~25 hari ke depan dipakai pesanan yang sudah tercatat di sheet, bukan tebakan).`:'';
+  const uplift=trend.pesananUpliftPct!=null?`Pesanan biasanya menambah ~${trend.pesananUpliftPct.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari omzet murni (rata-rata 56 hari terakhir; tanggal yang pesanannya sudah tercatat di sheet pakai angka pasti, bukan tebakan). Data diperbarui tiap malam jam 21.02 WIB.`:'';
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
+   <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast">Buat forecast →</button><span>Histori rencana & akurasi tim (buat pembelajaran) ada di tab Forecast → Monitoring.</span></div>
    <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div><p class="workspace-note">${cutoff?`Data real s.d. ${cutoff}, sisanya prediksi.`:'Belum ada data real yang cukup — seluruh garis prediksi.'} ${uplift}</p></article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
    </div>
    ${operationalSummary(outletId)}
-   ${badges()}`;
+   ${badges(outletId)}`;
  }
  function inspect(e){const p=e.target.closest('[data-fd-point]');if(!p)return;const box=p.closest('.pcs-main-chart')?.querySelector('.pcs-chart-readout');if(box)box.textContent=p.dataset.fdPoint+': '+money(Number(p.dataset.fdValue));}
  return {render,inspect,change};

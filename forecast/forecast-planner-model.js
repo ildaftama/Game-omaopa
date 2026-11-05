@@ -53,9 +53,13 @@
   // shipped (if given) swaps the predicted side for "akurasi dengan faktor produksi" (feature
   // #6) without touching the immutable plan/baseline used for the regular comparison.
   const rows=names.map((name,p)=>{const r=math.estimatedPartition(sales,orders,[record.outlet],p,[record.date])[0];return{p,name,planned:plan.active[p]?plan.regular[p]:0,shipped:shipped?plan.active[p]?shipped[p]:0:null,actual:r.retail.value,totalActual:r.total.value,estimated:r.retail.estimated,complete:r.retail.complete};});
-  const complete=rows.length>0&&rows.every(r=>r.complete),actual=complete?total(rows.map(r=>r.actual)):null,planned=total(rows.map(r=>r.planned)),absolute=complete?total(rows.map(r=>Math.abs(r.planned-r.actual))):null;
+  const complete=rows.length>0&&rows.every(r=>r.complete),actual=complete?total(rows.map(r=>r.actual)):null,actualTotal=complete?total(rows.map(r=>r.totalActual)):null,planned=total(rows.map(r=>r.planned)),absolute=complete?total(rows.map(r=>Math.abs(r.planned-r.actual))):null;
   const hasShipped=!!shipped,shippedTotal=hasShipped?total(rows.map(r=>r.shipped)):null,absoluteShipped=hasShipped&&complete?total(rows.map(r=>Math.abs(r.shipped-r.actual))):null;
-  return {rows,eligible,complete,actual,planned,absolute,wape:eligible&&complete&&actual>0?absolute/actual*100:null,hasShipped,shippedTotal,absoluteShipped,wapeShipped:hasShipped&&eligible&&complete&&actual>0?absoluteShipped/actual*100:null};
+  // Waste = kue dikirim tapi tidak laku sama sekali (reguler maupun pesanan) -- bukan selisih
+  // forecast vs penjualan (itu akurasi). Dijepit ke 0: kirim < total laku berarti data
+  // realisasi kirim yang diisi manual belum tepat, bukan "waste negatif".
+  const wasteTotal=hasShipped&&complete?total(rows.map(r=>Math.max(0,r.shipped-r.totalActual))):null;
+  return {rows,eligible,complete,actual,actualTotal,planned,absolute,wape:eligible&&complete&&actual>0?absolute/actual*100:null,hasShipped,shippedTotal,absoluteShipped,wapeShipped:hasShipped&&eligible&&complete&&actual>0?absoluteShipped/actual*100:null,wasteTotal,wastePercent:wasteTotal!=null&&shippedTotal>0?wasteTotal/shippedTotal*100:null};
  }
  function validCustomItems(a){return a===undefined||(Array.isArray(a)&&a.length<=20&&a.every(it=>it&&typeof it.name==='string'&&it.name.length>=1&&it.name.length<=60&&integer(it.regular)&&integer(it.orders)));}
  function validPlan(p){return p&&/^\d{4}-\d{2}-\d{2}$/.test(p.date)&&typeof p.outlet==='string'&&Array.isArray(p.active)&&p.active.length===12&&p.active.every(v=>typeof v==='boolean')&&['regular','orders'].every(k=>Array.isArray(p[k])&&p[k].length===12&&p[k].every(integer))&&Array.isArray(p.prices)&&p.prices.length===12&&p.prices.every(v=>v&&(v.value===null||(Number.isFinite(v.value)&&v.value>0)))&&typeof p.note==='string'&&validCustomItems(p.customItems);}
