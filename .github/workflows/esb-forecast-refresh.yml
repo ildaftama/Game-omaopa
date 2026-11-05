@@ -3,7 +3,14 @@ on:
   schedule:
     # 14.02 UTC = 21.02 WIB (Asia/Jakarta), setiap hari -- 2 menit setelah outlet tutup (21.00).
     - cron: '2 14 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      backfill_from:
+        description: 'Backfill saja (opsional): tanggal awal YYYY-MM-DD. Kosongkan untuk perilaku normal (hari ini saja).'
+        required: false
+      backfill_to:
+        description: 'Backfill saja (opsional): tanggal akhir YYYY-MM-DD. Wajib diisi kalau backfill_from diisi.'
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -57,10 +64,13 @@ jobs:
           # ~21.07 WIB) -- data yang sudah berhasil di percobaan pertama tetap tersimpan
           # (mergeSales menggabung, tidak menimpa), cuma outlet yang gagal yang diulang lagi.
           DAY=$(node -e "console.log(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date()))")
-          echo "Tanggal ditarik: $DAY"
+          FROM="${{ github.event.inputs.backfill_from }}"
+          TO="${{ github.event.inputs.backfill_to }}"
+          if [ -z "$FROM" ]; then FROM="$DAY"; TO="$DAY"; fi
+          echo "Tanggal ditarik: $FROM sampai $TO"
           for attempt in 1 2; do
             set +e
-            DATE_FROM="$DAY" DATE_TO="$DAY" node integration/pcs-sales.mjs
+            DATE_FROM="$FROM" DATE_TO="$TO" node integration/pcs-sales.mjs
             result=$?
             set -e
             if [ "$result" -eq 0 ]; then
