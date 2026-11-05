@@ -46,7 +46,7 @@ $('#workspace-content').addEventListener('focusin',e=>window.PcsPanels.inspect(e
 window.addEventListener('pcs-selection-changed',()=>{if(['pcs','orders'].includes(focus))render();});
 window.addEventListener('pcs-data-loaded',()=>{if(['pcs','orders','forecast','dashboard'].includes(focus))render();});
 window.addEventListener('forecast-operations-changed',()=>{if(['forecast','access','dashboard'].includes(focus))render();});
-window.addEventListener('forecast-plans-changed',()=>{if(focus==='access'||(focus==='forecast'&&window.ForecastWorkspace.cloudChanged()))render();});
+window.addEventListener('forecast-plans-changed',()=>{if(focus==='access'||focus==='dashboard'||(focus==='forecast'&&window.ForecastWorkspace.cloudChanged()))render();});
 window.addEventListener('forecast-sources-loaded',()=>{if(focus==='sources')render();});
 $('#sources-open').addEventListener('click',()=>{document.getElementById('source-dialog').close();focus='sources';render();});
 if(selected!=='__all__')sync();render();
