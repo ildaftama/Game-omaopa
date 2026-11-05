@@ -57,3 +57,19 @@ test('roti manis maps 1:1 using the confirmed ESB menu names (plain + "Bundling 
 test('transfer-only ledger postings do not create POS cake quantities',async()=>{const {zeroSalesDay}=await import('./pcs-sales.mjs');const row=(description,value)=>({description,hasViewAccess:true,details:[{periods:[{key:'04',value}]}]});assert.equal(zeroSalesDay({sales:[row('Penjualan - Makanan',0),row('Penjualan - Transfer',271700)]},'04'),true);assert.equal(zeroSalesDay({sales:[row('Penjualan - Makanan',1),row('Penjualan - Transfer',271700)]},'04'),false);});
 
 test('observed legacy single-flavor and two-flavor Mini boxes, Kartini and Gajah menus preserve units',()=>{const r=summarize([row('Mini Ogura Filling Chocolate',2),row('Mini Ogura Filling Choco & Cheese',1),row('Ogura Cheese Promo Kartini',3),row('Ogura Choco Promo Kartini',2),row('Chiffon Classic Ekstra Keju GO Gajah Raya',4)],job);assert.deepEqual(r.qty.slice(4,7),[4,23,0]);assert.equal(r.qty[0],3);assert.equal(r.qty[1],2);assert.equal(r.qty[8],4);});
+
+test('netSales sums every Sales row (header, component, and unmapped menus like "Promo") regardless of SKU mapping -- ground truth independent of sku()',()=>{
+ const r=summarize([
+  row('Malmil Cheese',3,{rowType:'PACKAGE_HEADER',total:39000,discountTotal:0}),
+  row('Malmil Cheese',3,{rowType:'PACKAGE_COMPONENT',total:5000,discountTotal:0}),
+  row('Paket Promo Spesial',1,{total:25000,discountTotal:5000}),
+  row('Minuman Es Teh',2,{total:12000,discountTotal:0}),
+  row('Ogura Cheese',2,{salesType:'Void',total:50000,discountTotal:0}),
+ ],job);
+ assert.equal(r.netSales,39000+5000+(25000-5000)+12000);
+ assert.equal(r.qty[2],3);
+});
+test('an unmapped non-cake menu name contributes to netSales without tripping the unmapped-cake safety net',()=>{
+ const r=summarize([row('Minuman Es Teh',2,{total:12000,discountTotal:0})],job);
+ assert.equal(r.netSales,12000);assert.equal(r.qty.reduce((a,b)=>a+b,0),0);
+});

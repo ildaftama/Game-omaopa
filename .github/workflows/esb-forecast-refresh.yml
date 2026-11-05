@@ -77,36 +77,6 @@ jobs:
               exit "$result"
             fi
           done
-      - name: Ambil omzet real (ledger ESB, ground-truth tanpa pemetaan SKU) bulan berjalan
-        env:
-          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
-          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
-        run: |
-          # Laporan profit-loss/daily-in-month berisi sebulan sekaligus per outlet (bukan per
-          # hari seperti pcs-sales.mjs), jadi cukup ditarik ulang tiap malam -- tidak perlu
-          # jendela tanggal. Owner menemukan "Omzet real" Dashboard (PCS x harga) bisa meleset
-          # puluhan juta dari Net Sales ESB asli pada hari tertentu walau semua outlet lengkap
-          # tersinkron PCS-nya -- angka ini dipakai Dashboard sebagai ground-truth pengganti,
-          # tidak bergantung sama sekali pada pemetaan nama menu.
-          for attempt in 1 2; do
-            set +e
-            node integration/pcs-net-sales.mjs
-            result=$?
-            set -e
-            if [ "$result" -eq 0 ]; then
-              echo "Semua bulan-outlet lengkap pada percobaan ke-$attempt."
-              break
-            elif [ "$result" -eq 2 ]; then
-              if [ "$attempt" -eq 1 ]; then
-                echo "::warning::Sebagian laporan omzet real belum terbaca. Coba lagi dalam 1 menit."
-                sleep 60
-              else
-                echo "::warning::Sebagian laporan omzet real masih belum terbaca setelah percobaan kedua. Data lama dipertahankan untuk outlet tersebut."
-              fi
-            else
-              exit "$result"
-            fi
-          done
       - name: Paketkan & simpan ke bundle referensi privat (bukan file publik)
         env:
           FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}

@@ -73,26 +73,25 @@ window.ForecastDashboard=(()=>{
   function forecastAt(date){return baselineLevel==null?null:baselineLevel*trendFactor*weekdayShape(date)*seasonalFactor(date);}
   return {lastDate,baselineLevel,forecastAt};
  }
- // Omzet real GROUND-TRUTH langsung dari ledger penjualan ESB (lihat integration/pcs-net-
- // sales.mjs) -- owner menemukan rekonstruksi PCS x harga bisa meleset puluhan juta dari Net
- // Sales ESB asli pada hari tertentu walau semua outlet lengkap tersinkron PCS-nya (kemungkinan
- // ada item/menu yang belum terpetakan SKU-nya tapi tetap laku). Dipakai saat tersedia untuk
- // pasangan tanggal+outlet itu; kalau belum (data net-sales belum tersinkron untuk hari itu),
- // jatuh ke rekonstruksi PCS x harga seperti sebelumnya -- bukan menghilangkan harinya.
- function netSalesData(){const d=window.ForecastSecureData?.['pcs-net-sales.json'];return d&&d.schemaVersion===1&&Array.isArray(d.days)?d:null;}
+ // Omzet real GROUND-TRUTH langsung dari jumlah SEMUA baris "Sales" di laporan sales-menu-cogs
+ // (lihat summarize()/netSales di integration/pcs-sales.mjs) -- sumber yang SAMA yang sudah
+ // ditarik tiap hari untuk PCS, jadi tidak perlu panggilan API terpisah. Owner menemukan
+ // rekonstruksi PCS x harga (dan sebelumnya laporan akuntansi "Net Sales") bisa meleset puluhan
+ // juta/hari dari Net Sales POS asli -- penyebabnya kategori seperti "Promo" yang tidak masuk
+ // Penjualan akuntansi tapi tetap laku. netSales di sini menjumlah SEMUA baris Sales apa pun
+ // SKU/kategorinya, jadi tidak mungkin ketinggalan kategori baru. Dipakai saat tersedia untuk
+ // hari itu (row.complete); kalau belum (data lama sebelum field ini ada), jatuh ke rekonstruksi
+ // PCS x harga seperti sebelumnya -- bukan menghilangkan harinya.
  function revenueTrend(outletId){
   const panels=window.PcsPanels.data(),planner=window.ForecastPlanner,cloud=window.ForecastPlanCloud,math=window.PcsMath;
   if(!panels.sales||!panels.orders)return null;
   const list=outletIds(outletId,panels.sales),expected=list.length;
-  const netSales=netSalesData();
-  const groundTruth=netSales?new Map(netSales.days.filter(r=>r.complete).map(r=>[r.date+'|'+r.id,r.netSales])):null;
   const byDate=new Map();
   for(const row of panels.sales.days){
    if(!list.includes(row.id))continue;
    const e=byDate.get(row.date)||{sum:0,known:0};
    if(row.complete){
-    const ground=groundTruth?.get(row.date+'|'+row.id);
-    if(ground!=null)e.sum+=ground;
+    if(Number.isFinite(row.netSales))e.sum+=row.netSales;
     else for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
     e.known++;
    }

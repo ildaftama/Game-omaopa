@@ -32,10 +32,18 @@ export function sku(name){
 }
 export function summarize(rows,{date,branchName}){
  if(!Array.isArray(rows))throw Error('Format rincian ESB tidak sesuai.');
- const qty=PRODUCTS.map(()=>0),free=PRODUCTS.map(()=>0);let unknownCake=0;const unmappedMenus=new Set();
+ const qty=PRODUCTS.map(()=>0),free=PRODUCTS.map(()=>0);let unknownCake=0,netSales=0;const unmappedMenus=new Set();
  for(const r of rows){
   if(r.salesDate!==date||r.branchName!==branchName)throw Error('Tanggal atau outlet ESB berbeda.');
-  if(r.salesType!=='Sales'||r.rowType==='PACKAGE_COMPONENT')continue;
+  if(r.salesType!=='Sales')continue;
+  if(!Number.isFinite(r.total)||!Number.isFinite(r.discountTotal))throw Error('Jumlah produk ESB tidak valid.');
+  // Omzet real = jumlah SEMUA baris Sales (header, component, alacarte -- apa pun nama/SKU-nya),
+  // TIDAK bergantung pemetaan sku() sama sekali. Ini sengaja terpisah dari qty di bawah: laporan
+  // "Net Sales" akuntansi (profit-loss) ternyata TIDAK memasukkan kategori "Promo" sebagai
+  // Penjualan, jadi pernah meleset puluhan juta/hari dari Net Sales POS asli -- sumber mentah
+  // sales-menu-cogs ini sudah dipakai setiap hari untuk PCS, jadi tidak perlu panggilan API baru.
+  netSales+=r.total-r.discountTotal;
+  if(r.rowType==='PACKAGE_COMPONENT')continue;
   if(!['ALACARTE','PACKAGE_HEADER'].includes(r.rowType))throw Error('Jenis baris ESB belum dikenali.');
   const p=sku(r.menuName),box=String(r.menuName).trim().toLowerCase(),miniBoxes={'mini ogura filling mix':[[4,3],[5,3],[6,3]],'mini ogura filling chocolate':[[5,9]],'mini ogura filling choco & cheese':[[4,4],[5,5]]},parts=miniBoxes[box]||(p===null?null:[[p,1]]);
   if(!parts){
@@ -48,12 +56,12 @@ export function summarize(rows,{date,branchName}){
      ||/^(?:paket .*roti|bundling.*roti|roti\b)/i.test(r.menuName)){unknownCake++;unmappedMenus.add(r.menuName);}
    continue;
   }
-  if(!Number.isSafeInteger(r.qty)||r.qty<0||!Number.isFinite(r.total)||!Number.isFinite(r.discountTotal))throw Error('Jumlah produk ESB tidak valid.');
+  if(!Number.isSafeInteger(r.qty)||r.qty<0)throw Error('Jumlah produk ESB tidak valid.');
   // Monetary fields classify fully complimentary lines only; never derive PCS from prices.
   for(const [index,multiplier]of parts)(r.total-r.discountTotal<=0?free:qty)[index]+=r.qty*multiplier;
  }
  if(unknownCake)throw Object.assign(Error('Ada nama menu kue baru yang perlu dipetakan.'),{unmappedMenus:[...unmappedMenus]});
- return {qty,free,mappingVersion:MAPPING_VERSION};
+ return {qty,free,mappingVersion:MAPPING_VERSION,netSales};
 }
 export function range(from,to){
  const dates=[];
@@ -91,7 +99,7 @@ export async function collectJobs(jobs,client){
   if(!report.complete)throw Error('Laporan belum lengkap.');
   if(!report.rows.length){
    if(report.count!==0||!await verifiedZero(job))throw Error('Laporan kosong belum terkonfirmasi.');
-   results.push({date:job.date,id:job.id,qty:PRODUCTS.map(()=>0),free:PRODUCTS.map(()=>0),mappingVersion:MAPPING_VERSION,complete:true,verifiedZero:'empty-menu-and-zero-sales-ledger'});
+   results.push({date:job.date,id:job.id,qty:PRODUCTS.map(()=>0),free:PRODUCTS.map(()=>0),mappingVersion:MAPPING_VERSION,netSales:0,complete:true,verifiedZero:'empty-menu-and-zero-sales-ledger'});
   }else results.push({date:job.date,id:job.id,...summarize(report.rows,job),complete:true});
  }catch(error){results.push({date:job.date,id:job.id,complete:false,reason:/menu kue baru/.test(error.message)?'unmapped-menu':/kosong/.test(error.message)?'empty-unverified':String(error.message).match(/HTTP \d{3}/)?.[0]||'unavailable',...(error.unmappedMenus?{unmappedMenus:error.unmappedMenus}:{})});}
  if(results.length%28===0)console.log('Laporan outlet diperiksa: '+results.length+'/'+jobs.length);
