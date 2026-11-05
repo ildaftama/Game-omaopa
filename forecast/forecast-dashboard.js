@@ -69,27 +69,25 @@ window.ForecastDashboard=(()=>{
    if(t==null||a==null||a<=0)return 1;
    return Math.max(.6,Math.min(1.8,t/a));
   }
-  // Prediksi tanggal-ke-tanggal: rumus yang SAMA dengan rekomendasi per-outlet "Buat forecast"
-  // (median kuantil hari-sama + tren terbatas 0.85-1.15x, pakai planner.quantile yang sama
-  // persis) -- tapi diterapkan ke omzet JARINGAN yang sudah dihitung di atas (series), bukan
-  // dengan memanggil ulang recommend()/estimatedPartition 28x per tanggal. Sempat dicoba
-  // per-outlet sungguhan: >15 detik untuk render satu grafik karena estimatedPartition
-  // membangun ulang peta data dari nol tiap dipanggil -- terlalu lambat untuk halaman biasa.
-  // Hasilnya tetap mewarisi pola hari-dalam-minggu & tren jangka pendek yang sama, cuma
-  // dihitung di level total jaringan, bukan dijumlah dari 28 forecast outlet terpisah.
+  // Prediksi tanggal-ke-tanggal, 3 komponen terpisah -- SEMUA dihitung dari data real mundur
+  // dari HARI INI/lastActual, bukan mundur dari tanggal target. Sempat dihitung mundur dari
+  // tanggal target: untuk Desember, jendela 56 harinya cuma kebagian ~7 hari data real (akhir
+  // Okt-awal Nov, satu-satunya yang ada), jadi nyaris sama untuk semua tanggal Desember --
+  // "nempel" ke level November. Dipisah di sini, tiap faktor selalu dapat jendela penuh:
+  const baseWin=lastActual?series.filter(r=>r.date>=planner.shift(lastActual,-56)):[];
+  const baselineLevel=baseWin.length?planner.quantile(baseWin.map(r=>r.value),.5):null;
+  const trendRecent=lastActual?series.filter(r=>r.date>=planner.shift(lastActual,-14)).map(r=>r.value):[],trendPrior=lastActual?series.filter(r=>r.date<planner.shift(lastActual,-14)&&r.date>=planner.shift(lastActual,-28)).map(r=>r.value):[];
+  const trendA=planner.quantile(trendRecent,.5),trendB=planner.quantile(trendPrior,.5),trendFactor=trendA!==null&&trendB>0?Math.max(.85,Math.min(1.15,trendA/trendB)):1;
+  // Pola hari-dalam-minggu: jendela lebih lebar (180 hari) supaya rasio-nya stabil walau
+  // riwayat terbaru tipis; ini rasio bentuk, bukan level, jadi aman dipakai lebih lebar.
+  const wideWin=lastActual?series.filter(r=>r.date>=planner.shift(lastActual,-180)):[],wideMedian=wideWin.length?planner.quantile(wideWin.map(r=>r.value),.5):baselineLevel;
+  function weekdayShape(date){
+   const wd=new Date(date+'T12:00:00Z').getUTCDay(),sameDay=wideWin.filter(r=>new Date(r.date+'T12:00:00Z').getUTCDay()===wd).map(r=>r.value);
+   return sameDay.length>=3&&wideMedian>0?Math.max(.5,Math.min(1.8,planner.quantile(sameDay,.5)/wideMedian)):1;
+  }
   function forecastAt(date){
-   // recommend() membatasi pool hari-sama ke 56 hari terakhir (bukan seluruh riwayat) --
-   // tanpa batas ini pool ketarik oleh data lama yang levelnya bisa beda jauh dari tren
-   // terkini (terbukti: tanpa batas, pool sampai 95 sampel dari Jan2025, prediksi jadi
-   // lebih tinggi dari omzet real beberapa hari terakhir).
-   const wd=d=>new Date(d+'T12:00:00Z').getUTCDay(),before=series.filter(r=>r.date>=planner.shift(date,-56)&&r.date<date);
-   if(!before.length)return null;
-   const same=before.filter(r=>wd(r.date)===wd(date)),selected=same.length>=3?same:before.slice(-14);
-   if(!selected.length)return null;
-   const recent=before.filter(r=>r.date>=planner.shift(date,-14)).map(r=>r.value),prior=before.filter(r=>r.date<planner.shift(date,-14)&&r.date>=planner.shift(date,-28)).map(r=>r.value);
-   const a=planner.quantile(recent,.5),b=planner.quantile(prior,.5),trend=a!==null&&b>0?Math.max(.85,Math.min(1.15,a/b)):1;
-   const central=planner.quantile(selected.map(r=>r.value),.5)*trend;
-   return central*seasonalFactor(date);
+   if(baselineLevel==null)return null;
+   return baselineLevel*trendFactor*weekdayShape(date)*seasonalFactor(date);
   }
   // Rencana forecaster (plan baseline yang disimpan tim), bukan prediksi algoritma — supaya
   // bisa dibandingkan 3 arah: real vs prediksi saya vs rencana tim. Baseline dipakai (bukan
@@ -201,7 +199,7 @@ window.ForecastDashboard=(()=>{
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   const cutoff=trend.lastActual?new Date(trend.lastActual+'T12:00:00+07:00').toLocaleDateString('id-ID',{day:'numeric',month:'short'}):null;
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div>${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}<p class="workspace-note">${cutoff?`Data penjualan real tersedia s.d. ${cutoff}; setelah itu (termasuk hari yang sudah lewat tapi belum ada datanya) ditampilkan sebagai prediksi.`:'Belum ada data penjualan real yang lengkap untuk periode ini — seluruh garis adalah prediksi.'} Metode: median kuantil hari-sama + tren terbatas (rumus sama dengan rekomendasi per-outlet "Buat forecast"), diterapkan ke omzet jaringan × faktor musiman (dibanding bulan sama tahun lalu, kalau ada datanya).${trend.hasPlan?' Rencana tim memakai rencana awal (baseline) yang disimpan forecaster.':''}</p></article>
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div>${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}<p class="workspace-note">${cutoff?`Data penjualan real tersedia s.d. ${cutoff}; setelah itu (termasuk hari yang sudah lewat tapi belum ada datanya) ditampilkan sebagai prediksi.`:'Belum ada data penjualan real yang lengkap untuk periode ini — seluruh garis adalah prediksi.'} Metode: level 56 hari terakhir × tren jangka pendek × pola hari-dalam-minggu (180 hari) × faktor musiman (bulan sama tahun lalu) — semua dihitung dari data real s.d. hari ini, bukan dari tanggal yang diprediksi.${trend.hasPlan?' Rencana tim memakai rencana awal (baseline) yang disimpan forecaster.':''}</p></article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
