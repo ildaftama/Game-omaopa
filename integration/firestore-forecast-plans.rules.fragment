@@ -155,3 +155,16 @@ match /forecastBriefs/{key} {
   allow create, update: if forecastBrief(request.resource.data, key);
   allow delete: if false;
 }
+// OPSIONAL -- hanya tambahkan kalau owner SETUJU akun sinkronisasi forecast (FIREBASE_SYNC_
+// EMAIL, sudah forecastManager() lewat staff/{uid}.super atau .master) boleh MEMBACA collection
+// "users" (database member: nama, telepon, tanggal lahir, umur, gender, homeOutlet, dll --
+// data pribadi pelanggan). Tujuannya: skrip sinkronisasi membaca lalu mengagregasi jadi
+// statistik per outlet TANPA data pribadi (cuma hitungan per kelompok umur/gender), sebelum
+// disimpan ke bundle forecast. Read-only -- TIDAK ada "allow write" di sini sama sekali, dan
+// hanya akun forecastManager() (sudah dipercaya penuh data finansial) yang dapat, bukan semua
+// staff/forecaster. Kalau owner TIDAK mau akun sinkronisasi menyentuh data member sama sekali,
+// JANGAN tambahkan blok ini -- fitur demografi customer per outlet tidak akan bisa dibangun.
+// match /users/{uid} {
+//   allow read: if forecastManager();
+//   allow write: if false;
+// }
