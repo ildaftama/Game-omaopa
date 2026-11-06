@@ -60,4 +60,14 @@
 @media(max-width:700px){.weather-map-layout{flex-direction:column}.weather-leaflet{height:360px}.weather-outlet-list{max-height:220px;flex:1 1 auto}.weather-reset-btn{font-size:10px;padding:6px 9px}.leaflet-popup-content-wrapper{max-height:250px}}
 .fd-chart-wrap{position:relative}.fd-tooltip{position:absolute;transform:translate(-50%,-100%);background:#1f2d3a;color:#fff;font-size:11px;line-height:1.4;padding:6px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;box-shadow:0 3px 10px #17283b33;z-index:5}.fd-tooltip:after{content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1f2d3a}.fd-tooltip[hidden]{display:none}
 .fd-shortcut{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 18px;padding:14px 18px;background:#f0f5f8;border-radius:10px}.fd-shortcut button{flex-shrink:0}.fd-shortcut span{font-size:12px;color:#536b7d;line-height:1.5}
-@media(max-width:550px){.fd-shortcut{padding:12px 14px;gap:10px}}
+.fd-trend-badge{font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;white-space:nowrap}
+.fd-trend-badge.fd-trend-up,.fd-trend-badge.fd-trend-sharp-up{color:#1f6b45;background:#e4f4ea}
+.fd-trend-badge.fd-trend-down,.fd-trend-badge.fd-trend-sharp-down{color:#a4302a;background:#fdeceb}
+.fd-trend-badge.fd-trend-flat{color:#637483;background:#f0f3f6}
+.fd-trend-watch{display:flex;flex-direction:column;gap:12px;margin-bottom:22px;background:#fffaf0;border-color:#f0dfb8}
+.fd-trend-flag{display:flex;flex-direction:column;gap:4px;padding:13px 16px;border-radius:9px;background:#fff}
+.fd-trend-flag b{font-size:13px}
+.fd-trend-flag span{font-size:12px;color:#536b7d;line-height:1.5}
+.fd-trend-flag.fd-trend-up{border-left:4px solid #2b7a5d}
+.fd-trend-flag.fd-trend-down{border-left:4px solid #b54848}
+@media(max-width:550px){.fd-shortcut{padding:12px 14px;gap:10px}.fd-trend-badge{font-size:10px;padding:4px 9px}.fd-trend-flag{padding:11px 13px}}

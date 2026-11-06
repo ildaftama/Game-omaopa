@@ -15,6 +15,7 @@ window.ForecastDashboard=(()=>{
  const months=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
  const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
  const dayLabel=d=>Number(d.slice(8,10));
+ const dateLabelShort=d=>Number(d.slice(8,10))+' '+months[Number(d.slice(5,7))-1].slice(0,3);
  function monthDates(ym){const [y,m]=ym.split('-').map(Number),days=new Date(Date.UTC(y,m,0)).getUTCDate();return Array.from({length:days},(_,i)=>`${ym}-${String(i+1).padStart(2,'0')}`);}
  // ym pakai bulan 1-indeks ("2026-11"). Date.UTC sendiri 0-indeks, jadi Date.UTC(y,m,1) dengan
  // m apa adanya (1-indeks) sudah otomatis jatuh ke bulan BERIKUTNYA — jangan ditambah lagi.
@@ -40,6 +41,66 @@ window.ForecastDashboard=(()=>{
   return p in PRICE_REFS?PRICE_REFS[p]:null;
  }
  function shiftYearDate(date,deltaYears){const [y,m,d]=date.split('-').map(Number);return `${y+deltaYears}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+ // Tren naik/turun dari data REAL (bukan prediksi): median 7 hari terakhir vs median 7 hari
+ // sebelum itu. Dipakai baik untuk badge di grafik (deret yang sedang dilihat) maupun untuk
+ // mencari outlet dengan tren paling tajam di seluruh jaringan (lihat networkTrendExtremes).
+ // Ambang: ±8% = "naik/turun", ±20% = "tajam" -- cukup longgar untuk hari biasa yang wajar
+ // naik-turun, tapi menangkap pergeseran nyata yang layak disiapkan/dikurangi kirimannya.
+ const TREND_LABEL={'sharp-up':['🔺🔺','Naik tajam'],up:['🔺','Naik'],flat:['➖','Stabil'],down:['🔻','Turun'],'sharp-down':['🔻🔻','Turun tajam']};
+ function trendFromSeries(series,planner){
+  if(!series.length)return null;
+  const lastDate=series.at(-1).date,valueByDate=new Map(series.map(r=>[r.date,r.value]));
+  const recent=[],prior=[];
+  for(let o=0;o<7;o++){const v=valueByDate.get(planner.shift(lastDate,-o));if(v!=null)recent.push(v);}
+  for(let o=7;o<14;o++){const v=valueByDate.get(planner.shift(lastDate,-o));if(v!=null)prior.push(v);}
+  if(recent.length<4||prior.length<4)return null;
+  const recentMed=planner.quantile(recent,.5),priorMed=planner.quantile(prior,.5);
+  if(!(priorMed>0))return null;
+  const pct=(recentMed-priorMed)/priorMed*100;
+  const dir=pct>=20?'sharp-up':pct>=8?'up':pct<=-20?'sharp-down':pct<=-8?'down':'flat';
+  return {pct,dir,recentMed,priorMed,asOf:lastDate};
+ }
+ function trendBadgeHtml(t){
+  if(!t)return '';
+  const [icon,label]=TREND_LABEL[t.dir],sign=t.pct>=0?'+':'';
+  return `<span class="fd-trend-badge fd-trend-${t.dir}">${icon} ${label} ${sign}${t.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%</span>`;
+ }
+ // Outlet dengan tren paling tajam (naik dan turun) di seluruh jaringan, dari omzet total
+ // harian per outlet (satu pass atas panels.sales.days, bukan memanggil ulang revenueTrend()
+ // 28x yang jauh lebih berat karena ikut memisahkan pesanan & menjalankan mesin forecast).
+ let trendExtremesCache=null;
+ function networkTrendExtremes(){
+  const panels=window.PcsPanels.data(),planner=window.ForecastPlanner;
+  if(!panels.sales)return null;
+  const cacheKey=panels.sales.days.length+'|'+today();
+  if(trendExtremesCache?.key===cacheKey)return trendExtremesCache.value;
+  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
+  const byOutlet=new Map();
+  for(const row of panels.sales.days){
+   if(!row.complete)continue;
+   let sum=0;for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)sum+=(row.qty[p]||0)*v;}
+   (byOutlet.get(row.id)||(byOutlet.set(row.id,[]),byOutlet.get(row.id))).push({date:row.date,value:sum});
+  }
+  const results=[];
+  for(const [id,series] of byOutlet){
+   series.sort((a,b)=>a.date.localeCompare(b.date));
+   const t=trendFromSeries(series,planner);
+   if(t)results.push({id,name:name(id),...t});
+  }
+  const value=results.length?{top:results.reduce((a,b)=>b.pct>a.pct?b:a),bottom:results.reduce((a,b)=>b.pct<a.pct?b:a)}:null;
+  trendExtremesCache={key:cacheKey,value};
+  return value;
+ }
+ // Kartu peringatan di puncak Dashboard -- hanya muncul kalau ada outlet yang BENAR-BENAR
+ // bergeser tajam (≥15%), supaya tidak jadi noise di hari yang wajar naik-turun kecil.
+ function trendWatchCard(){
+  const ext=networkTrendExtremes();if(!ext)return '';
+  const flags=[];
+  if(ext.top.pct>=15)flags.push(`<div class="fd-trend-flag fd-trend-up"><b>🔺 ${esc(ext.top.name)}</b><span>Naik tajam +${ext.top.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dari 7 hari sebelumnya — siapkan stok lebih, jangan sampai kehabisan saat ramai.</span></div>`);
+  if(ext.bottom.pct<=-15)flags.push(`<div class="fd-trend-flag fd-trend-down"><b>🔻 ${esc(ext.bottom.name)}</b><span>Turun tajam ${ext.bottom.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dari 7 hari sebelumnya — kurangi kiriman supaya waste terkontrol.</span></div>`);
+  if(!flags.length)return '';
+  return `<article class="workspace-card fd-trend-watch"><span class="micro-label">OUTLET PERLU PERHATIAN · TREN 7 HARI TERAKHIR</span>${flags.join('')}</article>`;
+ }
  // Mesin forecast generik -- dipakai terpisah untuk deret "omzet tanpa pesanan" dan deret
  // "omzet pesanan" (lihat revenueTrend) supaya tiap komponen punya baseline/tren/pola sendiri;
  // pesanan jauh lebih kecil (~3-4% omzet) dan lebih bergelombang daripada omzet reguler.
@@ -103,6 +164,7 @@ window.ForecastDashboard=(()=>{
   const actualAt=date=>{const e=byDate.get(date);return e&&e.known>0?e.sum*(expected/e.known):null;};
   const totalSeries=[...byDate.entries()].filter(([,e])=>e.known>0).map(([date,e])=>({date,value:e.sum*(expected/e.known)})).sort((a,b)=>a.date.localeCompare(b.date));
   const lastActual=totalSeries.at(-1)?.date||null;
+  const trendNow=trendFromSeries(totalSeries,planner);
 
   // Pisahkan omzet pesanan dari omzet reguler. PESANAN_PRODUCTS = 4 SKU inti (Ogura/Malmil,
   // 0-3) + Chiffon (7-9) -- Chiffon sering dipesan juga, owner konfirmasi 2026-11-06. Mesin
@@ -178,7 +240,7 @@ window.ForecastDashboard=(()=>{
   // Satu angka ringkas pengganti paragraf metodologi: berapa persen pesanan biasanya menambah
   // omzet murni, dipakai sebagai catatan singkat di bawah grafik.
   const pesananUpliftPct=pureEngine.baselineLevel>0&&pesananEngine.baselineLevel!=null?pesananEngine.baselineLevel/pureEngine.baselineLevel*100:null;
-  return {rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct};
+  return {rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct,trendNow};
  }
 
  // actualTotal/forecastTotal/plan = garis utama (tebal, warna pekat, selalu tampil default).
@@ -580,7 +642,8 @@ window.ForecastDashboard=(()=>{
   const uplift=trend.pesananUpliftPct!=null?`Pesanan biasanya menambah ~${trend.pesananUpliftPct.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari omzet murni (rata-rata 56 hari terakhir; tanggal yang pesanannya sudah tercatat di sheet pakai angka pasti, bukan tebakan). Data diperbarui tiap malam jam 21.02 WIB.`:'';
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
    <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast">Buat forecast →</button><span>Histori rencana & akurasi tim (buat pembelajaran) ada di tab Forecast → Monitoring.</span></div>
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${uplift?`<p class="workspace-note">${uplift}</p>`:''}</article>
+   ${outletId==='__all__'?trendWatchCard():''}
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${trend.trendNow?`<p class="workspace-note">Tren dihitung dari omzet real 7 hari terakhir vs 7 hari sebelumnya (bukan prediksi) — per ${dateLabelShort(trend.trendNow.asOf)}.</p>`:''}${uplift?`<p class="workspace-note">${uplift}</p>`:''}</article>
    <article class="workspace-card weather-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
