@@ -1,0 +1,45 @@
+name: Sinkronisasi pesanan sheet (tiap jam, jam kerja)
+on:
+  schedule:
+    # 01.00-14.00 UTC = 08.00-21.00 WIB, setiap jam -- supaya pesanan yang baru dicatat tim di
+    # sheet PESANAN siang/sore hari H-1 sudah ikut ter-autofill saat forecaster bikin rencana
+    # malam itu juga, bukan menunggu sinkronisasi penuh jam 21.02 WIB.
+    - cron: '0 1-14 * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  # Grup SAMA dengan esb-forecast-refresh.yml (sinkronisasi malam) -- keduanya menulis ke
+  # bundle Firestore yang sama (forecastPlans/reference_current). cancel-in-progress:false
+  # supaya kalau kebetulan tumpang tindih (mis. 21.00 WIB dekat 21.02 WIB), keduanya tetap
+  # jalan berurutan, bukan saling membatalkan atau balapan menulis bundle.
+  group: forecast-reference-sync
+  cancel-in-progress: false
+jobs:
+  sync-orders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Baca link sumber yang disimpan tim
+        run: node integration/pcs-source.mjs
+      - name: Siapkan pcs-sales.json dari bundle live (tidak diubah -- hanya pesanan yang disegarkan di sini)
+        env:
+          FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
+          FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: node integration/pack-forecast-reference.mjs prime
+      - name: Tarik pesanan terbaru dari sheet
+        run: python integration/pcs_orders.py
+      - name: Paketkan & simpan ke bundle referensi privat (bukan file publik)
+        env:
+          FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
+          FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: node integration/pack-forecast-reference.mjs
