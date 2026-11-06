@@ -8,8 +8,19 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
   const [appSDK,authSDK,dbSDK]=await Promise.all(['app','auth','firestore'].map(n=>import(`https://www.gstatic.com/firebasejs/12.14.0/firebase-${n}.js`)));
   const app=appSDK.getApps().some(a=>a.name==='[DEFAULT]')?appSDK.getApp():appSDK.initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
   const auth=authSDK.getAuth(app),db=dbSDK.getFirestore(app);let stop=null,range=null,generation=0;
+  // Beberapa bagian Dashboard/Forecast minta rentang tanggal BERBEDA-BEDA ke watch() dalam
+  // satu render (7 hari untuk waste, 56 hari untuk akurasi, 56+62 hari untuk grafik omzet).
+  // Dulu watch() cuma mengingat SATU rentang terakhir dan selalu berlangganan ULANG kalau beda
+  // dari sebelumnya -- tiap langganan ulang memicu onSnapshot (emit 'forecast-plans-changed')
+  // yang memicu render lagi, yang memanggil watch() lagi dengan rentang lain, dst: OSILASI
+  // tanpa henti antar 2-3 rentang (terukur: 1x ganti outlet = 15x render, 19x event dalam 3
+  // detik). Sekarang watch() cuma MELEBARKAN rentang yang sudah dilanggan (gabungan/union),
+  // tidak pernah menyempit -- begitu rentang terlebar sudah tercakup, permintaan rentang yang
+  // lebih sempit tidak perlu berlangganan ulang sama sekali.
   cloud.watch=(from,to)=>{
-   if(range?.[0]===from&&range?.[1]===to)return;range=[from,to];subscribe();
+   if(range&&from>=range[0]&&to<=range[1])return;
+   range=range?[from<range[0]?from:range[0],to>range[1]?to:range[1]]:[from,to];
+   subscribe();
   };
   function subscribe(){
    stop?.();stop=null;cloud.records=[];if(cloud.state!=='ready'||!range)return;
