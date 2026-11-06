@@ -315,6 +315,21 @@ window.ForecastDashboard=(()=>{
   const rows=Object.entries(perf.outlets).map(([id,o])=>({id,name:o.name||id,percent:o.periods?.[period]?.estimatedLostSalesPercent})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent);
   return rows.length?{period,rows}:null;
  }
+ // wasteByOutlet() (ground truth "dikirim vs laku") cuma terisi kalau forecaster sudah
+ // mencatat fulfillment -- jarang. Fallback ini rata-ratakan wastePercent PERFORMANCE_SUMMARY
+ // dari SEMUA bulan yang tersedia per outlet (bukan cuma bulan terakhir) supaya mewakili
+ // "kekuatan asli" outlet selama ini, bukan satu bulan yang mungkin anomali.
+ function wasteHistoricalFallback(outletId){
+  const perf=window.PERFORMANCE_SUMMARY;if(!perf?.outlets)return null;
+  const rows=[];
+  for(const [id,o] of Object.entries(perf.outlets)){
+   if(outletId!=='__all__'&&id!==outletId)continue;
+   const vals=Object.values(o.periods||{}).map(p=>p.wastePercent).filter(v=>v!=null);
+   if(!vals.length)continue;
+   rows.push({id,name:o.name||id,percent:vals.reduce((a,b)=>a+b,0)/vals.length,months:vals.length});
+  }
+  return rows.length?{rows:rows.sort((a,b)=>b.percent-a.percent)}:null;
+ }
  function badges(outletId){
   const wasteTeam=wasteByOutlet(outletId),wasteSheet=wasteSheetByOutlet(outletId),lostDaily=lostSalesByOutlet(outletId);
   const line=(r,threshold)=>`<div class="product-line"><b>${esc(r.name)}</b><span class="${r.percent>threshold?'fp-down':'fp-up'}">${r.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}%</span></div>`;
@@ -380,7 +395,7 @@ window.ForecastDashboard=(()=>{
  }
  function weatherMapSection(rows){
   if(!rows.length)return '';
-  return `<div class="weather-map-toolbar"><label for="weather-area-select">Fokus area</label><select id="weather-area-select" class="weather-area-select">${weatherAreaOptions(rows)}</select></div><div class="weather-map-layout"><div class="weather-leaflet-wrap"><div id="weather-leaflet-map" class="weather-leaflet" role="img" aria-label="Peta interaktif cuaca outlet"></div><button type="button" class="weather-reset-btn" id="weather-reset-view" title="Lihat semua outlet">⟲ Semua outlet</button></div><div class="weather-outlet-list">${weatherOutletListHtml(weatherRowsInArea(rows))}</div></div><p class="fp-caption">Klik titik di peta atau baris di daftar untuk detail per outlet · lingkaran merah = kemungkinan hujan ≥60% hari ini · pilih area untuk fokus ke sebagian outlet, atau tombol "Semua outlet" untuk kembali.</p>`;
+  return `<div class="weather-map-toolbar"><label for="weather-area-select">Fokus area</label><select id="weather-area-select" class="weather-area-select">${weatherAreaOptions(rows)}</select></div><div class="weather-map-layout"><div class="weather-leaflet-wrap"><div id="weather-leaflet-map" class="weather-leaflet" role="img" aria-label="Peta interaktif cuaca outlet"></div><button type="button" class="weather-reset-btn" id="weather-reset-view" title="Lihat semua outlet">⟲ Semua outlet</button></div><div class="weather-outlet-list">${weatherOutletListHtml(weatherRowsInArea(rows))}</div></div>`;
  }
  let leafletMap=null,leafletMarkers=new Map(),leafletContainerEl=null,leafletFitted=false;
  // Akurasi forecast (WAPE) untuk SATU outlet, 56 hari terakhir -- pola yang sama dengan
@@ -412,7 +427,7 @@ window.ForecastDashboard=(()=>{
   const temp=r.tempMax!=null&&r.tempMin!=null?`${Math.round(r.tempMin)}–${Math.round(r.tempMax)}°C`:'';
   const o=window.OUTLET_INTELLIGENCE?.outlets?.[r.id];
   const risk=r.today!=null&&r.today>=60;
-  const acc=outletAccuracy(r.id),waste=wasteByOutlet(r.id)?.[0],lost=lostSalesByOutlet(r.id)?.[0]||monthlyLostSalesFallback()?.rows.find(x=>x.id===r.id);
+  const acc=outletAccuracy(r.id),waste=wasteByOutlet(r.id)?.[0]||wasteHistoricalFallback(r.id)?.rows.find(x=>x.id===r.id),lost=lostSalesByOutlet(r.id)?.[0]||monthlyLostSalesFallback()?.rows.find(x=>x.id===r.id);
   const stat=(label,val,threshold)=>`<div class="weather-popup-stat"><span>${label}</span><b class="${val==null?'':threshold!=null&&val>threshold?'fp-down':'fp-up'}">${val==null?'—':val.toLocaleString('id-ID',{maximumFractionDigits:1})+'%'}</b></div>`;
   const swot=o?[['Kekuatan',o.strength],['Perlu diperbaiki',o.weakness],['Peluang',o.opportunity],['Tantangan',o.threat]].filter(([,v])=>v):[];
   // Nama outlet dibuat "sticky" (tetap terlihat saat isi popup di-scroll) -- berguna sekarang
