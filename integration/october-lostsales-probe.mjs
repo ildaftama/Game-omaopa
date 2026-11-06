@@ -10,9 +10,13 @@ import { outletLookup } from './performance-summary.mjs';
 // tim (sama seperti pack-forecast-reference.mjs/waste-recap.mjs yang sudah ada), tidak
 // menulis apa pun.
 async function listTabNames(sheetId) {
-  const res = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`, { signal: AbortSignal.timeout(30000) });
-  if (!res.ok) return [];
+  const t0 = Date.now();
+  let res;
+  try { res = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`, { signal: AbortSignal.timeout(100000) }); }
+  catch (e) { return ['(fetch xlsx gagal setelah ' + ((Date.now() - t0) / 1000).toFixed(1) + 's: ' + e.message + ')']; }
+  if (!res.ok) return ['(HTTP ' + res.status + ' setelah ' + ((Date.now() - t0) / 1000).toFixed(1) + 's)'];
   const buf = Buffer.from(await res.arrayBuffer());
+  console.log('xlsx size: ' + buf.length + ' bytes, waktu: ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
   fs.writeFileSync('.tmp-sheet.xlsx', buf);
   const { execSync } = await import('node:child_process');
   let xml = '';
