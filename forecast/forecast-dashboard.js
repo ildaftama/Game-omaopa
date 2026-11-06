@@ -329,6 +329,26 @@ window.ForecastDashboard=(()=>{
   return cards.length?`<div class="product-comparison">${cards.join('')}</div>`:'';
  }
 
+ // Pemetaan outlet -> area operasional, diturunkan dari klaster geografis koordinat KMZ yang
+ // SUDAH ADA di OUTLET_DATA (bukan tebakan dari nama outlet) -- supaya forecaster yang
+ // memegang satu wilayah (mis. tim Solo, tim Semarang) bisa fokus filter peta cuaca ke
+ // outlet yang mereka tangani saja. 28 outlet forecast terbagi 11 area.
+ const OUTLET_AREA={
+  'gajah-raya':'Semarang','udinus':'Semarang','unnes':'Semarang','undip':'Semarang',
+  'sampangan':'Semarang','unimus':'Semarang','ngaliyan':'Semarang',
+  uns:'Solo & sekitar',ums:'Solo & sekitar',makamhaji:'Solo & sekitar',
+  nusukan:'Solo & sekitar',laweyan:'Solo & sekitar',sukoharjo:'Solo & sekitar',
+  merbabu:'Klaten',rajawali:'Klaten',
+  boyolali:'Boyolali',karanganyar:'Karanganyar',sragen:'Sragen',
+  'pemuda-magelang':'Magelang & Muntilan',muntilann:'Magelang & Muntilan',
+  temanggung:'Temanggung',ambarawa:'Ambarawa',uksw:'Salatiga',
+  godean:'Jogja & Sleman',umy:'Jogja & Sleman','jakal-uii':'Jogja & Sleman',
+  'nusa-indah':'Jogja & Sleman',tajem:'Jogja & Sleman',
+ };
+ function areaOf(id){return OUTLET_AREA[id]||'Lainnya';}
+ let weatherAreaFilter='__all__';
+ function weatherRowsInArea(rows){return weatherAreaFilter==='__all__'?rows:rows.filter(r=>areaOf(r.id)===weatherAreaFilter);}
+
  const SOURCE_NOTE='<p class="fp-caption">Sumber: Open-Meteo (ramalan publik), probabilitas hujan RATA-RATA per hari dari model cuaca — bukan data yang kami karang. Awal musim hujan (November) wajar menunjukkan persentase tinggi di banyak outlet sekaligus karena satu sistem hujan bisa menutupi beberapa outlet yang berdekatan.</p>';
  // Kode cuaca WMO (field weathercode Open-Meteo) -> ikon + label kondisi Bahasa Indonesia.
  // Daftar lengkap: https://open-meteo.com/en/docs -- hanya kode yang relevan untuk Jogja/Jateng.
@@ -343,9 +363,19 @@ window.ForecastDashboard=(()=>{
  // penduduk" di app.js) -- bukan SVG sebaran sederhana lagi. Instance peta ini MANDIRI, tidak
  // berbagi apa pun dengan peta demografi (container id beda, tidak saling sentuh) supaya tidak
  // berisiko merusak fitur KMZ/population yang sudah ada.
+ function weatherOutletListHtml(rows){
+  return rows.slice().sort((a,b)=>(b.today??-1)-(a.today??-1)).map(r=>{const [icon]=weatherIcon(r.code,r.today);return `<button type="button" class="weather-outlet-row ${r.today!=null&&r.today>=60?'risk':''}" data-weather-focus="${esc(r.id)}"><span class="weather-outlet-icon">${icon}</span><span class="weather-outlet-name">${esc(r.name)}</span><span class="weather-outlet-pct">${r.today==null?'—':r.today+'%'}</span></button>`;}).join('')||'<p class="fp-caption">Tidak ada outlet di area ini.</p>';
+ }
+ function weatherAreaOptions(rows){
+  const counts=new Map();
+  for(const r of rows){const a=areaOf(r.id);counts.set(a,(counts.get(a)||0)+1);}
+  const areas=[...counts.keys()].sort((a,b)=>a.localeCompare(b,'id'));
+  return `<option value="__all__" ${weatherAreaFilter==='__all__'?'selected':''}>Semua area (${rows.length})</option>`+
+   areas.map(a=>`<option value="${esc(a)}" ${weatherAreaFilter===a?'selected':''}>${esc(a)} (${counts.get(a)})</option>`).join('');
+ }
  function weatherMapSection(rows){
   if(!rows.length)return '';
-  return `<div class="weather-map-layout"><div class="weather-leaflet-wrap"><div id="weather-leaflet-map" class="weather-leaflet" role="img" aria-label="Peta interaktif cuaca 28 outlet"></div><button type="button" class="weather-reset-btn" id="weather-reset-view" title="Lihat semua outlet">⟲ Semua outlet</button></div><div class="weather-outlet-list">${rows.slice().sort((a,b)=>(b.today??-1)-(a.today??-1)).map(r=>{const [icon]=weatherIcon(r.code,r.today);return `<button type="button" class="weather-outlet-row ${r.today!=null&&r.today>=60?'risk':''}" data-weather-focus="${esc(r.id)}"><span class="weather-outlet-icon">${icon}</span><span class="weather-outlet-name">${esc(r.name)}</span><span class="weather-outlet-pct">${r.today==null?'—':r.today+'%'}</span></button>`;}).join('')}</div></div><p class="fp-caption">Klik titik di peta atau baris di daftar untuk detail per outlet · lingkaran merah = kemungkinan hujan ≥60% hari ini · tombol "Semua outlet" mengembalikan tampilan peta.</p>`;
+  return `<div class="weather-map-toolbar"><label for="weather-area-select">Fokus area</label><select id="weather-area-select" class="weather-area-select">${weatherAreaOptions(rows)}</select></div><div class="weather-map-layout"><div class="weather-leaflet-wrap"><div id="weather-leaflet-map" class="weather-leaflet" role="img" aria-label="Peta interaktif cuaca outlet"></div><button type="button" class="weather-reset-btn" id="weather-reset-view" title="Lihat semua outlet">⟲ Semua outlet</button></div><div class="weather-outlet-list">${weatherOutletListHtml(weatherRowsInArea(rows))}</div></div><p class="fp-caption">Klik titik di peta atau baris di daftar untuk detail per outlet · lingkaran merah = kemungkinan hujan ≥60% hari ini · pilih area untuk fokus ke sebagian outlet, atau tombol "Semua outlet" untuk kembali.</p>`;
  }
  let leafletMap=null,leafletMarkers=new Map(),leafletContainerEl=null,leafletFitted=false;
  // Akurasi forecast (WAPE) untuk SATU outlet, 56 hari terakhir -- pola yang sama dengan
@@ -404,7 +434,7 @@ window.ForecastDashboard=(()=>{
    leafletMap=L.map(el,{scrollWheelZoom:false,zoomControl:true});
    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(leafletMap);
   }
-  const rows=lastWeatherRows,seen=new Set();
+  const rows=weatherRowsInArea(lastWeatherRows),seen=new Set();
   for(const r of rows){
    const o=window.OUTLET_DATA?.outlets?.find(x=>x.id===r.id);if(!o)continue;
    seen.add(r.id);
@@ -438,6 +468,21 @@ window.ForecastDashboard=(()=>{
   // setelah fokus ke satu outlet (lewat klik marker/daftar) tidak perlu navigasi manual.
   const resetBtn=document.getElementById('weather-reset-view');
   if(resetBtn)resetBtn.onclick=resetMapView;
+  // Filter area: dipilih sekali, lalu bertahan antar outlet/tab (module-level) supaya
+  // forecaster yang fokus satu wilayah tidak perlu pilih ulang tiap kali pindah layar.
+  // Mengubah filter cukup sinkronkan ulang marker+daftar dari data cuaca yang SUDAH ada
+  // (lastWeatherRows) -- tidak perlu panggil API cuaca lagi.
+  const areaSelect=document.getElementById('weather-area-select');
+  if(areaSelect&&!areaSelect.dataset.wired){
+   areaSelect.dataset.wired='1';
+   areaSelect.addEventListener('change',()=>{
+    weatherAreaFilter=areaSelect.value;
+    const listEl=document.querySelector('.weather-outlet-list');
+    if(listEl)listEl.innerHTML=weatherOutletListHtml(weatherRowsInArea(lastWeatherRows));
+    leafletFitted=false;
+    mountWeatherMap();
+   });
+  }
  }
  let lastWeatherRows=[];
  async function weatherHighlights(outletId){
