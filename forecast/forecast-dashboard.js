@@ -104,19 +104,25 @@ window.ForecastDashboard=(()=>{
   const totalSeries=[...byDate.entries()].filter(([,e])=>e.known>0).map(([date,e])=>({date,value:e.sum*(expected/e.known)})).sort((a,b)=>a.date.localeCompare(b.date));
   const lastActual=totalSeries.at(-1)?.date||null;
 
-  // Pisahkan omzet pesanan dari omzet reguler (hanya 4 SKU inti 0-3 yang punya data pesanan).
+  // Pisahkan omzet pesanan dari omzet reguler. PESANAN_PRODUCTS = 4 SKU inti (Ogura/Malmil,
+  // 0-3) + Chiffon (7-9) -- Chiffon sering dipesan juga, owner konfirmasi 2026-11-06. Mesin
+  // rekomendasi forecast (recommend()/compare() di forecast-planner-model.js) SUDAH memakai
+  // estimatedPartition() untuk SEMUA 12 SKU inti sejak awal (bukan cuma 0-3), jadi perluasan
+  // di sini TIDAK perlu perubahan apa pun di mesin prediksi -- murni memperluas cakupan grafik
+  // omzet murni/pesanan ini saja ke produk yang sama yang sudah dipakai di tempat lain.
   // estimatedPartition() dipanggil SEKALI per produk untuk SELURUH rentang tanggal & outlet
   // sekaligus (bukan per-outlet/per-tanggal) -- itu yang membuatnya cepat (~250ms untuk ~22
   // bulan data), beda dari percobaan awal yang memanggilnya ratusan kali per render.
+  const PESANAN_PRODUCTS=[0,1,2,3,7,8,9];
   const allSalesDates=[...new Set(panels.sales.days.map(r=>r.date))].sort();
-  const partsByProduct={};for(const p of [0,1,2,3])partsByProduct[p]=math.estimatedPartition(panels.sales,panels.orders,list,p,allSalesDates);
+  const partsByProduct={};for(const p of PESANAN_PRODUCTS)partsByProduct[p]=math.estimatedPartition(panels.sales,panels.orders,list,p,allSalesDates);
   const dateIndex=new Map(allSalesDates.map((d,i)=>[d,i]));
   function avgPrice(p){const vals=list.map(id=>actualPrice(window.FORECAST_REALIZED_PRICES,id,p)).filter(v=>v!=null);return vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;}
-  const pesananPrice=[0,1,2,3].map(avgPrice);
+  const pesananPrice=Object.fromEntries(PESANAN_PRODUCTS.map(p=>[p,avgPrice(p)]));
   function pesananRevenueAt(date){
    const i=dateIndex.get(date);if(i==null)return null;
    let sum=0,any=false;
-   for(const p of [0,1,2,3]){const o=partsByProduct[p][i].orders;if(o.value==null)continue;const scale=o.valid>0?(expected/o.valid):1;sum+=o.value*scale*(pesananPrice[p]||0);any=true;}
+   for(const p of PESANAN_PRODUCTS){const o=partsByProduct[p][i].orders;if(o.value==null)continue;const scale=o.valid>0?(expected/o.valid):1;sum+=o.value*scale*(pesananPrice[p]||0);any=true;}
    return any?sum:null;
   }
   const pureSeries=[],pesananSeries=[];
@@ -135,7 +141,7 @@ window.ForecastDashboard=(()=>{
   function knownPesananAt(date){
    if(!coveredSet.has(date)||blockedSet.has(date))return null;
    let sum=0,any=false;
-   for(const id of list){const o=ordersByKey.get(date+'|'+id);if(!o)continue;for(const p of [0,1,2,3]){const q=o.qty?.[p];if(Number.isSafeInteger(q)&&q>=0){sum+=q*(pesananPrice[p]||0);any=true;}}}
+   for(const id of list){const o=ordersByKey.get(date+'|'+id);if(!o)continue;for(const p of PESANAN_PRODUCTS){const q=o.qty?.[p];if(Number.isSafeInteger(q)&&q>=0){sum+=q*(pesananPrice[p]||0);any=true;}}}
    return any?sum:null;
   }
 
@@ -231,10 +237,16 @@ window.ForecastDashboard=(()=>{
 
  const WASTE_THRESHOLD=3.5,LOST_SALES_THRESHOLD=4.5; // Ambang dari owner.
  const fulfillmentCache=new Map();
+ // Ganti outlet (terutama "Semua outlet") bisa menyentuh puluhan rencana yang fulfillment-nya
+ // belum ter-cache sama sekali -- tiap satu SELESAI dimuat dari Firestore dulunya langsung
+ // memicu render ulang HALAMAN PENUH sendiri-sendiri, jadi terasa lambat/patah-patah kalau ada
+ // banyak yang belum ter-cache sekaligus. Digabung jadi satu render per batch pendek.
+ let fulfillmentRenderPending=false;
+ function scheduleFulfillmentRender(){if(fulfillmentRenderPending)return;fulfillmentRenderPending=true;setTimeout(()=>{fulfillmentRenderPending=false;window.dispatchEvent(new Event('forecast-plans-changed'));},120);}
  function fulfillmentFor(key){
   if(!fulfillmentCache.has(key)){
    fulfillmentCache.set(key,{loading:true,data:null});
-   window.ForecastPlanCloud.getFulfillment(key).then(f=>{fulfillmentCache.set(key,{loading:false,data:f});window.dispatchEvent(new Event('forecast-plans-changed'));}).catch(()=>fulfillmentCache.set(key,{loading:false,data:null}));
+   window.ForecastPlanCloud.getFulfillment(key).then(f=>{fulfillmentCache.set(key,{loading:false,data:f});scheduleFulfillmentRender();}).catch(()=>{fulfillmentCache.set(key,{loading:false,data:null});scheduleFulfillmentRender();});
   }
   return fulfillmentCache.get(key);
  }
@@ -377,11 +389,10 @@ window.ForecastDashboard=(()=>{
   lastTrend=trend;
   ensureWeather(outletId);
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
-  const cutoff=trend.lastActual?new Date(trend.lastActual+'T12:00:00+07:00').toLocaleDateString('id-ID',{day:'numeric',month:'short'}):null;
   const uplift=trend.pesananUpliftPct!=null?`Pesanan biasanya menambah ~${trend.pesananUpliftPct.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari omzet murni (rata-rata 56 hari terakhir; tanggal yang pesanannya sudah tercatat di sheet pakai angka pasti, bukan tebakan). Data diperbarui tiap malam jam 21.02 WIB.`:'';
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
    <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast">Buat forecast →</button><span>Histori rencana & akurasi tim (buat pembelajaran) ada di tab Forecast → Monitoring.</span></div>
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div><p class="workspace-note">${cutoff?`Data real s.d. ${cutoff}, sisanya prediksi.`:'Belum ada data real yang cukup — seluruh garis prediksi.'} ${uplift}</p></article>
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${uplift?`<p class="workspace-note">${uplift}</p>`:''}</article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>

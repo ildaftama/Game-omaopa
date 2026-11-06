@@ -52,6 +52,17 @@ $('#workspace-content').addEventListener('mouseover',e=>window.SeasonalityPanel.
 $('#workspace-content').addEventListener('focusin',e=>window.SeasonalityPanel.inspect(e,selected));
 $('#workspace-content').addEventListener('mouseover',e=>{window.PcsPanels.inspect(e);window.ForecastDashboard.inspect(e);});
 $('#workspace-content').addEventListener('focusin',e=>{window.PcsPanels.inspect(e);window.ForecastDashboard.inspect(e);});
+// Hover berbasis mouseover tidak pernah terpicu di layar sentuh (tanpa mouse, tidak ada
+// "arahkan kursor") -- jari yang menyentuh grafik lewat elementFromPoint() dicek apakah
+// kena titik data (data-fd-point/data-pcs-point), lalu dipakaikan logic inspect() yang sama.
+// passive:true supaya tidak mengganggu scroll halaman seperti biasa.
+function touchInspect(e){
+ const t=e.touches?.[0];if(!t)return;
+ const el=document.elementFromPoint(t.clientX,t.clientY);if(!el)return;
+ const fake={target:el};window.PcsPanels.inspect(fake);window.ForecastDashboard.inspect(fake);
+}
+$('#workspace-content').addEventListener('touchstart',touchInspect,{passive:true});
+$('#workspace-content').addEventListener('touchmove',touchInspect,{passive:true});
 window.addEventListener('pcs-selection-changed',()=>{if(['pcs','orders'].includes(focus))render();});
 window.addEventListener('pcs-data-loaded',()=>{if(['pcs','orders','forecast','dashboard'].includes(focus))render();});
 window.addEventListener('forecast-operations-changed',()=>{if(['forecast','access','dashboard'].includes(focus))render();});
