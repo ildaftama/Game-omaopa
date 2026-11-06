@@ -348,10 +348,43 @@ window.ForecastDashboard=(()=>{
   return `<div class="weather-map-layout"><div id="weather-leaflet-map" class="weather-leaflet" role="img" aria-label="Peta interaktif cuaca 28 outlet"></div><div class="weather-outlet-list">${rows.slice().sort((a,b)=>(b.today??-1)-(a.today??-1)).map(r=>{const [icon]=weatherIcon(r.code,r.today);return `<button type="button" class="weather-outlet-row ${r.today!=null&&r.today>=60?'risk':''}" data-weather-focus="${esc(r.id)}"><span class="weather-outlet-icon">${icon}</span><span class="weather-outlet-name">${esc(r.name)}</span><span class="weather-outlet-pct">${r.today==null?'—':r.today+'%'}</span></button>`;}).join('')}</div></div><p class="fp-caption">Klik titik di peta atau baris di daftar untuk detail per outlet · lingkaran merah = kemungkinan hujan ≥60% hari ini.</p>`;
  }
  let leafletMap=null,leafletMarkers=new Map(),leafletContainerEl=null,leafletFitted=false;
+ // Akurasi forecast (WAPE) untuk SATU outlet, 56 hari terakhir -- pola yang sama dengan
+ // operationalSummary() di bawah, cuma tidak di-cache (popup per-klik, bukan tiap render).
+ function outletAccuracy(id){
+  const cloud=window.ForecastPlanCloud,planner=window.ForecastPlanner,panels=window.PcsPanels.data();
+  if(!cloud||cloud.state!=='ready'||!panels.sales||!panels.orders)return null;
+  const from=planner.shift(today(),-56);
+  const valid=(cloud.records||[]).filter(r=>r.outlet===id&&r.date>=from&&r.date<=today()).map(r=>planner.compare(r,panels.sales,panels.orders)).filter(c=>c.eligible&&c.complete);
+  const actual=valid.reduce((s,c)=>s+c.actual,0);
+  return {wape:valid.length&&actual?valid.reduce((s,c)=>s+c.absolute,0)/actual*100:null,n:valid.length};
+ }
+ // Popup ringkas (cuaca + sekilas akurasi/waste/lost sales/produk unggulan) + tombol ke profil
+ // lengkap outlet (Ringkasan: SWOT, demografi, produk & laba, dll -- halaman yang SUDAH ada,
+ // tidak dibangun ulang di sini supaya tidak dobel pemeliharaan).
  function popupHtml(r){
   const [icon,label]=weatherIcon(r.code,r.today),[iconT,labelT]=weatherIcon(r.codeTomorrow,r.tomorrow);
   const temp=r.tempMax!=null&&r.tempMin!=null?`${Math.round(r.tempMin)}–${Math.round(r.tempMax)}°C`:'';
-  return `<div class="weather-popup"><b>${esc(r.name)}</b><div class="weather-popup-row"><span>${icon}</span><div><b>Hari ini</b><br>${esc(label)} · ${r.today==null?'data belum tersedia':r.today+'%'}${temp?' · '+temp:''}</div></div><div class="weather-popup-row"><span>${iconT}</span><div><b>Besok</b><br>${esc(labelT)} · ${r.tomorrow==null?'data belum tersedia':r.tomorrow+'%'}</div></div></div>`;
+  const o=window.OUTLET_INTELLIGENCE?.outlets?.[r.id];
+  const acc=outletAccuracy(r.id),waste=wasteByOutlet(r.id)?.[0],lost=lostSalesByOutlet(r.id)?.[0]||monthlyLostSalesFallback()?.rows.find(x=>x.id===r.id);
+  const stat=(label,val,threshold)=>`<div class="weather-popup-stat"><span>${label}</span><b class="${val==null?'':threshold!=null&&val>threshold?'fp-down':'fp-up'}">${val==null?'—':val.toLocaleString('id-ID',{maximumFractionDigits:1})+'%'}</b></div>`;
+  return `<div class="weather-popup"><b>${esc(r.name)}</b>
+   <div class="weather-popup-row"><span>${icon}</span><div><b>Hari ini</b><br>${esc(label)} · ${r.today==null?'data belum tersedia':r.today+'%'}${temp?' · '+temp:''}</div></div>
+   <div class="weather-popup-row"><span>${iconT}</span><div><b>Besok</b><br>${esc(labelT)} · ${r.tomorrow==null?'data belum tersedia':r.tomorrow+'%'}</div></div>
+   <div class="weather-popup-stats">${stat('Akurasi forecast',acc?.wape,null)}${stat('Waste',waste?.percent,WASTE_THRESHOLD)}${stat('Lost sales',lost?.percent,LOST_SALES_THRESHOLD)}</div>
+   ${o?.products?.[0]?`<p class="weather-popup-line">Produk terlaris: <b>${esc(o.products[0].name)}</b></p>`:''}
+   ${o?.strength?`<p class="weather-popup-line">${esc(o.strength)}</p>`:''}
+   <button type="button" class="button fp-primary weather-popup-btn" data-weather-profile="${esc(r.id)}">Lihat profil lengkap outlet →</button>
+  </div>`;
+ }
+ // Lompat ke halaman Ringkasan outlet (SWOT, demografi, produk & laba, dll -- sudah ada,
+ // dibangun tim sebelumnya) dari popup peta cuaca. Disimulasikan lewat event DOM yang SAMA
+ // persis dipakai UI aslinya (ganti nilai select lalu dispatch 'change'), supaya memakai jalur
+ // kode yang sudah terbukti jalan, bukan API baru yang harus dirawat sendiri.
+ function openOutletProfile(id){
+  const outletSel=document.getElementById('workspace-outlet');
+  if(outletSel){outletSel.value=id;outletSel.dispatchEvent(new Event('change',{bubbles:true}));}
+  const supportSel=document.getElementById('support-view');
+  if(supportSel){supportSel.value='summary';supportSel.dispatchEvent(new Event('change',{bubbles:true}));}
  }
  // mount() dipanggil SETIAP render (lihat outlet-workspace.js) -- idempoten: kalau container
  // DOM masih elemen yang SAMA (render ulang untuk outlet yang sama / re-render lain yang tidak
@@ -367,6 +400,13 @@ window.ForecastDashboard=(()=>{
    leafletContainerEl=el;leafletFitted=false;leafletMarkers=new Map();
    leafletMap=L.map(el,{scrollWheelZoom:false,zoomControl:true});
    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(leafletMap);
+   // Tombol "Lihat profil lengkap" di dalam konten popup -- didaftarkan sekali per instance
+   // peta (bukan per mount(), supaya listener tidak menumpuk), lewat event popupopen karena
+   // elemen popup baru dibuat Leaflet tiap kali dibuka.
+   leafletMap.on('popupopen',e=>{
+    const btn=e.popup.getElement()?.querySelector('[data-weather-profile]');
+    if(btn)btn.onclick=()=>openOutletProfile(btn.dataset.weatherProfile);
+   });
   }
   const rows=lastWeatherRows,seen=new Set();
   for(const r of rows){
