@@ -329,21 +329,26 @@ window.ForecastDashboard=(()=>{
   return cards.length?`<div class="product-comparison">${cards.join('')}</div>`:'';
  }
 
- // Pemetaan outlet -> area operasional, diturunkan dari klaster geografis koordinat KMZ yang
- // SUDAH ADA di OUTLET_DATA (bukan tebakan dari nama outlet) -- supaya forecaster yang
- // memegang satu wilayah (mis. tim Solo, tim Semarang) bisa fokus filter peta cuaca ke
- // outlet yang mereka tangani saja. 28 outlet forecast terbagi 11 area.
+ // Pemetaan outlet -> area tim forecaster (3 area operasional sesuai pembagian wilayah owner,
+ // BUKAN klaster otomatis) -- supaya tiap forecaster yang memegang satu wilayah bisa fokus
+ // filter peta cuaca ke outlet yang mereka tangani saja.
  const OUTLET_AREA={
-  'gajah-raya':'Semarang','udinus':'Semarang','unnes':'Semarang','undip':'Semarang',
-  'sampangan':'Semarang','unimus':'Semarang','ngaliyan':'Semarang',
-  uns:'Solo & sekitar',ums:'Solo & sekitar',makamhaji:'Solo & sekitar',
-  nusukan:'Solo & sekitar',laweyan:'Solo & sekitar',sukoharjo:'Solo & sekitar',
-  merbabu:'Klaten',rajawali:'Klaten',
-  boyolali:'Boyolali',karanganyar:'Karanganyar',sragen:'Sragen',
-  'pemuda-magelang':'Magelang & Muntilan',muntilann:'Magelang & Muntilan',
-  temanggung:'Temanggung',ambarawa:'Ambarawa',uksw:'Salatiga',
-  godean:'Jogja & Sleman',umy:'Jogja & Sleman','jakal-uii':'Jogja & Sleman',
-  'nusa-indah':'Jogja & Sleman',tajem:'Jogja & Sleman',
+  // Area 1: Jogja, Klaten, Magelang, Muntilan, Temanggung
+  godean:'Area 1',umy:'Area 1','jakal-uii':'Area 1','nusa-indah':'Area 1',tajem:'Area 1',
+  merbabu:'Area 1',rajawali:'Area 1',
+  'pemuda-magelang':'Area 1',muntilann:'Area 1',temanggung:'Area 1',
+  // Area 2: Solo, Sukoharjo, Sragen, Karanganyar, Boyolali
+  uns:'Area 2',ums:'Area 2',makamhaji:'Area 2',nusukan:'Area 2',laweyan:'Area 2',sukoharjo:'Area 2',
+  sragen:'Area 2',karanganyar:'Area 2',boyolali:'Area 2',
+  // Area 3: Semarang, UKSW (Salatiga), Ambarawa
+  'gajah-raya':'Area 3',udinus:'Area 3',unnes:'Area 3',undip:'Area 3',
+  sampangan:'Area 3',unimus:'Area 3',ngaliyan:'Area 3',
+  uksw:'Area 3',ambarawa:'Area 3',
+ };
+ const AREA_LABEL={
+  'Area 1':'Area 1 · Jogja/Klaten/Magelang/Temanggung',
+  'Area 2':'Area 2 · Solo/Sukoharjo/Sragen/Karanganyar/Boyolali',
+  'Area 3':'Area 3 · Semarang/Salatiga/Ambarawa',
  };
  function areaOf(id){return OUTLET_AREA[id]||'Lainnya';}
  let weatherAreaFilter='__all__';
@@ -371,7 +376,7 @@ window.ForecastDashboard=(()=>{
   for(const r of rows){const a=areaOf(r.id);counts.set(a,(counts.get(a)||0)+1);}
   const areas=[...counts.keys()].sort((a,b)=>a.localeCompare(b,'id'));
   return `<option value="__all__" ${weatherAreaFilter==='__all__'?'selected':''}>Semua area (${rows.length})</option>`+
-   areas.map(a=>`<option value="${esc(a)}" ${weatherAreaFilter===a?'selected':''}>${esc(a)} (${counts.get(a)})</option>`).join('');
+   areas.map(a=>`<option value="${esc(a)}" ${weatherAreaFilter===a?'selected':''}>${esc(AREA_LABEL[a]||a)} (${counts.get(a)})</option>`).join('');
  }
  function weatherMapSection(rows){
   if(!rows.length)return '';
@@ -406,10 +411,14 @@ window.ForecastDashboard=(()=>{
   const [icon,label]=weatherIcon(r.code,r.today),[iconT,labelT]=weatherIcon(r.codeTomorrow,r.tomorrow);
   const temp=r.tempMax!=null&&r.tempMin!=null?`${Math.round(r.tempMin)}–${Math.round(r.tempMax)}°C`:'';
   const o=window.OUTLET_INTELLIGENCE?.outlets?.[r.id];
+  const risk=r.today!=null&&r.today>=60;
   const acc=outletAccuracy(r.id),waste=wasteByOutlet(r.id)?.[0],lost=lostSalesByOutlet(r.id)?.[0]||monthlyLostSalesFallback()?.rows.find(x=>x.id===r.id);
   const stat=(label,val,threshold)=>`<div class="weather-popup-stat"><span>${label}</span><b class="${val==null?'':threshold!=null&&val>threshold?'fp-down':'fp-up'}">${val==null?'—':val.toLocaleString('id-ID',{maximumFractionDigits:1})+'%'}</b></div>`;
   const swot=o?[['Kekuatan',o.strength],['Perlu diperbaiki',o.weakness],['Peluang',o.opportunity],['Tantangan',o.threat]].filter(([,v])=>v):[];
-  return `<div class="weather-popup"><b>${esc(r.name)}</b>
+  // Nama outlet dibuat "sticky" (tetap terlihat saat isi popup di-scroll) -- berguna sekarang
+  // popup bisa lebih tinggi dari kotak peta dan harus di-scroll (lihat perbaikan terpotong
+  // di pcs-panel.css: .leaflet-popup-content-wrapper).
+  return `<div class="weather-popup"><div class="weather-popup-head">${esc(r.name)}${risk?'<span class="weather-popup-risk-tag">🌧️ Hujan tinggi</span>':''}</div>
    <div class="weather-popup-row"><span>${icon}</span><div><b>Hari ini</b><br>${esc(label)} · ${r.today==null?'data belum tersedia':r.today+'%'}${temp?' · '+temp:''}</div></div>
    <div class="weather-popup-row"><span>${iconT}</span><div><b>Besok</b><br>${esc(labelT)} · ${r.tomorrow==null?'data belum tersedia':r.tomorrow+'%'}</div></div>
    <div class="weather-popup-stats">${stat('Akurasi forecast',acc?.wape,null)}${stat('Waste',waste?.percent,WASTE_THRESHOLD)}${stat('Lost sales',lost?.percent,LOST_SALES_THRESHOLD)}</div>
@@ -537,11 +546,14 @@ window.ForecastDashboard=(()=>{
  // Cuaca di-fetch SEKALI per outlet+tanggal, bukan setiap render — render() dipanggil ulang
  // begitu cuaca selesai dimuat (untuk menampilkannya), jadi tanpa penjaga key ini akan jadi
  // loop tanpa henti (fetch -> render -> fetch -> ...) dan membuat halaman macet.
- let weatherHtml='<p class="workspace-note">Memuat ramalan cuaca…</p>',weatherKey='';
+ // Skeleton berbentuk sama seperti hasil akhir (kotak peta + toolbar + daftar outlet) supaya
+ // transisi ke data asli tidak "melompat" -- bukan cuma teks "Memuat..." polos.
+ const WEATHER_SKELETON=`<div class="weather-map-toolbar"><span class="skeleton" style="display:inline-block;width:160px;height:30px;border-radius:7px"></span></div><div class="weather-map-layout"><div class="weather-leaflet-wrap"><div class="weather-leaflet skeleton"></div></div><div class="weather-outlet-list">${Array(6).fill('<span class="skeleton" style="display:block;height:34px;margin:2px 0;border-radius:7px"></span>').join('')}</div></div>`;
+ let weatherHtml=WEATHER_SKELETON,weatherKey='';
  function ensureWeather(outletId){
   const key=outletId+'|'+today();
   if(weatherKey===key)return;
-  weatherKey=key;weatherHtml='<p class="workspace-note">Memuat ramalan cuaca…</p>';
+  weatherKey=key;weatherHtml=WEATHER_SKELETON;
   weatherHighlights(outletId).then(html=>{if(weatherKey===key){weatherHtml=html;window.dispatchEvent(new Event('forecast-operations-changed'));}});
  }
  function render(outletId){

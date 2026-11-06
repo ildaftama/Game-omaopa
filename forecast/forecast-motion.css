@@ -73,9 +73,9 @@ dialog[open]::backdrop{animation:fx-backdrop-in .24s var(--fx-ease)}
 
 /* Scrollbar halus (webkit) untuk daftar yang sudah ada di app */
 .outlet-list::-webkit-scrollbar,.weather-outlet-list::-webkit-scrollbar,
-.pcs-outlet-options::-webkit-scrollbar,.weather-popup-swot::-webkit-scrollbar{width:7px}
+.pcs-outlet-options::-webkit-scrollbar,.leaflet-popup-content-wrapper::-webkit-scrollbar{width:7px}
 .outlet-list::-webkit-scrollbar-thumb,.weather-outlet-list::-webkit-scrollbar-thumb,
-.pcs-outlet-options::-webkit-scrollbar-thumb,.weather-popup-swot::-webkit-scrollbar-thumb{
+.pcs-outlet-options::-webkit-scrollbar-thumb,.leaflet-popup-content-wrapper::-webkit-scrollbar-thumb{
  background:#c9cfc0;border-radius:10px}
 .outlet-list::-webkit-scrollbar-thumb:hover,.weather-outlet-list::-webkit-scrollbar-thumb:hover{background:#b2b9a6}
 
