@@ -329,17 +329,49 @@ window.ForecastDashboard=(()=>{
   return cards.length?`<div class="product-comparison">${cards.join('')}</div>`:'';
  }
 
- const SOURCE_NOTE='<p class="fp-caption">Sumber: Open-Meteo (ramalan publik), probabilitas hujan maksimum per hari dari model cuaca — bukan data yang kami karang. Awal musim hujan (November) wajar menunjukkan persentase tinggi di banyak outlet sekaligus karena satu sistem hujan bisa menutupi beberapa outlet yang berdekatan.</p>';
+ const SOURCE_NOTE='<p class="fp-caption">Sumber: Open-Meteo (ramalan publik), probabilitas hujan RATA-RATA per hari dari model cuaca — bukan data yang kami karang. Awal musim hujan (November) wajar menunjukkan persentase tinggi di banyak outlet sekaligus karena satu sistem hujan bisa menutupi beberapa outlet yang berdekatan.</p>';
+ // Kode cuaca WMO (field weathercode Open-Meteo) -> ikon + label kondisi Bahasa Indonesia.
+ // Daftar lengkap: https://open-meteo.com/en/docs -- hanya kode yang relevan untuk Jogja/Jateng.
+ function weatherIcon(code,probability){
+  const table={0:['☀️','Cerah'],1:['🌤️','Cerah berawan'],2:['⛅','Berawan sebagian'],3:['☁️','Mendung'],45:['🌫️','Berkabut'],48:['🌫️','Berkabut'],51:['🌦️','Gerimis'],53:['🌦️','Gerimis'],55:['🌦️','Gerimis'],56:['🌦️','Gerimis'],57:['🌦️','Gerimis'],61:['🌧️','Hujan ringan'],63:['🌧️','Hujan'],65:['🌧️','Hujan lebat'],66:['🌧️','Hujan'],67:['🌧️','Hujan lebat'],80:['🌧️','Hujan ringan'],81:['🌧️','Hujan'],82:['🌧️','Hujan sangat lebat'],95:['⛈️','Badai petir'],96:['⛈️','Badai petir'],99:['⛈️','Badai petir']};
+  if(code!=null&&table[code])return table[code];
+  // weathercode tidak tersedia (mis. sebagian gagal dimuat) -- tebak kasar dari probabilitas saja.
+  if(probability==null)return ['❔','Belum tersedia'];
+  return probability>=60?['🌧️','Kemungkinan hujan']:probability>=30?['⛅','Kemungkinan berawan']:['☀️','Kemungkinan cerah'];
+ }
+ // Peta sebaran sederhana (proyeksi lon/lat linear, BUKAN peta geografis presisi seperti tab
+ // "Peta & penduduk") -- cukup untuk gambaran relatif posisi 28 outlet + kondisi cuaca hari
+ // ini, tanpa menambah ketergantungan Leaflet baru di kartu Dashboard ini.
+ function weatherMapSvg(rows){
+  const pts=rows.map(r=>{const o=window.OUTLET_DATA?.outlets?.find(x=>x.id===r.id);return o?{...r,lat:o.lat,lon:o.lon}:null;}).filter(Boolean);
+  if(!pts.length)return '';
+  const lons=pts.map(p=>p.lon),lats=pts.map(p=>p.lat);
+  const padFrac=.12,lonSpan=Math.max(.01,Math.max(...lons)-Math.min(...lons)),latSpan=Math.max(.01,Math.max(...lats)-Math.min(...lats));
+  const minLon=Math.min(...lons)-lonSpan*padFrac,maxLon=Math.max(...lons)+lonSpan*padFrac,minLat=Math.min(...lats)-latSpan*padFrac,maxLat=Math.max(...lats)+latSpan*padFrac;
+  const w=Math.min(900,Math.max(340,(window.innerWidth||1120)-120)),h=Math.round(w*.62);
+  const x=lon=>((lon-minLon)/(maxLon-minLon))*w,y=lat=>h-((lat-minLat)/(maxLat-minLat))*h;
+  const svg=pts.map(p=>{
+   const [icon]=weatherIcon(p.code,p.today);
+   const px=x(p.lon),py=y(p.lat),bad=p.today!=null&&p.today>=60;
+   return `<g>
+    <circle cx="${px}" cy="${py}" r="5" fill="${bad?'#c0392b':'#2e8b57'}" stroke="#fff" stroke-width="1.3"><title>${esc(p.name)}: ${esc(weatherIcon(p.code,p.today)[1])}, ${p.today==null?'data belum tersedia':p.today+'%'}</title></circle>
+    <text x="${px}" y="${py-10}" text-anchor="middle" font-size="13">${icon}</text>
+    <text x="${px}" y="${py+18}" text-anchor="middle" font-size="9" fill="#44586b">${p.today==null?'—':p.today+'%'}</text>
+   </g>`;
+  }).join('');
+  return `<div class="pcs-chart weather-map"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Peta sebaran cuaca 28 outlet hari ini">${svg}</svg></div><p class="fp-caption">Posisi relatif (bukan peta geografis presisi) · lingkaran merah = kemungkinan hujan ≥60%. Arahkan/sentuh titik untuk nama outlet.</p>`;
+ }
  async function weatherHighlights(outletId){
   const sales=window.PcsPanels.data().sales;if(!sales)return '<p class="workspace-note">Data outlet belum termuat.</p>';
   const list=outletIds(outletId,sales);if(!list.length)return '<p class="workspace-note">Pilih outlet untuk lihat cuaca.</p>';
   const t=today(),tomorrow=window.ForecastPlanner.shift(t,1);
   let map;try{map=await window.WeatherForecast.getNetwork(list,t,tomorrow);}catch{return '<p class="workspace-note">Layanan cuaca belum dapat dihubungi.</p>'+SOURCE_NOTE;}
   const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
-  const byArea={1:[],2:[],3:[]};
+  const byArea={1:[],2:[],3:[]},mapRows=[];
   for(const [id,w] of map){
-   const area=window.OutletResearchNotes?.area(id);if(!area)continue;
    const d0=w.error?null:w.days.find(d=>d.date===t),d1=w.error?null:w.days.find(d=>d.date===tomorrow);
+   mapRows.push({id,name:name(id),today:d0?.probability??null,code:d0?.weatherCode??null});
+   const area=window.OutletResearchNotes?.area(id);if(!area)continue;
    byArea[area].push({id,today:d0?.probability??null,tomorrow:d1?.probability??null});
   }
   const sections=[1,2,3].map(n=>{
@@ -347,7 +379,7 @@ window.ForecastDashboard=(()=>{
    const summary=maxP<0?'Data belum tersedia':maxP>=60?`${risky.length} outlet berisiko hujan (tertinggi ${maxP}%)`:`Aman · tertinggi ${maxP}%`;
    return `<details class="weather-area"><summary><b>${esc(window.OutletResearchNotes.areaName(n))}</b><span class="${maxP>=60?'fp-warning':'fp-ok'}">${esc(summary)}</span></summary><div class="upcoming-line-list">${rows.sort((a,b)=>Math.max(b.today??-1,b.tomorrow??-1)-Math.max(a.today??-1,a.tomorrow??-1)).map(r=>`<div class="upcoming-line"><b>${esc(name(r.id))}</b><span>Hari ini ${r.today==null?'—':r.today+'%'} · Besok ${r.tomorrow==null?'—':r.tomorrow+'%'}</span></div>`).join('')}</div></details>`;
   });
-  return sections.join('')+SOURCE_NOTE;
+  return weatherMapSvg(mapRows)+sections.join('')+SOURCE_NOTE;
  }
 
  function eventsSoon(outletId){
