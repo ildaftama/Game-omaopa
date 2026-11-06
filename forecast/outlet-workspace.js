@@ -59,7 +59,7 @@ $('#workspace-content').addEventListener('focusin',e=>{window.PcsPanels.inspect(
 function touchInspect(e){
  const t=e.touches?.[0];if(!t)return;
  const el=document.elementFromPoint(t.clientX,t.clientY);if(!el)return;
- const fake={target:el};window.PcsPanels.inspect(fake);window.ForecastDashboard.inspect(fake);
+ const fake={target:el,clientX:t.clientX,clientY:t.clientY};window.PcsPanels.inspect(fake);window.ForecastDashboard.inspect(fake);
 }
 $('#workspace-content').addEventListener('touchstart',touchInspect,{passive:true});
 $('#workspace-content').addEventListener('touchmove',touchInspect,{passive:true});

@@ -222,7 +222,7 @@ window.ForecastDashboard=(()=>{
   rows.forEach((r,i)=>{for(const[key,color,,label,secondary]of drawOrder)if(r[key]!=null)svg+=`<circle cx="${x(i)}" cy="${y(r[key])}" r="${secondary?1.7:2.2}" fill="${color}" opacity="${secondary?.85:.9}" stroke="#fff" stroke-width="1"/><circle cx="${x(i)}" cy="${y(r[key])}" r="8" fill="transparent" tabindex="0" data-fd-point="${esc(label+' · '+longDate(r.date))}" data-fd-value="${Math.round(r[key])}"/>`;});
   const step=Math.max(1,Math.ceil(n/14));rows.forEach((r,i)=>{if(i%step!==0&&i!==n-1)return;svg+=`<text x="${x(i)}" y="${h-10}" text-anchor="middle" font-size="10">${dayLabel(r.date)}${r.date.endsWith('-01')?' '+months[Number(r.date.slice(5,7))-1].slice(0,3):''}</text>`;});
   const legend=active.map(([key,color,dash,label])=>`<label class="${hidden.has(key)?'off':'on'}"><input type="checkbox" data-fd-toggle="${key}" ${hidden.has(key)?'':'checked'}><i class="${dash?'dashed':''}" style="border-color:${color}"></i>${esc(label)}</label>`).join('');
-  return `<div class="pcs-chart"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik tren omzet real vs prediksi vs rencana tim">${svg}</svg></div><div class="fd-legend">${legend}</div><div class="pcs-chart-readout" aria-live="polite">Arahkan ke titik untuk lihat nominal. Klik label untuk sembunyikan/tampilkan.</div>`;
+  return `<div class="pcs-chart fd-chart-wrap"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Grafik tren omzet real vs prediksi vs rencana tim">${svg}</svg><div class="fd-tooltip" hidden></div></div><div class="fd-legend">${legend}</div><div class="pcs-chart-readout" aria-live="polite">Arahkan atau sentuh titik untuk lihat nominal langsung di grafik. Klik label untuk sembunyikan/tampilkan.</div>`;
  }
  function change(e){
   const cb=e.target.closest?.('[data-fd-toggle]');
@@ -356,21 +356,30 @@ window.ForecastDashboard=(()=>{
   return `<div class="upcoming-line-list">${events.slice(0,8).map(e=>`<div class="upcoming-line"><b>${esc(e.title)}</b><span>${esc(e.start)}${e.venue?' · '+esc(e.venue):''}</span></div>`).join('')}</div>`;
  }
 
+ // render() dipanggil berkali-kali berdekatan untuk outlet yang SAMA (mis. batch fulfillment
+ // di atas, atau event lain yang tidak benar-benar mengubah data) -- comparisons di sini
+ // memanggil compare() per rencana (bisa puluhan-ratusan seiring waktu), jadi hasilnya
+ // di-cache per (outletId, jumlah records, hari ini) dan dipakai ulang kalau belum berubah.
+ let opSummaryCache=null;
  function operationalSummary(outletId){
   const panels=window.PcsPanels.data(),planner=window.ForecastPlanner,cloud=window.ForecastPlanCloud,math=window.PcsMath;
+  const cacheKey=outletId+'|'+(cloud?.records?.length||0)+'|'+today();
+  if(opSummaryCache?.key===cacheKey)return opSummaryCache.html;
   const list=outletIds(outletId,panels.sales),yesterday=planner.shift(today(),-1);
   let sold=0,retail=0,orders=0;for(const p of [0,1,2,3]){const r=math.estimatedPartition(panels.sales,panels.orders,list,p,[yesterday])[0];sold+=r.total.value||0;retail+=r.retail.value||0;orders+=r.orders.value||0;}
   const from=planner.shift(today(),-56);
   const comparisons=(cloud?.records||[]).filter(r=>(outletId==='__all__'||r.outlet===outletId)&&r.date>=from&&r.date<=today()).map(r=>planner.compare(r,panels.sales,panels.orders));
   const valid=comparisons.filter(c=>c.eligible&&c.complete),actual=valid.reduce((s,c)=>s+c.actual,0),wapeA=valid.length&&actual?valid.reduce((s,c)=>s+c.absolute,0)/actual*100:null;
   const validShipped=valid.filter(c=>c.hasShipped),actualShipped=validShipped.reduce((s,c)=>s+c.actual,0),wapeB=validShipped.length&&actualShipped?validShipped.reduce((s,c)=>s+c.absoluteShipped,0)/actualShipped*100:null;
-  return `<div class="fp-metrics">
+  const html=`<div class="fp-metrics">
    <article><span>Penjualan kemarin (4 SKU inti)</span><strong>${num(sold)} <small>PCS</small></strong></article>
    <article><span>Penjualan murni</span><strong>${num(retail)} <small>PCS</small></strong></article>
-   <article><span>Pesanan</span><strong>${num(orders)} <small>PCS</small></strong></article>
+   <article><span>Pesanan (4 SKU inti)</span><strong>${num(orders)} <small>PCS</small></strong><small>Malmil &amp; Ogura saja</small></article>
    <article><span>Akurasi A · forecaster murni</span><strong>${pct(wapeA)}</strong><small>${valid.length} rencana, 56 hari</small></article>
    <article><span>Akurasi B · dengan faktor produksi</span><strong>${pct(wapeB)}</strong><small>${validShipped.length} rencana punya data kirim</small></article>
   </div>`;
+  opSummaryCache={key:cacheKey,html};
+  return html;
  }
 
  // Cuaca di-fetch SEKALI per outlet+tanggal, bukan setiap render — render() dipanggil ulang
@@ -400,6 +409,22 @@ window.ForecastDashboard=(()=>{
    ${operationalSummary(outletId)}
    ${badges(outletId)}`;
  }
- function inspect(e){const p=e.target.closest('[data-fd-point]');if(!p)return;const box=p.closest('.pcs-main-chart')?.querySelector('.pcs-chart-readout');if(box)box.textContent=p.dataset.fdPoint+': '+money(Number(p.dataset.fdValue));}
+ // Tooltip melayang DI TITIK yang disentuh/di-hover, bukan cuma teks tetap di bawah grafik --
+ // posisinya dari koordinat layar event (clientX/clientY, bukan koordinat SVG internal yang
+ // perlu konversi skala) relatif terhadap pembungkus .fd-chart-wrap. Readout di bawah grafik
+ // tetap diisi juga (dibiarkan untuk pembaca layar/aria-live, dan sebagai fallback kalau
+ // tooltip terpotong di tepi layar).
+ function inspect(e){
+  const p=e.target.closest('[data-fd-point]');if(!p)return;
+  const wrap=p.closest('.fd-chart-wrap');if(!wrap)return;
+  const box=p.closest('.pcs-main-chart')?.querySelector('.pcs-chart-readout');
+  const text=p.dataset.fdPoint+': '+money(Number(p.dataset.fdValue));
+  if(box)box.textContent=text;
+  const tip=wrap.querySelector('.fd-tooltip');if(!tip)return;
+  const rect=wrap.getBoundingClientRect(),cx=(e.clientX??0)-rect.left,cy=(e.clientY??0)-rect.top;
+  tip.textContent=text;tip.hidden=false;
+  tip.style.left=Math.max(6,Math.min(rect.width-6,cx))+'px';
+  tip.style.top=Math.max(0,cy-14)+'px';
+ }
  return {render,inspect,change};
 })();
