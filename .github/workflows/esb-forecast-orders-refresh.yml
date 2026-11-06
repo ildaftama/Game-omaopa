@@ -1,10 +1,16 @@
-name: Sinkronisasi pesanan sheet (tiap jam, jam kerja)
+name: Sinkronisasi pesanan & penjualan (tiap jam, jam kerja)
 on:
   schedule:
-    # 01.00-14.00 UTC = 08.00-21.00 WIB, setiap jam -- supaya pesanan yang baru dicatat tim di
-    # sheet PESANAN siang/sore hari H-1 sudah ikut ter-autofill saat forecaster bikin rencana
-    # malam itu juga, bukan menunggu sinkronisasi penuh jam 21.02 WIB.
-    - cron: '0 1-14 * * *'
+    # 01.00-15.00 UTC = 08.00-22.00 WIB, setiap jam. Dua tujuan:
+    # 1) Pesanan yang baru dicatat tim di sheet PESANAN siang/sore hari H-1 sudah ikut
+    #    ter-autofill saat forecaster bikin rencana malam itu juga, bukan menunggu
+    #    sinkronisasi penuh jam 21.02 WIB.
+    # 2) Omzet real (penjualan ESB) ditarik ULANG tiap jam untuk jendela 7 hari TERAKHIR
+    #    YANG SUDAH SELESAI (bukan hari ini -- lihat guard ALLOW_TODAY di pcs-sales.mjs,
+    #    sengaja TIDAK diset di sini) -- supaya kalau laporan ESB gagal/kepotong sebagian
+    #    saat sinkronisasi malam, ada banyak kesempatan sepanjang hari untuk menarik ulang &
+    #    memperbaiki, bukan cuma 2x percobaan jam 21.02-21.07 lalu macet sampai besok malam.
+    - cron: '0 1-15 * * *'
   workflow_dispatch: {}
 permissions:
   contents: read
@@ -16,9 +22,9 @@ concurrency:
   group: forecast-reference-sync
   cancel-in-progress: false
 jobs:
-  sync-orders:
+  sync-orders-and-sales:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +35,7 @@ jobs:
           python-version: '3.12'
       - name: Baca link sumber yang disimpan tim
         run: node integration/pcs-source.mjs
-      - name: Siapkan pcs-sales.json dari bundle live (tidak diubah -- hanya pesanan yang disegarkan di sini)
+      - name: Siapkan pcs-sales.json dari bundle live (basis merge, bukan snapshot repo)
         env:
           FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
           FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
@@ -37,6 +43,18 @@ jobs:
         run: node integration/pack-forecast-reference.mjs prime
       - name: Tarik pesanan terbaru dari sheet
         run: python integration/pcs_orders.py
+      - name: Tarik ulang penjualan ESB 7 hari terakhir yang sudah selesai (bukan hari ini)
+        env:
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+        # Tanpa DATE_FROM/DATE_TO/ALLOW_TODAY -- pcs-sales.mjs otomatis memakai jendela
+        # default (7 hari sampai KEMARIN) dan menolak menarik hari ini (lihat baris guard
+        # "Hanya tanggal yang sudah selesai boleh ditarik" di pcs-sales.mjs). mergeSales
+        # MENGGABUNG, bukan menimpa -- jadi aman dipanggil berkali-kali sepanjang hari.
+        # Gagal di sini TIDAK menggagalkan langkah pesanan di atas (sudah tersimpan ke
+        # pcs-orders.json) -- kalau penjualan gagal, bundle tetap dipaketkan dari pcs-sales.json
+        # hasil "prime" (live, tidak berkurang), coba lagi jam berikutnya.
+        run: node integration/pcs-sales.mjs || echo "::warning::Penarikan ulang penjualan jam ini belum berhasil sepenuhnya; dicoba lagi jam berikutnya."
       - name: Paketkan & simpan ke bundle referensi privat (bukan file publik)
         env:
           FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
