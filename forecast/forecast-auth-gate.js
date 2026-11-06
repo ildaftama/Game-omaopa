@@ -7,7 +7,7 @@ const auth=getAuth(app),db=getFirestore(app),gate=document.getElementById('forec
 let loaded=false,loading=null,generation=0,roleStop=null;
 const privateRef=key=>doc(db,'forecastPlans',key);
 const briefRef=key=>doc(db,'forecastBriefs',key);
-const globals=['OUTLET_DATA','INSIGHT_DATA','POPULATION_DATA','TRAFFIC_BASELINE_DATA','RADAR_GOOGLE_MAPS_KEY','ANALYSIS_DATA','OUTLET_INTELLIGENCE','FORECAST_EVALUATION','FORECAST_REALIZED_PRICES','PERFORMANCE_SUMMARY','WASTE_ESB_SUMMARY','REVENUE_VALIDATION','REVENUE_TREND_2026','REVENUE_TREND_2025','DATA_SOURCES','ORDERS_SUMMARY','NETWORK_PRODUCTS','FORECAST_HISTORY','FORECAST_HISTORY_REVENUE','DAILY_RECAP_SUMMARY'];
+const globals=['OUTLET_DATA','INSIGHT_DATA','POPULATION_DATA','TRAFFIC_BASELINE_DATA','RADAR_GOOGLE_MAPS_KEY','ANALYSIS_DATA','OUTLET_INTELLIGENCE','FORECAST_EVALUATION','FORECAST_REALIZED_PRICES','PERFORMANCE_SUMMARY','WASTE_ESB_SUMMARY','REVENUE_VALIDATION','REVENUE_TREND_2026','REVENUE_TREND_2025','DATA_SOURCES','ORDERS_SUMMARY','NETWORK_PRODUCTS','FORECAST_HISTORY','FORECAST_HISTORY_REVENUE','DAILY_RECAP_SUMMARY','CUSTOMER_DEMOGRAPHICS'];
 async function unpack(p){
  if(p.schemaVersion!==2||!Array.isArray(p.chunks)||!p.chunks.length||p.chunks.length>10||p.chunks.some(s=>typeof s!=='string'||s.length>700000)||!/^\w{64}$/.test(p.sha256))throw Error('package');
  const bytes=Uint8Array.from(atob(p.chunks.join('')),c=>c.charCodeAt(0)),raw=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();

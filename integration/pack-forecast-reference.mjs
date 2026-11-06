@@ -3,6 +3,7 @@ import zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { pull as pullDailyRecap } from './waste-recap.mjs';
+import { buildDemographics } from './customer-demographics.mjs';
 
 // Nightly ESB -> private reference bundle sync (feature: otomasi ESB malam hari).
 //
@@ -131,13 +132,21 @@ async function fetchDailyRecap(profiles) {
     return await pullDailyRecap(sheetId, profiles);
   } catch (e) { console.log('Rekap harian (waste/lost sales) belum berhasil ditarik: ' + e.message); return null; }
 }
+// Demografi member (database "users") per outlet -- kegagalan (misalnya rule belum/ belum
+// sempat di-publish) TIDAK boleh menggagalkan sinkronisasi ESB utama, sama seperti rekap
+// harian: dibungkus try/catch dan jatuh ke nilai lama di bundle kalau ada.
+async function fetchDemographics(env, fallback) {
+  try { return await buildDemographics(env); }
+  catch (e) { console.log('Demografi member belum berhasil ditarik: ' + e.message); return fallback || null; }
+}
 export async function run(env = process.env, salesPath = 'forecast/pcs-sales.json', ordersPath = 'forecast/pcs-orders.json') {
   const { idToken, uid } = await signIn(env);
   const current = await fetchBundle('forecastPlans/reference_current', idToken);
   if (!current) throw Error('Belum ada bundle referensi yang tersimpan — jalankan import manual (manager) terlebih dahulu sekali.');
   const sales = JSON.parse(fs.readFileSync(salesPath, 'utf8')), orders = JSON.parse(fs.readFileSync(ordersPath, 'utf8'));
   const dailyRecap = await fetchDailyRecap(current.globals?.OUTLET_INTELLIGENCE) || current.globals?.DAILY_RECAP_SUMMARY || null;
-  const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders } };
+  const demographics = await fetchDemographics(env, current.globals?.CUSTOMER_DEMOGRAPHICS);
+  const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}), ...(demographics ? { CUSTOMER_DEMOGRAPHICS: demographics } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders } };
   const packedFull = packBundle(full);
   await writeBundle('forecastPlans', 'reference', 'reference-manifest', 'reference-chunk', packedFull, idToken, uid);
   console.log('Bundle referensi penuh tersimpan: ' + packedFull.chunks.length + ' chunk.');

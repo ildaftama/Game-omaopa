@@ -358,9 +358,20 @@ window.ForecastDashboard=(()=>{
   const actual=valid.reduce((s,c)=>s+c.actual,0);
   return {wape:valid.length&&actual?valid.reduce((s,c)=>s+c.absolute,0)/actual*100:null,n:valid.length};
  }
- // Popup LENGKAP (cuaca + akurasi/waste/lost sales + produk unggulan + SWOT ringkas) --
- // owner minta semuanya tetap di popup, TIDAK berpindah halaman (sebelumnya ada tombol ke
- // Ringkasan outlet, dihapus atas permintaan: mengganggu alur, cukup di sini saja).
+ // Demografi member per outlet (sumber: collection Firestore "users", diagregasi read-only
+ // di integration/customer-demographics.mjs -- tidak pernah ada data pribadi individu di sini,
+ // cuma hitungan). null kalau bundle belum punya CUSTOMER_DEMOGRAPHICS (sync belum jalan sejak
+ // rule /users dipublish) atau outlet ini tidak punya member yang homeOutlet-nya ter-map.
+ function demographicsFor(id){
+  const d=window.CUSTOMER_DEMOGRAPHICS?.perOutlet?.[id];
+  if(!d||!d.total)return null;
+  const topAge=Object.entries(d.byAge||{}).filter(([,n])=>n>0).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const l=d.byGender?.L||0,p=d.byGender?.P||0,gTotal=l+p;
+  return {total:d.total,topAge,pctL:gTotal?Math.round(l/gTotal*100):null,pctP:gTotal?Math.round(p/gTotal*100):null};
+ }
+ // Popup LENGKAP (cuaca + akurasi/waste/lost sales + produk unggulan + demografi + SWOT
+ // ringkas) -- owner minta semuanya tetap di popup, TIDAK berpindah halaman (sebelumnya ada
+ // tombol ke Ringkasan outlet, dihapus atas permintaan: mengganggu alur, cukup di sini saja).
  function popupHtml(r){
   const [icon,label]=weatherIcon(r.code,r.today),[iconT,labelT]=weatherIcon(r.codeTomorrow,r.tomorrow);
   const temp=r.tempMax!=null&&r.tempMin!=null?`${Math.round(r.tempMin)}–${Math.round(r.tempMax)}°C`:'';
@@ -374,6 +385,7 @@ window.ForecastDashboard=(()=>{
    <div class="weather-popup-stats">${stat('Akurasi forecast',acc?.wape,null)}${stat('Waste',waste?.percent,WASTE_THRESHOLD)}${stat('Lost sales',lost?.percent,LOST_SALES_THRESHOLD)}</div>
    ${o?.products?.[0]?`<p class="weather-popup-line">🏆 Produk terlaris: <b>${esc(o.products[0].name)}</b>${o.products[0].salesShare!=null?` (${o.products[0].salesShare.toLocaleString('id-ID',{maximumFractionDigits:1})}%)`:''}</p>`:''}
    ${o?.customers?`<p class="weather-popup-line">👥 Pelanggan: ${esc(o.customers)}</p>`:''}
+   ${(()=>{const dm=demographicsFor(r.id);return dm?`<p class="weather-popup-line">👤 Member terdaftar: <b>${dm.total.toLocaleString('id-ID')}</b>${dm.topAge?` · dominan usia <b>${esc(dm.topAge)}</b>`:''}${dm.pctL!=null?` · ${dm.pctL}% L / ${dm.pctP}% P`:''}</p>`:'';})()}
    ${swot.length?`<div class="weather-popup-swot">${swot.map(([k,v])=>`<p><b>${k}:</b> ${esc(v)}</p>`).join('')}</div>`:''}
   </div>`;
  }
