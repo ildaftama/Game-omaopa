@@ -35,8 +35,9 @@ async function listAll(collection, idToken, pageSize = 300) {
   return all;
 }
 async function run() {
-  const { idToken } = await signIn(process.env);
-  console.log('Login sinkronisasi berhasil. Mengecek akses collection "users"...');
+  const { idToken, uid } = await signIn(process.env);
+  console.log('Login sinkronisasi berhasil. UID akun sinkronisasi: ' + uid);
+  console.log('Mengecek akses collection "users"...');
   const docs = await listAll('users', idToken);
   console.log(`\nTotal dokumen users: ${docs.length}`);
   const homeOutletCounts = new Map();
