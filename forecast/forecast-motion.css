@@ -1,0 +1,90 @@
+/* Lapisan interaksi & animasi bersama -- dimuat PALING TERAKHIR (lihat index.html) supaya
+   konsisten di seluruh app tanpa menduplikasi/menimpa warna atau layout tiap file CSS yang
+   sudah ada. Hanya menambah: transisi hover/press, animasi masuk saat render(), shimmer
+   loading, dan penghalusan kecil lain. Semua dimatikan total lewat prefers-reduced-motion
+   di bagian bawah file ini (lihat juga aturan serupa di styles.css baris 6). */
+:root{--fx-fast:140ms;--fx-med:220ms;--fx-slow:420ms;--fx-ease:cubic-bezier(.22,.8,.25,1)}
+
+.button,.tab,.text-button,.text-link,.outlet-item,.event-card,.feature-card,.workspace-card,
+.conclusion-card,.weather-card,.population-card,.weather-outlet-row,.weather-reset-btn,
+.pcs-outlet-menu>summary,.fd-legend label,input,select,textarea,.icon-button,.source-link,
+.weather-pin{
+ transition:background var(--fx-fast) var(--fx-ease),border-color var(--fx-fast) var(--fx-ease),
+  color var(--fx-fast) var(--fx-ease),box-shadow var(--fx-med) var(--fx-ease),
+  transform var(--fx-fast) var(--fx-ease),opacity var(--fx-med) var(--fx-ease)
+}
+
+/* Kartu: angkat halus + bayangan saat hover -- memberi kedalaman ke banyak grid kartu di app */
+.event-card:hover,.feature-card:hover,.workspace-card:hover,.conclusion-card:hover,
+.population-card:hover,.source-link:hover{
+ transform:translateY(-3px);box-shadow:0 10px 28px -14px rgba(20,30,20,.3)
+}
+.weather-outlet-row:hover,.outlet-item:hover{transform:translateX(2px)}
+
+/* Tombol: feedback tekan + tombol utama sedikit gradasi & terangkat saat hover */
+.button:active,.weather-reset-btn:active,.icon-button:active{transform:scale(.96)}
+.button.primary{background-image:linear-gradient(135deg,var(--green),#2e4a3a)}
+.button.primary:hover{box-shadow:0 6px 18px -6px rgba(57,87,69,.6);transform:translateY(-1px)}
+
+/* Tab aktif: garis bawah muncul dengan sapuan halus, bukan langsung patah */
+.tab{position:relative}
+.tab.active:after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:3px;
+ background:currentColor;border-radius:3px 3px 0 0;animation:fx-tab-in var(--fx-med) var(--fx-ease)}
+@keyframes fx-tab-in{from{transform:scaleX(0);opacity:0}to{transform:scaleX(1);opacity:1}}
+
+/* Animasi masuk untuk kartu/section yang baru dirender -- terpicu ulang setiap kali
+   render() mengganti innerHTML, pas untuk menandai "ini baru saja diperbarui". Sengaja
+   TIDAK mencakup baris daftar (.outlet-item dll) supaya mengetik di kolom cari tidak
+   memicu animasi berulang-ulang. */
+.workspace-card,.feature-card,.event-card,.conclusion-card,.weather-card,.detail,
+#workspace-content>*{animation:fx-rise var(--fx-slow) var(--fx-ease) both}
+@keyframes fx-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.events-grid>*:nth-child(1),.population-grid>*:nth-child(1){animation-delay:0ms}
+.events-grid>*:nth-child(2),.population-grid>*:nth-child(2){animation-delay:40ms}
+.events-grid>*:nth-child(3),.population-grid>*:nth-child(3){animation-delay:80ms}
+.events-grid>*:nth-child(4),.population-grid>*:nth-child(4){animation-delay:120ms}
+.events-grid>*:nth-child(5){animation-delay:160ms}
+.events-grid>*:nth-child(6){animation-delay:200ms}
+
+/* Shimmer loading -- opt-in lewat class="skeleton" di elemen yang sedang memuat */
+.skeleton{position:relative;overflow:hidden;background:var(--line,#e3e5da);border-radius:6px;color:transparent!important}
+.skeleton:after{content:'';position:absolute;inset:0;
+ background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);
+ animation:fx-shimmer 1.3s ease-in-out infinite}
+@keyframes fx-shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+/* Pin cuaca berisiko (hujan tinggi): denyut halus supaya menarik mata tanpa terkesan alarm */
+.weather-pin.risk{animation:fx-pin-pulse 2.1s ease-in-out infinite}
+@keyframes fx-pin-pulse{0%,100%{box-shadow:0 2px 6px #17283b40,0 0 0 0 rgba(192,57,43,.35)}
+ 50%{box-shadow:0 2px 6px #17283b40,0 0 0 7px rgba(192,57,43,0)}}
+
+/* Toast & dialog: slide/scale masuk alih-alih muncul instan */
+.toast:not([hidden]){animation:fx-toast-in var(--fx-med) var(--fx-ease)}
+@keyframes fx-toast-in{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+dialog[open]{animation:fx-dialog-in .24s var(--fx-ease)}
+dialog[open]::backdrop{animation:fx-backdrop-in .24s var(--fx-ease)}
+@keyframes fx-dialog-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes fx-backdrop-in{from{opacity:0}to{opacity:1}}
+
+/* Tooltip grafik: pop kecil supaya tidak terasa teleport ke posisi kursor */
+.fd-tooltip:not([hidden]){animation:fx-tooltip-in .14s var(--fx-ease)}
+@keyframes fx-tooltip-in{from{opacity:0;transform:translate(-50%,-94%) scale(.92)}to{opacity:1;transform:translate(-50%,-100%) scale(1)}}
+
+/* Scrollbar halus (webkit) untuk daftar yang sudah ada di app */
+.outlet-list::-webkit-scrollbar,.weather-outlet-list::-webkit-scrollbar,
+.pcs-outlet-options::-webkit-scrollbar,.weather-popup-swot::-webkit-scrollbar{width:7px}
+.outlet-list::-webkit-scrollbar-thumb,.weather-outlet-list::-webkit-scrollbar-thumb,
+.pcs-outlet-options::-webkit-scrollbar-thumb,.weather-popup-swot::-webkit-scrollbar-thumb{
+ background:#c9cfc0;border-radius:10px}
+.outlet-list::-webkit-scrollbar-thumb:hover,.weather-outlet-list::-webkit-scrollbar-thumb:hover{background:#b2b9a6}
+
+::selection{background:var(--green-light,#e9eee6);color:var(--ink,#292d27)}
+
+@media(prefers-reduced-motion:reduce){
+ .workspace-card,.feature-card,.event-card,.conclusion-card,.weather-card,.detail,#workspace-content>*,
+ .tab.active:after,.weather-pin.risk,.toast,.fd-tooltip,dialog[open],dialog[open]::backdrop,.skeleton:after{
+  animation:none!important}
+ .event-card:hover,.feature-card:hover,.workspace-card:hover,.conclusion-card:hover,.population-card:hover,
+ .source-link:hover,.button.primary:hover,.weather-outlet-row:hover,.outlet-item:hover{transform:none!important}
+}
