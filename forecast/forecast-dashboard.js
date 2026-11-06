@@ -339,28 +339,64 @@ window.ForecastDashboard=(()=>{
   if(probability==null)return ['❔','Belum tersedia'];
   return probability>=60?['🌧️','Kemungkinan hujan']:probability>=30?['⛅','Kemungkinan berawan']:['☀️','Kemungkinan cerah'];
  }
- // Peta sebaran sederhana (proyeksi lon/lat linear, BUKAN peta geografis presisi seperti tab
- // "Peta & penduduk") -- cukup untuk gambaran relatif posisi 28 outlet + kondisi cuaca hari
- // ini, tanpa menambah ketergantungan Leaflet baru di kartu Dashboard ini.
- function weatherMapSvg(rows){
-  const pts=rows.map(r=>{const o=window.OUTLET_DATA?.outlets?.find(x=>x.id===r.id);return o?{...r,lat:o.lat,lon:o.lon}:null;}).filter(Boolean);
-  if(!pts.length)return '';
-  const lons=pts.map(p=>p.lon),lats=pts.map(p=>p.lat);
-  const padFrac=.12,lonSpan=Math.max(.01,Math.max(...lons)-Math.min(...lons)),latSpan=Math.max(.01,Math.max(...lats)-Math.min(...lats));
-  const minLon=Math.min(...lons)-lonSpan*padFrac,maxLon=Math.max(...lons)+lonSpan*padFrac,minLat=Math.min(...lats)-latSpan*padFrac,maxLat=Math.max(...lats)+latSpan*padFrac;
-  const w=Math.min(900,Math.max(340,(window.innerWidth||1120)-120)),h=Math.round(w*.62);
-  const x=lon=>((lon-minLon)/(maxLon-minLon))*w,y=lat=>h-((lat-minLat)/(maxLat-minLat))*h;
-  const svg=pts.map(p=>{
-   const [icon]=weatherIcon(p.code,p.today);
-   const px=x(p.lon),py=y(p.lat),bad=p.today!=null&&p.today>=60;
-   return `<g>
-    <circle cx="${px}" cy="${py}" r="5" fill="${bad?'#c0392b':'#2e8b57'}" stroke="#fff" stroke-width="1.3"><title>${esc(p.name)}: ${esc(weatherIcon(p.code,p.today)[1])}, ${p.today==null?'data belum tersedia':p.today+'%'}</title></circle>
-    <text x="${px}" y="${py-10}" text-anchor="middle" font-size="13">${icon}</text>
-    <text x="${px}" y="${py+18}" text-anchor="middle" font-size="9" fill="#44586b">${p.today==null?'—':p.today+'%'}</text>
-   </g>`;
-  }).join('');
-  return `<div class="pcs-chart weather-map"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Peta sebaran cuaca 28 outlet hari ini">${svg}</svg></div><p class="fp-caption">Posisi relatif (bukan peta geografis presisi) · lingkaran merah = kemungkinan hujan ≥60%. Arahkan/sentuh titik untuk nama outlet.</p>`;
+ // Peta Leaflet SUNGGUHAN (sama library & tile OpenStreetMap yang dipakai tab "Peta &
+ // penduduk" di app.js) -- bukan SVG sebaran sederhana lagi. Instance peta ini MANDIRI, tidak
+ // berbagi apa pun dengan peta demografi (container id beda, tidak saling sentuh) supaya tidak
+ // berisiko merusak fitur KMZ/population yang sudah ada.
+ function weatherMapSection(rows){
+  if(!rows.length)return '';
+  return `<div class="weather-map-layout"><div id="weather-leaflet-map" class="weather-leaflet" role="img" aria-label="Peta interaktif cuaca 28 outlet"></div><div class="weather-outlet-list">${rows.slice().sort((a,b)=>(b.today??-1)-(a.today??-1)).map(r=>{const [icon]=weatherIcon(r.code,r.today);return `<button type="button" class="weather-outlet-row ${r.today!=null&&r.today>=60?'risk':''}" data-weather-focus="${esc(r.id)}"><span class="weather-outlet-icon">${icon}</span><span class="weather-outlet-name">${esc(r.name)}</span><span class="weather-outlet-pct">${r.today==null?'—':r.today+'%'}</span></button>`;}).join('')}</div></div><p class="fp-caption">Klik titik di peta atau baris di daftar untuk detail per outlet · lingkaran merah = kemungkinan hujan ≥60% hari ini.</p>`;
  }
+ let leafletMap=null,leafletMarkers=new Map(),leafletContainerEl=null,leafletFitted=false;
+ function popupHtml(r){
+  const [icon,label]=weatherIcon(r.code,r.today),[iconT,labelT]=weatherIcon(r.codeTomorrow,r.tomorrow);
+  const temp=r.tempMax!=null&&r.tempMin!=null?`${Math.round(r.tempMin)}–${Math.round(r.tempMax)}°C`:'';
+  return `<div class="weather-popup"><b>${esc(r.name)}</b><div class="weather-popup-row"><span>${icon}</span><div><b>Hari ini</b><br>${esc(label)} · ${r.today==null?'data belum tersedia':r.today+'%'}${temp?' · '+temp:''}</div></div><div class="weather-popup-row"><span>${iconT}</span><div><b>Besok</b><br>${esc(labelT)} · ${r.tomorrow==null?'data belum tersedia':r.tomorrow+'%'}</div></div></div>`;
+ }
+ // mount() dipanggil SETIAP render (lihat outlet-workspace.js) -- idempoten: kalau container
+ // DOM masih elemen yang SAMA (render ulang untuk outlet yang sama / re-render lain yang tidak
+ // mengganti kartu cuaca), peta & marker yang sudah ada dipakai ulang (cuma disinkronkan), tidak
+ // dibuat ulang dari nol (hemat, dan tidak mereset posisi/zoom yang sedang dilihat user). Kalau
+ // containernya ELEMEN BARU (innerHTML diganti total), instance lama (sudah yatim, terlepas
+ // dari DOM) dibuang dan peta baru dibuat.
+ function mountWeatherMap(){
+  const el=document.getElementById('weather-leaflet-map');
+  if(!el||typeof L==='undefined')return;
+  if(leafletContainerEl!==el){
+   if(leafletMap){try{leafletMap.remove();}catch{}}
+   leafletContainerEl=el;leafletFitted=false;leafletMarkers=new Map();
+   leafletMap=L.map(el,{scrollWheelZoom:false,zoomControl:true});
+   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(leafletMap);
+  }
+  const rows=lastWeatherRows,seen=new Set();
+  for(const r of rows){
+   const o=window.OUTLET_DATA?.outlets?.find(x=>x.id===r.id);if(!o)continue;
+   seen.add(r.id);
+   const [icon]=weatherIcon(r.code,r.today),risk=r.today!=null&&r.today>=60;
+   const html=`<div class="weather-pin ${risk?'risk':''}"><span>${icon}</span><small>${r.today==null?'—':r.today+'%'}</small></div>`;
+   const icon2=L.divIcon({className:'',html,iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-38]});
+   const existing=leafletMarkers.get(r.id);
+   if(existing){existing.setIcon(icon2);existing.setPopupContent(popupHtml(r));}
+   else{const m=L.marker([o.lat,o.lon],{icon:icon2,title:r.name}).addTo(leafletMap).bindPopup(popupHtml(r));leafletMarkers.set(r.id,m);}
+  }
+  for(const [id,m] of [...leafletMarkers])if(!seen.has(id)){leafletMap.removeLayer(m);leafletMarkers.delete(id);}
+  if(!leafletFitted&&leafletMarkers.size){
+   leafletFitted=true;
+   if(leafletMarkers.size===1){const only=[...leafletMarkers.values()][0];leafletMap.setView(only.getLatLng(),14);}
+   else leafletMap.fitBounds(L.latLngBounds([...leafletMarkers.values()].map(m=>m.getLatLng())),{padding:[28,28]});
+  }
+  setTimeout(()=>leafletMap?.invalidateSize(),60);
+  const list=document.querySelector('.weather-outlet-list');
+  if(list&&!list.dataset.wired){
+   list.dataset.wired='1';
+   list.addEventListener('click',e=>{
+    const row=e.target.closest('[data-weather-focus]');if(!row)return;
+    const m=leafletMarkers.get(row.dataset.weatherFocus);if(!m||!leafletMap)return;
+    leafletMap.flyTo(m.getLatLng(),14,{duration:.65});m.openPopup();
+   });
+  }
+ }
+ let lastWeatherRows=[];
  async function weatherHighlights(outletId){
   const sales=window.PcsPanels.data().sales;if(!sales)return '<p class="workspace-note">Data outlet belum termuat.</p>';
   const list=outletIds(outletId,sales);if(!list.length)return '<p class="workspace-note">Pilih outlet untuk lihat cuaca.</p>';
@@ -370,16 +406,17 @@ window.ForecastDashboard=(()=>{
   const byArea={1:[],2:[],3:[]},mapRows=[];
   for(const [id,w] of map){
    const d0=w.error?null:w.days.find(d=>d.date===t),d1=w.error?null:w.days.find(d=>d.date===tomorrow);
-   mapRows.push({id,name:name(id),today:d0?.probability??null,code:d0?.weatherCode??null});
+   mapRows.push({id,name:name(id),today:d0?.probability??null,code:d0?.weatherCode??null,tomorrow:d1?.probability??null,codeTomorrow:d1?.weatherCode??null,tempMax:d0?.tempMax??null,tempMin:d0?.tempMin??null});
    const area=window.OutletResearchNotes?.area(id);if(!area)continue;
    byArea[area].push({id,today:d0?.probability??null,tomorrow:d1?.probability??null});
   }
+  lastWeatherRows=mapRows;
   const sections=[1,2,3].map(n=>{
    const rows=byArea[n],maxP=Math.max(-1,...rows.flatMap(r=>[r.today,r.tomorrow]).filter(v=>v!=null)),risky=rows.filter(r=>(r.today!=null&&r.today>=60)||(r.tomorrow!=null&&r.tomorrow>=60));
    const summary=maxP<0?'Data belum tersedia':maxP>=60?`${risky.length} outlet berisiko hujan (tertinggi ${maxP}%)`:`Aman · tertinggi ${maxP}%`;
    return `<details class="weather-area"><summary><b>${esc(window.OutletResearchNotes.areaName(n))}</b><span class="${maxP>=60?'fp-warning':'fp-ok'}">${esc(summary)}</span></summary><div class="upcoming-line-list">${rows.sort((a,b)=>Math.max(b.today??-1,b.tomorrow??-1)-Math.max(a.today??-1,a.tomorrow??-1)).map(r=>`<div class="upcoming-line"><b>${esc(name(r.id))}</b><span>Hari ini ${r.today==null?'—':r.today+'%'} · Besok ${r.tomorrow==null?'—':r.tomorrow+'%'}</span></div>`).join('')}</div></details>`;
   });
-  return weatherMapSvg(mapRows)+sections.join('')+SOURCE_NOTE;
+  return weatherMapSection(mapRows)+sections.join('')+SOURCE_NOTE;
  }
 
  function eventsSoon(outletId){
@@ -434,13 +471,14 @@ window.ForecastDashboard=(()=>{
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
    <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast">Buat forecast →</button><span>Histori rencana & akurasi tim (buat pembelajaran) ada di tab Forecast → Monitoring.</span></div>
    <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3></div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${uplift?`<p class="workspace-note">${uplift}</p>`:''}</article>
+   <article class="workspace-card weather-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
    <div class="product-comparison">
-    <article class="workspace-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
    </div>
    ${operationalSummary(outletId)}
    ${badges(outletId)}`;
  }
+ function mount(){mountWeatherMap();}
  // Tooltip melayang DI TITIK yang disentuh/di-hover, bukan cuma teks tetap di bawah grafik --
  // posisinya dari koordinat layar event (clientX/clientY, bukan koordinat SVG internal yang
  // perlu konversi skala) relatif terhadap pembungkus .fd-chart-wrap. Readout di bawah grafik
@@ -458,5 +496,5 @@ window.ForecastDashboard=(()=>{
   tip.style.left=Math.max(6,Math.min(rect.width-6,cx))+'px';
   tip.style.top=Math.max(0,cy-14)+'px';
  }
- return {render,inspect,change};
+ return {render,inspect,change,mount};
 })();
