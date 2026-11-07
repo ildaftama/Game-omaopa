@@ -64,29 +64,47 @@ jobs:
           # ~21.07 WIB) -- data yang sudah berhasil di percobaan pertama tetap tersimpan
           # (mergeSales menggabung, tidak menimpa), cuma outlet yang gagal yang diulang lagi.
           DAY=$(node -e "console.log(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date()))")
+          WIB_HOUR=$(node -e "console.log(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jakarta',hour:'2-digit',hour12:false}).format(new Date()))")
           FROM="${{ github.event.inputs.backfill_from }}"
           TO="${{ github.event.inputs.backfill_to }}"
-          if [ -z "$FROM" ]; then FROM="$DAY"; TO="$DAY"; fi
-          echo "Tanggal ditarik: $FROM sampai $TO"
-          for attempt in 1 2; do
-            set +e
-            DATE_FROM="$FROM" DATE_TO="$TO" node integration/pcs-sales.mjs
-            result=$?
-            set -e
-            if [ "$result" -eq 0 ]; then
-              echo "Semua outlet lengkap pada percobaan ke-$attempt."
-              break
-            elif [ "$result" -eq 2 ]; then
-              if [ "$attempt" -eq 1 ]; then
-                echo "::warning::Sebagian laporan belum terbaca pada percobaan pertama. Coba lagi dalam 5 menit."
-                sleep 300
-              else
-                echo "::warning::Sebagian laporan masih belum terbaca setelah percobaan kedua. Snapshot sebelumnya dipertahankan untuk outlet tersebut."
-              fi
+          # GitHub Actions cron BISA tertunda jauh dari jadwal (pernah lebih dari 6 jam) --
+          # kalau run ini ternyata baru benar-benar jalan dini hari (bukan ~21.02 WIB seperti
+          # seharusnya), "$DAY" dari new Date() sudah berganti ke HARI BARU yang BARU MULAI
+          # (belum ada transaksi sama sekali). Menariknya dengan ALLOW_TODAY di jam seperti itu
+          # akan salah menandai hari itu "terverifikasi kosong & selesai" (lihat verifiedZero di
+          # pcs-sales.mjs) -- padahal cuma belum mulai. Pengaman: HANYA tarik hari berjalan kalau
+          # run ini benar-benar terjadi jam 20.00-23.59 WIB (dekat jadwal asli 21.02 WIB).
+          if [ -z "$FROM" ]; then
+            if [ "$WIB_HOUR" -ge 20 ]; then
+              FROM="$DAY"; TO="$DAY"
             else
-              exit "$result"
+              echo "::warning::Run ini jalan jam ${WIB_HOUR}:xx WIB, jauh dari jadwal 21.02 WIB (kemungkinan tertunda GitHub Actions sampai lewat tengah malam). Melewati tarikan hari berjalan supaya tidak salah menandai hari yang baru mulai sebagai 'selesai & kosong'. Hari ini akan tertarik lewat sinkronisasi tiap jam di siang hari atau sinkronisasi malam berikutnya."
             fi
-          done
+          fi
+          if [ -z "$FROM" ]; then
+            echo "Tidak ada tanggal yang ditarik pada run ini (lihat peringatan di atas)."
+          else
+            echo "Tanggal ditarik: $FROM sampai $TO"
+            for attempt in 1 2; do
+              set +e
+              DATE_FROM="$FROM" DATE_TO="$TO" node integration/pcs-sales.mjs
+              result=$?
+              set -e
+              if [ "$result" -eq 0 ]; then
+                echo "Semua outlet lengkap pada percobaan ke-$attempt."
+                break
+              elif [ "$result" -eq 2 ]; then
+                if [ "$attempt" -eq 1 ]; then
+                  echo "::warning::Sebagian laporan belum terbaca pada percobaan pertama. Coba lagi dalam 5 menit."
+                  sleep 300
+                else
+                  echo "::warning::Sebagian laporan masih belum terbaca setelah percobaan kedua. Snapshot sebelumnya dipertahankan untuk outlet tersebut."
+                fi
+              else
+                exit "$result"
+              fi
+            done
+          fi
       - name: Paketkan & simpan ke bundle referensi privat (bukan file publik)
         env:
           FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}

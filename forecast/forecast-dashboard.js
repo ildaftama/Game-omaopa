@@ -75,9 +75,11 @@ window.ForecastDashboard=(()=>{
   const cacheKey=panels.sales.days.length+'|'+today();
   if(trendExtremesCache?.key===cacheKey)return trendExtremesCache.value;
   const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
+  const todayStr=today();
   const byOutlet=new Map();
   for(const row of panels.sales.days){
-   if(!row.complete)continue;
+   // "Hari ini" dikecualikan sama seperti di revenueTrend() -- lihat komentar di sana.
+   if(!row.complete||row.date>=todayStr)continue;
    let sum=0;for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)sum+=(row.qty[p]||0)*v;}
    (byOutlet.get(row.id)||(byOutlet.set(row.id,[]),byOutlet.get(row.id))).push({date:row.date,value:sum});
   }
@@ -162,7 +164,16 @@ window.ForecastDashboard=(()=>{
   // sama sekali (expected>known) di-skala proporsional supaya outlet yang laporannya belum
   // sempat ditarik tidak membuat omzet hari itu kelihatan lebih kecil dari yang sebenarnya.
   const actualAt=date=>{const e=byDate.get(date);return e&&e.known>0?e.sum*(expected/e.known):null;};
-  const totalSeries=[...byDate.entries()].filter(([,e])=>e.known>0).map(([date,e])=>({date,value:e.sum*(expected/e.known)})).sort((a,b)=>a.date.localeCompare(b.date));
+  // "Hari ini" TIDAK PERNAH dianggap hari yang sudah final untuk lastActual/tren, APAPUN isi
+  // field complete-nya -- sinkronisasi malam (ALLOW_TODAY) sesekali bisa tertunda GitHub
+  // Actions sampai lewat tengah malam dan salah menandai hari yang baru mulai sebagai
+  // "terverifikasi kosong & selesai" (lihat pengaman WIB_HOUR di esb-forecast-refresh.yml).
+  // Menyaring "hari ini" di sini jadi lapis kedua supaya lastActual/trendNow tidak pernah
+  // ketipu oleh kejadian seperti itu, apapun penyebabnya. actualAt()/grafik di atas TIDAK
+  // disaring di sini -- itu tetap menampilkan apa adanya data yang ada (akan otomatis benar
+  // begitu sinkronisasi berikutnya menimpa angka yang salah).
+  const todayStr=today();
+  const totalSeries=[...byDate.entries()].filter(([date,e])=>e.known>0&&date<todayStr).map(([date,e])=>({date,value:e.sum*(expected/e.known)})).sort((a,b)=>a.date.localeCompare(b.date));
   const lastActual=totalSeries.at(-1)?.date||null;
   const trendNow=trendFromSeries(totalSeries,planner);
 
