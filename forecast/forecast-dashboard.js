@@ -92,19 +92,28 @@ window.ForecastDashboard=(()=>{
    const t=trendFromSeries(series,planner);
    if(t)results.push({id,name:name(id),...t});
   }
-  const value=results.length?{top:results.reduce((a,b)=>b.pct>a.pct?b:a),bottom:results.reduce((a,b)=>b.pct<a.pct?b:a)}:null;
+  const value=results.length?{all:results.slice().sort((a,b)=>b.pct-a.pct)}:null;
   trendExtremesCache={key:cacheKey,value};
   return value;
  }
- // Kartu peringatan di puncak Dashboard -- hanya muncul kalau ada outlet yang BENAR-BENAR
- // bergeser tajam (≥15%), supaya tidak jadi noise di hari yang wajar naik-turun kecil.
+ function trendRowHtml(r){
+  const sign=r.pct>=0?'+':'';
+  return `<div class="fd-trend-row fd-trend-${r.dir}"><span>${esc(r.name)}</span><b>${sign}${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%</b></div>`;
+ }
+ // Kartu peringatan di puncak Dashboard. Disorot (kartu besar, dengan saran) hanya outlet yang
+ // BENAR-BENAR bergeser tajam (≥15%, maksimal 5 outlet tiap arah) supaya tidak jadi noise --
+ // tapi SEMUA outlet (naik/turun/stabil) tetap bisa dilihat lewat "Lihat tren semua outlet".
  function trendWatchCard(){
   const ext=networkTrendExtremes();if(!ext)return '';
-  const flags=[];
-  if(ext.top.pct>=15)flags.push(`<div class="fd-trend-flag fd-trend-up"><b>🔺 ${esc(ext.top.name)}</b><span>Naik tajam +${ext.top.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dari 7 hari sebelumnya — siapkan stok lebih, jangan sampai kehabisan saat ramai.</span></div>`);
-  if(ext.bottom.pct<=-15)flags.push(`<div class="fd-trend-flag fd-trend-down"><b>🔻 ${esc(ext.bottom.name)}</b><span>Turun tajam ${ext.bottom.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dari 7 hari sebelumnya — kurangi kiriman supaya waste terkontrol.</span></div>`);
+  const risers=ext.all.filter(r=>r.pct>=15).sort((a,b)=>b.pct-a.pct).slice(0,5);
+  const fallers=ext.all.filter(r=>r.pct<=-15).sort((a,b)=>a.pct-b.pct).slice(0,5);
+  const flags=[
+   ...risers.map(r=>`<div class="fd-trend-flag fd-trend-up"><b>🔺 ${esc(r.name)}</b><span>Naik tajam +${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dari 7 hari sebelumnya — siapkan stok lebih, jangan sampai kehabisan saat ramai.</span></div>`),
+   ...fallers.map(r=>`<div class="fd-trend-flag fd-trend-down"><b>🔻 ${esc(r.name)}</b><span>Turun tajam ${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dari 7 hari sebelumnya — kurangi kiriman supaya waste terkontrol.</span></div>`),
+  ];
   if(!flags.length)return '';
-  return `<article class="workspace-card fd-trend-watch"><span class="micro-label">OUTLET PERLU PERHATIAN · TREN 7 HARI TERAKHIR</span>${flags.join('')}</article>`;
+  const full=`<details class="fd-trend-full"><summary>Lihat tren semua outlet (${ext.all.length})</summary><div class="fd-trend-rows">${ext.all.map(trendRowHtml).join('')}</div></details>`;
+  return `<article class="workspace-card fd-trend-watch"><span class="micro-label">OUTLET PERLU PERHATIAN · TREN 7 HARI TERAKHIR</span>${flags.join('')}${full}</article>`;
  }
  // Mesin forecast generik -- dipakai terpisah untuk deret "omzet tanpa pesanan" dan deret
  // "omzet pesanan" (lihat revenueTrend) supaya tiap komponen punya baseline/tren/pola sendiri;
