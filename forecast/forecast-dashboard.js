@@ -44,50 +44,45 @@ window.ForecastDashboard=(()=>{
  }
  function shiftYearDate(date,deltaYears){const [y,m,d]=date.split('-').map(Number);return `${y+deltaYears}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
  const TREND_LABEL={'sharp-up':['🔺🔺','Naik tajam'],up:['🔺','Naik'],flat:['➖','Stabil'],down:['🔻','Turun'],'sharp-down':['🔻🔻','Turun tajam']};
- // Tren naik/turun dari data REAL (bukan prediksi), dicocokkan per HARI YANG SAMA (Senin
- // dibanding Senin, Sabtu dibanding Sabtu, dst) -- bukan sekadar "7 hari terakhir vs 7 hari
- // sebelumnya" mentah, supaya lonjakan akhir pekan yang memang wajar/berulang TIDAK dibaca
- // sebagai "tren naik" (owner's concern: weekend bias). Untuk tiap hari di 7 hari terakhir,
- // dicari pembanding hari-sama 7 hari sebelumnya; kalau datanya bolong (riwayat ESB kadang
- // ada lubang), dicoba 14 lalu 21 hari sebelumnya -- tetap hari-yang-sama, cuma minggu
- // pembandingnya mundur sedikit. Hasil akhirnya median dari rasio per-pasangan (bukan median
- // nilai mentah) -- lebih tahan outlier satu hari aneh. "series" harus sudah terurut naik.
- function weekdayMatchedTrend(series,planner){
-  if(series.length<4)return null;
-  const valueByDate=new Map(series.map(r=>[r.date,r.value])),lastDate=series.at(-1).date;
-  const pairs=[];
-  for(let o=0;o<7;o++){
-   const d=planner.shift(lastDate,-o),v=valueByDate.get(d);if(v==null)continue;
-   let prior=null;
-   for(const back of [7,14,21]){const pv=valueByDate.get(planner.shift(d,-back));if(pv!=null){prior=pv;break;}}
-   if(prior==null)continue;
-   pairs.push({delta:v-prior,ratio:prior>0?(v-prior)/prior*100:null});
-  }
-  const withRatio=pairs.filter(x=>x.ratio!=null);
-  if(withRatio.length<4)return null;
-  const pct=planner.quantile(withRatio.map(x=>x.ratio),.5),deltaMed=planner.quantile(pairs.map(x=>x.delta),.5);
+ // Tren naik/turun dari data REAL (bukan prediksi): median minggu ini (7 titik data terakhir)
+ // dibanding median minggu lalu (7 titik sebelum itu). Dulu sempat dicoba pencocokan per
+ // hari-yang-sama (Senin vs Senin dst), tapi itu malah lebih rancu -- kalau satu minggu
+ // bolong harus mundur ke 2-3 minggu lalu, hasilnya beda-beda tiap hari dan susah dijelaskan.
+ // Dengan jendela 7-hari-penuh, Sabtu/Minggu akhir pekan sudah otomatis ikut terhitung DI
+ // KEDUA sisi (minggu ini maupun minggu lalu) karena satu jendela 7 hari selalu memuat satu
+ // dari tiap hari -- jadi pola akhir pekan yang memang rutin tidak condong ke salah satu sisi.
+ // "series" harus sudah terurut naik; dipakai POSISI (7 titik TERAKHIR, bukan 7 hari kalender
+ // mundur) supaya tahan lubang riwayat tanpa jadi rancu.
+ function weekTrend(series,planner){
+  if(series.length<8)return null;
+  const recentPts=series.slice(-7),priorPts=series.slice(-14,-7);
+  if(recentPts.length<4||priorPts.length<4)return null;
+  const recentMed=planner.quantile(recentPts.map(r=>r.value),.5),priorMed=planner.quantile(priorPts.map(r=>r.value),.5);
+  if(!(priorMed>0))return null;
+  const pct=(recentMed-priorMed)/priorMed*100;
   const dir=pct>=20?'sharp-up':pct>=8?'up':pct<=-20?'sharp-down':pct<=-8?'down':'flat';
-  return {pct,dir,deltaMed,asOf:lastDate,pairs:withRatio.length};
+  return {pct,dir,deltaMed:recentMed-priorMed,asOf:recentPts.at(-1).date};
  }
- // Produk yang paling banyak menyumbang kenaikan/penurunan (berdasarkan median selisih
- // RUPIAH per pasangan hari-sama, bukan persen -- supaya produk kecil yang kebetulan
- // persentasenya besar tidak mengalahkan produk besar yang sebetulnya lebih berdampak).
+ // Produk yang paling banyak menyumbang kenaikan/penurunan (selisih RUPIAH minggu-ke-minggu,
+ // bukan persen -- produk kecil yang persentasenya kebetulan besar tidak mengalahkan produk
+ // besar yang sebetulnya lebih berdampak).
  function productDriver(series,direction,planner){
   const byP=new Map();
   for(const pt of series){if(!pt.perProduct)continue;for(let p=0;p<PRODUCT_COUNT;p++){const v=pt.perProduct[p];if(!v)continue;(byP.get(p)||(byP.set(p,[]),byP.get(p))).push({date:pt.date,value:v});}}
   let best=null;
   for(const [p,s] of byP){
-   const t=weekdayMatchedTrend(s,planner);if(!t)continue;
+   const t=weekTrend(s,planner);if(!t)continue;
    if(direction==='up'&&!(t.pct>0))continue;
    if(direction==='down'&&!(t.pct<0))continue;
    if(!best||Math.abs(t.deltaMed)>Math.abs(best.deltaMed))best={p,...t};
   }
   return best;
  }
+ // Bahasa singkat, bukan gaya laporan -- cuma nama produk + arah, tanpa persen/rupiah dobel
+ // dengan baris utamanya.
  function driverCaption(driver){
   if(!driver)return '';
-  const sign=driver.pct>=0?'+':'';
-  return ` Didorong terutama oleh <b>${esc(productLabel(driver.p))}</b> (${sign}${driver.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%, ${sign}${money(Math.round(Math.abs(driver.deltaMed)))}/hari).`;
+  return `, terutama ${esc(productLabel(driver.p))}`;
  }
  function trendBadgeHtml(t){
   if(!t)return '';
@@ -151,7 +146,7 @@ window.ForecastDashboard=(()=>{
   const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
   const results=[];
   for(const [id,series] of ds.byOutlet){
-   const t=weekdayMatchedTrend(series,planner);if(!t)continue;
+   const t=weekTrend(series,planner);if(!t)continue;
    const driver=t.pct>0?productDriver(series,'up',planner):t.pct<0?productDriver(series,'down',planner):null;
    results.push({id,name:name(id),...t,driver});
   }
@@ -161,7 +156,7 @@ window.ForecastDashboard=(()=>{
  }
  // Tren waste & lost sales HARIAN per outlet (sumber sama dengan kartu waste/lost sales yang
  // sudah ada -- DAILY_RECAP_SUMMARY, dari sheet rekap tim), metodologi sama persis
- // (weekdayMatchedTrend) supaya konsisten dengan tren omzet. Waste/lost sales NAIK = buruk
+ // (weekTrend) supaya konsisten dengan tren omzet. Waste/lost sales NAIK = buruk
  // (beda semantik dari omzet naik = bagus), jadi hanya arah "naik tajam" yang diberi
  // peringatan di sini.
  let wasteLostTrendCache=null;
@@ -180,7 +175,7 @@ window.ForecastDashboard=(()=>{
     }
    }
    const results=[];
-   for(const [id,s] of byOutlet){s.sort((a,b)=>a.date.localeCompare(b.date));const t=weekdayMatchedTrend(s,planner);if(t)results.push({id,name:name(id),...t});}
+   for(const [id,s] of byOutlet){s.sort((a,b)=>a.date.localeCompare(b.date));const t=weekTrend(s,planner);if(t)results.push({id,name:name(id),...t});}
    return results.sort((a,b)=>b.pct-a.pct);
   }
   const value={waste:build(recap.waste),lost:build(recap.lostSalesMinutes)};
@@ -201,18 +196,18 @@ window.ForecastDashboard=(()=>{
   if(ext){
    const risers=ext.all.filter(r=>r.pct>=15).sort((a,b)=>b.pct-a.pct).slice(0,5);
    const fallers=ext.all.filter(r=>r.pct<=-15).sort((a,b)=>a.pct-b.pct).slice(0,5);
-   flags.push(...risers.map(r=>`<div class="fd-trend-flag fd-trend-up"><b>🔺 ${esc(r.name)}</b><span>Omzet naik tajam +${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dibanding hari yang sama minggu sebelumnya (tanpa pesanan) — siapkan stok lebih, jangan sampai kehabisan saat ramai.${driverCaption(r.driver)}</span></div>`));
-   flags.push(...fallers.map(r=>`<div class="fd-trend-flag fd-trend-down"><b>🔻 ${esc(r.name)}</b><span>Omzet turun tajam ${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dibanding hari yang sama minggu sebelumnya (tanpa pesanan) — kurangi kiriman supaya waste terkontrol.${driverCaption(r.driver)}</span></div>`));
+   flags.push(...risers.map(r=>`<div class="fd-trend-flag fd-trend-up"><b>🔺 ${esc(r.name)}</b><span>Omzet naik ${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% minggu ini${driverCaption(r.driver)}. Siapkan stok lebih.</span></div>`));
+   flags.push(...fallers.map(r=>`<div class="fd-trend-flag fd-trend-down"><b>🔻 ${esc(r.name)}</b><span>Omzet turun ${Math.abs(r.pct).toLocaleString('id-ID',{maximumFractionDigits:0})}% minggu ini${driverCaption(r.driver)}. Kurangi kiriman.</span></div>`));
   }
   if(wl){
    const wasteUp=wl.waste.filter(r=>r.pct>=20).sort((a,b)=>b.pct-a.pct).slice(0,3);
    const lostUp=wl.lost.filter(r=>r.pct>=20).sort((a,b)=>b.pct-a.pct).slice(0,3);
-   flags.push(...wasteUp.map(r=>`<div class="fd-trend-flag fd-trend-down"><b>🗑️ ${esc(r.name)}</b><span>Waste naik tajam +${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dibanding hari yang sama minggu sebelumnya — kemungkinan kiriman kelebihan, periksa jumlahnya.</span></div>`));
-   flags.push(...lostUp.map(r=>`<div class="fd-trend-flag fd-trend-down"><b>⏳ ${esc(r.name)}</b><span>Lost sales naik tajam +${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% dibanding hari yang sama minggu sebelumnya — kemungkinan sering kehabisan stok, pertimbangkan tambah kiriman.</span></div>`));
+   flags.push(...wasteUp.map(r=>`<div class="fd-trend-flag fd-trend-down"><b>🗑️ ${esc(r.name)}</b><span>Waste naik ${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% minggu ini. Cek jumlah kiriman.</span></div>`));
+   flags.push(...lostUp.map(r=>`<div class="fd-trend-flag fd-trend-down"><b>⏳ ${esc(r.name)}</b><span>Lost sales naik ${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% minggu ini. Kemungkinan sering kehabisan.</span></div>`));
   }
   if(!flags.length)return '';
   const full=ext?`<details class="fd-trend-full"><summary>Lihat tren omzet semua outlet (${ext.all.length})</summary><div class="fd-trend-rows">${ext.all.map(trendRowHtml).join('')}</div></details>`:'';
-  return `<article class="workspace-card fd-trend-watch"><span class="micro-label">OUTLET PERLU PERHATIAN · DIBANDING HARI SAMA MINGGU SEBELUMNYA, TANPA PESANAN</span>${flags.join('')}${full}</article>`;
+  return `<article class="workspace-card fd-trend-watch"><span class="micro-label">OUTLET PERLU PERHATIAN · MINGGU INI vs MINGGU LALU, TANPA PESANAN</span>${flags.join('')}${full}</article>`;
  }
  // Mesin forecast generik -- dipakai terpisah untuk deret "omzet tanpa pesanan" dan deret
  // "omzet pesanan" (lihat revenueTrend) supaya tiap komponen punya baseline/tren/pola sendiri;
@@ -290,7 +285,7 @@ window.ForecastDashboard=(()=>{
   // dan dicocokkan per hari-yang-sama -- bukan totalSeries mentah di atas -- supaya pesanan
   // masuk atau lonjakan akhir pekan yang wajar tidak terbaca sebagai "tren naik/turun".
   const organicSeries=aggregateOrganicSeries(list);
-  const trendNow=weekdayMatchedTrend(organicSeries,planner);
+  const trendNow=weekTrend(organicSeries,planner);
   const trendDriver=trendNow?(trendNow.pct>0?productDriver(organicSeries,'up',planner):trendNow.pct<0?productDriver(organicSeries,'down',planner):null):null;
 
   // Pisahkan omzet pesanan dari omzet reguler. PESANAN_PRODUCTS = 4 SKU inti (Ogura/Malmil,
@@ -770,7 +765,7 @@ window.ForecastDashboard=(()=>{
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
    <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast">Buat forecast →</button><span>Histori rencana & akurasi tim (buat pembelajaran) ada di tab Forecast → Monitoring.</span></div>
    ${outletId==='__all__'?trendWatchCard():''}
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${trend.trendNow?`<p class="workspace-note">Tren dibanding hari yang sama minggu sebelumnya (omzet real, tanpa pesanan, bukan prediksi) — per ${dateLabelShort(trend.trendNow.asOf)}.${driverCaption(trend.trendDriver)}</p>`:''}${uplift?`<p class="workspace-note">${uplift}</p>`:''}</article>
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${trend.trendNow?`<p class="workspace-note">Tren minggu ini vs minggu lalu, omzet real tanpa pesanan — per ${dateLabelShort(trend.trendNow.asOf)}${driverCaption(trend.trendDriver)}.</p>`:''}${uplift?`<p class="workspace-note">${uplift}</p>`:''}</article>
    <article class="workspace-card weather-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
