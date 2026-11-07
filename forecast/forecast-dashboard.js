@@ -87,7 +87,7 @@ window.ForecastDashboard=(()=>{
  function driverCaption(driver){
   if(!driver)return '';
   const sign=driver.pct>=0?'+':'';
-  return ` Didorong terutama oleh <b>${esc(productLabel(driver.p))}</b> (${sign}${driver.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%, ${money(Math.round(driver.deltaMed))}/hari).`;
+  return ` Didorong terutama oleh <b>${esc(productLabel(driver.p))}</b> (${sign}${driver.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%, ${sign}${money(Math.round(Math.abs(driver.deltaMed)))}/hari).`;
  }
  function trendBadgeHtml(t){
   if(!t)return '';
