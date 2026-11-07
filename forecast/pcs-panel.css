@@ -65,17 +65,18 @@
 .fd-trend-badge.fd-trend-down,.fd-trend-badge.fd-trend-sharp-down{color:#a4302a;background:#fdeceb}
 .fd-trend-badge.fd-trend-flat{color:#637483;background:#f0f3f6}
 .fd-trend-watch{display:flex;flex-direction:column;gap:12px;margin-bottom:22px;background:#fffaf0;border-color:#f0dfb8}
-.fd-trend-flag{display:flex;flex-direction:column;gap:4px;padding:13px 16px;border-radius:9px;background:#fff}
+.fd-trend-flag{display:flex;flex-direction:column;gap:4px;padding:13px 16px;border-radius:9px;background:#fff;border:0;width:100%;text-align:left;font:inherit;cursor:pointer}
 .fd-trend-flag b{font-size:13px}
 .fd-trend-flag span{font-size:12px;color:#536b7d;line-height:1.5}
 .fd-trend-flag.fd-trend-up{border-left:4px solid #2b7a5d;background:#eef8f3}
 .fd-trend-flag.fd-trend-up b{color:#1f6b45}
 .fd-trend-flag.fd-trend-down{border-left:4px solid #b54848;background:#fdf2f1}
 .fd-trend-flag.fd-trend-down b{color:#a4302a}
+.fd-trend-flag:hover{filter:brightness(.97)}
 .fd-trend-full{margin-top:2px}
 .fd-trend-full summary{cursor:pointer;font-size:12px;color:#536b7d;font-weight:600;padding:4px 0;list-style:revert}
 .fd-trend-rows{display:flex;flex-direction:column;gap:3px;max-height:300px;overflow-y:auto;margin-top:8px;padding-right:4px}
-.fd-trend-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 11px;border-radius:7px;font-size:12px;background:#f7f8f3}
+.fd-trend-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 11px;border-radius:7px;font-size:12px;background:#f7f8f3;border:0;width:100%;text-align:left;font:inherit;cursor:pointer}
 .fd-trend-row span{color:#2b3f4f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fd-trend-row b{font-weight:700;flex-shrink:0}
 .fd-trend-row.fd-trend-up b,.fd-trend-row.fd-trend-sharp-up b{color:#1f6b45}
@@ -83,4 +84,17 @@
 .fd-trend-row.fd-trend-down b,.fd-trend-row.fd-trend-sharp-down b{color:#a4302a}
 .fd-trend-row.fd-trend-down,.fd-trend-row.fd-trend-sharp-down{background:#fdf2f1}
 .fd-trend-row.fd-trend-flat b{color:#637483}
-@media(max-width:550px){.fd-shortcut{padding:12px 14px;gap:10px}.fd-trend-badge{font-size:10px;padding:4px 9px}.fd-trend-flag{padding:11px 13px}.fd-trend-rows{max-height:240px}}
+.fd-trend-row:hover,.fd-trend-flag:hover{filter:brightness(.96)}
+/* Dialog rincian outlet -- muncul saat klik nama outlet di kartu tren */
+.fd-outlet-dialog{width:min(640px,calc(100% - 28px))}
+.fd-outlet-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--line,#e3e5da)}
+.fd-outlet-section:first-of-type{margin-top:16px;padding-top:0;border-top:0}
+.fd-outlet-section h3{font-size:14px;margin:0 0 6px}
+.fd-outlet-table-wrap{overflow-x:auto;margin-top:8px}
+.fd-outlet-table{width:100%;border-collapse:collapse;font-size:12px}
+.fd-outlet-table th{text-align:left;font-size:10px;font-weight:600;color:#6c7f90;padding:6px 8px;white-space:nowrap;border-bottom:1px solid #e5eaee}
+.fd-outlet-table td{padding:7px 8px;border-bottom:1px solid #f0f3f6;white-space:nowrap}
+.fd-outlet-table td:first-child{white-space:normal;min-width:110px}
+.fd-outlet-new{color:#8a97a3;font-style:italic;font-weight:400}
+.fd-outlet-note{font-size:11px;color:#8a97a3;margin:8px 0 0}
+@media(max-width:550px){.fd-shortcut{padding:12px 14px;gap:10px}.fd-trend-badge{font-size:10px;padding:4px 9px}.fd-trend-flag{padding:11px 13px}.fd-trend-rows{max-height:240px}.fd-outlet-table{font-size:11px}}
