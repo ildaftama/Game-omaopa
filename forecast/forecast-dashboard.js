@@ -47,18 +47,21 @@ window.ForecastDashboard=(()=>{
  // Ambang: ±8% = "naik/turun", ±20% = "tajam" -- cukup longgar untuk hari biasa yang wajar
  // naik-turun, tapi menangkap pergeseran nyata yang layak disiapkan/dikurangi kirimannya.
  const TREND_LABEL={'sharp-up':['🔺🔺','Naik tajam'],up:['🔺','Naik'],flat:['➖','Stabil'],down:['🔻','Turun'],'sharp-down':['🔻🔻','Turun tajam']};
+ // "series" HARUS sudah terurut naik berdasarkan tanggal. Sengaja pakai 7/14 titik data
+ // TERAKHIR yang benar-benar ada (bukan 7/14 hari kalender mundur dari tanggal terakhir) --
+ // riwayat ESB kadang punya lubang beberapa hari (laporan belum pernah ditarik untuk tanggal
+ // itu), dan kalau lubangnya pas jatuh di jendela "7 hari sebelumnya", cara hitung berbasis
+ // kalender gagal total (prior jadi kosong) walau datanya sebenarnya cukup kalau dilihat
+ // sedikit lebih jauh ke belakang.
  function trendFromSeries(series,planner){
-  if(!series.length)return null;
-  const lastDate=series.at(-1).date,valueByDate=new Map(series.map(r=>[r.date,r.value]));
-  const recent=[],prior=[];
-  for(let o=0;o<7;o++){const v=valueByDate.get(planner.shift(lastDate,-o));if(v!=null)recent.push(v);}
-  for(let o=7;o<14;o++){const v=valueByDate.get(planner.shift(lastDate,-o));if(v!=null)prior.push(v);}
-  if(recent.length<4||prior.length<4)return null;
-  const recentMed=planner.quantile(recent,.5),priorMed=planner.quantile(prior,.5);
+  if(series.length<8)return null;
+  const recentPts=series.slice(-7),priorPts=series.slice(-14,-7);
+  if(recentPts.length<4||priorPts.length<4)return null;
+  const recentMed=planner.quantile(recentPts.map(r=>r.value),.5),priorMed=planner.quantile(priorPts.map(r=>r.value),.5);
   if(!(priorMed>0))return null;
   const pct=(recentMed-priorMed)/priorMed*100;
   const dir=pct>=20?'sharp-up':pct>=8?'up':pct<=-20?'sharp-down':pct<=-8?'down':'flat';
-  return {pct,dir,recentMed,priorMed,asOf:lastDate};
+  return {pct,dir,recentMed,priorMed,asOf:recentPts.at(-1).date};
  }
  function trendBadgeHtml(t){
   if(!t)return '';
