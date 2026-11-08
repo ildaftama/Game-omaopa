@@ -43,6 +43,13 @@ window.ForecastDashboard=(()=>{
   return p in PRICE_REFS?PRICE_REFS[p]:null;
  }
  function shiftYearDate(date,deltaYears){const [y,m,d]=date.split('-').map(Number);return `${y+deltaYears}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+ // Koreksi owner (2026-11-09) di atas HASIL mesin prediksi -- metodenya sendiri sengaja TIDAK
+ // diubah. Prediksi November konsisten di bawah omzet real (1-8 Nov), owner minta dinaikkan
+ // 8-10% (dipakai 9%, tengahnya) dan Desember ~5%. Bulan yang tidak tercantum = tanpa koreksi.
+ const FORECAST_MONTH_UPLIFT={'2026-11':1.09,'2026-12':1.05};
+ const monthUplift=date=>FORECAST_MONTH_UPLIFT[date.slice(0,7)]||1;
+ const upliftLabel=ym=>{const f=FORECAST_MONTH_UPLIFT[ym];return f&&f!==1?`${f>1?'+':''}${Math.round((f-1)*100)}%`:'';};
+ const moneyBig=n=>n==null?'—':n>=1e9?'Rp'+(n/1e9).toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})+' M':n>=1e6?'Rp'+(n/1e6).toLocaleString('id-ID',{maximumFractionDigits:1})+' jt':money(n);
  const TREND_LABEL={'sharp-up':['🔺🔺','Naik tajam'],up:['🔺','Naik'],flat:['➖','Stabil'],down:['🔻','Turun'],'sharp-down':['🔻🔻','Turun tajam']};
  // Tren naik/turun dari data REAL (bukan prediksi): median 3 hari terakhir dibanding median 3
  // hari sebelum itu. BUG yang ketemu di versi 7-hari sebelumnya: supaya tahan lubang riwayat,
@@ -148,14 +155,16 @@ window.ForecastDashboard=(()=>{
   for(const row of panels.sales.days){
    // "Hari ini" dikecualikan sama seperti di revenueTrend() -- lihat komentar di sana.
    if(!row.complete||row.date>=todayStr)continue;
-   const o=ordersByKey.get(row.date+'|'+row.id),perProduct=new Array(PRODUCT_COUNT).fill(0);let total=0;
+   const o=ordersByKey.get(row.date+'|'+row.id),perProduct=new Array(PRODUCT_COUNT).fill(0);let total=0,gross=0;
    for(let p=0;p<PRODUCT_COUNT;p++){
     const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v==null)continue;
-    let qty=row.qty[p]||0;
+    let qty=row.qty[p]||0;gross+=qty*v;
     if(PESANAN_PRODUCTS_TREND.includes(p)&&o){const pq=o.qty?.[p];if(Number.isSafeInteger(pq)&&pq>=0)qty=Math.max(0,qty-pq);}
     const val=qty*v;perProduct[p]=val;total+=val;
    }
-   (byOutlet.get(row.id)||(byOutlet.set(row.id,[]),byOutlet.get(row.id))).push({date:row.date,value:total,perProduct});
+   // gross = omzet real TERMASUK pesanan -- penyebut waste % (sama seperti PERFORMA OUTLET:
+   // waste dibagi total penjualan), beda dari value (tanpa pesanan) yang dipakai untuk tren.
+   (byOutlet.get(row.id)||(byOutlet.set(row.id,[]),byOutlet.get(row.id))).push({date:row.date,value:total,gross,perProduct});
   }
   for(const s of byOutlet.values())s.sort((a,b)=>a.date.localeCompare(b.date));
   const value={byOutlet};
@@ -379,10 +388,19 @@ window.ForecastDashboard=(()=>{
    const text=t.fromZero?'Baru naik dari 0':trendPctText(t);
    return `<p class="workspace-note"><b class="${good?'fp-up':'fp-down'}">${text}</b> dibanding 3 hari sebelumnya${windowContext(t.recentDates,name)}.</p>`;
   };
+  // Ringkasan satu paragraf di puncak dialog -- gabungan tiga aspek (omzet, waste, lost sales)
+  // jadi satu kesimpulan, supaya yang buka tidak perlu menyimpulkan sendiri dari tiga tabel.
+  const st=wasteLostStats().list.find(r=>r.id===id);
+  const omzetSentence=omzetTrend?(omzetTrend.fromZero?'Omzet baru mulai naik dari nol.':omzetTrend.dir==='flat'?'Omzet 3 hari terakhir stabil.':`Omzet ${omzetTrend.pct>0?'naik':'turun'} ${pct1(Math.abs(omzetTrend.pct))} dibanding 3 hari sebelumnya${driverCaption(omzetTrend.pct>0?productDriver(aggregateOrganicSeries([id]),'up',planner):productDriver(aggregateOrganicSeries([id]),'down',planner))}.`):'';
+  const summary=[omzetSentence,st?.wastePct!=null?wasteSentence(st):'',st?.lostPct!=null?lostSentence(st):''].filter(Boolean).join(' ');
+  const advice=st?adviceText(st):'';
+  const chip=(k,v,bad)=>`<div class="fd-outlet-chip ${bad==null?'':bad?'bad':'good'}"><span>${k}</span><b>${v}</b></div>`;
+  const chips=`<div class="fd-outlet-chips">${chip('Omzet · 3 hari',omzetTrend?(omzetTrend.fromZero?'baru':trendPctText(omzetTrend)):'—',omzetTrend&&!omzetTrend.fromZero?omzetTrend.pct<-8:null)}${chip(`Waste · batas ${WASTE_THRESHOLD}%`,pct1(st?.wastePct??null),st?.wastePct!=null?st.wasteOver:null)}${chip('Kehabisan / hari',st?.lostPerDay!=null?Math.round(st.lostPerDay)+' mnt':'—',st?.lostPct!=null?st.lostOver:null)}</div>`;
   return `<dialog id="fd-outlet-dialog" class="fd-outlet-dialog" aria-labelledby="fd-outlet-title"><div class="dialog-head"><h2 id="fd-outlet-title">${esc(name)}</h2><button type="button" class="icon-button" data-outlet-detail-close aria-label="Tutup">×</button></div>
+   ${chips}${summary?`<p class="fd-outlet-summary">${summary}${advice?` <b>${advice}</b>`:''}</p>`:''}
    <div class="fd-outlet-section"><h3>Omzet per produk</h3>${trendLine(omzetTrend,true)}${productRows.length?`<div class="fd-outlet-table-wrap"><table class="fd-outlet-table"><thead><tr><th>Produk</th><th>3 hari terakhir</th><th>3 hari sebelumnya</th><th>Perubahan</th></tr></thead><tbody>${productRows.map(outletDetailRow).join('')}</tbody></table></div>`:'<p class="workspace-note">Belum ada penjualan tercatat.</p>'}</div>
    <div class="fd-outlet-section"><h3>Waste</h3>${trendLine(wasteTrend,false)}${wasteCoreRows.length?`<div class="fd-outlet-table-wrap"><table class="fd-outlet-table"><thead><tr><th>Produk inti</th><th>3 hari terakhir</th><th>3 hari sebelumnya</th><th>Perubahan</th></tr></thead><tbody>${wasteCoreRows.map(outletWasteRow).join('')}</tbody></table></div><p class="fd-outlet-note">Cuma 4 SKU inti -- sheet WASTE belum merinci produk lain.</p>`:'<p class="workspace-note">Belum ada data waste tercatat.</p>'}</div>
-   <div class="fd-outlet-section"><h3>Lost sales</h3>${trendLine(lostTrend,false)}<p class="fd-outlet-note">Level outlet saja -- sheet rekap belum merinci lost sales per produk.</p></div>
+   <div class="fd-outlet-section"><h3>Lost sales</h3>${st?.lostSrc==='sheet'?`<p class="workspace-note">Rata-rata kehabisan <b>${Math.round(st.lostPerDay)} menit sehari</b> dalam ${st.lostDays} hari terakhir yang tercatat.</p>`:''}${trendLine(lostTrend,false)}<p class="fd-outlet-note">Level outlet saja — sheet rekap belum merinci lost sales per produk.</p></div>
   </dialog>`;
  }
  // Mesin forecast generik -- dipakai terpisah untuk deret "omzet tanpa pesanan" dan deret
@@ -393,19 +411,7 @@ window.ForecastDashboard=(()=>{
   const lastDate=series.length?series[series.length-1].date:null;
   const baseWin=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-56)):[];
   const baselineLevel=baseWin.length?planner.quantile(baseWin.map(r=>r.value),.5):null;
-  // Jendela tren PREDIKSI (bukan badge -- itu TREND_WINDOW=3 hari terpisah, lihat weekTrend()).
-  // SEBELUMNYA 14 hari vs 14 hari sebelumnya -- owner melaporkan (2026-11-09) prediksi
-  // November konsisten DI BAWAH omzet real beberapa hari terakhir. Dicek: 5-8 Nov median
-  // naik ~27% (badge 3 hari, dan 23/28 outlet ikut naik -- jaringan luas, bukan 1-2 outlet
-  // "kebetulan"), tapi trendFactor 14-vs-14 hari cuma menangkap ~+2% karena 10 hari paling
-  // tenang (29 Okt - 4 Nov) di jendela "14 hari terakhir" ikut meredam median bersama 4 hari
-  // yang benar2 naik tajam -- jendela terlalu lebar untuk kecepatan pergerakan yang terjadi.
-  // Dipersempit ke 7-vs-7 hari (bukan ikut 3 hari seperti badge -- untuk PREDIKSI ke depan
-  // tetap perlu cukup titik data supaya mediannya tidak goyah oleh satu-dua hari aneh) supaya
-  // lebih cepat bereaksi tanpa jadi seliar badge. Tidak menghilangkan gap sepenuhnya untuk
-  // lonjakan setajam ini (itu memang disengaja -- lihat batas trendFactor di bawah, forecast
-  // tetap tidak boleh mengejar lonjakan 3-4 hari secara membabi buta), tapi mengurangi jeda.
-  const trendRecent=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-7)).map(r=>r.value):[],trendPrior=lastDate?series.filter(r=>r.date<planner.shift(lastDate,-7)&&r.date>=planner.shift(lastDate,-14)).map(r=>r.value):[];
+  const trendRecent=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-14)).map(r=>r.value):[],trendPrior=lastDate?series.filter(r=>r.date<planner.shift(lastDate,-14)&&r.date>=planner.shift(lastDate,-28)).map(r=>r.value):[];
   const trendA=planner.quantile(trendRecent,.5),trendB=planner.quantile(trendPrior,.5),trendFactor=trendA!==null&&trendB>0?Math.max(.85,Math.min(1.15,trendA/trendB)):1;
   const wideWin=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-180)):[],wideMedian=wideWin.length?planner.quantile(wideWin.map(r=>r.value),.5):baselineLevel;
   function weekdayShape(date){
@@ -519,10 +525,11 @@ window.ForecastDashboard=(()=>{
   }
 
   const pureEngine=buildEngine(pureSeries,planner),pesananEngine=buildEngine(pesananSeries,planner);
-  const forecastPureAt=date=>pureEngine.forecastAt(date);
+  const forecastPureAt=date=>{const v=pureEngine.forecastAt(date);return v==null?null:v*monthUplift(date);};
+  // Pesanan yang SUDAH tercatat di sheet tidak ikut dikoreksi -- itu angka pasti, bukan tebakan.
   function forecastPesananAt(date){
    if(lastActual&&date>lastActual){const known=knownPesananAt(date);if(known!=null)return known;}
-   return pesananEngine.forecastAt(date);
+   const v=pesananEngine.forecastAt(date);return v==null?null:v*monthUplift(date);
   }
   function forecastTotalAt(date){
    const r=forecastPureAt(date),p=forecastPesananAt(date);
@@ -648,101 +655,138 @@ window.ForecastDashboard=(()=>{
   const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
   return [...perOutlet.entries()].map(([id,o])=>({id,name:name(id),percent:o.shipped>0?o.waste/o.shipped*100:null})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent);
  }
- // Lost sales HARIAN dari sheet rekap tim (tab "Rekap Forecast <bulan>", kolom menit
- // kehabisan tiap outlet tiap tanggal) -- ditarik tiap malam oleh waste-recap.mjs, bukan
- // snapshot September lagi. Dirata-rata 7 hari terakhir, dikonversi ke % dengan rumus yang
- // sama dengan performance-summary.mjs (menit / (hari x 12 jam buka x 60)).
- function lostSalesByOutlet(outletId){
-  const recap=window.DAILY_RECAP_SUMMARY?.lostSalesMinutes;if(!recap)return null;
-  const planner=window.ForecastPlanner,t=today(),from=planner.shift(t,-7);
-  const byOutlet=new Map();
-  for(const [date,rows] of Object.entries(recap)){
-   if(date<from||date>t)continue;
-   for(const [id,minutes] of Object.entries(rows)){
-    if(outletId!=='__all__'&&id!==outletId)continue;
-    const o=byOutlet.get(id)||{minutes:0,days:0};o.minutes+=minutes||0;o.days++;byOutlet.set(id,o);
+ // ---- Waste & lost sales per outlet, 7 hari terakhir yang sudah selesai ----
+ // Sumber (arahan owner 2026-11-09): data sheet REKAP HARIAN FORECAST yang sudah ada -- tab
+ // WASTE (nominal waste harian) dan tab "Rekap Forecast <bulan>" (menit kehabisan harian),
+ // BUKAN rata-rata bulanan lama. Waste % = nominal waste sheet / omzet real ESB (termasuk
+ // pesanan) pada tanggal & outlet yang SAMA -- rumus sama dengan PERFORMA OUTLET (waste dibagi
+ // penjualan); tanggal yang belum diisi di sheet dilewati, bukan dianggap nol. Pengecualian:
+ // outlet yang kiriman real-nya SUDAH dicatat forecaster di web (fulfillment, "dikirim vs
+ // laku") pakai hitungan itu -- itu patokan akhirnya begitu datanya lengkap. Rata-rata bulanan
+ // lama (PERFORMANCE_SUMMARY) cuma cadangan terakhir kalau sheet kosong untuk outlet itu.
+ const RECAP_WINDOW_DAYS=7,OPEN_MINUTES=12*60,MIN_RECAP_DAYS=3;
+ const CORE_SHORT=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco'];
+ const pct1=n=>n==null?'—':n.toLocaleString('id-ID',{maximumFractionDigits:1})+'%';
+ const nameList=a=>a.length<=1?(a[0]||''):a.slice(0,-1).join(', ')+' dan '+a.at(-1);
+ let wasteLostCache=null;
+ function wasteLostStats(){
+  const recap=window.DAILY_RECAP_SUMMARY,ds=dailyOutletProductSeries(),cloud=window.ForecastPlanCloud;
+  const settled=[...fulfillmentCache.values()].filter(v=>!v.loading).length;
+  const key=[today(),recap?.updatedAt||'',ds?[...ds.byOutlet.values()].reduce((s,v)=>s+v.length,0):0,cloud?.records?.length||0,settled].join('|');
+  if(wasteLostCache?.key===key)return wasteLostCache.value;
+  const t=today(),from=window.ForecastPlanner.shift(t,-RECAP_WINDOW_DAYS),inWin=d=>d>=from&&d<t;
+  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
+  const rows=new Map(),get=id=>rows.get(id)||(rows.set(id,{id,name:name(id),wasteNominal:0,wasteRevenue:0,wasteDays:0,core:[0,0,0,0],lostMinutes:0,lostDays:0}),rows.get(id));
+  for(const id of window.PcsPanels.data().sales?.outletIds||[])get(id);
+  let wasteLast=null,lostLast=null;
+  const revenueByKey=new Map();
+  if(ds)for(const [id,s] of ds.byOutlet)for(const pt of s)revenueByKey.set(pt.date+'|'+id,pt.gross);
+  for(const [date,day] of Object.entries(recap?.waste||{})){
+   if(!inWin(date))continue;
+   for(const [id,e] of Object.entries(day)){
+    const rev=revenueByKey.get(date+'|'+id);if(!(rev>0))continue;
+    const r=get(id);r.wasteNominal+=e.nominal||0;r.wasteRevenue+=rev;r.wasteDays++;(e.core||[]).forEach((v,k)=>{r.core[k]+=v||0;});
+    if(!wasteLast||date>wasteLast)wasteLast=date;
    }
   }
-  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
-  return [...byOutlet.entries()].map(([id,o])=>({id,name:name(id),percent:o.days>0?o.minutes/(o.days*12*60)*100:null})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent);
- }
- // Waste nominal langsung dari sheet (tab WASTE, kolom Nominal) -- angka PEMBANDING terhadap
- // wasteByOutlet() (dikirim vs laku, dari data rencana tim) di atas. Dua sumber/metode
- // berbeda, sengaja ditampilkan berdampingan, bukan dijumlah jadi satu angka.
- function wasteSheetByOutlet(outletId){
-  const recap=window.DAILY_RECAP_SUMMARY?.waste;if(!recap)return null;
-  const planner=window.ForecastPlanner,t=today(),from=planner.shift(t,-7);
-  const byOutlet=new Map();
-  for(const [date,rows] of Object.entries(recap)){
-   if(date<from||date>t)continue;
-   for(const [id,entry] of Object.entries(rows)){
-    if(outletId!=='__all__'&&id!==outletId)continue;
-    byOutlet.set(id,(byOutlet.get(id)||0)+(entry.nominal||0));
-   }
+  for(const [date,day] of Object.entries(recap?.lostSalesMinutes||{})){
+   if(!inWin(date))continue;
+   for(const [id,m] of Object.entries(day)){if(!Number.isFinite(m))continue;const r=get(id);r.lostMinutes+=m;r.lostDays++;if(!lostLast||date>lostLast)lostLast=date;}
   }
-  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
-  return [...byOutlet.entries()].map(([id,nominal])=>({id,name:name(id),nominal})).filter(r=>r.nominal>0).sort((a,b)=>b.nominal-a.nominal);
+  const team=new Map((wasteByOutlet('__all__')||[]).map(r=>[r.id,r.percent]));
+  const perf=window.PERFORMANCE_SUMMARY,perfPeriod=perf?.latestCompletePeriod;
+  const list=[...rows.values()].map(r=>{
+   let wastePct=null,wasteSrc=null;
+   if(team.has(r.id)){wastePct=team.get(r.id);wasteSrc='kirim';}
+   else if(r.wasteDays>=MIN_RECAP_DAYS){wastePct=r.wasteNominal/r.wasteRevenue*100;wasteSrc='sheet';}
+   else{const vals=Object.values(perf?.outlets?.[r.id]?.periods||{}).map(p=>p?.wastePercent).filter(v=>v!=null);if(vals.length){wastePct=vals.reduce((a,b)=>a+b,0)/vals.length;wasteSrc='bulanan';}}
+   let lostPct=null,lostSrc=null,lostPerDay=null;
+   if(r.lostDays>=MIN_RECAP_DAYS){lostPerDay=r.lostMinutes/r.lostDays;lostPct=lostPerDay/OPEN_MINUTES*100;lostSrc='sheet';}
+   else{const v=perf?.outlets?.[r.id]?.periods?.[perfPeriod]?.estimatedLostSalesPercent;if(v!=null){lostPct=v;lostSrc='bulanan';lostPerDay=v/100*OPEN_MINUTES;}}
+   const maxCore=Math.max(...r.core),topCore=maxCore>0?r.core.indexOf(maxCore):null;
+   return {...r,wastePct,wasteSrc,lostPct,lostSrc,lostPerDay,topCore,wasteOver:wastePct!=null&&wastePct>WASTE_THRESHOLD,lostOver:lostPct!=null&&lostPct>LOST_SALES_THRESHOLD};
+  }).filter(r=>r.wastePct!=null||r.lostPct!=null);
+  const ws=list.filter(r=>r.wasteSrc==='sheet'),ls=list.filter(r=>r.lostSrc==='sheet');
+  const wRev=ws.reduce((s,r)=>s+r.wasteRevenue,0),lDays=ls.reduce((s,r)=>s+r.lostDays,0);
+  const net={wastePct:wRev>0?ws.reduce((s,r)=>s+r.wasteNominal,0)/wRev*100:null,lostPerDay:lDays>0?ls.reduce((s,r)=>s+r.lostMinutes,0)/lDays:null};
+  net.lostPct=net.lostPerDay==null?null:net.lostPerDay/OPEN_MINUTES*100;
+  const value={list,net,wasteLast,lostLast,lostFromSheet:ls.length>0,wasteFromSheet:ws.length>0};
+  wasteLostCache={key,value};
+  return value;
  }
- function monthlyLostSalesFallback(){
-  const perf=window.PERFORMANCE_SUMMARY,period=perf?.latestCompletePeriod;if(!period)return null;
-  const rows=Object.entries(perf.outlets).map(([id,o])=>({id,name:o.name||id,percent:o.periods?.[period]?.estimatedLostSalesPercent})).filter(r=>r.percent!=null).sort((a,b)=>b.percent-a.percent);
-  return rows.length?{period,rows}:null;
+ // Kalimat dibuat bervariasi sesuai seberapa jauh lewat batas, bukan template yang sama
+ // untuk semua outlet -- owner minta bahasanya natural, tidak kaku/monoton.
+ function wasteSentence(r){
+  if(!r.wasteOver)return `Waste ${pct1(r.wastePct)}, masih aman di bawah batas ${WASTE_THRESHOLD}%.`;
+  const ratio=r.wastePct/WASTE_THRESHOLD;
+  const level=ratio>=2?'sudah dua kali lipat batas':ratio>=1.5?'jauh di atas batas':'sedikit lewat batas';
+  return `Waste ${pct1(r.wastePct)}, ${level}${r.topCore!=null?` — paling banyak sisa ${CORE_SHORT[r.topCore]}`:''}.`;
  }
- // wasteByOutlet() (ground truth "dikirim vs laku") cuma terisi kalau forecaster sudah
- // mencatat fulfillment -- jarang. Fallback ini rata-ratakan wastePercent PERFORMANCE_SUMMARY
- // dari SEMUA bulan yang tersedia per outlet (bukan cuma bulan terakhir) supaya mewakili
- // "kekuatan asli" outlet selama ini, bukan satu bulan yang mungkin anomali.
- function wasteHistoricalFallback(outletId){
-  const perf=window.PERFORMANCE_SUMMARY;if(!perf?.outlets)return null;
-  const rows=[];
-  for(const [id,o] of Object.entries(perf.outlets)){
-   if(outletId!=='__all__'&&id!==outletId)continue;
-   const vals=Object.values(o.periods||{}).map(p=>p.wastePercent).filter(v=>v!=null);
-   if(!vals.length)continue;
-   rows.push({id,name:o.name||id,percent:vals.reduce((a,b)=>a+b,0)/vals.length,months:vals.length});
+ function lostSentence(r){
+  const m=Math.round(r.lostPerDay);
+  if(!r.lostOver)return m>0?`Kehabisan rata-rata ${m} menit sehari, masih wajar.`:'Hampir tidak pernah kehabisan.';
+  const hours=m>=60?` (±${(m/60).toLocaleString('id-ID',{maximumFractionDigits:1})} jam)`:'';
+  return `Rata-rata kehabisan ${m} menit sehari${hours}.`;
+ }
+ function adviceText(r){
+  if(r.wasteOver&&r.lostOver)return 'Sisa banyak tapi juga sering kehabisan — kemungkinan komposisi produknya yang kurang pas, bukan jumlah totalnya.';
+  if(r.wasteOver)return r.topCore!=null?`Kurangi kiriman ${CORE_SHORT[r.topCore]} dulu.`:'Kurangi kiriman sedikit.';
+  if(r.lostOver)return r.wastePct!=null&&r.wastePct<WASTE_THRESHOLD*.6?'Waste-nya rendah, jadi kiriman masih aman ditambah.':'Tambah kiriman sedikit, sambil pantau waste-nya.';
+  return '';
+ }
+ function srcTag(src){return src==='kirim'?'dikirim vs laku':src==='bulanan'?'rata-rata bulanan lama':'';}
+ function wasteLostFlag(r,kind){
+  const icon=kind==='both'?'⚠️':kind==='waste'?'🗑️':'⏳';
+  const text=kind==='lost'?lostSentence(r):kind==='waste'?wasteSentence(r):`${wasteSentence(r)} ${lostSentence(r)}`;
+  const tag=[srcTag(r.wasteSrc),kind!=='waste'?srcTag(r.lostSrc):''].filter(Boolean)[0];
+  return `<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>${icon} ${esc(r.name)}</b><span>${text} ${adviceText(r)}${tag?` <i class="fd-wl-src">(${tag})</i>`:''}</span></button>`;
+ }
+ function wasteLostSourceNote(s){
+  const parts=[];
+  if(s.wasteFromSheet)parts.push(`waste dari sheet s.d. ${dateLabelShort(s.wasteLast)} dibagi omzet real ESB`);
+  if(s.lostFromSheet)parts.push(`lost sales dari sheet s.d. ${dateLabelShort(s.lostLast)} (menit kehabisan ÷ 12 jam buka)`);
+  else parts.push('lost sales harian bulan ini belum masuk dari sheet, sementara pakai rata-rata bulanan lama');
+  return `<p class="fd-outlet-note">Sumber: ${parts.join('; ')}. Begitu forecaster mencatat jumlah kiriman real di web, waste otomatis pindah ke hitungan dikirim vs laku.</p>`;
+ }
+ function wasteLostTable(list){
+  const cell=(v,over,extra)=>`<td class="${v==null?'':over?'fd-wl-bad':'fd-wl-good'}">${pct1(v)}${extra||''}</td>`;
+  const rows=list.slice().sort((a,b)=>(b.wastePct??-1)-(a.wastePct??-1)).map(r=>`<tr><td><button type="button" class="fd-wl-link" data-outlet-detail="${esc(r.id)}">${esc(r.name)}</button></td>${cell(r.wastePct,r.wasteOver)}${cell(r.lostPct,r.lostOver,r.lostPerDay!=null?` <small>${Math.round(r.lostPerDay)} mnt</small>`:'')}</tr>`).join('');
+  return `<details class="fd-trend-full"><summary>Lihat semua outlet (${list.length})</summary><div class="fd-outlet-table-wrap"><table class="fd-outlet-table fd-wl-table"><thead><tr><th>Outlet</th><th>Waste</th><th>Lost sales / hari</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
+ }
+ function wasteLostCard(outletId){
+  const s=wasteLostStats();
+  if(!s.list.length)return '';
+  const label=`<span class="micro-label">WASTE &amp; LOST SALES · ${RECAP_WINDOW_DAYS} HARI TERAKHIR · BATAS WASTE ${WASTE_THRESHOLD}% · LOST SALES ${LOST_SALES_THRESHOLD}%</span>`;
+  if(outletId!=='__all__'){
+   const r=s.list.find(x=>x.id===outletId);if(!r)return '';
+   const lines=[r.wastePct!=null?wasteSentence(r):'',r.lostPct!=null?lostSentence(r):''].filter(Boolean).join(' ');
+   const advice=adviceText(r);
+   return `<article class="workspace-card fd-wl-card ${r.wasteOver||r.lostOver?'fd-waste-warning':'fd-wl-ok'}">${label}<p class="fd-wl-summary">${lines}${advice?` <b>${advice}</b>`:''}</p>${wasteLostSourceNote(s)}</article>`;
   }
-  return rows.length?{rows:rows.sort((a,b)=>b.percent-a.percent)}:null;
- }
- function badges(outletId){
-  const wasteTeam=wasteByOutlet(outletId),wasteSheet=wasteSheetByOutlet(outletId),lostDaily=lostSalesByOutlet(outletId);
-  const line=(r,threshold)=>`<div class="product-line"><b>${esc(r.name)}</b><span class="${r.percent>threshold?'fp-down':'fp-up'}">${r.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}%</span></div>`;
-  const lineMoney=r=>`<div class="product-line"><b>${esc(r.name)}</b><span>${money(r.nominal)}</span></div>`;
-  const wasteTeamCard=wasteTeam==null?'':`<article class="workspace-card compact-card"><span class="micro-label">WASTE · DIKIRIM VS LAKU (RENCANA TIM)</span>${wasteTeam.length?wasteTeam.slice(0,5).map(r=>line(r,WASTE_THRESHOLD)).join(''):'<p class="workspace-note">Belum ada rencana 7 hari terakhir dengan data "real dikirim".</p>'}<p class="workspace-note">7 hari terakhir · ambang ${WASTE_THRESHOLD}%</p></article>`;
-  const wasteSheetCard=wasteSheet==null?'':`<article class="workspace-card compact-card"><span class="micro-label">WASTE · SHEET REKAP (NOMINAL, PEMBANDING)</span>${wasteSheet.length?wasteSheet.slice(0,5).map(lineMoney).join(''):'<p class="workspace-note">Belum ada data waste 7 hari terakhir di sheet.</p>'}<p class="workspace-note">7 hari terakhir · dari tab WASTE, pembanding kartu sebelah</p></article>`;
-  const fallback=lostDaily?null:monthlyLostSalesFallback();
-  const lostRows=lostDaily?.slice(0,5)||fallback?.rows.slice(0,5)||[];
-  const lostNote=lostDaily?`7 hari terakhir · ambang ${LOST_SALES_THRESHOLD}% · dari sheet rekap`:fallback?`${fallback.period} (bulanan, belum harian) · ambang ${LOST_SALES_THRESHOLD}%`:'';
-  const lostCard=!lostRows.length?'':`<article class="workspace-card compact-card"><span class="micro-label">5 OUTLET LOST SALES TERTINGGI</span>${lostRows.map(r=>line(r,LOST_SALES_THRESHOLD)).join('')}<p class="workspace-note">${lostNote}</p></article>`;
-  const cards=[wasteTeamCard,wasteSheetCard,lostCard].filter(Boolean);
-  return cards.length?`<div class="product-comparison">${cards.join('')}</div>`:'';
- }
- // Peringatan di HALAMAN PERTAMA kalau waste/lost sales real sudah melebihi ambang owner --
- // bukan cuma warna teks di kartu bawah (badges() di atas), tapi banner terpisah yang langsung
- // kelihatan begitu dashboard dibuka. Sumber data SAMA persis dengan badges() (ground truth
- // "dikirim vs laku" dulu, baru fallback rata-rata historis kalau belum ada data kirim 7 hari
- // ini) -- supaya tidak dobel logika/ambang.
- // Satu kelompok ambang (waste ATAU lost sales) -- gambaran GLOBAL dulu (berapa outlet,
- // rata-rata berapa) baru 5 terburuk langsung kelihatan, sisanya di-lipat ke "lihat outlet
- // lainnya" -- owner minta jangan langsung dump semua outlet, bikin fokus global dulu.
- function warnGroupHtml(icon,title,threshold,rows,srcLabel){
-  if(!rows.length)return '';
-  const avg=rows.reduce((s,r)=>s+r.percent,0)/rows.length;
-  const top=rows.slice(0,5),rest=rows.slice(5);
-  const row=r=>`<div class="fd-warn-row"><b>${esc(r.name)}</b><span>${r.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}%</span></div>`;
-  const restHtml=rest.length?`<details class="fd-warn-more"><summary>Lihat ${rest.length} outlet lainnya</summary>${rest.map(row).join('')}</details>`:'';
-  return `<div class="fd-warn-group"><span class="fd-warn-group-title">${icon} ${esc(title)} di atas ambang ${threshold}% · ${rows.length} outlet, rata-rata ${avg.toLocaleString('id-ID',{maximumFractionDigits:1})}% · ${esc(srcLabel)}</span>${top.map(row).join('')}${restHtml}</div>`;
- }
- function wasteThresholdWarning(outletId){
-  const team=wasteByOutlet(outletId);
-  const wasteSrc=team&&team.length?{rows:team,label:'dikirim vs laku, 7 hari terakhir'}:(()=>{const h=wasteHistoricalFallback(outletId);return h?.rows.length?{rows:h.rows,label:'rata-rata historis bulanan — data kirim 7 hari terakhir belum ada'}:{rows:[],label:''};})();
-  const lostDaily=lostSalesByOutlet(outletId);
-  const lostSrc=lostDaily&&lostDaily.length?{rows:lostDaily,label:'7 hari terakhir'}:(()=>{const f=monthlyLostSalesFallback();const rows=outletId==='__all__'?f?.rows:f?.rows.filter(r=>r.id===outletId);return rows?.length?{rows,label:f.period+' (bulanan, belum harian)'}:{rows:[],label:''};})();
-  const wasteOver=wasteSrc.rows.filter(r=>r.percent>WASTE_THRESHOLD).sort((a,b)=>b.percent-a.percent);
-  const lostOver=lostSrc.rows.filter(r=>r.percent>LOST_SALES_THRESHOLD).sort((a,b)=>b.percent-a.percent);
-  if(!wasteOver.length&&!lostOver.length)return '';
-  const wasteBlock=warnGroupHtml('🗑️','Waste',WASTE_THRESHOLD,wasteOver,wasteSrc.label);
-  const lostBlock=warnGroupHtml('⏳','Lost sales',LOST_SALES_THRESHOLD,lostOver,lostSrc.label);
-  return `<article class="workspace-card fd-waste-warning"><span class="micro-label">⚠️ PERLU TINDAKAN — MELEBIHI AMBANG OWNER</span>${wasteBlock}${lostBlock}</article>`;
+  const wOver=s.list.filter(r=>r.wasteOver).sort((a,b)=>b.wastePct-a.wastePct),lOver=s.list.filter(r=>r.lostOver).sort((a,b)=>b.lostPct-a.lostPct);
+  const both=wOver.filter(r=>r.lostOver);
+  const tile=(big,small,tone)=>`<div class="fd-overview-stat${tone?' fd-overview-'+tone:''}"><b>${big}</b><span>${small}</span></div>`;
+  const tiles=[
+   s.net.wastePct!=null?tile(pct1(s.net.wastePct),'waste jaringan',s.net.wastePct>WASTE_THRESHOLD?'down':'up'):'',
+   tile(wOver.length,'outlet waste lewat batas',wOver.length?'down':'up'),
+   s.net.lostPerDay!=null?tile(Math.round(s.net.lostPerDay)+' mnt','kehabisan / outlet / hari',s.net.lostPct>LOST_SALES_THRESHOLD?'down':'up'):'',
+   tile(lOver.length,'outlet sering kehabisan',lOver.length?'down':'up'),
+  ].join('');
+  const sentences=[];
+  if(s.net.wastePct!=null){
+   const head=s.net.wastePct>WASTE_THRESHOLD?`Waste jaringan ${pct1(s.net.wastePct)}, di atas batas ${WASTE_THRESHOLD}%`:`Waste jaringan ${pct1(s.net.wastePct)}, masih di bawah batas ${WASTE_THRESHOLD}%`;
+   sentences.push(wOver.length?`${head} — ${wOver.length} outlet lewat batas, paling berat di ${nameList(wOver.slice(0,3).map(r=>r.name))}.`:`${head}, dan belum ada outlet yang lewat.`);
+  }
+  if(lOver.length)sentences.push(`${lOver.length} outlet sering kehabisan, terutama ${nameList(lOver.slice(0,2).map(r=>r.name))}.`);
+  else if(s.net.lostPerDay!=null)sentences.push('Lost sales semua outlet masih dalam batas wajar.');
+  if(both.length)sentences.push(`${nameList(both.map(r=>r.name))} kena dua-duanya — sisa banyak tapi juga sering habis, cek komposisi produknya.`);
+  const groups=[];
+  const wOnly=wOver.filter(r=>!r.lostOver).slice(0,3),lOnly=lOver.filter(r=>!r.wasteOver).slice(0,3);
+  if(both.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Waste tinggi &amp; sering kehabisan</span><div class="fd-trend-grid">${both.slice(0,3).map(r=>wasteLostFlag(r,'both')).join('')}</div></div>`);
+  if(wOnly.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Waste paling tinggi</span><div class="fd-trend-grid">${wOnly.map(r=>wasteLostFlag(r,'waste')).join('')}</div></div>`);
+  if(lOnly.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Paling sering kehabisan</span><div class="fd-trend-grid">${lOnly.map(r=>wasteLostFlag(r,'lost')).join('')}</div></div>`);
+  const alarm=wOver.length||lOver.length;
+  return `<article class="workspace-card fd-wl-card ${alarm?'fd-waste-warning':'fd-wl-ok'}">${label}<div class="fd-overview">${tiles}</div>${sentences.length?`<p class="fd-wl-summary">${sentences.join(' ')}</p>`:''}${groups.join('')}${wasteLostTable(s.list)}${wasteLostSourceNote(s)}</article>`;
  }
 
  // Pemetaan outlet -> area tim forecaster (3 area operasional sesuai pembagian wilayah owner,
@@ -828,7 +872,8 @@ window.ForecastDashboard=(()=>{
   const temp=r.tempMax!=null&&r.tempMin!=null?`${Math.round(r.tempMin)}–${Math.round(r.tempMax)}°C`:'';
   const o=window.OUTLET_INTELLIGENCE?.outlets?.[r.id];
   const risk=r.today!=null&&r.today>=60;
-  const acc=outletAccuracy(r.id),waste=wasteByOutlet(r.id)?.[0]||wasteHistoricalFallback(r.id)?.rows.find(x=>x.id===r.id),lost=lostSalesByOutlet(r.id)?.[0]||monthlyLostSalesFallback()?.rows.find(x=>x.id===r.id);
+  const wl=wasteLostStats().list.find(x=>x.id===r.id);
+  const acc=outletAccuracy(r.id),waste={percent:wl?.wastePct??null},lost={percent:wl?.lostPct??null};
   const stat=(label,val,threshold)=>`<div class="weather-popup-stat"><span>${label}</span><b class="${val==null?'':threshold!=null&&val>threshold?'fp-down':'fp-up'}">${val==null?'—':val.toLocaleString('id-ID',{maximumFractionDigits:1})+'%'}</b></div>`;
   const swot=o?[['Kekuatan',o.strength],['Perlu diperbaiki',o.weakness],['Peluang',o.opportunity],['Tantangan',o.threat]].filter(([,v])=>v):[];
   // Nama outlet dibuat "sticky" (tetap terlihat saat isi popup di-scroll) -- berguna sekarang
@@ -972,24 +1017,49 @@ window.ForecastDashboard=(()=>{
   weatherKey=key;weatherHtml=WEATHER_SKELETON;
   weatherHighlights(outletId).then(html=>{if(weatherKey===key){weatherHtml=html;window.dispatchEvent(new Event('forecast-operations-changed'));}});
  }
+ // Ringkasan omzet per bulan di bawah grafik -- jawaban langsung untuk "berapa total omzet
+ // bulan ini/bulan depan" tanpa harus menjumlah titik grafik. "Perkiraan akhir bulan" =
+ // omzet real untuk hari yang sudah lewat + prediksi untuk sisa harinya (beda dari "prediksi
+ // sebulan" yang murni angka mesin untuk SEMUA hari, termasuk yang sudah lewat).
+ function monthSummaryHtml(trend){
+  const sum=(rows,k)=>rows.reduce((s,r)=>s+(r[k]||0),0);
+  const cards=[trend.ym,trend.ymNext].map(ym=>{
+   const rows=trend.rows.filter(r=>r.date.startsWith(ym));
+   const pred=sum(rows,'forecastTotal'),pure=sum(rows,'forecastPure');
+   if(!(pred>0))return '';
+   const elapsed=trend.lastActual?rows.filter(r=>r.date<=trend.lastActual&&r.actualTotal!=null):[];
+   const real=sum(elapsed,'actualTotal'),projected=real+sum(rows.filter(r=>!elapsed.includes(r)),'forecastTotal');
+   const predElapsed=sum(elapsed,'forecastTotal'),gap=real>0?(predElapsed-real)/real*100:null;
+   const up=upliftLabel(ym),title=months[Number(ym.slice(5,7))-1]+' '+ym.slice(0,4);
+   const line=(k,v,sub)=>`<div class="fd-month-line"><span>${k}</span><b title="${esc(money(Math.round(v)))}">${moneyBig(v)}</b>${sub?`<small>${sub}</small>`:''}</div>`;
+   const gapText=gap==null?'':`Untuk ${dateLabelShort(elapsed[0].date)}–${dateLabelShort(elapsed.at(-1).date)}, prediksi ${Math.abs(gap)<1?'hampir sama dengan':gap>0?`${pct1(gap)} di atas`:`${pct1(-gap)} di bawah`} real.`;
+   return `<div class="fd-month-card"><div class="fd-month-head"><b>${title}</b>${up?`<span class="fd-month-tag">koreksi ${up}</span>`:''}</div>
+    ${line('Prediksi sebulan',pred,`tanpa pesanan ${moneyBig(pure)}`)}
+    ${elapsed.length?line(`Real s.d. ${dateLabelShort(elapsed.at(-1).date)}`,real,`${elapsed.length} hari`):''}
+    ${elapsed.length?line('Perkiraan akhir bulan',projected,'real + prediksi sisa hari'):''}
+    ${gapText?`<p class="fd-month-gap">${gapText}</p>`:''}</div>`;
+  }).filter(Boolean);
+  if(!cards.length)return '';
+  const notes=[trend.ym,trend.ymNext].map(ym=>upliftLabel(ym)?`${months[Number(ym.slice(5,7))-1]} ${upliftLabel(ym)}`:'').filter(Boolean);
+  return `<div class="fd-month-summary">${cards.join('')}</div>${notes.length?`<p class="workspace-note">Hasil prediksi sudah dinaikkan (${notes.join(', ')}) dari angka mesin sesuai arahan owner — metode prediksinya sendiri tidak diubah.</p>`:''}`;
+ }
  function render(outletId){
   const trend=revenueTrend(outletId);
   if(!trend)return `<div class="workspace-empty">${esc(window.PcsPanels.data().error||'Memuat data penjualan & pesanan…')}</div>`;
   lastTrend=trend;
   ensureWeather(outletId);
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
-  const uplift=trend.pesananUpliftPct!=null?`Pesanan biasanya menambah ~${trend.pesananUpliftPct.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari omzet murni (rata-rata 56 hari terakhir; tanggal yang pesanannya sudah tercatat di sheet pakai angka pasti, bukan tebakan). Data diperbarui tiap malam jam 21.02 WIB.`:'';
+  const uplift=trend.pesananUpliftPct!=null?`Pesanan biasanya menambah ~${trend.pesananUpliftPct.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari omzet murni (rata-rata 56 hari terakhir; tanggal yang pesanannya sudah tercatat di sheet pakai angka pasti, bukan tebakan). Omzet real diperbarui otomatis tiap jam, ditutup tiap malam setelah outlet tutup.`:'';
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
    <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast">Buat forecast →</button><span>Histori rencana & akurasi tim (buat pembelajaran) ada di tab Forecast → Monitoring.</span></div>
-   ${wasteThresholdWarning(outletId)}
    ${outletId==='__all__'?trendWatchCard(trend.trendNow):''}
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${trend.trendNow?`<p class="workspace-note">Tren 3 hari terakhir vs 3 hari sebelumnya, omzet real tanpa pesanan — per ${dateLabelShort(trend.trendNow.asOf)}${trend.trendContext}${driverCaption(trend.trendDriver)}.</p>`:''}${uplift?`<p class="workspace-note">${uplift}</p>`:''}</article>
+   ${wasteLostCard(outletId)}
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${monthSummaryHtml(trend)}${trend.trendNow?`<p class="workspace-note">Tren 3 hari terakhir vs 3 hari sebelumnya, omzet real tanpa pesanan — per ${dateLabelShort(trend.trendNow.asOf)}${trend.trendContext}${driverCaption(trend.trendDriver)}.</p>`:''}${uplift?`<p class="workspace-note">${uplift}</p>`:''}</article>
    <article class="workspace-card weather-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>
    <div class="product-comparison">
     <article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article>
    </div>
    ${operationalSummary(outletId)}
-   ${badges(outletId)}
    ${outletDetailId?outletDetailHtml(outletDetailId):''}`;
  }
  function click(e){

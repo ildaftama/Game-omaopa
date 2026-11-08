@@ -99,16 +99,41 @@
 .fd-trend-row.fd-trend-flat b{color:#637483}
 .fd-trend-row:hover,.fd-trend-flag:hover{filter:brightness(.96)}
 /* Banner peringatan ambang waste/lost sales -- halaman pertama, lebih mendesak daripada kartu tren (merah, bukan kuning). */
-.fd-waste-warning{background:#fdf0ee;border-color:#eab6ac;margin-bottom:22px}
-.fd-warn-group+.fd-warn-group{margin-top:14px}
-.fd-warn-group-title{display:block;font-size:11px;font-weight:700;color:#a4302a;margin-bottom:6px}
-.fd-warn-row{display:flex;justify-content:space-between;gap:10px;padding:6px 2px;font-size:12.5px;border-bottom:1px solid #f3dcd8}
-.fd-warn-row:last-child{border-bottom:0}
-.fd-warn-row b{color:#2b3f4f;font-weight:600}
-.fd-warn-row span{font-weight:700;color:#a4302a;flex-shrink:0}
-.fd-warn-more{margin-top:4px}
-.fd-warn-more summary{cursor:pointer;font-size:11px;color:#a4302a;font-weight:600;padding:4px 0;list-style:revert}
-.fd-warn-more[open] summary{margin-bottom:2px}
+/* Kartu waste & lost sales -- pola sama dengan kartu tren: ringkasan global dulu, sorotan, baru tabel lengkap. */
+.fd-wl-card{display:flex;flex-direction:column;gap:14px;margin-bottom:22px}
+.fd-waste-warning{background:#fdf3f1;border-color:#efc4bb}
+.fd-wl-ok{background:#f2f9f5;border-color:#cfe6d8}
+.fd-waste-warning .fd-overview-stat{border-color:#efd3cc}
+.fd-wl-ok .fd-overview-stat{border-color:#cfe6d8}
+.fd-wl-summary{margin:0;font-size:13px;line-height:1.6;color:#33475a}
+.fd-wl-summary b{color:#8a3a12}
+.fd-wl-src{color:#8a97a3;font-style:normal;font-size:11px}
+.fd-wl-table td.fd-wl-bad{color:#a4302a;font-weight:700}
+.fd-wl-table td.fd-wl-good{color:#1f6b45}
+.fd-wl-table small{color:#8a97a3;font-weight:400;margin-left:4px}
+.fd-wl-link{border:0;background:none;padding:0;font:inherit;color:#1f3a4d;cursor:pointer;text-align:left}
+.fd-wl-link:hover{text-decoration:underline}
+/* Ringkasan omzet per bulan di bawah grafik */
+.fd-month-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:16px 0 6px}
+.fd-month-card{border:1px solid #e3e9ee;border-radius:10px;padding:12px 14px;background:#fafcfd;display:flex;flex-direction:column;gap:6px}
+.fd-month-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.fd-month-head b{font-size:13px;color:#1f3a4d}
+.fd-month-tag{font-size:10px;font-weight:700;color:#8a5a0f;background:#fff1d6;border-radius:20px;padding:3px 9px;white-space:nowrap}
+.fd-month-line{display:grid;grid-template-columns:1fr auto;align-items:baseline;column-gap:10px}
+.fd-month-line span{font-size:12px;color:#536b7d}
+.fd-month-line b{font-size:15px;color:#1f3a4d;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fd-month-line small{grid-column:1/-1;font-size:10.5px;color:#8a97a3}
+.fd-month-gap{margin:4px 0 0;font-size:11px;line-height:1.5;color:#6c7f90;border-top:1px dashed #e3e9ee;padding-top:7px}
+/* Ringkasan di puncak dialog outlet */
+.fd-outlet-chips{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.fd-outlet-chip{border:1px solid #e3e9ee;border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;background:#fafcfd;min-width:0}
+.fd-outlet-chip span{font-size:10px;color:#6c7f90}
+.fd-outlet-chip b{font-size:15px;color:#2b3f4f}
+.fd-outlet-chip.good b{color:#1f6b45}
+.fd-outlet-chip.bad{background:#fdf2f1;border-color:#efc4bb}
+.fd-outlet-chip.bad b{color:#a4302a}
+.fd-outlet-summary{margin:12px 0 0;font-size:13px;line-height:1.6;color:#33475a}
+.fd-outlet-summary b{color:#8a3a12}
 /* Dialog rincian outlet -- muncul saat klik nama outlet di kartu tren */
 .fd-outlet-dialog{width:min(640px,calc(100% - 28px))}
 .fd-outlet-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--line,#e3e5da)}
@@ -121,4 +146,4 @@
 .fd-outlet-table td:first-child{white-space:normal;min-width:110px}
 .fd-outlet-new{color:#8a97a3;font-style:italic;font-weight:400}
 .fd-outlet-note{font-size:11px;color:#8a97a3;margin:8px 0 0}
-@media(max-width:550px){.fd-shortcut{padding:12px 14px;gap:10px}.fd-trend-badge{font-size:10px;padding:4px 9px}.fd-trend-flag{padding:11px 13px}.fd-trend-rows{max-height:240px}.fd-outlet-table{font-size:11px}.fd-overview-stat{min-width:80px;padding:7px 11px}.fd-trend-grid{grid-template-columns:1fr}}
+@media(max-width:550px){.fd-shortcut{padding:12px 14px;gap:10px}.fd-trend-badge{font-size:10px;padding:4px 9px}.fd-trend-flag{padding:11px 13px}.fd-trend-rows{max-height:240px}.fd-outlet-table{font-size:11px}.fd-overview-stat{min-width:80px;padding:7px 11px}.fd-trend-grid{grid-template-columns:1fr}.fd-outlet-chip b{font-size:13px}.fd-month-line b{font-size:14px}.fd-wl-summary,.fd-outlet-summary{font-size:12.5px}}
