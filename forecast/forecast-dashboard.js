@@ -406,7 +406,7 @@ window.ForecastDashboard=(()=>{
   const summary=[omzetSentence,st?.wastePct!=null?wasteSentence(st):'',st?.lostPct!=null?lostSentence(st):''].filter(Boolean).join(' ');
   const advice=st?adviceText(st):'';
   const chip=(k,v,bad)=>`<div class="fd-outlet-chip ${bad==null?'':bad?'bad':'good'}"><span>${k}</span><b>${v}</b></div>`;
-  const chips=`<div class="fd-outlet-chips">${chip('Omzet · 3 hari',omzetTrend?(omzetTrend.fromZero?'baru':trendPctText(omzetTrend)):'—',omzetTrend&&!omzetTrend.fromZero?omzetTrend.pct<-8:null)}${chip(`Waste · batas ${W_TH}`,pct1(st?.wastePct??null),st?.wastePct!=null?st.wasteOver:null)}${chip(st?.lostSrc==='bulanan'?'Kehabisan / hari (bln lalu)':'Kehabisan / hari',st?.lostPerDay!=null?Math.round(st.lostPerDay)+' mnt':'—',st?.lostSrc==='sheet'?st.lostOver:null)}</div>`;
+  const chips=`<div class="fd-outlet-chips">${chip('Omzet · 3 hari',omzetTrend?(omzetTrend.fromZero?'baru':trendPctText(omzetTrend)):'—',omzetTrend&&!omzetTrend.fromZero?omzetTrend.pct<-8:null)}${chip(`Waste · batas ${W_TH}`,pct1(st?.wastePct??null),st?.wastePct!=null?st.wasteOver:null)}${chip('Kehabisan / hari',st?.lostPerDay!=null?Math.round(st.lostPerDay)+' mnt':'—',st?.lostSrc==='sheet'?st.lostOver:null)}</div>`;
   return `<dialog id="fd-outlet-dialog" class="fd-outlet-dialog" aria-labelledby="fd-outlet-title"><div class="dialog-head"><h2 id="fd-outlet-title">${esc(name)}</h2><button type="button" class="icon-button" data-outlet-detail-close aria-label="Tutup">×</button></div>
    ${chips}${summary?`<p class="fd-outlet-summary">${summary}${advice?` <b>${advice}</b>`:''}</p>`:''}
    <div class="fd-outlet-section"><h3>Omzet per produk</h3>${trendLine(omzetTrend,true)}${productRows.length?`<div class="fd-outlet-table-wrap"><table class="fd-outlet-table"><thead><tr><th>Produk</th><th>3 hari terakhir</th><th>3 hari sebelumnya</th><th>Perubahan</th></tr></thead><tbody>${productRows.map(outletDetailRow).join('')}</tbody></table></div>`:'<p class="workspace-note">Belum ada penjualan tercatat.</p>'}</div>
@@ -673,8 +673,9 @@ window.ForecastDashboard=(()=>{
  // pesanan) pada tanggal & outlet yang SAMA -- rumus sama dengan PERFORMA OUTLET (waste dibagi
  // penjualan); tanggal yang belum diisi di sheet dilewati, bukan dianggap nol. Pengecualian:
  // outlet yang kiriman real-nya SUDAH dicatat forecaster di web (fulfillment, "dikirim vs
- // laku") pakai hitungan itu -- itu patokan akhirnya begitu datanya lengkap. Rata-rata bulanan
- // lama (PERFORMANCE_SUMMARY) cuma cadangan terakhir kalau sheet kosong untuk outlet itu.
+ // laku") pakai hitungan itu -- itu patokan akhirnya begitu datanya lengkap. Data bulan lalu
+ // (PERFORMANCE_SUMMARY) SENGAJA tidak dipakai sama sekali (arahan owner): kalau sheet belum
+ // mencatat outlet itu, tampil "—", bukan angka lama.
  const RECAP_WINDOW_DAYS=7,OPEN_MINUTES=12*60,MIN_RECAP_DAYS=3;
  const CORE_SHORT=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco'];
  const pct1=n=>n==null?'—':n.toLocaleString('id-ID',{maximumFractionDigits:1})+'%';
@@ -709,15 +710,12 @@ window.ForecastDashboard=(()=>{
   }
   const team=new Map((wasteByOutlet('__all__')||[]).map(r=>[r.id,r.percent]));
   const omzetTrendById=new Map((networkTrendExtremes()?.all||[]).map(r=>[r.id,r]));
-  const perf=window.PERFORMANCE_SUMMARY,perfPeriod=perf?.latestCompletePeriod;
   const list=[...rows.values()].map(r=>{
    let wastePct=null,wasteSrc=null;
    if(team.has(r.id)){wastePct=team.get(r.id);wasteSrc='kirim';}
    else if(r.wasteDays>=MIN_RECAP_DAYS){wastePct=r.wasteNominal/r.wasteRevenue*100;wasteSrc='sheet';}
-   else{const vals=Object.values(perf?.outlets?.[r.id]?.periods||{}).map(p=>p?.wastePercent).filter(v=>v!=null);if(vals.length){wastePct=vals.reduce((a,b)=>a+b,0)/vals.length;wasteSrc='bulanan';}}
    let lostPct=null,lostSrc=null,lostPerDay=null;
    if(r.lostDays>=MIN_RECAP_DAYS){lostPerDay=r.lostMinutes/r.lostDays;lostPct=lostPerDay/OPEN_MINUTES*100;lostSrc='sheet';}
-   else{const v=perf?.outlets?.[r.id]?.periods?.[perfPeriod]?.estimatedLostSalesPercent;if(v!=null){lostPct=v;lostSrc='bulanan';lostPerDay=v/100*OPEN_MINUTES;}}
    const maxCore=Math.max(...r.core),topCore=maxCore>0?r.core.indexOf(maxCore):null;
    const ot=omzetTrendById.get(r.id);
    return {...r,omzetPct:ot&&!ot.fromZero?ot.pct:null,wastePct,wasteSrc,lostPct,lostSrc,lostPerDay,topCore,wasteOver:wastePct!=null&&wastePct>WASTE_THRESHOLD,lostOver:lostSrc==='sheet'&&lostPct>LOST_SALES_THRESHOLD};
@@ -740,7 +738,6 @@ window.ForecastDashboard=(()=>{
  }
  function lostSentence(r){
   const m=Math.round(r.lostPerDay);
-  if(r.lostSrc!=='sheet')return `Kehabisan rata-rata ${m} menit sehari menurut data bulan lalu (data harian belum masuk).`;
   if(!r.lostOver)return m>0?`Kehabisan rata-rata ${m} menit sehari, masih wajar.`:'Hampir tidak pernah kehabisan.';
   const hours=m>=60?` (±${(m/60).toLocaleString('id-ID',{maximumFractionDigits:1})} jam)`:'';
   return `Rata-rata kehabisan ${m} menit sehari${hours}.`;
@@ -756,7 +753,7 @@ window.ForecastDashboard=(()=>{
   if(r.lostOver)return r.wastePct!=null&&r.wastePct<WASTE_THRESHOLD*.6?'Waste-nya rendah, jadi kiriman masih aman ditambah.':'Tambah kiriman sedikit, sambil pantau waste-nya.';
   return '';
  }
- function srcTag(src){return src==='kirim'?'dikirim vs laku':src==='bulanan'?'rata-rata bulanan lama':'';}
+ function srcTag(src){return src==='kirim'?'dikirim vs laku':'';}
  function wasteLostFlag(r,kind){
   const icon=kind==='both'?'⚠️':kind==='waste'?'🗑️':'⏳';
   const text=kind==='lost'?lostSentence(r):kind==='waste'?wasteSentence(r):`${wasteSentence(r)} ${lostSentence(r)}`;
@@ -767,14 +764,13 @@ window.ForecastDashboard=(()=>{
   const parts=[];
   if(s.wasteFromSheet)parts.push(`waste dari sheet s.d. ${dateLabelShort(s.wasteLast)} dibagi omzet real ESB`);
   if(s.lostFromSheet)parts.push(`lost sales dari sheet s.d. ${dateLabelShort(s.lostLast)} (menit kehabisan ÷ 12 jam buka)`);
-  else parts.push('lost sales harian bulan ini belum masuk dari sheet, sementara pakai rata-rata bulanan lama');
+  else parts.push('lost sales harian (kolom di samping Waste, tab Rekap Forecast bulan ini) belum masuk — sedang ditarik di sinkronisasi berikutnya');
   return `<p class="fd-outlet-note">Sumber: ${parts.join('; ')}. Begitu forecaster mencatat jumlah kiriman real di web, waste otomatis pindah ke hitungan dikirim vs laku.</p>`;
  }
  function wasteLostTable(list){
-  const cell=(v,over,extra,stale)=>`<td class="${v==null||stale?'fd-wl-stale':over?'fd-wl-bad':'fd-wl-good'}">${pct1(v)}${stale?'*':''}${extra||''}</td>`;
-  const rows=list.slice().sort((a,b)=>(b.wastePct??-1)-(a.wastePct??-1)).map(r=>`<tr><td><button type="button" class="fd-wl-link" data-outlet-detail="${esc(r.id)}">${esc(r.name)}</button></td>${cell(r.wastePct,r.wasteOver,'',r.wasteSrc==='bulanan')}${cell(r.lostPct,r.lostOver,r.lostPerDay!=null?` <small>${Math.round(r.lostPerDay)} mnt</small>`:'',r.lostSrc!=='sheet')}</tr>`).join('');
-  const stale=list.some(r=>r.wasteSrc==='bulanan'||(r.lostPct!=null&&r.lostSrc!=='sheet'));
-  return `<details class="fd-trend-full"><summary>Lihat semua outlet (${list.length})</summary><div class="fd-outlet-table-wrap"><table class="fd-outlet-table fd-wl-table"><thead><tr><th>Outlet</th><th>Waste</th><th>Lost sales / hari</th></tr></thead><tbody>${rows}</tbody></table></div>${stale?'<p class="fd-outlet-note">* angka bulan lalu — data harian outlet ini belum masuk dari sheet.</p>':''}</details>`;
+  const cell=(v,over,extra)=>`<td class="${v==null?'fd-wl-stale':over?'fd-wl-bad':'fd-wl-good'}">${pct1(v)}${extra||''}</td>`;
+  const rows=list.slice().sort((a,b)=>(b.wastePct??-1)-(a.wastePct??-1)).map(r=>`<tr><td><button type="button" class="fd-wl-link" data-outlet-detail="${esc(r.id)}">${esc(r.name)}</button></td>${cell(r.wastePct,r.wasteOver)}${cell(r.lostPct,r.lostOver,r.lostPerDay!=null?` <small>${Math.round(r.lostPerDay)} mnt</small>`:'')}</tr>`).join('');
+  return `<details class="fd-trend-full"><summary>Lihat semua outlet (${list.length})</summary><div class="fd-outlet-table-wrap"><table class="fd-outlet-table fd-wl-table"><thead><tr><th>Outlet</th><th>Waste</th><th>Lost sales / hari</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
  }
  function wasteLostCard(outletId){
   const s=wasteLostStats();
