@@ -448,7 +448,7 @@ window.ForecastDashboard=(()=>{
   //    terbawa mentah-mentah.
   //  - Pertumbuhan: total 56 hari terakhir / total 56 hari yang sama tahun lalu (pasangan
   //    tanggal yang dua-duanya ada saja -- lubang data dilewati, bukan dianggap nol).
-  //  - 20 Des - 3 Jan disejajarkan per TANGGAL kalender (365 hari), bukan per hari-minggu:
+  //  - 18 Des - 4 Jan disejajarkan per TANGGAL kalender (365 hari), bukan per hari-minggu:
   //    lonjakan Natal/Tahun Baru melekat ke tanggal (24-25 Des 2025: 89-91 jt/hari).
   // Batasan yang diketahui: hari raya yang tanggalnya bergeser tiap tahun (Ramadan/Lebaran,
   // ~11 hari lebih awal tiap tahun) TIDAK sejajar -- di Feb-Mar 2026 metode ini meleset 10-27%.
@@ -457,11 +457,15 @@ window.ForecastDashboard=(()=>{
   if(lastDate)for(let k=0;k<56;k++){const d=planner.shift(lastDate,-k),x=valueByDate.get(d),y=valueByDate.get(planner.shift(d,-364));if(x!=null&&y!=null){yoyA+=x;yoyB+=y;yoyN++;}}
   const yoyGrowth=yoyN>=14&&yoyB>0?yoyA/yoyB:null;
   const YOY_OFFSETS=[-14,-7,0,7,14],YOY_WEIGHTS=[1,2,3,2,1];
+  // Masa libur Natal-Tahun Baru = 18 Des - 4 Jan (dari data 2025: lonjakan mulai 18 Des, reda
+  // 5 Jan). Tanggal BIASA tidak boleh ikut menyerap tanggal libur tahun lalu lewat penghalusan
+  // +-2 minggu -- tanpa pengecualian ini 1-17 Des 2026 sempat diprediksi Rp950 jt, LEBIH tinggi
+  // dari tahun lalu (Rp895 jt) padahal tren sedang di bawah tahun lalu.
+  const inHoliday=d=>{const md=d.slice(5);return md>='12-18'||md<='01-04';};
   function yoyAt(date){
    if(yoyGrowth==null)return null;
-   const md=date.slice(5);
-   if(md>='12-20'||md<='01-03'){const x=valueByDate.get(shiftYearDate(date,-1));if(x!=null)return x*yoyGrowth;}
-   let s=0,w=0;YOY_OFFSETS.forEach((o,i)=>{const x=valueByDate.get(planner.shift(date,o-364));if(x!=null){s+=x*YOY_WEIGHTS[i];w+=YOY_WEIGHTS[i];}});
+   if(inHoliday(date)){const x=valueByDate.get(shiftYearDate(date,-1));if(x!=null)return x*yoyGrowth;}
+   let s=0,w=0;YOY_OFFSETS.forEach((o,i)=>{const src=planner.shift(date,o-364);if(inHoliday(src))return;const x=valueByDate.get(src);if(x!=null){s+=x*YOY_WEIGHTS[i];w+=YOY_WEIGHTS[i];}});
    return w?s/w*yoyGrowth:null;
   }
   function forecastAt(date){const y=yoyAt(date);return y!=null?y:legacyAt(date);}
