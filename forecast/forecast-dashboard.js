@@ -86,6 +86,11 @@ window.ForecastDashboard=(()=>{
   const sign=t.pct>=0?'+':'';
   return `${sign}${t.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%`;
  }
+ // Buat .sort() aman dipakai di daftar yang bisa memuat entri fromZero (pct null) -- dalam
+ // desain weekTrend() di atas, fromZero SELALU arah naik (tidak pernah turun dari nol), jadi
+ // diperlakukan sebagai kenaikan paling tajam (lebih tajam dari angka berapa pun), bukan NaN
+ // yang bikin urutan .sort() tidak terduga.
+ function trendSortValue(r){return r.pct==null?Infinity:r.pct;}
  // Catatan konteks (bukan koreksi angka) -- kalau 3 hari terakhir memuat akhir pekan atau
  // bertepatan dengan kegiatan yang terdaftar untuk outlet ini, disebutkan apa adanya supaya
  // yang baca bisa menilai sendiri wajar atau tidak, bukan ditebak otomatis oleh sistem.
@@ -107,7 +112,7 @@ window.ForecastDashboard=(()=>{
   let best=null;
   for(const [p,s] of byP){
    const t=weekTrend(s,planner);if(!t)continue;
-   if(direction==='up'&&!(t.pct>0))continue;
+   if(direction==='up'&&!(t.fromZero||t.pct>0))continue;
    if(direction==='down'&&!(t.pct<0))continue;
    if(!best||Math.abs(t.deltaMed)>Math.abs(best.deltaMed))best={p,...t};
   }
@@ -182,11 +187,11 @@ window.ForecastDashboard=(()=>{
   const results=[];
   for(const [id,series] of ds.byOutlet){
    const t=weekTrend(series,planner);if(!t)continue;
-   const driver=t.pct>0?productDriver(series,'up',planner):t.pct<0?productDriver(series,'down',planner):null;
+   const driver=t.fromZero||t.pct>0?productDriver(series,'up',planner):t.pct<0?productDriver(series,'down',planner):null;
    const nm=name(id);
    results.push({id,name:nm,...t,driver,context:windowContext(t.recentDates,nm)});
   }
-  const value=results.length?{all:results.sort((a,b)=>b.pct-a.pct)}:null;
+  const value=results.length?{all:results.sort((a,b)=>trendSortValue(b)-trendSortValue(a))}:null;
   trendExtremesCache={key:cacheKey,value};
   return value;
  }
@@ -212,7 +217,7 @@ window.ForecastDashboard=(()=>{
    }
    const results=[];
    for(const [id,s] of byOutlet){s.sort((a,b)=>a.date.localeCompare(b.date));const t=weekTrend(s,planner);if(t){const nm=name(id);results.push({id,name:nm,...t,context:windowContext(t.recentDates,nm)});}}
-   return results.sort((a,b)=>b.pct-a.pct);
+   return results.sort((a,b)=>trendSortValue(b)-trendSortValue(a));
   }
   const value={waste:build(recap.waste),lost:build(recap.lostSalesMinutes)};
   wasteLostTrendCache={key:cacheKey,value};
@@ -272,17 +277,20 @@ window.ForecastDashboard=(()=>{
   const overview=networkOverviewHtml(networkTrend,ext,wl);
   const groups=[];
   if(ext){
-   const risers=ext.all.filter(r=>r.pct>=15).sort((a,b)=>b.pct-a.pct).slice(0,5);
+   // fromZero (lihat weekTrend/trendSortValue) IKUT masuk sebagai riser -- itu kenaikan paling
+   // tajam yang bisa terjadi (dari benar2 nol), bukan sesuatu yang pantas didiamkan dari sorotan
+   // cuma karena persennya tidak bisa dihitung sebagai angka.
+   const risers=ext.all.filter(r=>r.pct>=15||r.fromZero).sort((a,b)=>trendSortValue(b)-trendSortValue(a)).slice(0,5);
    const fallers=ext.all.filter(r=>r.pct<=-15).sort((a,b)=>a.pct-b.pct).slice(0,5);
-   if(risers.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Omzet naik tajam</span><div class="fd-trend-grid">${risers.map(r=>`<button type="button" class="fd-trend-flag fd-trend-up" data-outlet-detail="${esc(r.id)}"><b>🔺 ${esc(r.name)}</b><span>Omzet naik ${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% 3 hari terakhir${r.context}${driverCaption(r.driver)}. Siapkan stok lebih.${wasteCautionText(wl,r.id,'up')}</span></button>`).join('')}</div></div>`);
+   if(risers.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Omzet naik tajam</span><div class="fd-trend-grid">${risers.map(r=>`<button type="button" class="fd-trend-flag fd-trend-up" data-outlet-detail="${esc(r.id)}"><b>🔺 ${esc(r.name)}</b><span>Omzet naik ${trendPctText(r)} 3 hari terakhir${r.context}${driverCaption(r.driver)}. Siapkan stok lebih.${wasteCautionText(wl,r.id,'up')}</span></button>`).join('')}</div></div>`);
    if(fallers.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Omzet turun tajam</span><div class="fd-trend-grid">${fallers.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>🔻 ${esc(r.name)}</b><span>Omzet turun ${Math.abs(r.pct).toLocaleString('id-ID',{maximumFractionDigits:0})}% 3 hari terakhir${r.context}${driverCaption(r.driver)}. Kurangi kiriman.${wasteCautionText(wl,r.id,'down')}</span></button>`).join('')}</div></div>`);
   }
   if(wl){
-   const wasteUp=wl.waste.filter(r=>r.pct>=20).sort((a,b)=>b.pct-a.pct).slice(0,3);
-   const lostUp=wl.lost.filter(r=>r.pct>=20).sort((a,b)=>b.pct-a.pct).slice(0,3);
+   const wasteUp=wl.waste.filter(r=>r.pct>=20||r.fromZero).sort((a,b)=>trendSortValue(b)-trendSortValue(a)).slice(0,3);
+   const lostUp=wl.lost.filter(r=>r.pct>=20||r.fromZero).sort((a,b)=>trendSortValue(b)-trendSortValue(a)).slice(0,3);
    if(wasteUp.length||lostUp.length){
-    const wasteFlags=wasteUp.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>🗑️ ${esc(r.name)}</b><span>Waste naik ${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% 3 hari terakhir${r.context}. Cek jumlah kiriman.</span></button>`);
-    const lostFlags=lostUp.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>⏳ ${esc(r.name)}</b><span>Lost sales naik ${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% 3 hari terakhir${r.context}. Kemungkinan sering kehabisan.</span></button>`);
+    const wasteFlags=wasteUp.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>🗑️ ${esc(r.name)}</b><span>Waste naik ${trendPctText(r)} 3 hari terakhir${r.context}. Cek jumlah kiriman.</span></button>`);
+    const lostFlags=lostUp.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>⏳ ${esc(r.name)}</b><span>Lost sales naik ${trendPctText(r)} 3 hari terakhir${r.context}. Kemungkinan sering kehabisan.</span></button>`);
     groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Waste &amp; lost sales naik</span><div class="fd-trend-grid">${[...wasteFlags,...lostFlags].join('')}</div></div>`);
    }
   }
@@ -453,7 +461,7 @@ window.ForecastDashboard=(()=>{
   // bukan totalSeries mentah di atas -- supaya pesanan masuk tidak terbaca sebagai "tren naik".
   const organicSeries=aggregateOrganicSeries(list);
   const trendNow=weekTrend(organicSeries,planner);
-  const trendDriver=trendNow?(trendNow.pct>0?productDriver(organicSeries,'up',planner):trendNow.pct<0?productDriver(organicSeries,'down',planner):null):null;
+  const trendDriver=trendNow?(trendNow.fromZero||trendNow.pct>0?productDriver(organicSeries,'up',planner):trendNow.pct<0?productDriver(organicSeries,'down',planner):null):null;
   const trendOutletName=outletId==='__all__'?null:(window.OUTLET_INTELLIGENCE?.outlets?.[outletId]?.name||outletId);
   const trendContext=trendNow?windowContext(trendNow.recentDates,trendOutletName):'';
 
