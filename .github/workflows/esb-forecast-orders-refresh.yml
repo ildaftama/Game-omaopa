@@ -1,7 +1,8 @@
-name: Sinkronisasi pesanan & penjualan (tiap jam, jam kerja)
+name: Sinkronisasi pesanan & penjualan (tiap jam)
 on:
   schedule:
-    # 01.11-15.11 UTC = 08.11-22.11 WIB, setiap jam. Dua tujuan:
+    # Tiap jam, 24 JAM PENUH (bukan cuma jam kerja 08-22 WIB lagi -- lihat catatan 2026-11-08
+    # di bawah). Dua tujuan:
     # 1) Pesanan yang baru dicatat tim di sheet PESANAN siang/sore hari H-1 sudah ikut
     #    ter-autofill saat forecaster bikin rencana malam itu juga, bukan menunggu
     #    sinkronisasi penuh jam 21.02 WIB.
@@ -19,10 +20,15 @@ on:
     # seluruh GitHub. Menit digeser ke :11 (bukan solusi sempurna -- GitHub tetap tidak
     # menjamin SLA untuk schedule -- tapi mengurangi kemungkinan tertunda/terlewat). Karena
     # pcs-sales.mjs menggabung (merge), bukan menimpa, dan selalu menarik ulang jendela 7 hari
-    # terakhir, keterlambatan di sini tetap self-heal begitu SALAH SATU run berikutnya jalan --
-    # tapi tetap bisa terasa "telat" kalau banyak run berturut-turut gagal jalan seperti
-    # kemarin.
-    - cron: '11 1-15 * * *'
+    # terakhir, keterlambatan di sini tetap self-heal begitu SALAH SATU run berikutnya jalan.
+    #
+    # Sebelumnya dibatasi 08-22 WIB saja -- itu sebabnya omzet semalam kadang masih belum
+    # ter-update kalau dicek pagi-pagi (08.00-22.00 WIB adalah jendela PERTAMA kali ada
+    # percobaan terjadwal, jadi kalau ketiga percobaan malam di esb-forecast-refresh.yml gagal
+    # semua, tidak ada yang mencoba lagi sampai siang). Diperluas 24 jam penuh karena repo ini
+    # PUBLIC -- runner ubuntu-latest GitHub Actions GRATIS TANPA BATAS untuk repo public, jadi
+    # tidak ada risiko biaya/kuota menjalankan ini tiap jam sepanjang hari.
+    - cron: '11 * * * *'
   workflow_dispatch: {}
 permissions:
   contents: read
