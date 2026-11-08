@@ -1,0 +1,26 @@
+name: Probe kesehatan sinkronisasi (sekali pakai, read-only)
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cek kelengkapan sinkronisasi (read-only, tanpa angka omzet)
+        env:
+          FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
+          FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: node integration/sync-health-probe.mjs > probe-output.txt 2>&1 || true
+      - name: Simpan hasil sebagai artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-health-probe
+          path: probe-output.txt
+          retention-days: 3
