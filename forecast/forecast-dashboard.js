@@ -399,11 +399,14 @@ window.ForecastDashboard=(()=>{
   // Ringkasan satu paragraf di puncak dialog -- gabungan tiga aspek (omzet, waste, lost sales)
   // jadi satu kesimpulan, supaya yang buka tidak perlu menyimpulkan sendiri dari tiga tabel.
   const st=wasteLostStats().list.find(r=>r.id===id);
-  const omzetSentence=omzetTrend?(omzetTrend.fromZero?'Omzet baru mulai naik dari nol.':omzetTrend.dir==='flat'?'Omzet 3 hari terakhir stabil.':`Omzet ${omzetTrend.pct>0?'naik':'turun'} ${pct1(Math.abs(omzetTrend.pct))} dibanding 3 hari sebelumnya${driverCaption(omzetTrend.pct>0?productDriver(aggregateOrganicSeries([id]),'up',planner):productDriver(aggregateOrganicSeries([id]),'down',planner))}.`):'';
+  // Produk pendorong diambil dari tabel di bawahnya (selisih rupiah 3 hari) supaya kalimat dan
+  // tabel tidak saling bertentangan.
+  const dialogDriver=omzetTrend&&!omzetTrend.fromZero?productRows.filter(r=>r.prior!=null&&(omzetTrend.pct>0?r.recent>r.prior:r.recent<r.prior)).sort((x,y)=>Math.abs(y.recent-y.prior)-Math.abs(x.recent-x.prior))[0]:null;
+  const omzetSentence=omzetTrend?(omzetTrend.fromZero?'Omzet baru mulai naik dari nol.':omzetTrend.dir==='flat'?'Omzet 3 hari terakhir stabil.':`Omzet ${omzetTrend.pct>0?'naik':'turun'} ${Math.round(Math.abs(omzetTrend.pct))}% dibanding 3 hari sebelumnya${dialogDriver?`, terutama ${esc(dialogDriver.label)}`:''}.`):'';
   const summary=[omzetSentence,st?.wastePct!=null?wasteSentence(st):'',st?.lostPct!=null?lostSentence(st):''].filter(Boolean).join(' ');
   const advice=st?adviceText(st):'';
   const chip=(k,v,bad)=>`<div class="fd-outlet-chip ${bad==null?'':bad?'bad':'good'}"><span>${k}</span><b>${v}</b></div>`;
-  const chips=`<div class="fd-outlet-chips">${chip('Omzet · 3 hari',omzetTrend?(omzetTrend.fromZero?'baru':trendPctText(omzetTrend)):'—',omzetTrend&&!omzetTrend.fromZero?omzetTrend.pct<-8:null)}${chip(`Waste · batas ${W_TH}`,pct1(st?.wastePct??null),st?.wastePct!=null?st.wasteOver:null)}${chip('Kehabisan / hari',st?.lostPerDay!=null?Math.round(st.lostPerDay)+' mnt':'—',st?.lostPct!=null?st.lostOver:null)}</div>`;
+  const chips=`<div class="fd-outlet-chips">${chip('Omzet · 3 hari',omzetTrend?(omzetTrend.fromZero?'baru':trendPctText(omzetTrend)):'—',omzetTrend&&!omzetTrend.fromZero?omzetTrend.pct<-8:null)}${chip(`Waste · batas ${W_TH}`,pct1(st?.wastePct??null),st?.wastePct!=null?st.wasteOver:null)}${chip(st?.lostSrc==='bulanan'?'Kehabisan / hari (bln lalu)':'Kehabisan / hari',st?.lostPerDay!=null?Math.round(st.lostPerDay)+' mnt':'—',st?.lostSrc==='sheet'?st.lostOver:null)}</div>`;
   return `<dialog id="fd-outlet-dialog" class="fd-outlet-dialog" aria-labelledby="fd-outlet-title"><div class="dialog-head"><h2 id="fd-outlet-title">${esc(name)}</h2><button type="button" class="icon-button" data-outlet-detail-close aria-label="Tutup">×</button></div>
    ${chips}${summary?`<p class="fd-outlet-summary">${summary}${advice?` <b>${advice}</b>`:''}</p>`:''}
    <div class="fd-outlet-section"><h3>Omzet per produk</h3>${trendLine(omzetTrend,true)}${productRows.length?`<div class="fd-outlet-table-wrap"><table class="fd-outlet-table"><thead><tr><th>Produk</th><th>3 hari terakhir</th><th>3 hari sebelumnya</th><th>Perubahan</th></tr></thead><tbody>${productRows.map(outletDetailRow).join('')}</tbody></table></div>`:'<p class="workspace-note">Belum ada penjualan tercatat.</p>'}</div>
@@ -705,6 +708,7 @@ window.ForecastDashboard=(()=>{
    for(const [id,m] of Object.entries(day)){if(!Number.isFinite(m))continue;const r=get(id);r.lostMinutes+=m;r.lostDays++;if(!lostLast||date>lostLast)lostLast=date;}
   }
   const team=new Map((wasteByOutlet('__all__')||[]).map(r=>[r.id,r.percent]));
+  const omzetTrendById=new Map((networkTrendExtremes()?.all||[]).map(r=>[r.id,r]));
   const perf=window.PERFORMANCE_SUMMARY,perfPeriod=perf?.latestCompletePeriod;
   const list=[...rows.values()].map(r=>{
    let wastePct=null,wasteSrc=null;
@@ -715,7 +719,8 @@ window.ForecastDashboard=(()=>{
    if(r.lostDays>=MIN_RECAP_DAYS){lostPerDay=r.lostMinutes/r.lostDays;lostPct=lostPerDay/OPEN_MINUTES*100;lostSrc='sheet';}
    else{const v=perf?.outlets?.[r.id]?.periods?.[perfPeriod]?.estimatedLostSalesPercent;if(v!=null){lostPct=v;lostSrc='bulanan';lostPerDay=v/100*OPEN_MINUTES;}}
    const maxCore=Math.max(...r.core),topCore=maxCore>0?r.core.indexOf(maxCore):null;
-   return {...r,wastePct,wasteSrc,lostPct,lostSrc,lostPerDay,topCore,wasteOver:wastePct!=null&&wastePct>WASTE_THRESHOLD,lostOver:lostSrc==='sheet'&&lostPct>LOST_SALES_THRESHOLD};
+   const ot=omzetTrendById.get(r.id);
+   return {...r,omzetPct:ot&&!ot.fromZero?ot.pct:null,wastePct,wasteSrc,lostPct,lostSrc,lostPerDay,topCore,wasteOver:wastePct!=null&&wastePct>WASTE_THRESHOLD,lostOver:lostSrc==='sheet'&&lostPct>LOST_SALES_THRESHOLD};
   }).filter(r=>r.wastePct!=null||r.lostPct!=null);
   const ws=list.filter(r=>r.wasteSrc==='sheet'),ls=list.filter(r=>r.lostSrc==='sheet');
   const wRev=ws.reduce((s,r)=>s+r.wasteRevenue,0),lDays=ls.reduce((s,r)=>s+r.lostDays,0);
@@ -742,7 +747,12 @@ window.ForecastDashboard=(()=>{
  }
  function adviceText(r){
   if(r.wasteOver&&r.lostOver)return 'Sisa banyak tapi juga sering kehabisan — kemungkinan komposisi produknya yang kurang pas, bukan jumlah totalnya.';
-  if(r.wasteOver)return r.topCore!=null?`Kurangi kiriman ${CORE_SHORT[r.topCore]} dulu.`:'Kurangi kiriman sedikit.';
+  // Waste tinggi TAPI omzet sedang naik tajam: memotong kiriman justru berisiko kehabisan --
+  // cukup tahan (jangan ditambah) sampai lonjakannya jelas bertahan.
+  const prod=r.topCore!=null?CORE_SHORT[r.topCore]:'kiriman';
+  if(r.wasteOver&&r.omzetPct!=null&&r.omzetPct>=15)return `Omzet sedang naik, jadi ${prod} jangan dipotong — cukup jangan ditambah dulu.`;
+  if(r.wasteOver&&r.omzetPct!=null&&r.omzetPct<=-15)return `Omzet juga sedang turun, kurangi kiriman ${prod}.`;
+  if(r.wasteOver)return r.topCore!=null?`Kurangi kiriman ${prod} dulu.`:'Kurangi kiriman sedikit.';
   if(r.lostOver)return r.wastePct!=null&&r.wastePct<WASTE_THRESHOLD*.6?'Waste-nya rendah, jadi kiriman masih aman ditambah.':'Tambah kiriman sedikit, sambil pantau waste-nya.';
   return '';
  }
