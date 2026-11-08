@@ -64,7 +64,20 @@
 .fd-trend-badge.fd-trend-up,.fd-trend-badge.fd-trend-sharp-up{color:#1f6b45;background:#e4f4ea}
 .fd-trend-badge.fd-trend-down,.fd-trend-badge.fd-trend-sharp-down{color:#a4302a;background:#fdeceb}
 .fd-trend-badge.fd-trend-flat{color:#637483;background:#f0f3f6}
-.fd-trend-watch{display:flex;flex-direction:column;gap:12px;margin-bottom:22px;background:#fffaf0;border-color:#f0dfb8}
+.fd-trend-watch{display:flex;flex-direction:column;gap:14px;margin-bottom:22px;background:#fffaf0;border-color:#f0dfb8}
+/* Ringkasan global (gambaran umum semua outlet) -- tampil DULUAN, sebelum rincian per outlet. */
+.fd-overview{display:flex;flex-wrap:wrap;gap:8px}
+.fd-overview-stat{display:flex;flex-direction:column;gap:2px;padding:8px 14px;border-radius:9px;background:#fff;border:1px solid #f0dfb8;min-width:98px}
+.fd-overview-stat b{font-size:15px;color:#2b3f4f;line-height:1.3}
+.fd-overview-stat span{font-size:10.5px;color:#8a7a4e}
+.fd-overview-stat.fd-overview-up b,.fd-overview-stat.fd-trend-up b,.fd-overview-stat.fd-trend-sharp-up b{color:#1f6b45}
+.fd-overview-stat.fd-overview-down b,.fd-overview-stat.fd-trend-down b,.fd-overview-stat.fd-trend-sharp-down b{color:#a4302a}
+.fd-overview-headline{background:#fff3d6;border-color:#e9cd8e}
+.fd-overview-headline b{font-size:14px}
+.fd-trend-group{display:flex;flex-direction:column;gap:8px}
+.fd-trend-group-title{font-size:11px;font-weight:700;color:#8a7a4e;text-transform:uppercase;letter-spacing:.3px}
+.fd-trend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}
+.fd-trend-caution{display:block;margin-top:5px;color:#a0620f}
 .fd-trend-flag{display:flex;flex-direction:column;gap:4px;padding:13px 16px;border-radius:9px;background:#fff;border:0;width:100%;text-align:left;font:inherit;cursor:pointer}
 .fd-trend-flag b{font-size:13px}
 .fd-trend-flag span{font-size:12px;color:#536b7d;line-height:1.5}
@@ -85,6 +98,14 @@
 .fd-trend-row.fd-trend-down,.fd-trend-row.fd-trend-sharp-down{background:#fdf2f1}
 .fd-trend-row.fd-trend-flat b{color:#637483}
 .fd-trend-row:hover,.fd-trend-flag:hover{filter:brightness(.96)}
+/* Banner peringatan ambang waste/lost sales -- halaman pertama, lebih mendesak daripada kartu tren (merah, bukan kuning). */
+.fd-waste-warning{background:#fdf0ee;border-color:#eab6ac;margin-bottom:22px}
+.fd-warn-group+.fd-warn-group{margin-top:14px}
+.fd-warn-group-title{display:block;font-size:11px;font-weight:700;color:#a4302a;margin-bottom:6px}
+.fd-warn-row{display:flex;justify-content:space-between;gap:10px;padding:6px 2px;font-size:12.5px;border-bottom:1px solid #f3dcd8}
+.fd-warn-row:last-child{border-bottom:0}
+.fd-warn-row b{color:#2b3f4f;font-weight:600}
+.fd-warn-row span{font-weight:700;color:#a4302a;flex-shrink:0}
 /* Dialog rincian outlet -- muncul saat klik nama outlet di kartu tren */
 .fd-outlet-dialog{width:min(640px,calc(100% - 28px))}
 .fd-outlet-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--line,#e3e5da)}
@@ -97,4 +118,4 @@
 .fd-outlet-table td:first-child{white-space:normal;min-width:110px}
 .fd-outlet-new{color:#8a97a3;font-style:italic;font-weight:400}
 .fd-outlet-note{font-size:11px;color:#8a97a3;margin:8px 0 0}
-@media(max-width:550px){.fd-shortcut{padding:12px 14px;gap:10px}.fd-trend-badge{font-size:10px;padding:4px 9px}.fd-trend-flag{padding:11px 13px}.fd-trend-rows{max-height:240px}.fd-outlet-table{font-size:11px}}
+@media(max-width:550px){.fd-shortcut{padding:12px 14px;gap:10px}.fd-trend-badge{font-size:10px;padding:4px 9px}.fd-trend-flag{padding:11px 13px}.fd-trend-rows{max-height:240px}.fd-outlet-table{font-size:11px}.fd-overview-stat{min-width:80px;padding:7px 11px}.fd-trend-grid{grid-template-columns:1fr}}

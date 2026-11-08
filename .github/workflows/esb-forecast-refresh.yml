@@ -1,8 +1,19 @@
 name: Sinkronisasi bundle referensi Forecast (malam)
 on:
   schedule:
-    # 14.02 UTC = 21.02 WIB (Asia/Jakarta), setiap hari -- 2 menit setelah outlet tutup (21.00).
+    # TIGA percobaan, bukan satu -- 14.02/15.02/16.02 UTC = 21.02/22.02/23.02 WIB. Owner
+    # melaporkan omzet semalam kadang masih belum update paginya; root cause (dicek 2026-11-08):
+    # GitHub Actions `schedule` best-effort, TIDAK ada SLA -- riwayat run nyata menunjukkan
+    # jadwal "sekali semalam" ini bisa gagal terpicu sama sekali, dan karena cuma 1x kesempatan,
+    # satu kegagalan berarti hari itu TIDAK tertutup sampai sinkronisasi tiap jam esok siang
+    # (esb-forecast-orders-refresh.yml, mulai jam 08 WIB) akhirnya menariknya ulang -- itu
+    # sebabnya pagi hari terasa "belum update". Ketiga jadwal di sini SEMUA dijaga guard
+    # WIB_HOUR>=20 di bawah (lihat langkah "Ambil PCS..."), jadi tiap satu yang benar2 jalan
+    # dalam jendela 20.00-23.59 WIB akan menarik hari itu dengan aman (merge, bukan timpa) --
+    # kemungkinan SEMUA TIGA gagal jauh lebih kecil daripada kemungkinan satu-satunya gagal.
     - cron: '2 14 * * *'
+    - cron: '2 15 * * *'
+    - cron: '2 16 * * *'
   workflow_dispatch:
     inputs:
       backfill_from:
