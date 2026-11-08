@@ -393,7 +393,19 @@ window.ForecastDashboard=(()=>{
   const lastDate=series.length?series[series.length-1].date:null;
   const baseWin=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-56)):[];
   const baselineLevel=baseWin.length?planner.quantile(baseWin.map(r=>r.value),.5):null;
-  const trendRecent=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-14)).map(r=>r.value):[],trendPrior=lastDate?series.filter(r=>r.date<planner.shift(lastDate,-14)&&r.date>=planner.shift(lastDate,-28)).map(r=>r.value):[];
+  // Jendela tren PREDIKSI (bukan badge -- itu TREND_WINDOW=3 hari terpisah, lihat weekTrend()).
+  // SEBELUMNYA 14 hari vs 14 hari sebelumnya -- owner melaporkan (2026-11-09) prediksi
+  // November konsisten DI BAWAH omzet real beberapa hari terakhir. Dicek: 5-8 Nov median
+  // naik ~27% (badge 3 hari, dan 23/28 outlet ikut naik -- jaringan luas, bukan 1-2 outlet
+  // "kebetulan"), tapi trendFactor 14-vs-14 hari cuma menangkap ~+2% karena 10 hari paling
+  // tenang (29 Okt - 4 Nov) di jendela "14 hari terakhir" ikut meredam median bersama 4 hari
+  // yang benar2 naik tajam -- jendela terlalu lebar untuk kecepatan pergerakan yang terjadi.
+  // Dipersempit ke 7-vs-7 hari (bukan ikut 3 hari seperti badge -- untuk PREDIKSI ke depan
+  // tetap perlu cukup titik data supaya mediannya tidak goyah oleh satu-dua hari aneh) supaya
+  // lebih cepat bereaksi tanpa jadi seliar badge. Tidak menghilangkan gap sepenuhnya untuk
+  // lonjakan setajam ini (itu memang disengaja -- lihat batas trendFactor di bawah, forecast
+  // tetap tidak boleh mengejar lonjakan 3-4 hari secara membabi buta), tapi mengurangi jeda.
+  const trendRecent=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-7)).map(r=>r.value):[],trendPrior=lastDate?series.filter(r=>r.date<planner.shift(lastDate,-7)&&r.date>=planner.shift(lastDate,-14)).map(r=>r.value):[];
   const trendA=planner.quantile(trendRecent,.5),trendB=planner.quantile(trendPrior,.5),trendFactor=trendA!==null&&trendB>0?Math.max(.85,Math.min(1.15,trendA/trendB)):1;
   const wideWin=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-180)):[],wideMedian=wideWin.length?planner.quantile(wideWin.map(r=>r.value),.5):baselineLevel;
   function weekdayShape(date){
