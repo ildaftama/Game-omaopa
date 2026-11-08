@@ -110,6 +110,7 @@
 .fd-wl-src{color:#8a97a3;font-style:normal;font-size:11px}
 .fd-wl-table td.fd-wl-bad{color:#a4302a;font-weight:700}
 .fd-wl-table td.fd-wl-good{color:#1f6b45}
+.fd-wl-table td.fd-wl-stale{color:#8a97a3}
 .fd-wl-table small{color:#8a97a3;font-weight:400;margin-left:4px}
 .fd-wl-link{border:0;background:none;padding:0;font:inherit;color:#1f3a4d;cursor:pointer;text-align:left}
 .fd-wl-link:hover{text-decoration:underline}
