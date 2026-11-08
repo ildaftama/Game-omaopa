@@ -19,9 +19,14 @@ const MONTHS_EN = ['January','February','March','April','May','June','July','Aug
 const MONTH_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const MONTH_ABBR = ['JAN','FEB','MAR','APR','MEI','JUN','JUL','AGT','SEP','OKT','NOV','DES'];
 
-async function fetchSheetCsv(sheetId, tabName) {
+// Tab "Rekap Forecast <bulan>" sangat berat (301 kolom penuh rumus) -- diukur 2026-11-09,
+// ekspor gviz-nya butuh ±250 detik. Batas lama 30 detik membuat tab ini SELALU gagal diam-diam,
+// jadi lost sales harian tidak pernah masuk sejak Oktober (cuma tab WASTE yang ringan yang
+// berhasil). Tab bulanan diberi waktu jauh lebih longgar; tab WASTE tetap 30 detik.
+const MONTH_TAB_TIMEOUT_MS = 360000, RECAP_BUDGET_MS = 480000;
+async function fetchSheetCsv(sheetId, tabName, timeoutMs = 30000) {
  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
- const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+ const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
  if (!res.ok) throw Error(`Tab sheet "${tabName}" tidak terbaca (HTTP ${res.status}).`);
  return res.text();
 }
@@ -42,7 +47,9 @@ export function parseCsv(text) {
  return rows.filter(r => !(r.length === 1 && r[0] === ''));
 }
 
-const num = v => { const n = Number(String(v ?? '').replace(/[^0-9.-]/g, '')); return Number.isFinite(n) ? n : null; };
+// Sel kosong / "#N/A" (rumus tanggal yang belum diisi tim) harus jadi null, BUKAN 0 --
+// Number('') === 0, jadi tanpa cek ini "#N/A" diam-diam terbaca "0 menit kehabisan".
+const num = v => { const s = String(v ?? '').replace(/[^0-9.-]/g, ''); if (!s || s === '-' || s === '.') return null; const n = Number(s); return Number.isFinite(n) ? n : null; };
 
 // "01 January 2026" -> "2026-01-01"
 function parseIsoDate(label) {
@@ -101,14 +108,16 @@ export function parseLostSalesTab(csvText, getId) {
  return byDate;
 }
 
-// Nama tab bulanan tim TIDAK konsisten (lihat "Rekap Forecast AGUSTUS" vs "...OKT" vs
-// "...NOV" -- kadang nama penuh, kadang singkatan). Coba nama penuh dulu lalu singkatan,
-// dan WAJIB validasi header tanggal blok pertama benar-benar bulan+tahun yang diminta
-// (lihat peringatan gviz-fallback di atas) sebelum dipakai.
-export async function fetchLostSalesForMonth(sheetId, year, monthIndex0, getId) {
- const candidates = [...new Set([`Rekap Forecast ${MONTH_ID[monthIndex0].toUpperCase()}`, `Rekap Forecast ${MONTH_ABBR[monthIndex0]}`])];
+// Nama tab bulanan tim TIDAK konsisten ("Rekap Forecast AGUSTUS" vs "...SEPT" vs "...OKT" vs
+// "...NOV"). Singkatan dicoba DULU (pola tim sejak September) -- nama yang salah tidak error,
+// gviz diam-diam mengembalikan sheet PERTAMA, dan tiap percobaan tab bulanan bisa makan
+// beberapa menit, jadi urutan ini penting. Header tanggal blok pertama WAJIB divalidasi
+// benar-benar bulan+tahun yang diminta (lihat peringatan gviz-fallback di atas).
+export async function fetchLostSalesForMonth(sheetId, year, monthIndex0, getId, deadline = Infinity) {
+ const candidates = [...new Set([`Rekap Forecast ${MONTH_ABBR[monthIndex0]}`, ...(monthIndex0 === 8 ? ['Rekap Forecast SEPT'] : []), `Rekap Forecast ${MONTH_ID[monthIndex0].toUpperCase()}`])];
  for (const tabName of candidates) {
-  let text; try { text = await fetchSheetCsv(sheetId, tabName); } catch { continue; }
+  const left = deadline - Date.now(); if (left < 20000) break;
+  let text; try { text = await fetchSheetCsv(sheetId, tabName, Math.min(MONTH_TAB_TIMEOUT_MS, left)); } catch { continue; }
   const rows = parseCsv(text); if (!rows.length) continue;
   const firstDate = parseDateHeaderCell(rows[0][1]);
   if (firstDate !== `${year}-${String(monthIndex0 + 1).padStart(2, '0')}-01`) continue;
@@ -117,16 +126,27 @@ export async function fetchLostSalesForMonth(sheetId, year, monthIndex0, getId) 
  return null;
 }
 
-export async function pull(sheetId, profiles, { now = new Date() } = {}) {
+export async function pull(sheetId, profiles, { now = new Date(), previous = null } = {}) {
  const getId = outletLookup(profiles);
  const wasteCsv = await fetchSheetCsv(sheetId, 'WASTE');
  const waste = parseWasteTab(wasteCsv, getId);
  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
  const [year, month] = today.slice(0, 7).split('-').map(Number);
- const months = [[year, month - 1]]; if (month === 1) months.push([year - 1, 11]); else months.push([year, month - 2]);
- const lostSales = {}; const monthsUsed = [];
+ // Bulan lalu cuma ditarik ulang di awal bulan (jendela 7 hari dashboard masih menyentuhnya)
+ // -- selebihnya sudah tersimpan dari tarikan sebelumnya (lihat merge `previous` di bawah),
+ // tidak perlu membebani tiap run dengan tab berat kedua.
+ const day = Number(today.slice(8, 10));
+ const months = [[year, month - 1]];
+ if (day <= 8) { if (month === 1) months.push([year - 1, 11]); else months.push([year, month - 2]); }
+ // Mulai dari lost sales yang sudah tersimpan di bundle (kalau ada), lalu ditimpa tanggal yang
+ // berhasil ditarik ulang -- tab bulanan yang kebetulan gagal/timeout di satu run tidak lagi
+ // menghapus data lost sales yang sudah ada.
+ // Anggaran waktu total untuk tab bulanan -- jangan sampai tab yang lambat membuat seluruh job
+ // sinkronisasi (yang juga membawa omzet ESB tiap jam) kena batas waktu workflow dan gagal total.
+ const deadline = Date.now() + RECAP_BUDGET_MS;
+ const lostSales = { ...(previous?.lostSalesMinutes || {}) }; const monthsUsed = [];
  for (const [y, mi] of months) {
-  const result = await fetchLostSalesForMonth(sheetId, y, mi, getId).catch(() => null);
+  const result = await fetchLostSalesForMonth(sheetId, y, mi, getId, deadline).catch(() => null);
   if (result) { Object.assign(lostSales, result.data); monthsUsed.push(result.tabName); }
  }
  // Template bulan berjalan sudah berisi 0 untuk tanggal yang BELUM terjadi (bukan data real

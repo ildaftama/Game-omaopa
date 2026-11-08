@@ -124,12 +124,12 @@ export async function prime(env = process.env, salesPath = 'forecast/pcs-sales.j
 // <bulan>") ditarik dari sheet publik tim, bukan ESB -- kegagalan di sini TIDAK boleh
 // menggagalkan sinkronisasi ESB utama, jadi dibungkus try/catch dan jatuh ke data lama di
 // bundle (kalau ada) daripada membatalkan seluruh run().
-async function fetchDailyRecap(profiles) {
+async function fetchDailyRecap(profiles, previous) {
   try {
     const sources = JSON.parse(fs.readFileSync('forecast/data-sources.json', 'utf8'));
     const sheetId = sources.sources.find(s => s.key === 'forecast')?.url?.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
     if (!sheetId || !profiles) return null;
-    return await pullDailyRecap(sheetId, profiles);
+    return await pullDailyRecap(sheetId, profiles, { previous });
   } catch (e) { console.log('Rekap harian (waste/lost sales) belum berhasil ditarik: ' + e.message); return null; }
 }
 // Demografi member (database "users") per outlet -- kegagalan (misalnya rule belum/ belum
@@ -144,7 +144,7 @@ export async function run(env = process.env, salesPath = 'forecast/pcs-sales.jso
   const current = await fetchBundle('forecastPlans/reference_current', idToken);
   if (!current) throw Error('Belum ada bundle referensi yang tersimpan — jalankan import manual (manager) terlebih dahulu sekali.');
   const sales = JSON.parse(fs.readFileSync(salesPath, 'utf8')), orders = JSON.parse(fs.readFileSync(ordersPath, 'utf8'));
-  const dailyRecap = await fetchDailyRecap(current.globals?.OUTLET_INTELLIGENCE) || current.globals?.DAILY_RECAP_SUMMARY || null;
+  const dailyRecap = await fetchDailyRecap(current.globals?.OUTLET_INTELLIGENCE, current.globals?.DAILY_RECAP_SUMMARY) || current.globals?.DAILY_RECAP_SUMMARY || null;
   const demographics = await fetchDemographics(env, current.globals?.CUSTOMER_DEMOGRAPHICS);
   const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}), ...(demographics ? { CUSTOMER_DEMOGRAPHICS: demographics } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders } };
   const packedFull = packBundle(full);

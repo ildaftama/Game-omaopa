@@ -42,7 +42,9 @@ concurrency:
 jobs:
   sync-orders-and-sales:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30, bukan 20: tarikan lost sales dari tab "Rekap Forecast <bulan>" (sheet tim) butuh
+    # beberapa menit (tab berat, lihat MONTH_TAB_TIMEOUT_MS di waste-recap.mjs).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
