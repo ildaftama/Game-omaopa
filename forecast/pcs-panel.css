@@ -106,6 +106,9 @@
 .fd-warn-row:last-child{border-bottom:0}
 .fd-warn-row b{color:#2b3f4f;font-weight:600}
 .fd-warn-row span{font-weight:700;color:#a4302a;flex-shrink:0}
+.fd-warn-more{margin-top:4px}
+.fd-warn-more summary{cursor:pointer;font-size:11px;color:#a4302a;font-weight:600;padding:4px 0;list-style:revert}
+.fd-warn-more[open] summary{margin-bottom:2px}
 /* Dialog rincian outlet -- muncul saat klik nama outlet di kartu tren */
 .fd-outlet-dialog{width:min(640px,calc(100% - 28px))}
 .fd-outlet-section{margin-top:20px;padding-top:16px;border-top:1px solid var(--line,#e3e5da)}

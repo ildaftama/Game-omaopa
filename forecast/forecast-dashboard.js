@@ -65,10 +65,26 @@ window.ForecastDashboard=(()=>{
   if(daySpan(priorPts[0].date,priorPts.at(-1).date)>TREND_MAX_SPAN_DAYS)return null;
   if(daySpan(priorPts.at(-1).date,recentPts[0].date)>TREND_MAX_SPAN_DAYS)return null;
   const recentMed=planner.quantile(recentPts.map(r=>r.value),.5),priorMed=planner.quantile(priorPts.map(r=>r.value),.5);
-  if(!(priorMed>0))return null;
+  // BUG yang dilaporkan owner (2026-11-08): sebelumnya priorMed=0 (3 hari sebelumnya benar2
+  // nol -- mis. waste 0 lalu muncul) membuat fungsi ini `return null` (persen tak terhingga,
+  // tidak bisa dihitung) -- tapi itu artinya kejadian "dari nol ke ada" DIAM-DIAM HILANG dari
+  // semua tempat yang pakai weekTrend() (badge, kartu peringatan, DAN hitungan "N outlet waste
+  // naik" di ringkasan global), padahal itu justru sinyal paling jelas/tajam, bukan yang paling
+  // meragukan. Sekarang tetap dilaporkan (dir sharp-up, pct=null+fromZero=true) selama memang
+  // recentMed>0 -- cuma kalau KEDUANYA nol (benar2 tidak ada apa-apa) baru null (tidak ada
+  // yang perlu dilaporkan). Pemanggil WAJIB cek fromZero sebelum format pct sebagai angka.
+  if(!(priorMed>0))return recentMed>0?{pct:null,fromZero:true,dir:'sharp-up',deltaMed:recentMed,recentMed,priorMed:0,recentDates:recentPts.map(r=>r.date),asOf:recentPts.at(-1).date}:null;
   const pct=(recentMed-priorMed)/priorMed*100;
   const dir=pct>=20?'sharp-up':pct>=8?'up':pct<=-20?'sharp-down':pct<=-8?'down':'flat';
   return {pct,dir,deltaMed:recentMed-priorMed,recentMed,priorMed,recentDates:recentPts.map(r=>r.date),asOf:recentPts.at(-1).date};
+ }
+ // Teks persen aman -- dipakai di SEMUA tempat yang menampilkan angka dari weekTrend(), supaya
+ // kasus fromZero (lihat komentar di weekTrend) tidak pernah mencoba format null jadi angka
+ // (itu akan error) dan tetap jujur: bukan "+∞%" atau angka karangan, tapi "baru/naik dari 0".
+ function trendPctText(t){
+  if(t.pct==null)return '(dari 0)';
+  const sign=t.pct>=0?'+':'';
+  return `${sign}${t.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%`;
  }
  // Catatan konteks (bukan koreksi angka) -- kalau 3 hari terakhir memuat akhir pekan atau
  // bertepatan dengan kegiatan yang terdaftar untuk outlet ini, disebutkan apa adanya supaya
@@ -105,8 +121,8 @@ window.ForecastDashboard=(()=>{
  }
  function trendBadgeHtml(t){
   if(!t)return '';
-  const [icon,label]=TREND_LABEL[t.dir],sign=t.pct>=0?'+':'';
-  return `<span class="fd-trend-badge fd-trend-${t.dir}">${icon} ${label} ${sign}${t.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%</span>`;
+  const [icon,label]=TREND_LABEL[t.dir];
+  return `<span class="fd-trend-badge fd-trend-${t.dir}">${icon} ${label} ${trendPctText(t)}</span>`;
  }
  // Omzet harian per outlet DENGAN pesanan dikeluarkan (angka PASTI dari sheet PESANAN pada
  // tanggal yang tercatat -- bukan estimasi statistik -- supaya lonjakan karena pesanan masuk
@@ -203,8 +219,7 @@ window.ForecastDashboard=(()=>{
   return value;
  }
  function trendRowHtml(r){
-  const sign=r.pct>=0?'+':'';
-  return `<button type="button" class="fd-trend-row fd-trend-${r.dir}" data-outlet-detail="${esc(r.id)}"><span>${esc(r.name)}</span><b>${sign}${r.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%</b></button>`;
+  return `<button type="button" class="fd-trend-row fd-trend-${r.dir}" data-outlet-detail="${esc(r.id)}"><span>${esc(r.name)}</span><b>${trendPctText(r)}</b></button>`;
  }
  // Hitung berapa outlet naik/turun/stabil dari daftar hasil weekTrend() -- dipakai untuk
  // ringkasan global (gambaran umum dulu) sebelum rincian per outlet.
@@ -219,10 +234,10 @@ window.ForecastDashboard=(()=>{
  function wasteCautionText(wl,id,omzetDir){
   const w=wl?.waste.find(x=>x.id===id);
   if(!w||!(w.dir==='up'||w.dir==='sharp-up'))return '';
-  const wastePct=w.pct.toLocaleString('id-ID',{maximumFractionDigits:0});
+  const wastePct=trendPctText(w);
   return omzetDir==='up'
-   ?` <b class="fd-trend-caution">Tapi waste juga naik ${wastePct}% — tetap hati-hati, jangan kirim kebablasan.</b>`
-   :` <b class="fd-trend-caution">Waste malah ikut naik ${wastePct}% walau omzet turun — segera sesuaikan kiriman, bukan cuma dikurangi asal.</b>`;
+   ?` <b class="fd-trend-caution">Tapi waste juga naik ${wastePct} — tetap hati-hati, jangan kirim kebablasan.</b>`
+   :` <b class="fd-trend-caution">Waste malah ikut naik ${wastePct} walau omzet turun — segera sesuaikan kiriman, bukan cuma dikurangi asal.</b>`;
  }
  // Ringkasan global (gambaran umum SEMUA outlet dulu) -- owner minta ini di depan, baru
  // rincian per outlet di bawahnya (lihat flags/full di trendWatchCard). networkTrend = tren
@@ -231,8 +246,8 @@ window.ForecastDashboard=(()=>{
  function networkOverviewHtml(networkTrend,ext,wl){
   const stats=[];
   if(networkTrend){
-   const [icon,label]=TREND_LABEL[networkTrend.dir],sign=networkTrend.pct>=0?'+':'';
-   stats.push(`<div class="fd-overview-stat fd-overview-headline fd-trend-${networkTrend.dir}"><b>${icon} ${label}</b><span>Omzet jaringan ${sign}${networkTrend.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}% 3 hari terakhir</span></div>`);
+   const [icon,label]=TREND_LABEL[networkTrend.dir];
+   stats.push(`<div class="fd-overview-stat fd-overview-headline fd-trend-${networkTrend.dir}"><b>${icon} ${label}</b><span>Omzet jaringan ${trendPctText(networkTrend)} 3 hari terakhir</span></div>`);
   }
   if(ext){
    const c=trendDirCounts(ext.all);
@@ -331,7 +346,14 @@ window.ForecastDashboard=(()=>{
  }
  function outletWasteRow(r){
   const pct=r.prior>0?(r.recent-r.prior)/r.prior*100:null;
-  const pctTxt=pct==null?'—':`<b class="${pct<=0?'fp-up':'fp-down'}">${pct>=0?'+':''}${pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%</b>`;
+  // BUG dilaporkan owner: "3 hari sebelumnya" 0 pcs lalu ada waste (mis. 0 -> 3 pcs) menampilkan
+  // "—" seperti tidak ada perubahan, padahal itu KENAIKAN waste nyata dari nol -- cuma persennya
+  // yang tidak bisa dihitung (pembagi nol), bukan datanya yang kosong. Dibedakan dari r.prior
+  // benar2 null (data belum ada sama sekali, baris itu malah tidak akan lolos filter pemanggil).
+  let pctTxt;
+  if(pct!=null)pctTxt=`<b class="${pct<=0?'fp-up':'fp-down'}">${pct>=0?'+':''}${pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%</b>`;
+  else if(r.prior===0&&r.recent>0)pctTxt='<b class="fp-down">Naik dari 0</b>';
+  else pctTxt='—';
   return `<tr><td>${esc(r.label)}</td><td>${num(r.recent)} pcs</td><td>${r.prior==null?'—':num(r.prior)+' pcs'}</td><td>${pctTxt}</td></tr>`;
  }
  function outletDetailHtml(id){
@@ -343,8 +365,11 @@ window.ForecastDashboard=(()=>{
   const productRows=outletProductRows(id),wasteCoreRows=outletWasteCoreRows(id);
   const trendLine=(t,goodWhenUp)=>{
    if(!t)return '<p class="workspace-note">Belum cukup data (riwayat bolong atau terlalu sedikit).</p>';
-   const good=goodWhenUp?t.pct>=0:t.pct<0,sign=t.pct>=0?'+':'';
-   return `<p class="workspace-note"><b class="${good?'fp-up':'fp-down'}">${sign}${t.pct.toLocaleString('id-ID',{maximumFractionDigits:0})}%</b> dibanding 3 hari sebelumnya${windowContext(t.recentDates,name)}.</p>`;
+   // fromZero (lihat weekTrend): 3 hari sebelumnya benar2 nol, jadi "naik"-nya selalu sesuai
+   // goodWhenUp langsung -- BUKAN dihitung dari t.pct (null, tidak bisa dibandingkan >=0).
+   const good=t.fromZero?goodWhenUp:(goodWhenUp?t.pct>=0:t.pct<0);
+   const text=t.fromZero?'Baru naik dari 0':trendPctText(t);
+   return `<p class="workspace-note"><b class="${good?'fp-up':'fp-down'}">${text}</b> dibanding 3 hari sebelumnya${windowContext(t.recentDates,name)}.</p>`;
   };
   return `<dialog id="fd-outlet-dialog" class="fd-outlet-dialog" aria-labelledby="fd-outlet-title"><div class="dialog-head"><h2 id="fd-outlet-title">${esc(name)}</h2><button type="button" class="icon-button" data-outlet-detail-close aria-label="Tutup">×</button></div>
    <div class="fd-outlet-section"><h3>Omzet per produk</h3>${trendLine(omzetTrend,true)}${productRows.length?`<div class="fd-outlet-table-wrap"><table class="fd-outlet-table"><thead><tr><th>Produk</th><th>3 hari terakhir</th><th>3 hari sebelumnya</th><th>Perubahan</th></tr></thead><tbody>${productRows.map(outletDetailRow).join('')}</tbody></table></div>`:'<p class="workspace-note">Belum ada penjualan tercatat.</p>'}</div>
@@ -676,6 +701,17 @@ window.ForecastDashboard=(()=>{
  // kelihatan begitu dashboard dibuka. Sumber data SAMA persis dengan badges() (ground truth
  // "dikirim vs laku" dulu, baru fallback rata-rata historis kalau belum ada data kirim 7 hari
  // ini) -- supaya tidak dobel logika/ambang.
+ // Satu kelompok ambang (waste ATAU lost sales) -- gambaran GLOBAL dulu (berapa outlet,
+ // rata-rata berapa) baru 5 terburuk langsung kelihatan, sisanya di-lipat ke "lihat outlet
+ // lainnya" -- owner minta jangan langsung dump semua outlet, bikin fokus global dulu.
+ function warnGroupHtml(icon,title,threshold,rows,srcLabel){
+  if(!rows.length)return '';
+  const avg=rows.reduce((s,r)=>s+r.percent,0)/rows.length;
+  const top=rows.slice(0,5),rest=rows.slice(5);
+  const row=r=>`<div class="fd-warn-row"><b>${esc(r.name)}</b><span>${r.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}%</span></div>`;
+  const restHtml=rest.length?`<details class="fd-warn-more"><summary>Lihat ${rest.length} outlet lainnya</summary>${rest.map(row).join('')}</details>`:'';
+  return `<div class="fd-warn-group"><span class="fd-warn-group-title">${icon} ${esc(title)} di atas ambang ${threshold}% · ${rows.length} outlet, rata-rata ${avg.toLocaleString('id-ID',{maximumFractionDigits:1})}% · ${esc(srcLabel)}</span>${top.map(row).join('')}${restHtml}</div>`;
+ }
  function wasteThresholdWarning(outletId){
   const team=wasteByOutlet(outletId);
   const wasteSrc=team&&team.length?{rows:team,label:'dikirim vs laku, 7 hari terakhir'}:(()=>{const h=wasteHistoricalFallback(outletId);return h?.rows.length?{rows:h.rows,label:'rata-rata historis bulanan — data kirim 7 hari terakhir belum ada'}:{rows:[],label:''};})();
@@ -684,9 +720,8 @@ window.ForecastDashboard=(()=>{
   const wasteOver=wasteSrc.rows.filter(r=>r.percent>WASTE_THRESHOLD).sort((a,b)=>b.percent-a.percent);
   const lostOver=lostSrc.rows.filter(r=>r.percent>LOST_SALES_THRESHOLD).sort((a,b)=>b.percent-a.percent);
   if(!wasteOver.length&&!lostOver.length)return '';
-  const row=r=>`<div class="fd-warn-row"><b>${esc(r.name)}</b><span>${r.percent.toLocaleString('id-ID',{maximumFractionDigits:1})}%</span></div>`;
-  const wasteBlock=wasteOver.length?`<div class="fd-warn-group"><span class="fd-warn-group-title">🗑️ Waste di atas ambang ${WASTE_THRESHOLD}% · ${esc(wasteSrc.label)}</span>${wasteOver.map(row).join('')}</div>`:'';
-  const lostBlock=lostOver.length?`<div class="fd-warn-group"><span class="fd-warn-group-title">⏳ Lost sales di atas ambang ${LOST_SALES_THRESHOLD}% · ${esc(lostSrc.label)}</span>${lostOver.map(row).join('')}</div>`:'';
+  const wasteBlock=warnGroupHtml('🗑️','Waste',WASTE_THRESHOLD,wasteOver,wasteSrc.label);
+  const lostBlock=warnGroupHtml('⏳','Lost sales',LOST_SALES_THRESHOLD,lostOver,lostSrc.label);
   return `<article class="workspace-card fd-waste-warning"><span class="micro-label">⚠️ PERLU TINDAKAN — MELEBIHI AMBANG OWNER</span>${wasteBlock}${lostBlock}</article>`;
  }
 
