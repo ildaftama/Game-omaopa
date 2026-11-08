@@ -1,7 +1,7 @@
 name: Sinkronisasi pesanan & penjualan (tiap jam, jam kerja)
 on:
   schedule:
-    # 01.00-15.00 UTC = 08.00-22.00 WIB, setiap jam. Dua tujuan:
+    # 01.11-15.11 UTC = 08.11-22.11 WIB, setiap jam. Dua tujuan:
     # 1) Pesanan yang baru dicatat tim di sheet PESANAN siang/sore hari H-1 sudah ikut
     #    ter-autofill saat forecaster bikin rencana malam itu juga, bukan menunggu
     #    sinkronisasi penuh jam 21.02 WIB.
@@ -10,7 +10,19 @@ on:
     #    sengaja TIDAK diset di sini) -- supaya kalau laporan ESB gagal/kepotong sebagian
     #    saat sinkronisasi malam, ada banyak kesempatan sepanjang hari untuk menarik ulang &
     #    memperbaiki, bukan cuma 2x percobaan jam 21.02-21.07 lalu macet sampai besok malam.
-    - cron: '0 1-15 * * *'
+    #
+    # CATATAN (2026-11-08, dicek owner): riwayat run NYATA menunjukkan jadwal "tiap jam" ini
+    # TIDAK benar-benar jalan tiap jam -- cuma 5x terjadi dalam ~49 jam (harusnya ~45x). Ini
+    # keterbatasan platform GitHub Actions sendiri: `schedule` adalah best-effort, bukan
+    # terjamin, dan GitHub SENDIRI mendokumentasikan jadwal yang jatuh tepat di awal jam
+    # (menit :00) paling sering tertunda/terlewat karena itu titik tersibuk semua workflow di
+    # seluruh GitHub. Menit digeser ke :11 (bukan solusi sempurna -- GitHub tetap tidak
+    # menjamin SLA untuk schedule -- tapi mengurangi kemungkinan tertunda/terlewat). Karena
+    # pcs-sales.mjs menggabung (merge), bukan menimpa, dan selalu menarik ulang jendela 7 hari
+    # terakhir, keterlambatan di sini tetap self-heal begitu SALAH SATU run berikutnya jalan --
+    # tapi tetap bisa terasa "telat" kalau banyak run berturut-turut gagal jalan seperti
+    # kemarin.
+    - cron: '11 1-15 * * *'
   workflow_dispatch: {}
 permissions:
   contents: read
