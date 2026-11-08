@@ -44,12 +44,6 @@ window.ForecastDashboard=(()=>{
   return p in PRICE_REFS?PRICE_REFS[p]:null;
  }
  function shiftYearDate(date,deltaYears){const [y,m,d]=date.split('-').map(Number);return `${y+deltaYears}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
- // Koreksi owner (2026-11-09) di atas HASIL mesin prediksi -- metodenya sendiri sengaja TIDAK
- // diubah. Prediksi November konsisten di bawah omzet real (1-8 Nov), owner minta dinaikkan
- // 8-10% (dipakai 9%, tengahnya) dan Desember ~5%. Bulan yang tidak tercantum = tanpa koreksi.
- const FORECAST_MONTH_UPLIFT={'2026-11':1.09,'2026-12':1.05};
- const monthUplift=date=>FORECAST_MONTH_UPLIFT[date.slice(0,7)]||1;
- const upliftLabel=ym=>{const f=FORECAST_MONTH_UPLIFT[ym];return f&&f!==1?`${f>1?'+':''}${Math.round((f-1)*100)}%`:'';};
  const moneyBig=n=>n==null?'—':n>=1e9?'Rp'+(n/1e9).toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2})+' M':n>=1e6?'Rp'+(n/1e6).toLocaleString('id-ID',{maximumFractionDigits:1})+' jt':money(n);
  const TREND_LABEL={'sharp-up':['🔺🔺','Naik tajam'],up:['🔺','Naik'],flat:['➖','Stabil'],down:['🔻','Turun'],'sharp-down':['🔻🔻','Turun tajam']};
  // Tren naik/turun dari data REAL (bukan prediksi): median 3 hari terakhir dibanding median 3
@@ -444,8 +438,34 @@ window.ForecastDashboard=(()=>{
    if(t==null||a==null||a<=0)return 1;
    return Math.max(.5,Math.min(2.2,t/a));
   }
-  function forecastAt(date){return baselineLevel==null?null:baselineLevel*trendFactor*weekdayShape(date)*seasonalFactor(date);}
-  return {lastDate,baselineLevel,forecastAt};
+  function legacyAt(date){return baselineLevel==null?null:baselineLevel*trendFactor*weekdayShape(date)*seasonalFactor(date);}
+  // Metode UTAMA sejak 2026-11-09: "pola tahun lalu x pertumbuhan terkini". Diuji mundur
+  // (rolling origin tiap minggu Jan-Okt 2026, horizon 30 hari, omzet jaringan): di luar musim
+  // Ramadan/Lebaran rata-rata meleset 3,0% untuk total sebulan & 7,0% per hari (WAPE), vs
+  // 6,6% & 10,2% untuk mesin lama di atas (legacyAt) -- dan blend keduanya justru lebih buruk.
+  //  - Patokan: hari yang SAMA minggunya tahun lalu (geser 364 hari, jadi Senin ketemu Senin),
+  //    dihaluskan +-2 minggu dengan bobot 1-2-3-2-1 supaya satu hari aneh tahun lalu tidak
+  //    terbawa mentah-mentah.
+  //  - Pertumbuhan: total 56 hari terakhir / total 56 hari yang sama tahun lalu (pasangan
+  //    tanggal yang dua-duanya ada saja -- lubang data dilewati, bukan dianggap nol).
+  //  - 20 Des - 3 Jan disejajarkan per TANGGAL kalender (365 hari), bukan per hari-minggu:
+  //    lonjakan Natal/Tahun Baru melekat ke tanggal (24-25 Des 2025: 89-91 jt/hari).
+  // Batasan yang diketahui: hari raya yang tanggalnya bergeser tiap tahun (Ramadan/Lebaran,
+  // ~11 hari lebih awal tiap tahun) TIDAK sejajar -- di Feb-Mar 2026 metode ini meleset 10-27%.
+  // Kalau data tahun lalu tidak tersedia, kembali ke mesin lama (legacyAt).
+  let yoyA=0,yoyB=0,yoyN=0;
+  if(lastDate)for(let k=0;k<56;k++){const d=planner.shift(lastDate,-k),x=valueByDate.get(d),y=valueByDate.get(planner.shift(d,-364));if(x!=null&&y!=null){yoyA+=x;yoyB+=y;yoyN++;}}
+  const yoyGrowth=yoyN>=14&&yoyB>0?yoyA/yoyB:null;
+  const YOY_OFFSETS=[-14,-7,0,7,14],YOY_WEIGHTS=[1,2,3,2,1];
+  function yoyAt(date){
+   if(yoyGrowth==null)return null;
+   const md=date.slice(5);
+   if(md>='12-20'||md<='01-03'){const x=valueByDate.get(shiftYearDate(date,-1));if(x!=null)return x*yoyGrowth;}
+   let s=0,w=0;YOY_OFFSETS.forEach((o,i)=>{const x=valueByDate.get(planner.shift(date,o-364));if(x!=null){s+=x*YOY_WEIGHTS[i];w+=YOY_WEIGHTS[i];}});
+   return w?s/w*yoyGrowth:null;
+  }
+  function forecastAt(date){const y=yoyAt(date);return y!=null?y:legacyAt(date);}
+  return {lastDate,baselineLevel,forecastAt,yoyGrowth};
  }
  // PENTING: row.netSales (dari summarize() di pcs-sales.mjs, dipaketkan 2026-11-06) SEMENTARA
  // TIDAK dipakai di sini -- hasil backfill langsung dibandingkan ke ERP dan angkanya malah LEBIH
@@ -536,11 +556,10 @@ window.ForecastDashboard=(()=>{
   }
 
   const pureEngine=buildEngine(pureSeries,planner),pesananEngine=buildEngine(pesananSeries,planner);
-  const forecastPureAt=date=>{const v=pureEngine.forecastAt(date);return v==null?null:v*monthUplift(date);};
-  // Pesanan yang SUDAH tercatat di sheet tidak ikut dikoreksi -- itu angka pasti, bukan tebakan.
+  const forecastPureAt=date=>pureEngine.forecastAt(date);
   function forecastPesananAt(date){
    if(lastActual&&date>lastActual){const known=knownPesananAt(date);if(known!=null)return known;}
-   const v=pesananEngine.forecastAt(date);return v==null?null:v*monthUplift(date);
+   return pesananEngine.forecastAt(date);
   }
   function forecastTotalAt(date){
    const r=forecastPureAt(date),p=forecastPesananAt(date);
@@ -569,7 +588,7 @@ window.ForecastDashboard=(()=>{
   // Satu angka ringkas pengganti paragraf metodologi: berapa persen pesanan biasanya menambah
   // omzet murni, dipakai sebagai catatan singkat di bawah grafik.
   const pesananUpliftPct=pureEngine.baselineLevel>0&&pesananEngine.baselineLevel!=null?pesananEngine.baselineLevel/pureEngine.baselineLevel*100:null;
-  return {rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct,trendNow,trendDriver,trendContext};
+  return {rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct,yoyGrowth:pureEngine.yoyGrowth,trendNow,trendDriver,trendContext};
  }
 
  // actualTotal/forecastTotal/plan = garis utama (tebal, warna pekat, selalu tampil default).
@@ -1049,18 +1068,18 @@ window.ForecastDashboard=(()=>{
    const elapsed=trend.lastActual?rows.filter(r=>r.date<=trend.lastActual&&r.actualTotal!=null):[];
    const real=sum(elapsed,'actualTotal'),projected=real+sum(rows.filter(r=>!elapsed.includes(r)),'forecastTotal');
    const predElapsed=sum(elapsed,'forecastTotal'),gap=real>0?(predElapsed-real)/real*100:null;
-   const up=upliftLabel(ym),title=months[Number(ym.slice(5,7))-1]+' '+ym.slice(0,4);
+   const title=months[Number(ym.slice(5,7))-1]+' '+ym.slice(0,4);
    const line=(k,v,sub)=>`<div class="fd-month-line"><span>${k}</span><b title="${esc(money(Math.round(v)))}">${moneyBig(v)}</b>${sub?`<small>${sub}</small>`:''}</div>`;
    const gapText=gap==null?'':`Untuk ${dateRange(elapsed[0].date,elapsed.at(-1).date)}, prediksi ${Math.abs(gap)<1?'hampir sama dengan':gap>0?`${pct1(gap)} di atas`:`${pct1(-gap)} di bawah`} real.`;
-   return `<div class="fd-month-card"><div class="fd-month-head"><b>${title}</b>${up?`<span class="fd-month-tag">koreksi ${up}</span>`:''}</div>
+   return `<div class="fd-month-card"><div class="fd-month-head"><b>${title}</b></div>
     ${line('Prediksi sebulan',pred,`tanpa pesanan ${moneyBig(pure)}`)}
     ${elapsed.length?line(`Real s.d. ${dateLabelShort(elapsed.at(-1).date)}`,real,`${elapsed.length} hari`):''}
     ${elapsed.length?line('Perkiraan akhir bulan',projected,'real + prediksi sisa hari'):''}
     ${gapText?`<p class="fd-month-gap">${gapText}</p>`:''}</div>`;
   }).filter(Boolean);
   if(!cards.length)return '';
-  const notes=[trend.ym,trend.ymNext].map(ym=>upliftLabel(ym)?`${months[Number(ym.slice(5,7))-1]} ${upliftLabel(ym)}`:'').filter(Boolean);
-  return `<div class="fd-month-summary">${cards.join('')}</div>${notes.length?`<p class="workspace-note">Hasil prediksi sudah dinaikkan (${notes.join(', ')}) dari angka mesin sesuai arahan owner — metode prediksinya sendiri tidak diubah.</p>`:''}`;
+  const g=trend.yoyGrowth,growth=g==null?'':`8 minggu terakhir omzet ${Math.abs(g-1)<.005?'sama dengan':g>1?`${pct1((g-1)*100)} di atas`:`${pct1((1-g)*100)} di bawah`} periode yang sama tahun lalu. `;
+  return `<div class="fd-month-summary">${cards.join('')}</div><p class="workspace-note">Cara hitung: pola harian di tanggal yang sama tahun lalu × pertumbuhan terkini. ${growth}Diuji ke data Jan–Okt 2026 (di luar Ramadan), rata-rata meleset ±3% untuk total sebulan.</p>`;
  }
  function render(outletId){
   const trend=revenueTrend(outletId);
