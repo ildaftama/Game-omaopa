@@ -138,8 +138,8 @@ export function parseLostSalesTab(input, getId) {
 // gviz diam-diam mengembalikan sheet PERTAMA, dan tiap percobaan tab bulanan bisa makan
 // beberapa menit, jadi urutan ini penting. Header tanggal blok pertama WAJIB divalidasi
 // benar-benar bulan+tahun yang diminta (lihat peringatan gviz-fallback di atas).
-export async function fetchLostSalesForMonth(sheetId, year, monthIndex0, getId, deadline = Infinity) {
- const candidates = [...new Set([`Rekap Forecast ${MONTH_ABBR[monthIndex0]}`, ...(monthIndex0 === 8 ? ['Rekap Forecast SEPT'] : []), `Rekap Forecast ${MONTH_ID[monthIndex0].toUpperCase()}`])];
+export async function fetchLostSalesForMonth(sheetId, year, monthIndex0, getId, deadline = Infinity, prefix = 'Rekap Forecast') {
+ const candidates = [...new Set([`${prefix} ${MONTH_ABBR[monthIndex0]}`, ...(monthIndex0 === 8 ? [`${prefix} SEPT`] : []), `${prefix} ${MONTH_ID[monthIndex0].toUpperCase()}`])];
  for (const tabName of candidates) {
   const left = deadline - Date.now(); if (left < 20000) break;
   let rows; try { rows = await fetchSheetRows(sheetId, tabName, Math.min(MONTH_TAB_TIMEOUT_MS, left)); } catch { continue; }
@@ -151,13 +151,14 @@ export async function fetchLostSalesForMonth(sheetId, year, monthIndex0, getId, 
  return null;
 }
 
-export async function pull(sheetId, profiles, { now = new Date(), previous = null } = {}) {
+// wasteTab/lostTabPrefix bisa diubah di halaman Pengaturan web (sumber "Rekap forecast harian").
+export async function pull(sheetId, profiles, { now = new Date(), previous = null, wasteTab = 'WASTE', lostTabPrefix = 'Rekap Forecast' } = {}) {
  const getId = outletLookup(profiles);
  // Tab WASTE biasanya cepat, tapi workbook ini kadang lambat sekali (rumus IMPORTRANGE ribuan
  // sel di tab Rekap bulanan). Kalau WASTE gagal/timeout, pakai data waste yang sudah tersimpan
  // dan TETAP lanjut menarik lost sales -- dulu satu kegagalan di sini menggugurkan semuanya.
  // Dimulai sekarang, ditunggu setelah tab bulanan -- dua tab berat ditarik bersamaan.
- const wastePromise = fetchSheetRows(sheetId, 'WASTE', WASTE_TAB_TIMEOUT_MS).then(rows => ({ rows }), error => ({ error }));
+ const wastePromise = fetchSheetRows(sheetId, wasteTab, WASTE_TAB_TIMEOUT_MS).then(rows => ({ rows }), error => ({ error }));
  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
  const [year, month] = today.slice(0, 7).split('-').map(Number);
  // Bulan lalu cuma ditarik ulang di awal bulan (jendela 7 hari dashboard masih menyentuhnya)
@@ -174,7 +175,7 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
  const deadline = Date.now() + RECAP_BUDGET_MS;
  const lostSales = { ...(previous?.lostSalesMinutes || {}) }; const monthsUsed = [];
  for (const [y, mi] of months) {
-  const result = await fetchLostSalesForMonth(sheetId, y, mi, getId, deadline).catch(() => null);
+  const result = await fetchLostSalesForMonth(sheetId, y, mi, getId, deadline, lostTabPrefix).catch(() => null);
   if (result) { Object.assign(lostSales, result.data); monthsUsed.push(result.tabName); }
   else console.log(`Tab lost sales ${MONTH_ID[mi]} ${y} belum terbaca di run ini.`);
  }
@@ -200,15 +201,21 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
  };
 }
 
+// Pengaturan web (ditulis pcs-source.mjs ke .pcs-temp) diutamakan; bawaan repo kalau belum ada.
+export function recapSource() {
+ const file = fs.existsSync('.pcs-temp/data-sources.json') ? '.pcs-temp/data-sources.json' : 'forecast/data-sources.json';
+ const s = JSON.parse(fs.readFileSync(file, 'utf8')).sources.find(x => x.key === 'forecast');
+ const sheetId = s?.url?.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+ return sheetId ? { sheetId, wasteTab: s.wasteTab || 'WASTE', lostTabPrefix: s.lostTabPrefix || 'Rekap Forecast' } : null;
+}
+
 async function main() {
  const vm = await import('node:vm');
  const ctx = { window: {} };
  vm.default.runInNewContext(fs.readFileSync(new URL('../forecast/outlet-intelligence-data.js', import.meta.url), 'utf8'), ctx);
- const sources = JSON.parse(fs.readFileSync('forecast/data-sources.json', 'utf8'));
- const sheetUrl = sources.sources.find(s => s.key === 'forecast')?.url;
- const sheetId = sheetUrl?.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
- if (!sheetId) throw Error('Sumber "forecast" (Rekap Harian Forecast) belum terdaftar di data-sources.json.');
- const result = await pull(sheetId, ctx.window.OUTLET_INTELLIGENCE);
+ const src = recapSource();
+ if (!src) throw Error('Sumber "forecast" (Rekap Harian Forecast) belum terdaftar di data-sources.json.');
+ const result = await pull(src.sheetId, ctx.window.OUTLET_INTELLIGENCE, src);
  fs.mkdirSync('.pcs-temp', { recursive: true });
  fs.writeFileSync('.pcs-temp/daily-recap.json', JSON.stringify(result));
  console.log(JSON.stringify({ wasteDays: Object.keys(result.waste).length, lostSalesDays: Object.keys(result.lostSalesMinutes).length, monthTabsUsed: result.lostSalesMonthTabsUsed }));

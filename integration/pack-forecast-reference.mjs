@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { pull as pullDailyRecap } from './waste-recap.mjs';
+import { pull as pullDailyRecap, recapSource } from './waste-recap.mjs';
 import { buildDemographics } from './customer-demographics.mjs';
 
 // Nightly ESB -> private reference bundle sync (feature: otomasi ESB malam hari).
@@ -126,10 +126,9 @@ export async function prime(env = process.env, salesPath = 'forecast/pcs-sales.j
 // bundle (kalau ada) daripada membatalkan seluruh run().
 async function fetchDailyRecap(profiles, previous) {
   try {
-    const sources = JSON.parse(fs.readFileSync('forecast/data-sources.json', 'utf8'));
-    const sheetId = sources.sources.find(s => s.key === 'forecast')?.url?.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1];
-    if (!sheetId || !profiles) return null;
-    return await pullDailyRecap(sheetId, profiles, { previous });
+    const src = recapSource();
+    if (!src || !profiles) return null;
+    return await pullDailyRecap(src.sheetId, profiles, { previous, wasteTab: src.wasteTab, lostTabPrefix: src.lostTabPrefix });
   } catch (e) { console.log('Rekap harian (waste/lost sales) belum berhasil ditarik: ' + e.message); return null; }
 }
 // Demografi member (database "users") per outlet -- kegagalan (misalnya rule belum/ belum

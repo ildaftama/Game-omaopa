@@ -15,13 +15,16 @@ window.WeatherForecast=(()=>{
  // cuma 30-an% dan di lapangan sering tidak hujan sama sekali (dilaporkan owner 2026-11-09).
  // Label harian sekarang disusun dari peluang hujan rata-rata + total curah hujan + tutupan
  // awan; kode "terburuk" cuma dipakai untuk badai petir yang memang berpeluang tinggi.
+ // Ambang label & model bisa diubah di Pengaturan (forecast-settings.js); bawaan 45% & model otomatis.
+ const prefs=()=>window.ForecastSettings?.get().weather||{model:'best_match',rainLabelProb:45};
+ const modelParam=()=>{const m=prefs().model;return m&&m!=='best_match'?'&models='+encodeURIComponent(m):'';};
  function conditionCode(d){
-  const p=d.probability,mm=d.precipitationMm,cc=d.cloudCover,wc=d.weatherCode;
+  const p=d.probability,mm=d.precipitationMm,cc=d.cloudCover,wc=d.weatherCode,t=prefs().rainLabelProb;
   if(p!=null&&mm!=null){
-   if(p>=60&&mm>=10)return mm>=25?65:63;
-   if(p>=45&&mm>=2)return 61;
+   if(p>=t+15&&mm>=10)return mm>=25?65:63;
+   if(p>=t&&mm>=2)return 61;
   }
-  if(wc!=null&&wc>=95&&p!=null&&p>=50)return 95;
+  if(wc!=null&&wc>=95&&p!=null&&p>=t+5)return 95;
   if(cc!=null)return cc<20?0:cc<50?1:cc<80?2:3;
   return wc!=null&&wc<=3?wc:2;
  }
@@ -31,7 +34,7 @@ window.WeatherForecast=(()=>{
   return r.json();
  }
  async function get(outletId,date){
-  const key=outletId+'|'+date,cached=cache.get(key);if(cached)return cached;
+  const key=outletId+'|'+date+'|'+JSON.stringify(prefs()),cached=cache.get(key);if(cached)return cached;
   const promise=(async()=>{
    const coords=outletCoords(outletId);
    if(!coords)return {date,outletId,error:'Koordinat outlet belum tersedia untuk ramalan cuaca.'};
@@ -48,7 +51,7 @@ window.WeatherForecast=(()=>{
     // belum tentu seberat itu (owner cek sendiri: kejadian hujan hari itu <90%, bukan 100%
     // seperti yang tadinya ditampilkan). Rata-rata jauh lebih jarang menyentuh 100%, lebih
     // mewakili "kemungkinan hujan hari ini" yang wajar dipahami, bukan puncak sesaat.
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&start_date=${date}&end_date=${date}&daily=precipitation_probability_mean,precipitation_sum,temperature_2m_max,temperature_2m_min,weathercode,cloud_cover_mean&timezone=Asia%2FJakarta`;
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&start_date=${date}&end_date=${date}&daily=precipitation_probability_mean,precipitation_sum,temperature_2m_max,temperature_2m_min,weathercode,cloud_cover_mean&timezone=Asia%2FJakarta${modelParam()}`;
     const d=await fetchJson(url),i=d.daily?.time?.indexOf(date);
     if(i==null||i<0)return {date,outletId,error:'Tanggal ini di luar jangkauan ramalan cuaca (±16 hari).'};
     const day={date,outletId,source:'forecast',probability:d.daily.precipitation_probability_mean[i]??null,precipitationMm:d.daily.precipitation_sum[i]??null,tempMax:d.daily.temperature_2m_max[i]??null,tempMin:d.daily.temperature_2m_min[i]??null,weatherCode:d.daily.weathercode?.[i]??null,cloudCover:d.daily.cloud_cover_mean?.[i]??null};
@@ -62,12 +65,12 @@ window.WeatherForecast=(()=>{
  async function getNetwork(outletIds,date,dateTo){
   const to=dateTo||date,rows=outletIds.map(id=>({id,coords:outletCoords(id)})).filter(r=>r.coords);
   if(!rows.length)return new Map();
-  const key='net|'+rows.map(r=>r.id).join(',')+'|'+date+'|'+to,cached=cache.get(key);if(cached)return cached;
+  const key='net|'+rows.map(r=>r.id).join(',')+'|'+date+'|'+to+'|'+JSON.stringify(prefs()),cached=cache.get(key);if(cached)return cached;
   const promise=(async()=>{
    const lat=rows.map(r=>r.coords.lat).join(','),lon=rows.map(r=>r.coords.lon).join(',');
    // precipitation_probability_MEAN, bukan _max -- lihat catatan di get() di atas. weathercode
    // ditambah untuk ikon kondisi (cerah/berawan/hujan dll) di peta cuaca jaringan.
-   const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${to}&daily=precipitation_probability_mean,precipitation_sum,temperature_2m_max,temperature_2m_min,weathercode,cloud_cover_mean&current=weather_code,temperature_2m,precipitation,cloud_cover&timezone=Asia%2FJakarta`;
+   const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${to}&daily=precipitation_probability_mean,precipitation_sum,temperature_2m_max,temperature_2m_min,weathercode,cloud_cover_mean&current=weather_code,temperature_2m,precipitation,cloud_cover&timezone=Asia%2FJakarta${modelParam()}`;
    const map=new Map();
    try{
     const d=await fetchJson(url),list=Array.isArray(d)?d:[d];
