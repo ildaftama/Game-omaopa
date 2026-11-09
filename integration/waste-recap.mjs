@@ -24,7 +24,10 @@ const MONTH_ABBR = ['JAN','FEB','MAR','APR','MEI','JUN','JUL','AGT','SEP','OKT',
 // ekspor gviz-nya butuh ±250 detik. Batas lama 30 detik membuat tab ini SELALU gagal diam-diam,
 // jadi lost sales harian tidak pernah masuk sejak Oktober (cuma tab WASTE yang ringan yang
 // berhasil). Tab bulanan diberi waktu jauh lebih longgar; tab WASTE tetap 30 detik.
-const MONTH_TAB_TIMEOUT_MS = 360000, RECAP_BUDGET_MS = 480000, WASTE_TAB_TIMEOUT_MS = 120000, SHEETS_API_TIMEOUT_MS = 60000;
+// Run 2026-11-09 dengan Sheets API: tetap timeout di 60 detik -- API ini juga menunggu Google
+// menghitung ulang rumus IMPORTRANGE workbook, sama lambatnya dengan ekspor (±4 menit terukur).
+// Jadi batasnya disamakan dengan ekspor, dan WASTE + tab bulanan ditarik BERSAMAAN.
+const MONTH_TAB_TIMEOUT_MS = 360000, RECAP_BUDGET_MS = 480000, WASTE_TAB_TIMEOUT_MS = 300000;
 // JALUR UTAMA (arahan owner 2026-11-09): Google Sheets API v4 (values.get) dengan API key di
 // secret GOOGLE_SHEETS_API_KEY. API ini membaca nilai yang SUDAH dihitung Google -- tidak
 // memaksa workbook dirender ulang seperti ekspor gviz. Itu penting karena tab "Rekap Forecast
@@ -41,7 +44,7 @@ async function fetchSheetRows(sheetId, tabName, timeoutMs = 30000) {
  if (key) {
   const range = encodeURIComponent(`'${tabName.replace(/'/g, "''")}'`);
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS`;
-  const res = await fetch(url, { headers: { 'X-goog-api-key': key }, signal: AbortSignal.timeout(Math.min(timeoutMs, SHEETS_API_TIMEOUT_MS)) });
+  const res = await fetch(url, { headers: { 'X-goog-api-key': key }, signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw Error(`Tab sheet "${tabName}" tidak terbaca lewat Sheets API (HTTP ${res.status}).`);
   const body = await res.json();
   return (body.values || []).map(r => r.map(v => v == null ? '' : String(v)));
@@ -153,9 +156,8 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
  // Tab WASTE biasanya cepat, tapi workbook ini kadang lambat sekali (rumus IMPORTRANGE ribuan
  // sel di tab Rekap bulanan). Kalau WASTE gagal/timeout, pakai data waste yang sudah tersimpan
  // dan TETAP lanjut menarik lost sales -- dulu satu kegagalan di sini menggugurkan semuanya.
- let waste = { ...(previous?.waste || {}) }, wasteFresh = false;
- try { Object.assign(waste, parseWasteTab(await fetchSheetRows(sheetId, 'WASTE', WASTE_TAB_TIMEOUT_MS), getId)); wasteFresh = true; }
- catch (e) { console.log('Tab WASTE belum terbaca (' + e.message + '); pakai waste tersimpan.'); }
+ // Dimulai sekarang, ditunggu setelah tab bulanan -- dua tab berat ditarik bersamaan.
+ const wastePromise = fetchSheetRows(sheetId, 'WASTE', WASTE_TAB_TIMEOUT_MS).then(rows => ({ rows }), error => ({ error }));
  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
  const [year, month] = today.slice(0, 7).split('-').map(Number);
  // Bulan lalu cuma ditarik ulang di awal bulan (jendela 7 hari dashboard masih menyentuhnya)
@@ -174,10 +176,16 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
  for (const [y, mi] of months) {
   const result = await fetchLostSalesForMonth(sheetId, y, mi, getId, deadline).catch(() => null);
   if (result) { Object.assign(lostSales, result.data); monthsUsed.push(result.tabName); }
+  else console.log(`Tab lost sales ${MONTH_ID[mi]} ${y} belum terbaca di run ini.`);
  }
  // Template bulan berjalan sudah berisi 0 untuk tanggal yang BELUM terjadi (bukan data real
  // "tidak ada lost sales") -- buang tanggal setelah hari ini supaya tidak jadi angka palsu.
  for (const date of Object.keys(lostSales)) if (date > today) delete lostSales[date];
+ let waste = { ...(previous?.waste || {}) }, wasteFresh = false;
+ const wasteResult = await wastePromise;
+ if (wasteResult.rows) { Object.assign(waste, parseWasteTab(wasteResult.rows, getId)); wasteFresh = true; }
+ else console.log('Tab WASTE belum terbaca (' + wasteResult.error.message + '); pakai waste tersimpan.');
+ console.log(`Rekap sheet: waste ${wasteFresh ? 'baru' : 'tersimpan'}, lost sales dari ${monthsUsed.length ? monthsUsed.join(', ') : 'data tersimpan'} (via ${process.env.GOOGLE_SHEETS_API_KEY ? 'Sheets API' : 'gviz'}).`);
  if (!wasteFresh && !monthsUsed.length && previous) throw Error('Sheet rekap tidak terbaca sama sekali di run ini.');
  return {
   schemaVersion: 1,
