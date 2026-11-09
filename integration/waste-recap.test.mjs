@@ -99,3 +99,18 @@ test('pull() keeps previously stored lost sales when the heavy month tab cannot 
   assert.deepEqual(result.lostSalesMonthTabsUsed, []);
  } finally { global.fetch = originalFetch; }
 });
+
+test('pull() keeps stored waste and still reads lost sales when the WASTE tab times out', async () => {
+ const dateRow = csvRow(['`', 'Sunday, 1 November 2026', ...Array(9).fill('')]);
+ const novCsv = [dateRow, csvRow(Array(11).fill('')), csvRow(Array(11).fill('')), csvRow(['Jakal', ...Array(9).fill(''), '92'])].join('\n');
+ const profiles = { outlets: { 'jakal-uii': { name: 'Jakal' } } };
+ const previous = { waste: { '2026-11-01': { 'jakal-uii': { core: [1, 0, 0, 0], nominal: 4100 } } } };
+ const originalFetch = global.fetch;
+ global.fetch = async (url) => { if (String(url).includes('WASTE')) throw Error('timeout'); return { ok: true, text: async () => novCsv }; };
+ try {
+  const result = await pull('sheet-id', profiles, { now: new Date('2026-11-20T10:00:00+07:00'), previous });
+  assert.equal(result.waste['2026-11-01']['jakal-uii'].nominal, 4100);
+  assert.equal(result.wasteFresh, false);
+  assert.equal(result.lostSalesMinutes['2026-11-01']['jakal-uii'], 92);
+ } finally { global.fetch = originalFetch; }
+});

@@ -23,7 +23,7 @@ const MONTH_ABBR = ['JAN','FEB','MAR','APR','MEI','JUN','JUL','AGT','SEP','OKT',
 // ekspor gviz-nya butuh ±250 detik. Batas lama 30 detik membuat tab ini SELALU gagal diam-diam,
 // jadi lost sales harian tidak pernah masuk sejak Oktober (cuma tab WASTE yang ringan yang
 // berhasil). Tab bulanan diberi waktu jauh lebih longgar; tab WASTE tetap 30 detik.
-const MONTH_TAB_TIMEOUT_MS = 360000, RECAP_BUDGET_MS = 480000;
+const MONTH_TAB_TIMEOUT_MS = 360000, RECAP_BUDGET_MS = 480000, WASTE_TAB_TIMEOUT_MS = 120000;
 async function fetchSheetCsv(sheetId, tabName, timeoutMs = 30000) {
  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -128,8 +128,12 @@ export async function fetchLostSalesForMonth(sheetId, year, monthIndex0, getId, 
 
 export async function pull(sheetId, profiles, { now = new Date(), previous = null } = {}) {
  const getId = outletLookup(profiles);
- const wasteCsv = await fetchSheetCsv(sheetId, 'WASTE');
- const waste = parseWasteTab(wasteCsv, getId);
+ // Tab WASTE biasanya cepat, tapi workbook ini kadang lambat sekali (rumus IMPORTRANGE ribuan
+ // sel di tab Rekap bulanan). Kalau WASTE gagal/timeout, pakai data waste yang sudah tersimpan
+ // dan TETAP lanjut menarik lost sales -- dulu satu kegagalan di sini menggugurkan semuanya.
+ let waste = { ...(previous?.waste || {}) }, wasteFresh = false;
+ try { Object.assign(waste, parseWasteTab(await fetchSheetCsv(sheetId, 'WASTE', WASTE_TAB_TIMEOUT_MS), getId)); wasteFresh = true; }
+ catch (e) { console.log('Tab WASTE belum terbaca (' + e.message + '); pakai waste tersimpan.'); }
  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
  const [year, month] = today.slice(0, 7).split('-').map(Number);
  // Bulan lalu cuma ditarik ulang di awal bulan (jendela 7 hari dashboard masih menyentuhnya)
@@ -152,9 +156,11 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
  // Template bulan berjalan sudah berisi 0 untuk tanggal yang BELUM terjadi (bukan data real
  // "tidak ada lost sales") -- buang tanggal setelah hari ini supaya tidak jadi angka palsu.
  for (const date of Object.keys(lostSales)) if (date > today) delete lostSales[date];
+ if (!wasteFresh && !monthsUsed.length && previous) throw Error('Sheet rekap tidak terbaca sama sekali di run ini.');
  return {
   schemaVersion: 1,
   updatedAt: new Date().toISOString(),
+  wasteFresh,
   source: 'REKAP HARIAN FORECAST 2026 (tab WASTE + Rekap Forecast <bulan>)',
   lossMethod: 'Menit kehabisan dari sheet / hari / 12 jam buka -- asumsi penjualan merata.',
   lostSalesMonthTabsUsed: monthsUsed,

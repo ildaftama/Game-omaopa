@@ -10,6 +10,21 @@ window.WeatherForecast=(()=>{
   const o=window.OUTLET_DATA?.outlets?.find(x=>x.id===outletId);
   return o&&Number.isFinite(o.lat)&&Number.isFinite(o.lon)?{lat:o.lat,lon:o.lon}:null;
  }
+ // Kode cuaca HARIAN Open-Meteo = kondisi TERBURUK dalam sehari -- satu jam gerimis di model
+ // sudah cukup membuat seluruh hari tertulis "Hujan ringan", padahal peluang hujan rata-ratanya
+ // cuma 30-an% dan di lapangan sering tidak hujan sama sekali (dilaporkan owner 2026-11-09).
+ // Label harian sekarang disusun dari peluang hujan rata-rata + total curah hujan + tutupan
+ // awan; kode "terburuk" cuma dipakai untuk badai petir yang memang berpeluang tinggi.
+ function conditionCode(d){
+  const p=d.probability,mm=d.precipitationMm,cc=d.cloudCover,wc=d.weatherCode;
+  if(p!=null&&mm!=null){
+   if(p>=60&&mm>=10)return mm>=25?65:63;
+   if(p>=45&&mm>=2)return 61;
+  }
+  if(wc!=null&&wc>=95&&p!=null&&p>=50)return 95;
+  if(cc!=null)return cc<20?0:cc<50?1:cc<80?2:3;
+  return wc!=null&&wc<=3?wc:2;
+ }
  async function fetchJson(url){
   let r;try{r=await fetch(url,{signal:AbortSignal.timeout(8000)});}catch{throw Error('network');}
   if(!r.ok)throw Error('http-'+r.status);
@@ -33,10 +48,11 @@ window.WeatherForecast=(()=>{
     // belum tentu seberat itu (owner cek sendiri: kejadian hujan hari itu <90%, bukan 100%
     // seperti yang tadinya ditampilkan). Rata-rata jauh lebih jarang menyentuh 100%, lebih
     // mewakili "kemungkinan hujan hari ini" yang wajar dipahami, bukan puncak sesaat.
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&start_date=${date}&end_date=${date}&daily=precipitation_probability_mean,precipitation_sum,temperature_2m_max,temperature_2m_min,weathercode&timezone=Asia%2FJakarta`;
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&start_date=${date}&end_date=${date}&daily=precipitation_probability_mean,precipitation_sum,temperature_2m_max,temperature_2m_min,weathercode,cloud_cover_mean&timezone=Asia%2FJakarta`;
     const d=await fetchJson(url),i=d.daily?.time?.indexOf(date);
     if(i==null||i<0)return {date,outletId,error:'Tanggal ini di luar jangkauan ramalan cuaca (±16 hari).'};
-    return {date,outletId,source:'forecast',probability:d.daily.precipitation_probability_mean[i]??null,precipitationMm:d.daily.precipitation_sum[i]??null,tempMax:d.daily.temperature_2m_max[i]??null,tempMin:d.daily.temperature_2m_min[i]??null,weatherCode:d.daily.weathercode?.[i]??null};
+    const day={date,outletId,source:'forecast',probability:d.daily.precipitation_probability_mean[i]??null,precipitationMm:d.daily.precipitation_sum[i]??null,tempMax:d.daily.temperature_2m_max[i]??null,tempMin:d.daily.temperature_2m_min[i]??null,weatherCode:d.daily.weathercode?.[i]??null,cloudCover:d.daily.cloud_cover_mean?.[i]??null};
+    return {...day,conditionCode:conditionCode(day)};
    }catch{return {date,outletId,error:'Layanan cuaca (Open-Meteo) belum dapat dihubungi.'};}
   })();
   cache.set(key,promise);return promise;
@@ -51,7 +67,7 @@ window.WeatherForecast=(()=>{
    const lat=rows.map(r=>r.coords.lat).join(','),lon=rows.map(r=>r.coords.lon).join(',');
    // precipitation_probability_MEAN, bukan _max -- lihat catatan di get() di atas. weathercode
    // ditambah untuk ikon kondisi (cerah/berawan/hujan dll) di peta cuaca jaringan.
-   const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${to}&daily=precipitation_probability_mean,precipitation_sum,temperature_2m_max,temperature_2m_min,weathercode&timezone=Asia%2FJakarta`;
+   const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${to}&daily=precipitation_probability_mean,precipitation_sum,temperature_2m_max,temperature_2m_min,weathercode,cloud_cover_mean&current=weather_code,temperature_2m,precipitation,cloud_cover&timezone=Asia%2FJakarta`;
    const map=new Map();
    try{
     const d=await fetchJson(url),list=Array.isArray(d)?d:[d];
@@ -59,9 +75,13 @@ window.WeatherForecast=(()=>{
      const dd=list[i]?.daily;if(!dd){map.set(r.id,{error:'Ramalan cuaca belum tersedia.'});return;}
      const byDate=new Map(dd.time.map((t,j)=>[t,j]));
      const days=[];for(let s=date;s<=to;s=new Date(new Date(s+'T00:00:00Z').getTime()+86400000).toISOString().slice(0,10)){
-      const j=byDate.get(s);days.push(j==null?{date:s,error:true}:{date:s,probability:dd.precipitation_probability_mean[j]??null,precipitationMm:dd.precipitation_sum[j]??null,tempMax:dd.temperature_2m_max[j]??null,tempMin:dd.temperature_2m_min[j]??null,weatherCode:dd.weathercode?.[j]??null});
+      const j=byDate.get(s);if(j==null){days.push({date:s,error:true});continue;}const day={date:s,probability:dd.precipitation_probability_mean[j]??null,precipitationMm:dd.precipitation_sum[j]??null,tempMax:dd.temperature_2m_max[j]??null,tempMin:dd.temperature_2m_min[j]??null,weatherCode:dd.weathercode?.[j]??null,cloudCover:dd.cloud_cover_mean?.[j]??null};days.push({...day,conditionCode:conditionCode(day)});
      }
-     map.set(r.id,{days,coords:r.coords});
+     // Kondisi SEKARANG (model diperbarui tiap 15 menit) -- jauh lebih dekat ke keadaan nyata
+     // di outlet daripada ramalan harian, jadi ditampilkan terpisah.
+     const c=list[i]?.current;
+     const now=c?{code:c.weather_code??null,temp:c.temperature_2m??null,precipitationMm:c.precipitation??null,time:c.time||null}:null;
+     map.set(r.id,{days,coords:r.coords,now});
     });
    }catch{for(const r of rows)map.set(r.id,{error:'Layanan cuaca (Open-Meteo) belum dapat dihubungi.'});}
    return map;
