@@ -121,4 +121,7 @@ jobs:
           FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
           FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
           FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+          # Baca sheet rekap (waste/lost sales) lewat Google Sheets API -- lihat fetchSheetRows di
+          # integration/waste-recap.mjs. Kalau secret belum ada, otomatis jatuh ke ekspor gviz lama.
+          GOOGLE_SHEETS_API_KEY: ${{ secrets.GOOGLE_SHEETS_API_KEY }}
         run: node integration/pack-forecast-reference.mjs

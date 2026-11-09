@@ -7,7 +7,8 @@ import { estimateLostSales, outletLookup } from './performance-summary.mjs';
 // outlet+tanggal, sudah ada kolom Nominal -- tidak perlu ganti nama tab tiap bulan) dan
 // "Rekap Forecast <BULAN>" (format lebar, satu blok 10 kolom per tanggal, kolom terakhir
 // tiap blok = menit kehabisan/lost sales -- dipakai performance-summary.mjs versi manual
-// sebelumnya). Dibaca lewat endpoint ekspor gviz publik (sama seperti XLSX publik yang
+// sebelumnya). Dibaca lewat Google Sheets API kalau GOOGLE_SHEETS_API_KEY ada (lihat
+// fetchSheetRows), selain itu lewat endpoint ekspor gviz publik (sama seperti XLSX publik yang
 // sudah dipakai pcs_orders.py untuk sheet PESANAN) -- tanpa kredensial.
 //
 // PERINGATAN: kalau nama tab tidak ditemukan, Google gviz TIDAK mengembalikan error --
@@ -23,13 +24,34 @@ const MONTH_ABBR = ['JAN','FEB','MAR','APR','MEI','JUN','JUL','AGT','SEP','OKT',
 // ekspor gviz-nya butuh ±250 detik. Batas lama 30 detik membuat tab ini SELALU gagal diam-diam,
 // jadi lost sales harian tidak pernah masuk sejak Oktober (cuma tab WASTE yang ringan yang
 // berhasil). Tab bulanan diberi waktu jauh lebih longgar; tab WASTE tetap 30 detik.
-const MONTH_TAB_TIMEOUT_MS = 360000, RECAP_BUDGET_MS = 480000, WASTE_TAB_TIMEOUT_MS = 120000;
-async function fetchSheetCsv(sheetId, tabName, timeoutMs = 30000) {
+const MONTH_TAB_TIMEOUT_MS = 360000, RECAP_BUDGET_MS = 480000, WASTE_TAB_TIMEOUT_MS = 120000, SHEETS_API_TIMEOUT_MS = 60000;
+// JALUR UTAMA (arahan owner 2026-11-09): Google Sheets API v4 (values.get) dengan API key di
+// secret GOOGLE_SHEETS_API_KEY. API ini membaca nilai yang SUDAH dihitung Google -- tidak
+// memaksa workbook dirender ulang seperti ekspor gviz. Itu penting karena tab "Rekap Forecast
+// <bulan>" berisi ±3.000 sel rumus LET+IMPORTRANGE: ekspor gviz-nya sampai 4 menit atau error
+// 500, dan ikut melambatkan tab WASTE yang ringan, sehingga lost sales tidak pernah masuk.
+// FORMATTED_VALUE dipakai supaya isinya sama persis dengan ekspor CSV (tanggal "01 January
+// 2026", angka berformat) -- parser di bawah tidak perlu tahu sumbernya. Key dikirim lewat
+// header X-goog-api-key, bukan query string. Tanpa key -> jatuh ke ekspor gviz lama.
+// Beda perilaku yang penting: Sheets API MENOLAK nama tab yang tidak ada (error), sedangkan
+// gviz diam-diam mengembalikan sheet pertama -- validasi bulan di bawah tetap dipakai untuk
+// keduanya.
+async function fetchSheetRows(sheetId, tabName, timeoutMs = 30000) {
+ const key = process.env.GOOGLE_SHEETS_API_KEY;
+ if (key) {
+  const range = encodeURIComponent(`'${tabName.replace(/'/g, "''")}'`);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS`;
+  const res = await fetch(url, { headers: { 'X-goog-api-key': key }, signal: AbortSignal.timeout(Math.min(timeoutMs, SHEETS_API_TIMEOUT_MS)) });
+  if (!res.ok) throw Error(`Tab sheet "${tabName}" tidak terbaca lewat Sheets API (HTTP ${res.status}).`);
+  const body = await res.json();
+  return (body.values || []).map(r => r.map(v => v == null ? '' : String(v)));
+ }
  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
  if (!res.ok) throw Error(`Tab sheet "${tabName}" tidak terbaca (HTTP ${res.status}).`);
- return res.text();
+ return parseCsv(await res.text());
 }
+const toRows = input => typeof input === 'string' ? parseCsv(input) : input;
 
 // Parser CSV yang menangani sel bertanda kutip berisi baris baru (header "Lost sales
 // (menit)\nTanpa mini cisfon" di sheet ini) -- split('\n') polos akan memotongnya salah.
@@ -70,8 +92,8 @@ function parseDateHeaderCell(label) {
 
 // Format panjang: Tanggal, Outlet, Ochis, Ocho, Mchis, Mcho, ...(produk lain h-1/h-2/h-3),
 // Nominal (kolom 36), Area (37). Dijumlah per outlet+tanggal (jaga-jaga ada baris duplikat).
-export function parseWasteTab(csvText, getId) {
- const rows = parseCsv(csvText);
+export function parseWasteTab(input, getId) {
+ const rows = toRows(input);
  const byDate = {};
  for (let i = 1; i < rows.length; i++) {
   const r = rows[i]; if (!r[0] || !r[1]) continue;
@@ -90,8 +112,8 @@ export function parseWasteTab(csvText, getId) {
 // data outlet mulai baris ke-4 (indeks 3). Kolom terakhir tiap blok (offset+9) = menit
 // kehabisan -- posisi ini sudah dipakai & terverifikasi oleh performance-summary.mjs versi
 // manual sebelumnya (stockRow[10+d*10]).
-export function parseLostSalesTab(csvText, getId) {
- const rows = parseCsv(csvText);
+export function parseLostSalesTab(input, getId) {
+ const rows = toRows(input);
  if (!rows.length) return {};
  const dateRow = rows[0], blocks = [];
  for (let c = 1; c < dateRow.length; c += 10) blocks.push({ col: c, date: parseDateHeaderCell(dateRow[c]) });
@@ -117,11 +139,11 @@ export async function fetchLostSalesForMonth(sheetId, year, monthIndex0, getId, 
  const candidates = [...new Set([`Rekap Forecast ${MONTH_ABBR[monthIndex0]}`, ...(monthIndex0 === 8 ? ['Rekap Forecast SEPT'] : []), `Rekap Forecast ${MONTH_ID[monthIndex0].toUpperCase()}`])];
  for (const tabName of candidates) {
   const left = deadline - Date.now(); if (left < 20000) break;
-  let text; try { text = await fetchSheetCsv(sheetId, tabName, Math.min(MONTH_TAB_TIMEOUT_MS, left)); } catch { continue; }
-  const rows = parseCsv(text); if (!rows.length) continue;
+  let rows; try { rows = await fetchSheetRows(sheetId, tabName, Math.min(MONTH_TAB_TIMEOUT_MS, left)); } catch { continue; }
+  if (!rows.length) continue;
   const firstDate = parseDateHeaderCell(rows[0][1]);
   if (firstDate !== `${year}-${String(monthIndex0 + 1).padStart(2, '0')}-01`) continue;
-  return { tabName, data: parseLostSalesTab(text, getId) };
+  return { tabName, data: parseLostSalesTab(rows, getId) };
  }
  return null;
 }
@@ -132,7 +154,7 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
  // sel di tab Rekap bulanan). Kalau WASTE gagal/timeout, pakai data waste yang sudah tersimpan
  // dan TETAP lanjut menarik lost sales -- dulu satu kegagalan di sini menggugurkan semuanya.
  let waste = { ...(previous?.waste || {}) }, wasteFresh = false;
- try { Object.assign(waste, parseWasteTab(await fetchSheetCsv(sheetId, 'WASTE', WASTE_TAB_TIMEOUT_MS), getId)); wasteFresh = true; }
+ try { Object.assign(waste, parseWasteTab(await fetchSheetRows(sheetId, 'WASTE', WASTE_TAB_TIMEOUT_MS), getId)); wasteFresh = true; }
  catch (e) { console.log('Tab WASTE belum terbaca (' + e.message + '); pakai waste tersimpan.'); }
  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now);
  const [year, month] = today.slice(0, 7).split('-').map(Number);
@@ -162,6 +184,7 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
   updatedAt: new Date().toISOString(),
   wasteFresh,
   source: 'REKAP HARIAN FORECAST 2026 (tab WASTE + Rekap Forecast <bulan>)',
+  via: process.env.GOOGLE_SHEETS_API_KEY ? 'sheets-api' : 'gviz',
   lossMethod: 'Menit kehabisan dari sheet / hari / 12 jam buka -- asumsi penjualan merata.',
   lostSalesMonthTabsUsed: monthsUsed,
   waste,

@@ -114,3 +114,29 @@ test('pull() keeps stored waste and still reads lost sales when the WASTE tab ti
   assert.equal(result.lostSalesMinutes['2026-11-01']['jakal-uii'], 92);
  } finally { global.fetch = originalFetch; }
 });
+
+test('with GOOGLE_SHEETS_API_KEY set, tabs are read through the Sheets API (key in header, not URL) and a missing tab name falls through to the next candidate', async () => {
+ const profiles = { outlets: { 'jakal-uii': { name: 'Jakal' } } };
+ const wasteValues = [Array(38).fill(''), ['04 November 2026', 'Jakal', '1', '', '', '', ...Array(30).fill(''), 'Rp5,000', 'Area 1']];
+ const novValues = [['`', 'Sunday, 1 November 2026'], [], [], ['Jakal', '', '', '', '', '', '', '', '', '', '92']];
+ const seen = [];
+ const originalFetch = global.fetch, originalKey = process.env.GOOGLE_SHEETS_API_KEY;
+ process.env.GOOGLE_SHEETS_API_KEY = 'test-key';
+ global.fetch = async (url, opts) => {
+  const u = String(url); seen.push(u);
+  assert.ok(u.startsWith('https://sheets.googleapis.com/v4/spreadsheets/sheet-id/values/'));
+  assert.ok(!u.includes('test-key'));
+  assert.equal(opts.headers['X-goog-api-key'], 'test-key');
+  const tab = decodeURIComponent(u.split('/values/')[1].split('?')[0]);
+  if (tab === "'WASTE'") return { ok: true, json: async () => ({ values: wasteValues }) };
+  if (tab === "'Rekap Forecast NOV'") return { ok: true, json: async () => ({ values: novValues }) };
+  return { ok: false, status: 400, json: async () => ({}) };
+ };
+ try {
+  const result = await pull('sheet-id', profiles, { now: new Date('2026-11-20T10:00:00+07:00') });
+  assert.equal(result.via, 'sheets-api');
+  assert.deepEqual(result.waste['2026-11-04']['jakal-uii'], { core: [1, 0, 0, 0], nominal: 5000 });
+  assert.equal(result.lostSalesMinutes['2026-11-01']['jakal-uii'], 92);
+  assert.deepEqual(result.lostSalesMonthTabsUsed, ['Rekap Forecast NOV']);
+ } finally { global.fetch = originalFetch; if (originalKey === undefined) delete process.env.GOOGLE_SHEETS_API_KEY; else process.env.GOOGLE_SHEETS_API_KEY = originalKey; }
+});
