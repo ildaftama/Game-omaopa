@@ -245,8 +245,8 @@ window.ForecastDashboard=(()=>{
   if(!w||!(w.dir==='up'||w.dir==='sharp-up'))return '';
   const wastePct=trendPctText(w);
   return omzetDir==='up'
-   ?` <b class="fd-trend-caution">Tapi waste juga naik ${wastePct} — tetap hati-hati, jangan kirim kebablasan.</b>`
-   :` <b class="fd-trend-caution">Waste malah ikut naik ${wastePct} walau omzet turun — segera sesuaikan kiriman, bukan cuma dikurangi asal.</b>`;
+   ?` <b class="fd-trend-caution">Tapi waste juga naik ${wastePct} — jaga agar kiriman tidak terlalu banyak.</b>`
+   :` <b class="fd-trend-caution">Waste justru naik ${wastePct} saat omzet turun — sesuaikan kiriman per produk, bukan hanya mengurangi total.</b>`;
  }
  // Ringkasan global (gambaran umum SEMUA outlet dulu) -- owner minta ini di depan, baru
  // rincian per outlet di bawahnya (lihat flags/full di trendWatchCard). networkTrend = tren
@@ -279,10 +279,10 @@ window.ForecastDashboard=(()=>{
  // Saran dibedakan menurut besarnya pergerakan -- bukan "Siapkan stok lebih" yang sama persis
  // di setiap kartu (owner: bahasanya kaku & monoton).
  function riserAdvice(r){
-  if(r.fromZero)return 'Baru mulai laku, pantau dulu sebelum menambah banyak.';
-  return r.pct>=50?'Lonjakan besar, tambah kiriman.':r.pct>=25?'Naik cukup tinggi, siapkan stok lebih.':'Mulai naik, tambah sedikit.';
+  if(r.fromZero)return 'Penjualan mulai tumbuh, pantau dulu sebelum menambah kiriman.';
+  return r.pct>=50?'Kenaikan signifikan, tambah kiriman.':r.pct>=25?'Kenaikan cukup tinggi, siapkan stok lebih.':'Mulai naik, tambah kiriman secara bertahap.';
  }
- function fallerAdvice(r){return r.pct<=-30?'Turun cukup dalam, kurangi kiriman.':'Agak melemah, kurangi sedikit.';}
+ function fallerAdvice(r){return r.pct<=-30?'Penurunan cukup dalam, kurangi kiriman.':'Sedikit melemah, kurangi kiriman secara bertahap.';}
  function trendWatchCard(networkTrend){
   const ext=networkTrendExtremes(),wl=wasteLostTrendExtremes();
   const overview=networkOverviewHtml(networkTrend,ext,wl);
@@ -300,8 +300,8 @@ window.ForecastDashboard=(()=>{
    const wasteUp=wl.waste.filter(r=>r.pct>=20||r.fromZero).sort((a,b)=>trendSortValue(b)-trendSortValue(a)).slice(0,3);
    const lostUp=wl.lost.filter(r=>r.pct>=20||r.fromZero).sort((a,b)=>trendSortValue(b)-trendSortValue(a)).slice(0,3);
    if(wasteUp.length||lostUp.length){
-    const wasteFlags=wasteUp.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>🗑️ ${esc(r.name)}</b><span>Waste ${trendPctText(r)}${r.context}. ${r.fromZero||r.pct>=100?'Naik tajam — cek produk mana yang paling banyak sisa.':'Cek lagi jumlah kirimannya.'}</span></button>`);
-    const lostFlags=lostUp.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>⏳ ${esc(r.name)}</b><span>Lost sales ${trendPctText(r)}${r.context}. ${r.fromZero?'Mulai sering kehabisan.':'Makin sering kehabisan, pertimbangkan tambah kiriman.'}</span></button>`);
+    const wasteFlags=wasteUp.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>🗑️ ${esc(r.name)}</b><span>Waste ${trendPctText(r)}${r.context}. ${r.fromZero||r.pct>=100?'Naik tajam — periksa produk dengan sisa terbanyak.':'Tinjau kembali jumlah kiriman.'}</span></button>`);
+    const lostFlags=lostUp.map(r=>`<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>⏳ ${esc(r.name)}</b><span>Lost sales ${trendPctText(r)}${r.context}. ${r.fromZero?'Stok mulai sering habis.':'Stok makin sering habis, pertimbangkan menambah kiriman.'}</span></button>`);
     groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Waste &amp; lost sales naik</span><div class="fd-trend-grid">${[...wasteFlags,...lostFlags].join('')}</div></div>`);
    }
   }
@@ -763,24 +763,24 @@ window.ForecastDashboard=(()=>{
  function wasteSentence(r){
   if(!r.wasteOver)return `Waste ${pct1(r.wastePct)}, masih aman di bawah batas ${W_TH}.`;
   const ratio=r.wastePct/WASTE_THRESHOLD;
-  const level=ratio>=2?'sudah dua kali lipat batas':ratio>=1.5?'jauh di atas batas':'sedikit lewat batas';
-  return `Waste ${pct1(r.wastePct)}, ${level}${r.topCore!=null?` — paling banyak sisa ${CORE_SHORT[r.topCore]}`:''}.`;
+  const level=ratio>=2?'lebih dari dua kali batas':ratio>=1.5?'jauh di atas batas':'sedikit di atas batas';
+  return `Waste ${pct1(r.wastePct)}, ${level}${r.topCore!=null?` — sisa terbanyak ${CORE_SHORT[r.topCore]}`:''}.`;
  }
  function lostSentence(r){
   const m=Math.round(r.lostPerDay);
-  if(!r.lostOver)return m>0?`Kehabisan rata-rata ${m} menit sehari, masih wajar.`:'Hampir tidak pernah kehabisan.';
+  if(!r.lostOver)return m>0?`Stok habis rata-rata ${m} menit per hari, masih dalam batas.`:'Stok hampir tidak pernah habis.';
   const hours=m>=60?` (±${(m/60).toLocaleString('id-ID',{maximumFractionDigits:1})} jam)`:'';
-  return `Rata-rata kehabisan ${m} menit sehari${hours}.`;
+  return `Stok habis rata-rata ${m} menit per hari${hours}.`;
  }
  function adviceText(r){
-  if(r.wasteOver&&r.lostOver)return 'Sisa banyak tapi juga sering kehabisan — kemungkinan komposisi produknya yang kurang pas, bukan jumlah totalnya.';
+  if(r.wasteOver&&r.lostOver)return 'Sisa tinggi namun stok juga sering habis — kemungkinan komposisi produk yang perlu disesuaikan, bukan jumlah totalnya.';
   // Waste tinggi TAPI omzet sedang naik tajam: memotong kiriman justru berisiko kehabisan --
   // cukup tahan (jangan ditambah) sampai lonjakannya jelas bertahan.
   const prod=r.topCore!=null?CORE_SHORT[r.topCore]:'kiriman';
-  if(r.wasteOver&&r.omzetPct!=null&&r.omzetPct>=15)return `Omzet sedang naik, jadi ${prod} jangan dipotong — cukup jangan ditambah dulu.`;
+  if(r.wasteOver&&r.omzetPct!=null&&r.omzetPct>=15)return `Omzet sedang naik, jadi kiriman ${prod} cukup dipertahankan, belum perlu ditambah.`;
   if(r.wasteOver&&r.omzetPct!=null&&r.omzetPct<=-15)return `Omzet juga sedang turun, kurangi kiriman ${prod}.`;
-  if(r.wasteOver)return r.topCore!=null?`Kurangi kiriman ${prod} dulu.`:'Kurangi kiriman sedikit.';
-  if(r.lostOver)return r.wastePct!=null&&r.wastePct<WASTE_THRESHOLD*.6?'Waste-nya rendah, jadi kiriman masih aman ditambah.':'Tambah kiriman sedikit, sambil pantau waste-nya.';
+  if(r.wasteOver)return r.topCore!=null?`Kurangi kiriman ${prod}.`:'Kurangi kiriman secara bertahap.';
+  if(r.lostOver)return r.wastePct!=null&&r.wastePct<WASTE_THRESHOLD*.6?'Waste rendah, kiriman masih aman ditambah.':'Tambah kiriman secara bertahap sambil memantau waste.';
   return '';
  }
  function srcTag(src){return src==='kirim'?'dikirim vs laku':'';}
@@ -811,18 +811,18 @@ window.ForecastDashboard=(()=>{
   const tile=(big,small,tone)=>`<div class="fd-overview-stat${tone?' fd-overview-'+tone:''}"><b>${big}</b><span>${small}</span></div>`;
   const tiles=[
    s.net.wastePct!=null?tile(pct1(s.net.wastePct),'waste jaringan',s.net.wastePct>WASTE_THRESHOLD?'down':'up'):'',
-   tile(wOver.length,'outlet waste lewat batas',wOver.length?'down':'up'),
+   tile(wOver.length,'outlet waste di atas batas',wOver.length?'down':'up'),
    s.net.lostPerDay!=null?tile(Math.round(s.net.lostPerDay)+' mnt','kehabisan / outlet / hari',s.net.lostPct>LOST_SALES_THRESHOLD?'down':'up'):'',
-   s.lostFromSheet?tile(lOver.length,'outlet sering kehabisan',lOver.length?'down':'up'):tile('—','lost sales harian belum masuk',''),
+   s.lostFromSheet?tile(lOver.length,'outlet sering kehabisan stok',lOver.length?'down':'up'):tile('—','lost sales harian belum masuk',''),
   ].join('');
   const sentences=[];
   if(s.net.wastePct!=null){
    const head=s.net.wastePct>WASTE_THRESHOLD?`Waste jaringan ${pct1(s.net.wastePct)}, di atas batas ${W_TH}`:`Waste jaringan ${pct1(s.net.wastePct)}, masih di bawah batas ${W_TH}`;
-   sentences.push(wOver.length?`${head} — ${wOver.length} outlet lewat batas, paling berat di ${nameList(wOver.slice(0,3).map(r=>r.name))}.`:`${head}, dan belum ada outlet yang lewat.`);
+   sentences.push(wOver.length?`${head} — ${wOver.length} outlet di atas batas, tertinggi di ${nameList(wOver.slice(0,3).map(r=>r.name))}.`:`${head}, dan belum ada outlet yang melewati batas.`);
   }
-  if(lOver.length)sentences.push(`${lOver.length} outlet sering kehabisan, terutama ${nameList(lOver.slice(0,2).map(r=>r.name))}.`);
+  if(lOver.length)sentences.push(`${lOver.length} outlet sering kehabisan stok, terutama ${nameList(lOver.slice(0,2).map(r=>r.name))}.`);
   else if(s.net.lostPerDay!=null)sentences.push('Lost sales semua outlet masih dalam batas wajar.');
-  if(both.length)sentences.push(`${nameList(both.map(r=>r.name),2)} kena dua-duanya — sisa banyak tapi juga sering habis, cek komposisi produknya.`);
+  if(both.length)sentences.push(`${nameList(both.map(r=>r.name),2)} mengalami keduanya — sisa tinggi namun stok juga sering habis, perlu peninjauan komposisi produk.`);
   const groups=[];
   const wOnly=wOver.filter(r=>!r.lostOver).slice(0,3),lOnly=lOver.filter(r=>!r.wasteOver).slice(0,3);
   if(both.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Waste tinggi &amp; sering kehabisan</span><div class="fd-trend-grid">${both.slice(0,3).map(r=>wasteLostFlag(r,'both')).join('')}</div></div>`);
