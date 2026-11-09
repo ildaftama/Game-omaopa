@@ -560,9 +560,28 @@ window.ForecastDashboard=(()=>{
   }
 
   const pureEngine=buildEngine(pureSeries,planner),pesananEngine=buildEngine(pesananSeries,planner);
-  const forecastPureAt=date=>pureEngine.forecastAt(date);
+  // Prediksi tanggal yang SUDAH LEWAT dibekukan (arahan owner 2026-11-10): sebelumnya semua
+  // tanggal dihitung ulang tiap kali dashboard dibuka, jadi prediksi 9 Nov yang kemarin tampil
+  // 38 jt berubah jadi 42 jt begitu omzet real 9 Nov masuk -- terutama karena bagian pesanannya
+  // berganti dari angka pasti sheet PESANAN ke rata-rata mesin, plus faktor pertumbuhan ikut
+  // bergeser. Sekarang tanggal lewat memakai prediksi "versi H-1": mesin yang hanya melihat data
+  // SEBELUM tanggal itu, dengan aturan pesanan yang sama seperti saat itu (pesanan tercatat
+  // dipakai pasti). Hasilnya sama persis dengan yang tampil sehari sebelumnya dan tidak berubah
+  // lagi -- tanpa perlu menyimpan apa pun. Tanggal yang belum lewat tetap diperbarui tiap hari.
+  const frozen=new Map();
+  function frozenAt(date){
+   if(!frozen.has(date)){
+    const pe=buildEngine(pureSeries.filter(r=>r.date<date),planner),se=buildEngine(pesananSeries.filter(r=>r.date<date),planner);
+    const pure=pe.forecastAt(date),known=knownPesananAt(date),pes=known!=null?known:se.forecastAt(date);
+    frozen.set(date,{pure,pes});
+   }
+   return frozen.get(date);
+  }
+  const isPast=date=>lastActual&&date<=lastActual;
+  const forecastPureAt=date=>isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);
   function forecastPesananAt(date){
-   if(lastActual&&date>lastActual){const known=knownPesananAt(date);if(known!=null)return known;}
+   if(isPast(date))return frozenAt(date).pes;
+   const known=knownPesananAt(date);if(known!=null)return known;
    return pesananEngine.forecastAt(date);
   }
   function forecastTotalAt(date){
