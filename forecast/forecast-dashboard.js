@@ -1262,5 +1262,23 @@ window.ForecastDashboard=(()=>{
  // Dipakai "Forecast dari omzet": prediksi omzet reguler/pesanan jaringan untuk satu tanggal
  // (bulan ini & bulan depan), angka yang sama dengan garis prediksi di grafik dashboard.
  function predict(date){try{const r=revenueTrend('__all__')?.rows.find(x=>x.date===date);return r?{pure:r.forecastPure,total:r.forecastTotal}:null;}catch{return null;}}
- return {render,inspect,change,mount,click,predict};
+ // Dipakai saran buffer "Forecast dari omzet": waste (sheet WASTE, nominal / omzet ESB) dan
+ // menit habis stok (sheet rekap) untuk N TANGGAL TERAKHIR YANG SUDAH DIISI tim (bukan N hari
+ // kalender -- sheet sering telat 1-3 hari), jaringan & per outlet. Sama aturannya dengan kartu
+ // waste/lost di dashboard (outlet tanpa baris waste pada tanggal terisi = 0).
+ function recentWasteLost(n=7){
+  applySettings();
+  const recap=window.DAILY_RECAP_SUMMARY,ds=dailyOutletProductSeries(),t=today(),floor=window.ForecastPlanner.shift(t,-28);
+  const rev=new Map();if(ds)for(const [id,s] of ds.byOutlet)for(const pt of s)rev.set(pt.date+'|'+id,pt.gross);
+  const ids=window.PcsPanels.data().sales?.outletIds||[],by=new Map(ids.map(id=>[id,{wn:0,wr:0,wd:0,lm:0,ld:0}]));
+  const wDates=Object.keys(recap?.waste||{}).filter(x=>x<t&&x>=floor&&Object.keys(recap.waste[x]).length).sort().slice(-n);
+  for(const date of wDates)for(const [id,r] of by){const g=rev.get(date+'|'+id);if(!(g>0))continue;r.wn+=recap.waste[date][id]?.nominal||0;r.wr+=g;r.wd++;}
+  const lDates=Object.keys(recap?.lostSalesMinutes||{}).filter(x=>x<t&&x>=floor).sort().slice(-n);
+  for(const date of lDates)for(const [id,m] of Object.entries(recap.lostSalesMinutes[date]||{})){const r=by.get(id);if(r&&Number.isFinite(m)){r.lm+=m;r.ld++;}}
+  const pctOf=r=>({wastePct:r.wd>=MIN_RECAP_DAYS&&r.wr>0?r.wn/r.wr*100:null,lostPct:r.ld>=MIN_RECAP_DAYS?r.lm/r.ld/OPEN_MINUTES*100:null,lostPerDay:r.ld>=MIN_RECAP_DAYS?r.lm/r.ld:null});
+  const all=[...by.values()].reduce((s,r)=>({wn:s.wn+r.wn,wr:s.wr+r.wr,wd:Math.max(s.wd,r.wd),lm:s.lm+r.lm,ld:s.ld+r.ld}),{wn:0,wr:0,wd:0,lm:0,ld:0});
+  const net={wastePct:all.wd>=MIN_RECAP_DAYS&&all.wr>0?all.wn/all.wr*100:null,lostPct:all.ld>0&&lDates.length>=MIN_RECAP_DAYS?all.lm/all.ld/OPEN_MINUTES*100:null,lostPerDay:all.ld>0&&lDates.length>=MIN_RECAP_DAYS?all.lm/all.ld:null};
+  return {net,byOutlet:new Map([...by].map(([id,r])=>[id,pctOf(r)])),wasteThreshold:WASTE_THRESHOLD,lostThreshold:LOST_SALES_THRESHOLD,wasteFrom:wDates[0]||null,wasteTo:wDates.at(-1)||null,lostFrom:lDates[0]||null,lostTo:lDates.at(-1)||null};
+ }
+ return {render,inspect,change,mount,click,predict,recentWasteLost};
 })();
