@@ -8,22 +8,30 @@ window.ForecastShipping=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
  const shift=(d,n)=>window.ForecastPlanner.shift(d,n);
+ // Warna dibuat kalem & seragam (owner 2026-11-10: versi pertama terlalu kontras). Tiap rute
+ // punya satu warna aksen lembut; produk dibedakan lewat titik warna kecil + kelompok kategori,
+ // bukan latar baris mencolok, supaya tetap mudah dibaca di layar HP grup WA.
  const GROUPS=[
-  {name:'Semarang',color:'#c9a6d6',outlets:[['unnes','UNNES'],['sampangan','SAMPANGAN'],['undip','UNDIP'],['udinus','UDINUS'],['unimus','UNIMUS'],['ngaliyan','NGALIYAN'],['gajah-raya','GAJAH RAYA']]},
-  {name:'Magelang – Salatiga',color:'#c9a6d6',outlets:[['muntilann','MUNTILAN'],['pemuda-magelang','MAGELANG'],['temanggung','TEMANGGUNG'],['uksw','UKSW'],['ambarawa','AMBARAWA']]},
-  {name:'Solo',color:'#a8d5a2',outlets:[['merbabu','MERBABU'],['rajawali','RAJAWALI'],['ums','UMS'],['makamhaji','MAKAMHAJI'],['laweyan','LAWEYAN'],['sukoharjo','SUKOHARJO'],['nusukan','NUSUKAN'],['uns','JEBRES'],['sragen','SRAGEN'],['karanganyar','KARANGANYAR'],['boyolali','BOYOLALI']]},
-  {name:'Jogja',color:'#5ee0e6',outlets:[['nusa-indah','NUSA INDAH'],['umy','UMY'],['jakal-uii','JAKAL'],['tajem','TAJEM'],['godean','GODEAN']]},
+  {name:'Semarang',color:'#6c5b9e',outlets:[['unnes','UNNES'],['sampangan','SAMPANGAN'],['undip','UNDIP'],['udinus','UDINUS'],['unimus','UNIMUS'],['ngaliyan','NGALIYAN'],['gajah-raya','GAJAH RAYA']]},
+  {name:'Magelang – Salatiga',color:'#9a5f84',outlets:[['muntilann','MUNTILAN'],['pemuda-magelang','MAGELANG'],['temanggung','TEMANGGUNG'],['uksw','UKSW'],['ambarawa','AMBARAWA']]},
+  {name:'Solo',color:'#4e8a5e',outlets:[['merbabu','MERBABU'],['rajawali','RAJAWALI'],['ums','UMS'],['makamhaji','MAKAMHAJI'],['laweyan','LAWEYAN'],['sukoharjo','SUKOHARJO'],['nusukan','NUSUKAN'],['uns','JEBRES'],['sragen','SRAGEN'],['karanganyar','KARANGANYAR'],['boyolali','BOYOLALI']]},
+  {name:'Jogja',color:'#2e7f8f',outlets:[['nusa-indah','NUSA INDAH'],['umy','UMY'],['jakal-uii','JAKAL'],['tajem','TAJEM'],['godean','GODEAN']]},
  ];
- // [label di gambar, sumber: indeks SKU inti atau nama produk lain, warna baris]
+ // [label, sumber: indeks SKU inti atau nama produk lain, titik warna, kategori]
+ const CATS=['Ogura & Malmil','Mini','Chiffon','Roti & lainnya'];
  const ROWS=[
-  ['Ogura Cheese',0,'#ffffff'],['Ogura Chocolate',1,'#ffffff'],['Malmil Cheese',2,'#ffffff'],['Malmil Choco',3,'#ffffff'],
-  ['Mini Cheese (pcs)',4,'#ffff00'],['Mini Choco (pcs)',5,'#f6a04d'],['Mini Durian (pcs)',6,'#22e83a'],['BOX MINI','Box Mini','#d9d2e9'],
-  ['Chiffon Classic Keju',7,'#fde9d9'],['Chiffon Classic Ekstra Keju',8,'#fde9d9'],['Chiffon Lite Keju',11,'#c6d9f1'],['Chiffon Lite Ekstra Keju',10,'#c6d9f1'],
-  ['Chiffon Butter',9,'#fbc96b'],['Chiffon Kurma','Chiffon Kurma','#e9935a'],['Roti Manis Sosis','Roti Sosis','#f4c7c3'],['Roti Manis Abon','Roti Abon','#6d9eeb'],
-  ['Roti Manis Coklat Meses','Roti Coklat','#c5e0b4'],['WHIP','Whip','#f4b183'],
+  ['Ogura Cheese',0,'#e2c15a',0],['Ogura Chocolate',1,'#8b5e3c',0],['Malmil Cheese',2,'#e2c15a',0],['Malmil Choco',3,'#8b5e3c',0],
+  ['Mini Cheese (pcs)',4,'#e2c15a',1],['Mini Choco (pcs)',5,'#8b5e3c',1],['Mini Durian (pcs)',6,'#7fae6b',1],['Box Mini','Box Mini','#a597c7',1],
+  ['Chiffon Classic Keju',7,'#e6b39b',2],['Chiffon Classic Ekstra Keju',8,'#d99a7e',2],['Chiffon Lite Keju',11,'#9db7d8',2],['Chiffon Lite Ekstra Keju',10,'#7d9cc6',2],
+  ['Chiffon Butter',9,'#e0b25e',2],['Chiffon Kurma','Chiffon Kurma','#b97b55',2],
+  ['Roti Manis Sosis','Roti Sosis','#d6918b',3],['Roti Manis Abon','Roti Abon','#7b95c4',3],['Roti Manis Coklat Meses','Roti Coklat','#8b5e3c',3],['Whip','Whip','#e3a77d',3],
  ];
  const REQ_ROWS=[['Ogura Cheese'],['Ogura Chocolate'],['Malmil Cheese'],['Malmil Choco'],['Mini pcs cheese'],['Mini pcs choco'],['Mini pcs durian'],['Chiffon Keju'],['Chiffon Ekstra Keju'],['Chiffon Lite Keju'],['Chiffon Lite Ekstra Keju'],['Chiffon Butter'],['Roti Manis Sosis'],['Roti Manis Abon'],['Roti Manis Coklat']];
+ const REQ_ACCENT='#4f6378';
  const METHODS=['Diambil ke Pabrik','Diantar oleh Driver'];
+ const mix=(hex,to,a)=>{const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),A=p(hex),B=p(to);return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*a).toString(16).padStart(2,'0')).join('');};
+ const tint=(h,a)=>mix(h,'#ffffff',a),shade=(h,a)=>mix(h,'#000000',a);
+ const nf=n=>Number(n).toLocaleString('id-ID');
  let date=null,status='';
  const store=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch{return null;}};
  const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
@@ -39,52 +47,80 @@ window.ForecastShipping=(()=>{
  function qty(record,src,pct){
   if(!record)return null;const p=record.plan;let v=0;
   if(typeof src==='number'){if(!p.active?.[src])return 0;v=(p.regular[src]||0)+(p.orders[src]||0);}
-  else{const it=(p.customItems||[]).find(x=>String(x.name).trim().toLowerCase()===src.toLowerCase());v=it?(it.regular||0)+(it.orders||0):0;}
+  else{const it=(p.customItems||[]).find(x=>String(x.name).trim().toLowerCase()===src.toLowerCase());v=it?(Number(it.regular)||0)+(Number(it.orders)||0):0;}
   return Math.round(v*pct/100);
  }
+ const sumOf=vals=>{const k=vals.filter(v=>v!=null);return k.length?k.reduce((a,b)=>a+Number(b||0),0):null;};
  function groupData(by){
   const P=pcts();
-  return GROUPS.map(g=>({...g,cols:g.outlets.map(([id,label])=>{const r=by.get(id),pct=Number.isFinite(P[id])?P[id]:100;return {id,label,pct,record:r,values:ROWS.map(([,src])=>qty(r,src,pct))};})}));
+  return GROUPS.map(g=>{const cols=g.outlets.map(([id,label])=>{const r=by.get(id),pct=Number.isFinite(P[id])?P[id]:100;return {id,label,pct,record:r,values:ROWS.map(([,src])=>qty(r,src,pct))};});
+   const totals=ROWS.map((_,ri)=>sumOf(cols.map(c=>c.values[ri])));return {...g,cols,totals,grand:sumOf(totals),filled:cols.filter(c=>c.record).length};});
  }
+ const numCell=v=>v==null?'<td class="fs-nil">—</td>':Number(v)===0?'<td class="fs-zero">0</td>':`<td>${nf(v)}</td>`;
  function render(){
   if(!date)date=shift(today(),1);
   const by=plans(),groups=groupData(by),missing=groups.flatMap(g=>g.cols.filter(c=>!c.record).map(c=>c.label)),reqs=requests();
-  const table=g=>`<div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner" rowspan="2">Pengiriman Pertama</th>${g.cols.map(c=>`<th class="${c.record?'':'fs-ship-missing'}" style="background:${g.color}">${esc(c.label)}</th>`).join('')}</tr><tr>${g.cols.map(c=>`<th class="fs-ship-pct"><input type="number" min="0" max="100" step="5" value="${c.pct}" data-ship-pct="${esc(c.id)}" aria-label="Persen pengiriman pertama ${esc(c.label)}">%</th>`).join('')}</tr></thead><tbody>${ROWS.map(([label,,color],ri)=>`<tr style="background:${color}"><td>${esc(label)}</td>${g.cols.map(c=>`<td>${c.values[ri]==null?'—':c.values[ri]}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const reqTable=`<div class="fs-ship-wrap"><table class="fs-ship fs-req"><thead><tr><th class="fs-ship-corner">Request tambahan</th>${reqs.map((c,i)=>`<th><input type="text" maxlength="40" value="${esc(c.name)}" data-req-name="${i}" placeholder="Nama peminta" aria-label="Nama peminta"><button type="button" class="fs-req-remove" data-req-remove="${i}" aria-label="Hapus kolom">×</button></th>`).join('')}<th><button type="button" class="button" data-req-add>+ Kolom</button></th></tr></thead><tbody>${REQ_ROWS.map(([label],ri)=>`<tr><td>${esc(label)}</td>${reqs.map((c,i)=>`<td><input type="number" min="0" max="10000" step="1" value="${c.qty?.[ri]??''}" data-req-qty="${i}:${ri}" aria-label="${esc(label)}"></td>`).join('')}<td></td></tr>`).join('')}<tr class="fs-req-meta"><td>Waktu pengambilan/pengiriman</td>${reqs.map((c,i)=>`<td><input type="text" maxlength="30" value="${esc(c.time||'')}" data-req-time="${i}" placeholder="Pukul 09.30"></td>`).join('')}<td></td></tr><tr class="fs-req-meta"><td>Pengambilan/pengiriman</td>${reqs.map((c,i)=>`<td><select data-req-method="${i}">${METHODS.map(m=>`<option ${c.method===m?'selected':''}>${m}</option>`).join('')}</select></td>`).join('')}<td></td></tr></tbody></table></div>`;
+  const body=g=>CATS.map((cat,ci)=>`<tr class="fs-cat"><td colspan="${g.cols.length+2}">${esc(cat)}</td></tr>${ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${g.cols.map(c=>numCell(c.values[ri])).join('')}${numCell(g.totals[ri]).replace('<td','<td data-tot')}</tr>`).join('')}`).join('');
+  const table=g=>`<section class="fs-ship-card" style="--acc:${g.color};--acc-soft:${tint(g.color,.9)};--acc-ink:${shade(g.color,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">${esc(g.name)}</h3><span class="fs-ship-meta">${g.filled}/${g.cols.length} outlet terisi${g.grand!=null?` · ${nf(g.grand)} pcs`:''}</span></header><div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner" rowspan="2">Produk</th>${g.cols.map(c=>`<th class="${c.record?'':'fs-ship-missing'}" title="${c.record?'':'Belum ada rencana tersimpan'}">${esc(c.label)}</th>`).join('')}<th class="fs-ship-totalh" rowspan="2">Total</th></tr><tr class="fs-ship-pctrow">${g.cols.map(c=>`<th><label class="fs-ship-pct"><input type="number" min="0" max="100" step="5" value="${c.pct}" data-ship-pct="${esc(c.id)}" aria-label="Persen pengiriman pertama ${esc(c.label)}"><span>%</span></label></th>`).join('')}</tr></thead><tbody>${body(g)}</tbody></table></div></section>`;
+  const reqTable=`<section class="fs-ship-card fs-req-card" style="--acc:${REQ_ACCENT};--acc-soft:${tint(REQ_ACCENT,.9)};--acc-ink:${shade(REQ_ACCENT,.3)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Request tambahan</h3><span class="fs-ship-meta">Pesanan manajemen sebelah · tersimpan di perangkat ini</span></header><div class="fs-ship-wrap"><table class="fs-ship fs-req"><thead><tr><th class="fs-ship-corner">Produk</th>${reqs.map((c,i)=>`<th><div class="fs-req-name"><input type="text" maxlength="40" value="${esc(c.name)}" data-req-name="${i}" placeholder="Nama peminta" aria-label="Nama peminta"><button type="button" class="fs-req-remove" data-req-remove="${i}" aria-label="Hapus kolom" title="Hapus kolom">×</button></div></th>`).join('')}<th class="fs-req-addcell"><button type="button" class="fs-req-add" data-req-add>+ Tambah peminta</button></th></tr></thead><tbody>${REQ_ROWS.map(([label],ri)=>`<tr><td>${esc(label)}</td>${reqs.map((c,i)=>`<td><input type="number" min="0" max="10000" step="1" value="${c.qty?.[ri]??''}" data-req-qty="${i}:${ri}" aria-label="${esc(label)}" placeholder="0"></td>`).join('')}<td></td></tr>`).join('')}<tr class="fs-cat"><td colspan="${reqs.length+2}">Pengambilan / pengiriman</td></tr><tr><td>Waktu</td>${reqs.map((c,i)=>`<td><input type="text" maxlength="30" value="${esc(c.time||'')}" data-req-time="${i}" placeholder="Pukul 09.30"></td>`).join('')}<td></td></tr><tr><td>Cara</td>${reqs.map((c,i)=>`<td><select data-req-method="${i}">${METHODS.map(m=>`<option ${c.method===m?'selected':''}>${m}</option>`).join('')}</select></td>`).join('')}<td></td></tr></tbody></table></div>${reqs.length?'':'<p class="fs-req-empty">Belum ada request. Klik <b>+ Tambah peminta</b> untuk menambah kolom (misalnya Admin Pogung atau Marketing HO).</p>'}</section>`;
   const canShare=!!(navigator.canShare&&navigator.share);
-  return `<div class="fs-ship-head"><label>Tanggal kiriman<input type="date" id="fs-ship-date" value="${date}"></label><div class="fs-ship-actions">${canShare?'<button type="button" class="button fp-primary" data-ship-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ship-download>Unduh gambar</button></div></div>
-   <p class="fp-caption">${dateLabel(date)} · dari rencana terakhir yang disimpan forecaster (reguler + pesanan). Ubah persen kalau pengiriman pertama tidak 100%.</p>
-   ${missing.length?`<p class="fp-alert">Belum ada rencana tersimpan untuk: ${esc(missing.join(', '))}. Kolomnya tampil "—".</p>`:''}
-   ${status?`<p class="fp-caption" role="status">${esc(status)}</p>`:''}
-   ${groups.map(g=>`<h3 class="fs-ship-title">${esc(g.name)}</h3>${table(g)}`).join('')}
-   <h3 class="fs-ship-title">Request tambahan (manajemen sebelah)</h3><p class="fp-caption">Tersimpan di perangkat ini untuk tanggal yang dipilih. Ikut menjadi gambar tersendiri kalau ada kolomnya.</p>${reqTable}`;
+  return `<div class="fs-ship-head"><label class="fs-ship-date">Tanggal kiriman<input type="date" id="fs-ship-date" value="${date}"></label><div class="fs-ship-actions">${canShare?'<button type="button" class="button fp-primary" data-ship-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ship-download>Unduh gambar</button></div></div>
+   <p class="fs-ship-sub">${esc(dateLabel(date))} · dari rencana terakhir forecaster (reguler + pesanan). Ubah persen bila pengiriman pertama tidak 100%.</p>
+   ${missing.length?`<p class="fs-ship-note"><b>${missing.length} outlet</b> belum punya rencana tersimpan, kolomnya tampil abu-abu: ${esc(missing.join(', '))}.</p>`:''}
+   ${status?`<p class="fs-ship-sub" role="status">${esc(status)}</p>`:''}
+   <div class="fs-ship-list">${groups.map(table).join('')}${reqTable}</div>`;
  }
  // ---- Gambar (canvas) ----
- function drawTable({title,headerColor,colLabels,subLabels,rows,corner}){
-  const LW=230,CW=118,RH=26,HH=44,SH=24,PAD=16,TH=34;
-  const cols=colLabels.length,W=PAD*2+LW+CW*cols,H=PAD*2+TH+HH+(subLabels?SH:0)+RH*rows.length;
+ function drawTable({title,accent,colLabels,subLabels,sections,showTotal}){
+  const F='"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
+  const LW=232,CW=98,TW=showTotal?88:0,RH=30,CH=26,HH=44,SH=24,PAD=28,HEAD=86,FOOT=40;
+  const cols=colLabels.length,bodyH=sections.reduce((a,s)=>a+(s.title?CH:0)+s.rows.length*RH,0);
+  const TWD=LW+CW*cols+TW,W=PAD*2+TWD,headH=HH+(subLabels?SH:0),H=PAD+HEAD+headH+bodyH+FOOT;
   const cv=document.createElement('canvas'),scale=2;cv.width=W*scale;cv.height=H*scale;const x=cv.getContext('2d');x.scale(scale,scale);
-  x.fillStyle='#fff';x.fillRect(0,0,W,H);
-  x.fillStyle='#1f3a4d';x.font='bold 15px Arial';x.textBaseline='middle';x.fillText(title,PAD,PAD+TH/2-4);
-  let y=PAD+TH;const left=PAD;
-  const cell=(cx,cy,w,h,fill,text,opt={})=>{x.fillStyle=fill;x.fillRect(cx,cy,w,h);x.strokeStyle='#333';x.lineWidth=1;x.strokeRect(cx+.5,cy+.5,w,h);if(text==null)return;x.fillStyle=opt.color||'#000';x.font=`${opt.bold?'bold ':''}${opt.italic?'italic ':''}${opt.size||12}px Arial`;x.textAlign=opt.align||'center';
-   const lines=String(text).split('\n'),lh=(opt.size||12)+3,ty=cy+h/2-(lines.length-1)*lh/2;lines.forEach((l,i)=>x.fillText(l,opt.align==='left'?cx+8:cx+w/2,ty+i*lh));x.textAlign='left';};
-  cell(left,y,LW,HH+(subLabels?SH:0),'#f4cccc',corner,{bold:true,size:13});
-  colLabels.forEach((l,i)=>cell(left+LW+i*CW,y,CW,HH,headerColor,l,{bold:true,size:12}));
-  if(subLabels)subLabels.forEach((l,i)=>cell(left+LW+i*CW,y+HH,CW,SH,'#fff',l,{bold:true,italic:true,size:11}));
-  y+=HH+(subLabels?SH:0);
-  for(const r of rows){cell(left,y,LW,RH,r.color||'#fff',r.label,{bold:true,align:'left',size:12});r.values.forEach((v,i)=>cell(left+LW+i*CW,y,CW,RH,r.color||'#fff',v==null?'—':String(v),{bold:true,size:12}));y+=RH;}
+  const soft=tint(accent,.88),ink=shade(accent,.35),totBg=tint(accent,.95);
+  const text=(t,tx,ty,{size=13,weight=400,color='#1f2d3a',align='left'}={})=>{x.font=`${weight} ${size}px ${F}`;x.fillStyle=color;x.textAlign=align;x.textBaseline='middle';const ls=String(t).split('\n'),lh=size+3;ls.forEach((l,i)=>x.fillText(l,tx,ty-(ls.length-1)*lh/2+i*lh));};
+  const rect=(rx,ry,w,h,c)=>{x.fillStyle=c;x.fillRect(rx,ry,w,h);};
+  const hline=(ry,c='#e5e9ee',w=1)=>{x.strokeStyle=c;x.lineWidth=w;x.beginPath();x.moveTo(PAD,ry+.5);x.lineTo(PAD+TWD,ry+.5);x.stroke();};
+  rect(0,0,W,H,'#ffffff');rect(0,0,W,6,accent);
+  text('OMA OPA CAKERY',PAD,PAD+6,{size:11,weight:700,color:'#8592a0'});
+  text(title,PAD,PAD+32,{size:21,weight:700,color:'#1c2b38'});
+  text(dateLabel(date),PAD,PAD+58,{size:13,color:'#5f6f7e'});
+  let y=PAD+HEAD;const cx=i=>PAD+LW+i*CW+CW/2,tx=PAD+LW+CW*cols+TW/2;
+  rect(PAD,y,TWD,headH,soft);
+  text('Produk',PAD+14,y+headH/2,{size:12,weight:700,color:ink});
+  colLabels.forEach((l,i)=>text(l,cx(i),y+HH/2,{size:12,weight:700,color:ink,align:'center'}));
+  if(subLabels)subLabels.forEach((l,i)=>text(l,cx(i),y+HH+SH/2-2,{size:11,color:'#6b7a88',align:'center'}));
+  if(showTotal)text('TOTAL',tx,y+headH/2,{size:12,weight:700,color:ink,align:'center'});
+  y+=headH;hline(y-1,accent,2);
+  let zebra=0;
+  for(const s of sections){
+   if(s.title){rect(PAD,y,TWD,CH,'#f1f4f7');text(s.title.toUpperCase(),PAD+14,y+CH/2,{size:10.5,weight:700,color:'#66768a'});y+=CH;hline(y,'#e5e9ee');zebra=0;}
+   for(const r of s.rows){
+    rect(PAD,y,TWD,RH,zebra++%2?'#fafbfc':'#ffffff');if(showTotal)rect(PAD+LW+CW*cols,y,TW,RH,totBg);
+    let lx=PAD+14;if(r.dot){x.fillStyle=r.dot;x.beginPath();x.arc(lx+4,y+RH/2,4.5,0,Math.PI*2);x.fill();lx+=16;}
+    text(r.label,lx,y+RH/2,{size:13,color:'#24323f'});
+    const cellTxt=(v,px,bold)=>{if(v==null||v==='')return text(v==null?'—':'',px,y+RH/2,{size:13,color:'#b7c0ca',align:'center'});if(typeof v==='number'||/^\d+$/.test(String(v))){const n=Number(v);return text(nf(n),px,y+RH/2,{size:13,weight:n?700:400,color:n?(bold?ink:'#1c2b38'):'#b7c0ca',align:'center'});}text(v,px,y+RH/2,{size:11.5,color:'#24323f',align:'center'});};
+    r.values.forEach((v,i)=>cellTxt(v,cx(i)));
+    if(showTotal)cellTxt(r.total,tx,true);
+    y+=RH;hline(y);
+   }
+  }
+  x.strokeStyle='#dbe1e7';x.lineWidth=1;x.strokeRect(PAD+.5,PAD+HEAD+.5,TWD-1,y-PAD-HEAD-1);
+  x.strokeStyle='#eef1f4';for(let i=0;i<=cols;i++){if(i===0||i===cols&&!showTotal)continue;const vx=PAD+LW+i*CW+.5;x.beginPath();x.moveTo(vx,PAD+HEAD+headH);x.lineTo(vx,y);x.stroke();}
+  x.strokeStyle='#dbe1e7';const vx0=PAD+LW+.5;x.beginPath();x.moveTo(vx0,PAD+HEAD);x.lineTo(vx0,y);x.stroke();
+  const stamp=new Date().toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  text(`Dibuat dari Forecast Oma Opa · ${stamp} WIB`,PAD,y+FOOT/2+2,{size:10.5,color:'#97a3ae'});
   return cv;
  }
  function images(){
-  const by=plans(),groups=groupData(by),out=[],dl=dateLabel(date);
-  for(const g of groups)out.push({name:`Pengiriman ${g.name} ${date}.png`,canvas:drawTable({title:`Pengiriman Pertama · ${g.name} · ${dl}`,headerColor:g.color,corner:'Pengiriman\nPertama',colLabels:g.cols.map(c=>c.label),subLabels:g.cols.map(c=>c.pct+'%'),rows:ROWS.map(([label,,color],ri)=>({label,color,values:g.cols.map(c=>c.values[ri])}))})});
+  const by=plans(),groups=groupData(by),out=[];
+  for(const g of groups)out.push({name:`Pengiriman ${g.name} ${date}.png`,canvas:drawTable({title:`Pengiriman Pertama · ${g.name}`,accent:g.color,showTotal:true,colLabels:g.cols.map(c=>c.label),subLabels:g.cols.map(c=>c.record?c.pct+'%':'belum ada'),
+   sections:CATS.map((cat,ci)=>({title:cat,rows:ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>({label,dot,values:g.cols.map(c=>c.values[ri]),total:g.totals[ri]}))}))})});
   const reqs=requests().filter(c=>c.name||c.qty?.some(v=>v!==''&&v!=null));
   if(reqs.length){
-   const rows=REQ_ROWS.map(([label],ri)=>({label,values:reqs.map(c=>{const v=c.qty?.[ri];return v===''||v==null||Number(v)===0?'':String(v);})}));
-   rows.push({label:'Waktu pengambilan/\npengiriman',color:'#e3e1f2',values:reqs.map(c=>c.time||'')});
-   rows.push({label:'Pengambilan/pengiriman',color:'#e3e1f2',values:reqs.map(c=>wrap(c.method||''))});
-   out.push({name:`Request tambahan ${date}.png`,canvas:drawTable({title:`Request Tambahan · ${dl}`,headerColor:'#e3e1f2',corner:'REQUEST TAMBAHAN',colLabels:reqs.map(c=>wrap(c.name||'-')),rows})});
+   const rows=REQ_ROWS.map(([label],ri)=>{const values=reqs.map(c=>{const v=c.qty?.[ri];return v===''||v==null||Number(v)===0?'':String(Number(v));});return {label,values,total:values.some(v=>v!=='')?values.reduce((a,v)=>a+(Number(v)||0),0):''};});
+   out.push({name:`Request tambahan ${date}.png`,canvas:drawTable({title:'Request Tambahan',accent:REQ_ACCENT,showTotal:true,colLabels:reqs.map(c=>wrap(c.name||'-')),
+    sections:[{rows},{title:'Pengambilan / pengiriman',rows:[{label:'Waktu',values:reqs.map(c=>c.time||''),total:''},{label:'Cara',values:reqs.map(c=>wrap(c.method||'')),total:''}]}]})});
   }
   return out;
  }
