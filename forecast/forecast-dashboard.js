@@ -422,6 +422,38 @@ window.ForecastDashboard=(()=>{
  // Mesin forecast generik -- dipakai terpisah untuk deret "omzet tanpa pesanan" dan deret
  // "omzet pesanan" (lihat revenueTrend) supaya tiap komponen punya baseline/tren/pola sendiri;
  // pesanan jauh lebih kecil (~3-4% omzet) dan lebih bergelombang daripada omzet reguler.
+ // Prediksi PER OUTLET: gabungan 50:50 antara (a) pola tahun lalu outlet itu sendiri dan
+ // (b) prediksi jaringan x porsi outlet itu dari total jaringan (per hari-minggu, 8 minggu
+ // terakhir). Diuji mundur 2026-11-10 (28 outlet, origin tiap 2 minggu Mei-Okt, horizon 30
+ // hari): akurasi harian 75,1% -> 76,4%, meleset total sebulan rata-rata 10,7% -> 9,6%.
+ // Penjualan harian satu outlet memang jauh lebih bergejolak daripada jaringan (di jaringan
+ // naik-turun 28 outlet saling menutupi), jadi ±76% harian adalah batas wajarnya -- semua
+ // metode yang diuji mentok di 73-76%. Diterapkan sebagai faktor pengali di atas mesin outlet
+ // (rasio gabungan / pola outlet), supaya pemisahan omzet murni vs pesanan tetap utuh.
+ const yoyGrowthCache=new Map();
+ function yoyMapAt(V,tag,origin,date,planner){
+  const gk=tag+'|'+origin;
+  if(!yoyGrowthCache.has(gk)){let a=0,b=0,n=0;for(let k=0;k<56;k++){const d=planner.shift(origin,-k),x=V.get(d),y=V.get(planner.shift(d,-364));if(x!=null&&y!=null){a+=x;b+=y;n++;}}yoyGrowthCache.set(gk,n>=14&&b>0?a/b:null);}
+  const g=yoyGrowthCache.get(gk);if(g==null)return null;
+  const md=date.slice(5),hol=d=>{const m=d.slice(5);return m>='12-18'||m<='01-04';};
+  if(md>='12-18'||md<='01-04'){const x=V.get(shiftYearDate(date,-1));if(x!=null)return x*g;}
+  let s=0,w=0;[-14,-7,0,7,14].forEach((o,i)=>{const src=planner.shift(date,o-364);if(hol(src))return;const x=V.get(src);if(x!=null){const wt=[1,2,3,2,1][i];s+=x*wt;w+=wt;}});
+  return w?s/w*g:null;
+ }
+ function makeOutletAdjust(id,planner){
+  const ds=dailyOutletProductSeries(),own=ds?.byOutlet.get(id);if(!own)return null;
+  const V=new Map(own.map(p=>[p.date,p.gross])),N=new Map();
+  for(const s of ds.byOutlet.values())for(const p of s)N.set(p.date,(N.get(p.date)||0)+p.gross);
+  const wd=d=>new Date(d+'T12:00:00Z').getUTCDay(),cache=new Map();
+  return (date,origin)=>{
+   const key=date+'|'+origin;if(cache.has(key))return cache.get(key);
+   let r=1;
+   const a=yoyMapAt(V,'o:'+id,origin,date,planner),n=yoyMapAt(N,'net',origin,date,planner);
+   let so=0,sn=0;for(let k=0;k<56;k++){const x=planner.shift(origin,-k);if(wd(x)!==wd(date))continue;const v=V.get(x),t=N.get(x);if(v!=null&&t){so+=v;sn+=t;}}
+   if(a>0&&n!=null&&sn>0)r=(.5*a+.5*n*(so/sn))/a;
+   cache.set(key,r);return r;
+  };
+ }
  function buildEngine(series,planner){
   const valueByDate=new Map(series.map(r=>[r.date,r.value]));
   const lastDate=series.length?series[series.length-1].date:null;
@@ -589,11 +621,14 @@ window.ForecastDashboard=(()=>{
    return frozen.get(date);
   }
   const isPast=date=>lastActual&&date<=lastActual;
-  const forecastPureAt=date=>isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);
+  const outletAdjust=outletId==='__all__'?null:makeOutletAdjust(outletId,planner);
+  // Tanggal lewat: faktor dihitung dengan data s.d. H-1 (ikut dibekukan seperti prediksinya).
+  const adj=date=>outletAdjust&&lastActual?outletAdjust(date,isPast(date)?planner.shift(date,-1):lastActual):1;
+  const forecastPureAt=date=>{const v=isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);return v==null?null:v*adj(date);};
   function forecastPesananAt(date){
-   if(isPast(date))return frozenAt(date).pes;
+   if(isPast(date)){const k=knownPesananAt(date);if(k!=null)return k;const v=frozenAt(date).pes;return v==null?null:v*adj(date);}
    const known=knownPesananAt(date);if(known!=null)return known;
-   return pesananEngine.forecastAt(date);
+   const v=pesananEngine.forecastAt(date);return v==null?null:v*adj(date);
   }
   function forecastTotalAt(date){
    const r=forecastPureAt(date),p=forecastPesananAt(date);
@@ -1163,7 +1198,7 @@ window.ForecastDashboard=(()=>{
    return `<li class="${up?'over':'under'}"><b>${esc(r.label)}</b> cenderung ${pct1(Math.abs(r.bias))} ${up?'di atas':'di bawah'} real (${moneyBig(r.F)} vs ${moneyBig(r.A)}). ${up?'Kurangi':'Tambah'} ${esc(r.verb)} sekitar ${k}% ${up?'agar waste tidak menumpuk':'agar tidak kehabisan stok'}.</li>`;
   });
   return `<article class="workspace-card fd-accuracy"><span class="micro-label">AKURASI ${month.toUpperCase()} · ${dateRange(days[0].date,days.at(-1).date).toUpperCase()} · DALAM RUPIAH</span>
-   <div class="fd-outlet-table-wrap"><table class="fd-acc-table"><thead><tr><th></th><th>Akurasi</th><th>Selisih total</th><th>Rencana vs real</th></tr></thead><tbody>${rows.map(line).join('')}</tbody></table></div>
+   <div class="fd-outlet-table-wrap"><table class="fd-acc-table"><thead><tr><th></th><th>Akurasi</th><th>Selisih total</th><th>Prediksi/rencana vs real</th></tr></thead><tbody>${rows.map(line).join('')}</tbody></table></div>
    ${warns.length?`<ul class="fd-acc-warn">${warns.join('')}</ul>`:`<p class="fd-accuracy-note">Semua masih dalam selisih ±3% dari real.</p>`}</article>`;
  }
  function render(outletId){
