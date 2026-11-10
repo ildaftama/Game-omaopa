@@ -1,6 +1,6 @@
 'use strict';
 // The same three website roles protect reference data and team plans.
-window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',records:[],allRecords:[],log:[],watch(){},async deletePlans(){throw Error('Penyimpanan tim belum siap.');},async restorePlan(){throw Error('Penyimpanan tim belum siap.');},async save(){throw Error('Penyimpanan tim belum siap.');},async getFulfillment(){return null;},async saveFulfillment(){throw Error('Penyimpanan tim belum siap.');}};
+window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',records:[],allRecords:[],log:[],watch(){},async deletePlans(){throw Error('Penyimpanan tim belum siap.');},staffName(){return '';},async getRevisions(){return [];},async restorePlan(){throw Error('Penyimpanan tim belum siap.');},async save(){throw Error('Penyimpanan tim belum siap.');},async getFulfillment(){return null;},async saveFulfillment(){throw Error('Penyimpanan tim belum siap.');}};
 (async()=>{
  const cloud=window.ForecastPlanCloud,emit=()=>window.dispatchEvent(new Event('forecast-plans-changed'));
  try{
@@ -57,6 +57,12 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
     });return revision;
    }catch(e){if(e.message==='CONFLICT')throw Error('Rencana ini baru diubah rekan tim. Buka rencana tim terbaru sebelum menyimpan lagi. Draft Anda tetap tersimpan.');if(e.code==='permission-denied')throw Error('Izin menyimpan rencana tim belum aktif. Draft belum dikirim dan tetap tersimpan di perangkat ini.');throw Error('Rencana belum tersimpan ke tim. Periksa koneksi dan coba lagi.');}
   };
+  // Riwayat: nama staf dari uid (dibaca sekali per uid, disimpan di memori) & semua versi satu
+  // rencana. Staf yang tidak boleh membaca dokumen staf lain cukup melihat "Akun staf".
+  const names=new Map();
+  cloud.staffName=uid=>{if(!uid)return '';if(uid===cloud.uid)return staffName||'Anda';if(names.has(uid))return names.get(uid);names.set(uid,null);
+   dbSDK.getDoc(dbSDK.doc(db,'staff',uid)).then(s=>{const d=s.exists()?s.data():{};names.set(uid,String(d.name||d.nama||d.displayName||'').slice(0,60)||'Akun staf');emit();}).catch(()=>{names.set(uid,'Akun staf');emit();});return null;};
+  cloud.getRevisions=async key=>{const s=await dbSDK.getDocs(dbSDK.collection(db,'forecastPlans',key,'revisions'));return s.docs.map(d=>d.data()).sort((a,b)=>a.revision-b.revision);};
   // Hapus rencana: dokumen & semua revisinya TETAP ada; hanya diberi tanda "deleted" + entri
   // log permanen (alasan wajib) dalam satu tulisan. Satu outlet per tulisan.
   cloud.deletePlans=async(records,reason,onProgress)=>{
