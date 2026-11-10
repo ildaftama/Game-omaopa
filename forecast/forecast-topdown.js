@@ -66,13 +66,15 @@ window.ForecastTopdown=(()=>{
   if(cache?.key===key)return cache;
   const ids=[...d.sales.outletIds],from=model.shift(date,-56),byOutlet=new Map();
   for(const r of d.sales.days){if(r.date<from||r.date>=date||!r.complete||!Array.isArray(r.qty)||wd(r.date)!==wd(date))continue;if(!byOutlet.has(r.id))byOutlet.set(r.id,[]);byOutlet.get(r.id).push(r);}
-  const outlets=new Map();let B=0;
+  const outlets=new Map(),lwDate=model.shift(date,-7);let B=0;
   for(const id of ids){
    const recs=model.recommend(d.sales,d.orders,id,date),prices=model.prices(window.FORECAST_REALIZED_PRICES,id,date),hist=byOutlet.get(id)||[];
    const base=recs.map((r,p)=>{if(r.central!=null)return r.central;const m=median(hist.map(x=>x.qty[p]||0));return m==null?0:m;});
    const value=base.reduce((s,q,p)=>s+q*(prices[p].value||0),0);B+=value;
    const roti={};for(const i of Object.values(ROTI)){const v=hist.filter(x=>x.qty.length>i).map(x=>x.qty[i]||0);roti[i]=v.length>=3?Math.round(median(v)):null;}
-   outlets.set(id,{id,recs,prices,base,value,orders:orderQty(id),roti});
+   const lwRow=d.sales.days.find(x=>x.id===id&&x.date===lwDate&&x.complete&&Array.isArray(x.qty)),lwOrd=d.orders.days.find(x=>x.id===id&&x.date===lwDate);
+   const lw=lwRow?Math.max(0,lwRow.qty.slice(0,12).reduce((a,b)=>a+(b||0),0)-(lwOrd?.knownQty||lwOrd?.qty||[]).reduce((a,b)=>a+(Number(b)||0),0)):null;
+   outlets.set(id,{id,recs,prices,base,value,orders:orderQty(id),roti,lw});
   }
   const pred=window.ForecastDashboard?.predict?.(date)||null;
   let wl=null;try{wl=window.ForecastDashboard?.recentWasteLost?.(7)||null;}catch{}
@@ -141,8 +143,16 @@ window.ForecastTopdown=(()=>{
   if(synced){ensureShape(c);persist();}
   return c;
  }
+ // Pembanding: reguler terjual hari yang sama minggu lalu (ESB 12 produk inti dikurangi pesanan
+ // tercatat). Selisih > 25% disorot supaya angka janggal cepat terlihat saat meneliti.
+ const LW_ALERT=25;
+ // Kunci setelah hari H (owner 2026-11-10): mulai 00.00 WIB tanggal kiriman, rencana hanya bisa
+ // disimpan/dihapus akun Master -- juga dijaga rules Firestore (forecastOpenDate).
+ const locked=()=>date<=today()&&window.ForecastAuth?.role?.master!==true;
+ function lwCell(o,pcs){if(o.lw==null)return {txt:'—',cls:'ft-muted',title:'Penjualan minggu lalu belum lengkap'};if(!o.lw)return {txt:pcs?'baru':'—',cls:'ft-muted',title:'Minggu lalu tidak ada penjualan reguler'};const d=(pcs/o.lw-1)*100,big=Math.abs(d)>LW_ALERT;return {txt:(d>0?'+':d<0?'−':'')+Math.abs(Math.round(d))+'%',cls:big?(d>0?'ft-lw-up':'ft-lw-down'):'ft-lw-ok',title:`Minggu lalu terjual ${o.lw} pcs reguler · rencana ${pcs} pcs${big?' · selisih besar, cek lagi':''}`};}
  const qtyOf=v=>{const n=Number(v);return Number.isFinite(n)&&n>=0?n:0;};
  function outletTotals(c,id){const o=c.outlets.get(id),cells=draft.cells[id]||[];let pcs=0,val=0;cells.forEach((v,p)=>{const q=qtyOf(v);pcs+=q;val+=q*(o.prices[p].value||0);});const ex=draft.extra[id]||{};let extra=0,exOrd=0;for(const nm of draft.names){extra+=qtyOf(ex[nm]?.r);exOrd+=qtyOf(ex[nm]?.o);}return {pcs,val,extra,orders:(draft.orders[id]||[]).reduce((a,b)=>a+qtyOf(b),0)+exOrd};}
+ function lwTotal(c){let lw=0,pcs=0,n=0;for(const id of c.ids){const o=c.outlets.get(id);if(o.lw==null)continue;lw+=o.lw;pcs+=outletTotals(c,id).pcs;n++;}if(!lw)return 'Minggu lalu: data belum lengkap';const d=(pcs/lw-1)*100;return `Minggu lalu ${nf(lw)} pcs terjual · rencana ${d>0?'+':d<0?'−':''}${Math.abs(d).toLocaleString('id-ID',{maximumFractionDigits:1})}%`;}
  function totals(c){let pcs=0,val=0,orders=0,extra=0;for(const id of c.ids){const t=outletTotals(c,id);pcs+=t.pcs;val+=t.val;orders+=t.orders;extra+=t.extra;}return {pcs,val,orders,extra};}
  // customItems yang akan disimpan untuk outlet ini: kolom produk lain yang bernilai > 0, plus
  // item lama di rencana tim yang namanya tidak ada di kolom (tidak pernah dihapus diam-diam).
@@ -173,10 +183,10 @@ window.ForecastTopdown=(()=>{
  }
  function render(){
   if(!data().sales||!data().orders)return '<div class="fp-empty">Memuat riwayat penjualan dan pesanan…</div>';
-  const c=prepare(),t=totals(c),pred=c.pred?.pure,diff=pred?((draft.target/pred-1)*100):null,span=SHORT.length+draft.names.length+5;
-  const head=`<thead><tr><th class="ft-outlet">Outlet</th><th class="ft-num">Omzet</th>${SHORT.map(([a,b],p)=>`<th class="ft-sku" title="${esc(model.names[p])}">${a}<br><small>${b}</small></th>`).join('')}${draft.names.map((nm,i)=>`<th class="ft-sku ft-xh${i===0?' ft-xfirst':''}" title="${esc(nm)} · diisi manual">${shortName(nm)}</th>`).join('')}<th class="ft-num">Reguler</th><th class="ft-num">Pesanan</th><th>Status</th></tr></thead>`;
+  const c=prepare(),t=totals(c),pred=c.pred?.pure,diff=pred?((draft.target/pred-1)*100):null,span=SHORT.length+draft.names.length+6;
+  const head=`<thead><tr><th class="ft-outlet">Outlet</th><th class="ft-num">Omzet</th>${SHORT.map(([a,b],p)=>`<th class="ft-sku" title="${esc(model.names[p])}">${a}<br><small>${b}</small></th>`).join('')}${draft.names.map((nm,i)=>`<th class="ft-sku ft-xh${i===0?' ft-xfirst':''}" title="${esc(nm)} · diisi manual">${shortName(nm)}</th>`).join('')}<th class="ft-num">Reguler</th><th class="ft-num" title="Rencana reguler 12 produk inti dibanding reguler terjual hari yang sama minggu lalu">vs mg lalu</th><th class="ft-num">Pesanan</th><th>Status</th></tr></thead>`;
   const row=id=>{const o=c.outlets.get(id),tt=outletTotals(c,id),[sk,sl]=statusOf(id),auto=draft.auto?.[id]||[],open=draft.open.includes(id),ex=draft.extra[id];const adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'';const note=draft.notes[id]?'<span class="ft-notedot" title="Ada catatan">✎</span>':'';
-   return `<tr data-ft-row="${esc(id)}" class="${open?'ft-open':''}"><td class="ft-outlet"><button type="button" class="ft-oname" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Ubah pesanan & catatan outlet ini"><span class="ft-caret">${open?'▾':'▸'}</span>${esc(name(id))}</button>${adj}${note}</td><td class="ft-num" data-ft-val="${esc(id)}">${rp(tt.val)}</td>${draft.cells[id].map((v,p)=>`<td><input class="ft-cell${auto[p]!=null&&String(auto[p])!==String(v)?' ft-edited':''}" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(v)}" data-ft-cell="${esc(id)}:${p}" aria-label="${esc(name(id))} ${esc(model.names[p])}" title="Saran awal: ${esc(auto[p]??'—')}"></td>`).join('')}${draft.names.map((nm,i)=>`<td class="${i===0?'ft-xfirst':''}"><input class="ft-cell ft-xcell" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(ex[nm].r)}" data-ft-xr="${esc(id)}:${i}" aria-label="${esc(name(id))} ${esc(nm)}" ${rotiIdx(nm)!=null?`title="Saran median hari sama: ${o.roti[rotiIdx(nm)]??'data belum cukup'}"`:''}></td>`).join('')}<td class="ft-num ft-strong" data-ft-pcs="${esc(id)}">${nf(tt.pcs+tt.extra)}</td><td class="ft-num ${tt.orders?'':'ft-muted'}" data-ft-ord-total="${esc(id)}">${tt.orders?nf(tt.orders):'—'}</td><td><span class="ft-pill ${sk}" data-ft-status="${esc(id)}">${sl}</span></td></tr>${open?detailRow(c,id,span):''}`;};
+   return `<tr data-ft-row="${esc(id)}" class="${open?'ft-open':''}"><td class="ft-outlet"><button type="button" class="ft-oname" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Ubah pesanan & catatan outlet ini"><span class="ft-caret">${open?'▾':'▸'}</span>${esc(name(id))}</button>${adj}${note}</td><td class="ft-num" data-ft-val="${esc(id)}">${rp(tt.val)}</td>${draft.cells[id].map((v,p)=>`<td><input class="ft-cell${auto[p]!=null&&String(auto[p])!==String(v)?' ft-edited':''}" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(v)}" data-ft-cell="${esc(id)}:${p}" aria-label="${esc(name(id))} ${esc(model.names[p])}" title="Saran awal: ${esc(auto[p]??'—')}"></td>`).join('')}${draft.names.map((nm,i)=>`<td class="${i===0?'ft-xfirst':''}"><input class="ft-cell ft-xcell" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(ex[nm].r)}" data-ft-xr="${esc(id)}:${i}" aria-label="${esc(name(id))} ${esc(nm)}" ${rotiIdx(nm)!=null?`title="Saran median hari sama: ${o.roti[rotiIdx(nm)]??'data belum cukup'}"`:''}></td>`).join('')}<td class="ft-num ft-strong" data-ft-pcs="${esc(id)}">${nf(tt.pcs+tt.extra)}</td>${(()=>{const l=lwCell(o,tt.pcs);return `<td class="ft-num ${l.cls}" data-ft-lw="${esc(id)}" title="${esc(l.title)}">${l.txt}</td>`;})()}<td class="ft-num ${tt.orders?'':'ft-muted'}" data-ft-ord-total="${esc(id)}">${tt.orders?nf(tt.orders):'—'}</td><td><span class="ft-pill ${sk}" data-ft-status="${esc(id)}">${sl}</span></td></tr>${open?detailRow(c,id,span):''}`;};
   const body=c.groups.map(g=>`<tr class="ft-group" style="--acc:${g.color}"><td colspan="${span}">${esc(g.name)}</td></tr>${g.ids.map(row).join('')}`).join('');
   const adjN=c.ids.filter(id=>c.outlets.get(id).adj.pct).length;
   const changedN=c.ids.filter(id=>statusOf(id)[0]!=='saved').length,existing=c.ids.filter(id=>record(id)).length;
@@ -195,14 +205,14 @@ window.ForecastTopdown=(()=>{
    <p class="ft-sub">${esc(dateLabel(date))} · ${diff==null?'':Math.abs(diff)<.05?'Target sesuai prediksi · ':`Target ${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi · `}porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir. Kotak kuning = sudah diubah dari hasil bagi otomatis. Klik nama outlet untuk mengubah pesanan & catatannya.</p>
    <div class="ft-summary">
     <div><span>Omzet hasil bagi</span><strong data-ft-total-val>${rp(t.val)}</strong><small>12 produk inti</small></div>
-    <div><span>Total reguler</span><strong data-ft-total-pcs>${nf(t.pcs+t.extra)} pcs</strong><small data-ft-total-extra>${t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi'}</small></div>
+    <div><span>Total reguler</span><strong data-ft-total-pcs>${nf(t.pcs+t.extra)} pcs</strong><small data-ft-lw-total>${esc(lwTotal(c))}</small><small data-ft-total-extra>${t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi'}</small></div>
     <div><span>Pesanan outlet</span><strong data-ft-total-ord>${nf(t.orders)} pcs</strong><small>ditambahkan terpisah</small></div>
     <div><span>Pesanan pabrik</span><strong>${foN==null?'—':nf(foN)+' pcs'}</strong><small>${foN==null?'menunggu sinkron':'tidak masuk outlet'}</small></div>
    </div>
    ${factoryBlock()}
-   ${date<=today()?'<p class="fs-ship-note">Tanggal ini sudah berjalan/berlalu. Rencana yang disimpan sekarang tidak dihitung sebagai forecast sebelum penjualan.</p>':''}
+   ${locked()?'<p class="fp-lock-note">🔒 Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.</p>':date<=today()?'<p class="fs-ship-note">Hari H sudah dimulai. Anda Master, jadi masih bisa mengubah, tapi rencana yang disimpan sekarang tidak dihitung di akurasi.</p>':''}
    <div class="ft-table-wrap"><table class="ft-table">${head}<tbody>${body}</tbody></table></div>
-   <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
+   <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
    <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}. Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>
   </div>`;
  }
@@ -221,11 +231,13 @@ window.ForecastTopdown=(()=>{
  function pendingInfo(c){const ids=c.ids.filter(x=>statusOf(x)[0]!=='saved'),areas=c.groups.map(g=>[g.name,g.ids.filter(id=>ids.includes(id)).length]).filter(([,n])=>n);return {n:ids.length,areas:areas.map(([a,n])=>`${a} ${n}`).join(', ')};}
  const saveText=i=>i.n?`Simpan ${i.n} outlet ke tim`:'Semua outlet tersimpan';
  const pendingMsg=i=>i.n?`${i.n} outlet belum tersimpan / berubah (${i.areas}). Teliti angkanya, lalu simpan.`:'Semua outlet sudah tersimpan sesuai angka di tabel.';
- function saveLabel(){const c=compute(),i=pendingInfo(c),btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!i.n;btn.textContent=saveText(i);btn.title=i.n?`Per area: ${i.areas}`:'';const any=c.ids.some(x=>record(x));btn.hidden=!i.n&&any;const nx=q('[data-ft-next]');if(nx)nx.hidden=!!i.n||!any;}const m=q('.ft-msg');if(m&&!message)m.textContent=pendingMsg(i);}
+ function saveLabel(){const c=compute(),i=pendingInfo(c),btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!i.n||locked();btn.textContent=saveText(i);btn.title=i.n?`Per area: ${i.areas}`:'';const any=c.ids.some(x=>record(x));btn.hidden=!i.n&&any;const nx=q('[data-ft-next]');if(nx)nx.hidden=!!i.n||!any;}const m=q('.ft-msg');if(m&&!message)m.textContent=pendingMsg(i);}
  function refreshTotals(id){
   const c=compute(),tt=outletTotals(c,id),t=totals(c),E=CSS.escape(id);
   const v=q(`[data-ft-val="${E}"]`);if(v)v.textContent=rp(tt.val);
   const pc=q(`[data-ft-pcs="${E}"]`);if(pc)pc.textContent=nf(tt.pcs+tt.extra);
+  const lc=q(`[data-ft-lw="${E}"]`);if(lc){const l=lwCell(c.outlets.get(id),tt.pcs);lc.textContent=l.txt;lc.className='ft-num '+l.cls;lc.title=l.title;}
+  const lt=q('[data-ft-lw-total]');if(lt)lt.textContent=lwTotal(c);
   const od=q(`[data-ft-ord-total="${E}"]`);if(od){od.textContent=tt.orders?nf(tt.orders):'—';od.classList.toggle('ft-muted',!tt.orders);}
   const st=q(`[data-ft-status="${E}"]`);if(st){const [k,l]=statusOf(id);st.className='ft-pill '+k;st.textContent=l;}
   const tv=q('[data-ft-total-val]');if(tv)tv.textContent=rp(t.val);
@@ -268,7 +280,7 @@ window.ForecastTopdown=(()=>{
    if(edited&&!confirm('Angka reguler yang sudah diubah manual akan diganti hasil bagi otomatis. Pesanan, produk lain & catatan tidak berubah. Lanjutkan?'))return false;
    draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));persist();message=`Target ${rp(draft.target)} sudah dibagi ke ${compute().ids.length} outlet. Teliti angkanya, lalu simpan.`;return true;
   }
-  if(e.target.closest('[data-ft-save]')){saveAll();return true;}
+  if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.';return true;}saveAll();return true;}
   return false;
  }
  function keydown(){return false;}

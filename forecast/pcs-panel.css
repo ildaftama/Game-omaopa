@@ -491,3 +491,10 @@
 .fp-day-box .fp-table{background:#fff}
 .fp-step{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-right:6px;border-radius:50%;background:#e4ebf0;color:#3d5566;font-size:10.5px;font-weight:700;vertical-align:1px}
 .fp-subnav button[aria-pressed="true"] .fp-step{background:#fff;color:#1f3a4d}
+/* vs minggu lalu & kunci hari H */
+.ft-lw-ok{color:#5b6b7a}
+.ft-lw-up{color:#8a6212;font-weight:700;background:#fff6e3}
+.ft-lw-down{color:#a14b31;font-weight:700;background:#fdf0eb}
+.ft-summary small[data-ft-lw-total]{display:block}
+.fp-lock-note{margin:0;padding:9px 12px;border-radius:10px;background:#f1f4f7;border:1px solid #dfe5ea;color:#3d5566;font-size:12.5px;line-height:1.5}
+.fp-lock-tag{margin-left:8px;font-size:11.5px;color:#6b7a88}

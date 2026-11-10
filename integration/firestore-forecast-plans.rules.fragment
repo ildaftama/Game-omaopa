@@ -105,14 +105,26 @@ function forecastRecord(d, key) {
     && d.savedBy == request.auth.uid && d.savedAt == request.time
     && d.firstSavedAt is timestamp && forecastPlan(d.plan,d);
 }
+// Kunci setelah hari H (owner 2026-11-10): mulai 00.00 WIB tanggal rencana, rencana hanya bisa
+// dibuat/diubah/dihapus akun Master. Realisasi kirim (fulfillment) tetap terbuka.
+function forecastOpenDate(date) {
+  return request.time < timestamp.date(int(date.split('-')[0]), int(date.split('-')[1]), int(date.split('-')[2])) - duration.value(7, 'h');
+}
+function forecastMasterUser() {
+  return request.auth != null
+    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+    && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true;
+}
 match /forecastPlans/{key} {
   allow read: if forecastPlanner();
   allow create: if forecastReference(request.resource.data,key) || (forecastPlanner() && forecastRecord(request.resource.data,key)
+    && (forecastOpenDate(request.resource.data.date) || forecastMasterUser())
     && request.resource.data.revision == 1
     && request.resource.data.firstSavedAt == request.time
     && request.resource.data.baseline == request.resource.data.plan
     && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/1).data == request.resource.data);
   allow update: if forecastReference(request.resource.data,key) || (forecastPlanner() && forecastRecord(request.resource.data,key)
+    && (forecastOpenDate(request.resource.data.date) || forecastMasterUser())
     && request.resource.data.date == resource.data.date
     && request.resource.data.outlet == resource.data.outlet
     && request.resource.data.revision == resource.data.revision + 1
@@ -159,6 +171,7 @@ match /forecastPlans/{key} {
 // tulisan yang sama. Akurasi memakai rencana yang tidak dihapus; manajer melihat log-nya.
 function forecastDeleteMark() {
   return forecastPlanner()
+    && (forecastOpenDate(resource.data.date) || forecastMasterUser())
     && resource.data.get('deleted', null) == null
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted'])
     && request.resource.data.deleted is map
