@@ -55,7 +55,7 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
      const revision=(previous?.revision||0)+1,stamp=dbSDK.serverTimestamp(),fresh=!previous||!!previous.deleted,record={schemaVersion:1,date:plan.date,outlet:plan.outlet,revision,plan,baseline:fresh?plan:previous.baseline,firstSavedAt:fresh?stamp:previous.firstSavedAt,savedAt:stamp,savedBy:uid};
      tx.set(ref,record);tx.set(dbSDK.doc(ref,'revisions',String(revision)),record);return revision;
     });return revision;
-   }catch(e){if(e.message==='CONFLICT')throw Error('Rencana ini baru diubah rekan tim. Buka rencana tim terbaru sebelum menyimpan lagi. Draft Anda tetap tersimpan.');if(e.code==='permission-denied')throw Error('Izin menyimpan rencana tim belum aktif. Draft belum dikirim dan tetap tersimpan di perangkat ini.');throw Error('Rencana belum tersimpan ke tim. Periksa koneksi dan coba lagi.');}
+   }catch(e){console.error('[forecast save]',plan.date,plan.outlet,e?.code,e?.message);const why=` (kode: ${e?.code||e?.message||'tidak diketahui'})`;if(e.message==='CONFLICT')throw Error('Rencana ini baru diubah rekan tim. Buka rencana tim terbaru sebelum menyimpan lagi. Draft Anda tetap tersimpan.');if(e.code==='permission-denied')throw Error('Izin menyimpan ditolak aturan Firestore'+why+'. Draft tetap tersimpan di perangkat ini.');throw Error('Rencana belum tersimpan ke tim'+why+'. Draft tetap tersimpan di perangkat ini.');}
   };
   // Riwayat: nama staf dari uid (dibaca sekali per uid, disimpan di memori) & semua versi satu
   // rencana. Staf yang tidak boleh membaca dokumen staf lain cukup melihat "Akun staf".

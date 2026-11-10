@@ -154,19 +154,22 @@ window.ForecastTopdown=(()=>{
   if(!PD())return '';
   const ins=prodInputs(c),pl=PD().plan(ins,factoryOrders()?.qty,draft.prodOverride||{},{miniStock:draft.miniStock}),m=pl.mode,stale=proposal&&proposal.sig!==prodSig(pl);
   const plus=pl.rows.filter(r=>r.diff>0).reduce((a,r)=>a+r.diff,0),minus=pl.rows.filter(r=>r.diff<0).reduce((a,r)=>a-r.diff,0),batches=pl.rows.reduce((a,r)=>a+r.batches,0);
-  const fam=PD().families().map(f=>{const rs=pl.rows.filter(r=>r.family.key===f.key);return `<tr class="fpd-fam"><td colspan="5">${esc(f.label)} <span>1 angkatan = ${f.size} pcs${f.unit?` (${f.unit})`:''}</span></td></tr>${rs.map(r=>{
-   if(r.combined)return `<tr><td><b>Mini Ogura · campur 3 rasa</b><small>${r.per.map(x=>`${esc(SHORT[x.p][1])} ${nf(x.total)}`).join(' · ')}${r.box?` · Box Mini ${nf(r.box/9)} pax = ${nf(r.box)} pcs`:''}</small>${r.box?`<small class="fpd-boxnote">Box Mini dihitung TAMBAHAN di luar kolom Mini pcs. Kalau box itu diambil dari kebutuhan Mini outlet yang sama, kurangi kolom Mini pcs outlet tersebut supaya tidak dobel.</small>`:''}<label class="fpd-stock">Stok Mini dari produksi sebelumnya <input type="number" inputmode="numeric" min="0" max="10000" step="1" data-ft-mini-stock value="${esc(draft.miniStock??'')}" placeholder="0"> pcs</label></td><td class="ft-num">${nf(r.total)}</td><td class="ft-num"><b>${r.batches}</b> angkatan<small>= ${nf(r.target)} pcs</small></td><td>${r.batches?`<span class="fpd-ok">Selalu dibulatkan naik</span><small>sisa ${nf(r.leftover)} pcs jadi stok hari berikutnya (dirapel)</small>`:`<span class="fpd-ok">Stok cukup</span><small>tidak perlu produksi · sisa stok ${nf(r.leftover)} pcs</small>`}</td><td></td></tr>`;
+  const fam=PD().families().map(f=>{const rs=pl.rows.filter(r=>r.family.key===f.key);return `<tr class="fpd-fam"><td colspan="3">${esc(f.label)} <span>1 angkatan = ${f.size} pcs${f.unit?` (${f.unit})`:''}</span></td></tr>${rs.map(r=>{
+   if(r.combined)return `<tr><td><b>Mini Ogura · campur 3 rasa</b><small>${r.per.map(x=>`${esc(SHORT[x.p][1])} ${nf(x.total)}`).join(' · ')}${r.box?` · Box Mini ${nf(r.box/9)} pax = ${nf(r.box)} pcs`:''}</small>${r.box?`<small class="fpd-boxnote">Box Mini dihitung TAMBAHAN di luar kolom Mini pcs. Kalau box itu diambil dari kebutuhan Mini outlet yang sama, kurangi kolom Mini pcs outlet tersebut supaya tidak dobel.</small>`:''}<label class="fpd-stock">Stok Mini dari produksi sebelumnya <input type="number" inputmode="numeric" min="0" max="10000" step="1" data-ft-mini-stock value="${esc(draft.miniStock??'')}" placeholder="0"> pcs</label></td><td class="ft-num">${nf(r.total)}</td><td><div class="fpd-fixed"><b>${r.batches?`${r.batches} angkatan`:'Tidak perlu produksi'}</b><span>${r.batches?`${nf(r.target)} pcs · selalu dibulatkan naik · sisa ${nf(r.leftover)} pcs jadi stok besok`:`stok cukup · sisa stok ${nf(r.leftover)} pcs`}</span></div></td></tr>`;
    const parts=[`reguler ${nf(r.regular)}`,r.orders?`pesanan ${nf(r.orders)}`:'',r.factory?`pabrik ${nf(r.factory)}`:'',r.box?`Box Mini ${nf(r.box)}`:''].filter(Boolean).join(' · ');
-   const adj=r.diff>0?`<span class="fpd-plus">+${r.diff} pcs</span><small>dibulatkan naik · lebih ${r.diff} pcs</small>`:r.diff<0?`<span class="fpd-minus">−${-r.diff} pcs</span><small>dibulatkan turun · kurang ${-r.diff} pcs</small>`:'<span class="fpd-ok">Pas</span>';
-   return `<tr><td><b>${esc(model.names[r.p])}</b><small>${parts}</small></td><td class="ft-num">${nf(r.total)}</td><td class="ft-num"><b>${r.batches}</b> angkatan<small>= ${nf(r.target)} pcs</small></td><td>${adj}${r.overridden?'<small class="fpd-manual">diubah manual</small>':''}</td><td>${r.rem?`<button type="button" class="fpd-flip" data-ft-prod-flip="${r.p}" title="Sisa ${r.rem} dari ${r.size} pcs">${r.dir==='up'?'Bulatkan turun':'Bulatkan naik'}</button>`:''}</td></tr>`;}).join('')}`;}).join('');
+    // Pilihan produksi: dua kartu (turun / naik) yang masing-masing menampilkan akibatnya;
+    // saran sistem ditandai, pilihan aktif disorot. Kalau total pas kelipatan, cukup satu label.
+    const full=Math.floor(r.total/r.size),opt=(dir,n,txt,cls)=>`<button type="button" class="fpd-opt ${cls} ${r.dir===dir?'on':''}" data-ft-prod-set="${r.p}:${dir}" aria-pressed="${r.dir===dir}"><span class="fpd-opt-top"><b>${n?`${n} angkatan`:'Tidak diproduksi'}</b>${r.auto===dir?'<i>saran</i>':''}</span><span class="fpd-opt-sub">${txt}</span></button>`;
+    const choice=r.rem?`<div class="fpd-seg" role="group" aria-label="Pilih produksi ${esc(model.names[r.p])}">${opt('down',full,`${nf(full*r.size)} pcs · kurang ${r.rem} pcs`,'down')}${opt('up',full+1,`${nf((full+1)*r.size)} pcs · lebih ${r.size-r.rem} pcs`,'up')}</div>${r.overridden?'<small class="fpd-manual">Dipilih manual, berbeda dari saran sistem</small>':''}`:`<div class="fpd-fixed ok"><b>${r.batches} angkatan</b><span>${nf(r.target)} pcs · pas, tidak ada sisa</span></div>`;
+    return `<tr><td><b>${esc(model.names[r.p])}</b><small>${parts}</small></td><td class="ft-num">${nf(r.total)}</td><td>${choice}</td></tr>`;}).join('')}`;}).join('');
   let prop='';
   if(proposal&&!stale){
    const rows=pl.rows.filter(r=>proposal.map.has(r.p)),nOut=new Set();for(const r of rows)for(const x of proposal.map.get(r.p).list)nOut.add(x.id);
    prop=`<div class="fpd-prop"><div class="fpd-prop-head"><b>Usulan penyesuaian ke outlet</b><span>${nOut.size} outlet berubah. Kelebihan ke outlet yang sering habis stok, kekurangan dari outlet yang waste-nya tinggi. Pesanan tidak diubah.</span></div>${rows.map(r=>{const pr=proposal.map.get(r.p),add=r.diff>0;return `<details class="fpd-item"><summary><span class="${add?'fpd-plus':'fpd-minus'}">${add?'+':'−'}${Math.abs(r.diff)}</span> <b>${esc(model.names[r.p])}</b> <span class="fpd-muted">${add?'ditambah ke':'dikurangi dari'} ${pr.list.length} outlet${pr.unplaced?` · ${Math.abs(pr.unplaced)} pcs tidak bisa dibagi (jadi sisa)`:''}</span></summary><div class="fpd-chips">${pr.list.map(x=>`<span class="${x.delta>0?'up':'down'}">${esc(name(x.id))} <b>${x.delta>0?'+':'−'}${Math.abs(x.delta)}</b></span>`).join('')}</div></details>`;}).join('')}<div class="fpd-prop-actions"><button type="button" class="button" data-ft-prod-cancel>Batal</button><button type="button" class="button fp-primary" data-ft-prod-apply>Terapkan ke tabel</button></div></div>`;
   }
-  return `<section class="fpd"><div class="fpd-head"><div><h3>Rencana produksi (angkatan)</h3><p>Total semua outlet + pesanan pabrik, dibulatkan ke angkatan dapur. Setelah disimpan, versi untuk dapur ada di menu <b>3 · Rencana produksi</b>.</p></div><div class="fpd-mode fpd-${m.kind}"><b>${esc(m.title)}</b><span>${esc(m.text)}</span></div></div>
+  return `<section class="fpd"><div class="fpd-head"><div><h3>Rencana produksi (angkatan)</h3><p>Total semua outlet + pesanan pabrik, dibulatkan ke angkatan dapur. Ikut berubah setiap angka outlet diubah. Gambar untuk dapur bisa diunduh di menu <b>3 · Rencana produksi</b> setelah semua outlet tersimpan.</p></div><div class="fpd-mode fpd-${m.kind}"><b>${esc(m.title)}</b><span>${esc(m.text)}</span></div></div>
    <div class="fpd-sum"><div><span>Total angkatan</span><strong>${batches}</strong></div><div><span>Kelebihan (dibulatkan naik)</span><strong class="${plus?'fpd-plus':''}">${plus?'+'+plus:0} pcs</strong></div><div><span>Kekurangan (dibulatkan turun)</span><strong class="${minus?'fpd-minus':''}">${minus?'−'+minus:0} pcs</strong></div></div>
-   <div class="ft-table-wrap fpd-wrap"><table class="ft-table fpd-table"><thead><tr><th class="fpd-l">Produk</th><th class="ft-num">Total rencana</th><th class="ft-num">Produksi</th><th class="fpd-l">Penyesuaian</th><th></th></tr></thead><tbody>${fam}</tbody></table></div>
+   <div class="ft-table-wrap fpd-wrap"><table class="ft-table fpd-table"><thead><tr><th class="fpd-l">Produk</th><th class="ft-num">Total rencana</th><th class="fpd-l">Pilih produksi <span class="fpd-muted">(klik untuk mengganti)</span></th></tr></thead><tbody>${fam}</tbody></table></div>
    ${plus||minus?(proposal&&!stale?prop:`<div class="fpd-cta">${stale?'<span class="fpd-muted">Angka berubah sejak usulan dibuat, hitung ulang.</span>':`<span>Selisih ${plus?`+${plus} pcs`:''}${plus&&minus?' dan ':''}${minus?`−${minus} pcs`:''} perlu dibagi ke outlet supaya kiriman pas dengan produksi.</span>`}<button type="button" class="button fp-primary" data-ft-prod-propose>Bagi otomatis ke outlet</button></div>`):'<p class="fpd-done">Semua rasa sudah pas dengan angkatan. Tidak ada sisa atau kekurangan.</p>'}
   </section>`;
  }
@@ -207,8 +210,20 @@ window.ForecastTopdown=(()=>{
   const items=f.qty.map((q,p)=>[q,p]).filter(([q])=>q>0);
   return `<div class="ft-factory"><b>Pesanan pabrik · ${nf(f.qty.reduce((a,b)=>a+b,0))} pcs</b>${items.length?`<span>${items.map(([q,p])=>`${esc(model.names[p])} <b>${q}</b>`).join(' · ')}</span>`:'<span>Tidak ada pesanan untuk pabrik pada tanggal ini.</span>'}${f.partial?'<em>Sebagian varian belum pasti, cek sheet PESANAN.</em>':''}<small>Diproduksi terpisah, tidak masuk outlet mana pun. Tampil juga di Rincian kirim.</small></div>`;
  }
- function render(){
+ // Menu "3 · Rencana produksi" (owner 2026-11-10): angkatan langsung mengikuti forecast yang SEDANG
+ // disusun (draft halaman Buat forecast), tidak menunggu disimpan. Unduh/bagikan gambar untuk dapur
+ // baru terbuka setelah semua outlet tersimpan -- itu langkah terakhir.
+ function productionPage(){
+  const c=prepare(),i=pendingInfo(c),saved=c.ids.filter(id=>record(id)).length,done=!i.n&&saved>0,canShare=!!(navigator.canShare&&navigator.share);
+  const stat=done?`<div class="fpp-status done"><b>✓ Semua ${c.ids.length} outlet tersimpan</b><span>Rencana produksi final, siap diunduh untuk dapur.</span></div>`:`<div class="fpp-status draft"><b>Draft · ${i.n} outlet belum tersimpan</b><span>Angka di bawah sudah mengikuti forecast yang sedang disusun. Simpan semua outlet untuk membuka unduhan.${i.areas?` (${esc(i.areas)})`:''}</span></div>`;
+  const acts=done?`${canShare?'<button type="button" class="button fp-primary" data-ft-prod-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ft-prod-download>Unduh gambar</button>`:`<button type="button" class="button" data-fp-mode="topdown">← Kembali ke Buat forecast</button><button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!i.n||locked()?'disabled':''}>${saving?'Menyimpan…':saveText(i)}</button>`;
+  return `<div class="ft-wrap"><div class="fpp-top"><label class="ft-date">Tanggal kiriman<input type="date" id="ft-date" value="${date}"></label>${stat}<div class="fpp-actions">${acts}</div></div>
+   <p class="fs-ship-sub fs-ship-status ft-msg" role="status" ${message?'':'hidden'}>${esc(message)}</p>
+   <div id="ft-prod">${productionBlock(c)}</div></div>`;
+ }
+ function render(view){
   if(!data().sales||!data().orders)return '<div class="fp-empty">Memuat riwayat penjualan dan pesanan…</div>';
+  if(view==='production')return productionPage();
   const c=prepare(),t=totals(c),pred=c.pred?.pure,diff=pred?((draft.target/pred-1)*100):null,span=SHORT.length+draft.names.length+6;
   const head=`<thead><tr><th class="ft-outlet">Outlet</th><th class="ft-num">Omzet</th>${SHORT.map(([a,b],p)=>`<th class="ft-sku" title="${esc(model.names[p])}">${a}<br><small>${b}</small></th>`).join('')}${draft.names.map((nm,i)=>`<th class="ft-sku ft-xh${i===0?' ft-xfirst':''}" title="${esc(nm)} · diisi manual">${shortName(nm)}</th>`).join('')}<th class="ft-num">Reguler</th><th class="ft-num" title="Rencana reguler 12 produk inti dibanding reguler terjual hari yang sama minggu lalu">vs mg lalu</th><th class="ft-num">Pesanan</th><th>Status</th></tr></thead>`;
   const row=id=>{const o=c.outlets.get(id),tt=outletTotals(c,id),[sk,sl]=statusOf(id),auto=draft.auto?.[id]||[],open=draft.open.includes(id),ex=draft.extra[id];const adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'';const note=draft.notes[id]?'<span class="ft-notedot" title="Ada catatan">✎</span>':'';
@@ -308,11 +323,15 @@ window.ForecastTopdown=(()=>{
    if(edited&&!confirm('Angka reguler yang sudah diubah manual akan diganti hasil bagi otomatis. Pesanan, produk lain & catatan tidak berubah. Lanjutkan?'))return false;
    draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));persist();message=`Target ${rp(draft.target)} sudah dibagi ke ${compute().ids.length} outlet. Teliti angkanya, lalu simpan.`;return true;
   }
+  const st=e.target.closest('[data-ft-prod-set]');
+  if(st){const [pp,dir]=st.dataset.ftProdSet.split(':'),p=+pp,c=compute(),r=PD().plan(prodInputs(c),factoryOrders()?.qty,draft.prodOverride||{},{miniStock:draft.miniStock}).rows.find(x=>x.p===p);if(r&&r.dir!==dir){draft.prodOverride=draft.prodOverride||{};if(dir===r.auto)delete draft.prodOverride[p];else draft.prodOverride[p]=dir;persist();proposal=null;}return true;}
   const fl=e.target.closest('[data-ft-prod-flip]');
   if(fl){const p=+fl.dataset.ftProdFlip,c=compute(),r=PD().plan(prodInputs(c),factoryOrders()?.qty,draft.prodOverride||{},{miniStock:draft.miniStock}).rows.find(x=>x.p===p);if(r){draft.prodOverride=draft.prodOverride||{};const next=r.dir==='up'?'down':'up';if(next===r.auto)delete draft.prodOverride[p];else draft.prodOverride[p]=next;persist();proposal=null;}return true;}
   if(e.target.closest('[data-ft-prod-propose]')){const c=compute(),ins=prodInputs(c),pl=PD().plan(ins,factoryOrders()?.qty,draft.prodOverride||{},{miniStock:draft.miniStock});proposal={sig:prodSig(pl),map:PD().propose(pl.rows,ins)};return true;}
   if(e.target.closest('[data-ft-prod-cancel]')){proposal=null;return true;}
   if(e.target.closest('[data-ft-prod-apply]')){if(proposal){const ids=new Set();for(const [p,pr] of proposal.map)for(const x of pr.list){const cur=qtyOf(draft.cells[x.id][p]);draft.cells[x.id][p]=String(Math.max(0,cur+x.delta));ids.add(x.id);}persist();message=`Penyesuaian angkatan diterapkan ke ${ids.size} outlet (kotak kuning). Teliti lalu simpan ke tim.`;proposal=null;}return true;}
+  if(e.target.closest('[data-ft-prod-download]')){window.ForecastShipping?.exportProduction?.(date,false);return false;}
+  if(e.target.closest('[data-ft-prod-share]')){window.ForecastShipping?.exportProduction?.(date,true);return false;}
   if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.';return true;}saveAll();return true;}
   return false;
  }
@@ -322,7 +341,7 @@ window.ForecastTopdown=(()=>{
  // Selama menyimpan, layar TIDAK dirender ulang tiap outlet (dulu 28 outlet x snapshot Firestore
  // = puluhan render penuh dalam beberapa detik -> layar berkedip). Pesan progres diperbarui di
  // tempat; render penuh sekali di akhir.
- const say=t=>{message=t;const m=q('.ft-msg');if(m)m.textContent=t;};
+ const say=t=>{message=t;const m=q('.ft-msg');if(m){m.textContent=t;m.hidden=false;}};
  async function saveAll(){
   const c=compute(),todo=c.ids.filter(id=>statusOf(id)[0]!=='saved'),bad=v=>v===''||!model.integer(Number(v));
   for(const id of todo){
@@ -330,19 +349,19 @@ window.ForecastTopdown=(()=>{
    for(const nm of draft.names){const x=draft.extra[id][nm];if(!model.integer(qtyOf(x.r))||!model.integer(qtyOf(x.o))){message=`Angka ${nm} di ${name(id)} belum valid.`;rerender();return;}}
    if(customItemsOf(id).length>20){message=`${name(id)}: maksimal 20 produk lain.`;rerender();return;}
   }
-  saving=true;let ok=0;const fail=[];
+  saving=true;let ok=0,failWhy='';const fail=[];
   const btn=q('[data-ft-save]');if(btn){btn.disabled=true;btn.textContent='Menyimpan…';}
   const saveOne=async id=>{
 
    const o=c.outlets.get(id),r=record(id),regular=draft.cells[id].map(Number),orders=draft.orders[id].map(Number),items=customItemsOf(id);
    const plan={date,outlet:id,active:regular.map((v,p)=>v>0||orders[p]>0),regular,orders,note:String(draft.notes[id]||'').trim()||`Dibagi otomatis dari target omzet reguler ${rp(draft.target)}.`,prices:o.prices,recommendations:o.recs,method:o.recs.find(x=>x.method)?.method||'weekday-median-trend-v1',cutoff:o.recs.map(x=>x.through).filter(Boolean).sort().at(-1)||null,...(items.length?{customItems:items}:{})};
    if(!plan.active.some(Boolean))plan.active[2]=true;
-   try{await cloud().save(plan,r?.revision||0);ok++;if(!draft.notes[id])draft.notes[id]=plan.note;}catch(err){fail.push(name(id)+(String(err.message).includes('diubah rekan')?' (diubah rekan, muat ulang)':''));}
+   try{await cloud().save(plan,r?.revision||0);ok++;if(!draft.notes[id])draft.notes[id]=plan.note;}catch(err){fail.push(name(id)+(String(err.message).includes('diubah rekan')?' (diubah rekan, muat ulang)':''));failWhy=failWhy||String(err.message);}
    say(`Menyimpan… ${ok+fail.length}/${todo.length} outlet selesai`);
   };
   // 5 outlet sekaligus; tiap outlet tetap satu transaksi sendiri (cek konflik versi per outlet).
   for(let i=0;i<todo.length;i+=5)await Promise.all(todo.slice(i,i+5).map(saveOne));
-  persist();saving=false;message=fail.length?`${ok} outlet tersimpan. Gagal: ${fail.join(', ')}.`:`${ok} outlet tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
+  persist();saving=false;message=fail.length?`${ok} outlet tersimpan. Gagal ${fail.length}: ${fail.join(', ')}. Penyebab: ${failWhy}`:`${ok} outlet tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
  }
  // Dipakai tab detail outlet: angka hasil bagi untuk outlet+tanggal ini (kalau belum ada rencana
  // tim), supaya detail outlet langsung berisi angka yang sama dengan halaman utama.

@@ -194,5 +194,7 @@ window.ForecastShipping=(()=>{
   if(t.dataset.shipPct!==undefined){input(e);return true;}
   const r=input(e);return r===null?false:r;
  }
- return {render,click,input,change,groups:GROUPS};
+ // Dipakai menu Rencana produksi (forecast-topdown.js) untuk tanggal yang sedang disusun.
+ function exportProduction(d,viaShare){date=d;return viaShare?share('production'):download('production');}
+ return {render,click,input,change,groups:GROUPS,exportProduction};
 })();
