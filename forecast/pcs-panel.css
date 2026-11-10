@@ -343,3 +343,28 @@
 .ft-factory em{font-style:normal;color:#a0671a;font-size:11.5px}
 .ft-factory small{flex-basis:100%;font-size:11px;color:#8d7e62}
 @media (max-width:820px){.ft-xadd input{min-width:0;flex:1 1 160px}.ft-detail-box{max-width:calc(100vw - 48px)}}
+/* Hapus rencana (soft delete) + log aktivitas */
+.fp-del-panel{display:grid;gap:8px;margin:0 0 14px;padding:14px 16px;border:1px solid #efc9bd;background:#fdf6f3;border-radius:12px;font-size:13px;color:#4a2f25}
+.fp-del-panel.restore{border-color:#c6dfd0;background:#f3faf6;color:#25402f}
+.fp-del-panel p{margin:0;font-size:12.5px;line-height:1.5}
+.fp-del-panel label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600}
+.fp-del-panel textarea{font:inherit;font-size:13px;font-weight:400;border:1px solid #dccfc9;border-radius:8px;padding:7px 9px;background:#fff;resize:vertical}
+.fp-del-late{color:#a14b31;font-weight:600}
+.fp-del-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.fp-del-msg{margin-right:auto;font-size:12px;color:#6b5a52}
+.button.fp-danger{background:#b5492f;border-color:#b5492f;color:#fff}
+.button.fp-danger:hover{background:#9c3c25}
+.fp-del-link{all:unset;cursor:pointer;margin-left:8px;font-size:11.5px;color:#a14b31;text-decoration:underline;text-underline-offset:2px}
+.fp-del-link:hover{color:#7d321d}
+.fp-log summary{cursor:pointer}
+.fp-log-late td{background:#fdf3f0}
+.fp-log-reason{white-space:normal!important;min-width:180px;max-width:340px;text-align:left}
+.ft-save-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* Pengaturan › Produk */
+.fs-h3{margin:0 0 4px;font-size:14px;color:#1c2b38}
+.fs-prod-list{display:grid;gap:6px;margin:10px 0}
+.fs-prod-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.fs-prod-row>input[type=text]{flex:1 1 220px;min-width:0;font:inherit;font-size:13px;border:1px solid #d3dce4;border-radius:8px;padding:7px 9px}
+.fs-prod-row select{font:inherit;font-size:13px;border:1px solid #d3dce4;border-radius:8px;padding:6px 8px;background:#fff}
+.fs-prod-row small{font-size:11px;color:#8592a0}
+.fs-prod-row .fs-check{margin:0}

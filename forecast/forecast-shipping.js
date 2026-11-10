@@ -17,15 +17,15 @@ window.ForecastShipping=(()=>{
   {name:'Solo',color:'#4e8a5e',outlets:[['merbabu','MERBABU'],['rajawali','RAJAWALI'],['ums','UMS'],['makamhaji','MAKAMHAJI'],['laweyan','LAWEYAN'],['sukoharjo','SUKOHARJO'],['nusukan','NUSUKAN'],['uns','JEBRES'],['sragen','SRAGEN'],['karanganyar','KARANGANYAR'],['boyolali','BOYOLALI']]},
   {name:'Jogja',color:'#2e7f8f',outlets:[['nusa-indah','NUSA INDAH'],['umy','UMY'],['jakal-uii','JAKAL'],['tajem','TAJEM'],['godean','GODEAN']]},
  ];
- // [label, sumber: indeks SKU inti atau nama produk lain, titik warna, kategori]
- const CATS=['Ogura & Malmil','Mini','Chiffon','Roti & lainnya'];
- const ROWS=[
-  ['Ogura Cheese',0,'#e2c15a',0],['Ogura Chocolate',1,'#8b5e3c',0],['Malmil Cheese',2,'#e2c15a',0],['Malmil Choco',3,'#8b5e3c',0],
-  ['Mini Cheese (pcs)',4,'#e2c15a',1],['Mini Choco (pcs)',5,'#8b5e3c',1],['Mini Durian (pcs)',6,'#7fae6b',1],['Box Mini','Box Mini','#a597c7',1],
-  ['Chiffon Classic Keju',7,'#e6b39b',2],['Chiffon Classic Ekstra Keju',8,'#d99a7e',2],['Chiffon Lite Keju',11,'#9db7d8',2],['Chiffon Lite Ekstra Keju',10,'#7d9cc6',2],
-  ['Chiffon Butter',9,'#e0b25e',2],['Chiffon Kurma','Chiffon Kurma','#b97b55',2],
-  ['Roti Manis Sosis','Roti Sosis','#d6918b',3],['Roti Manis Abon','Roti Abon','#7b95c4',3],['Roti Manis Coklat Meses','Roti Coklat','#8b5e3c',3],['Whip','Whip','#e3a77d',3],
- ];
+ // Baris = [label, sumber, titik warna, kategori]; sumber = indeks SKU inti atau objek produk
+ // lain. Daftar & nama mengikuti Pengaturan › Produk (forecast-products.js), dibangun ulang
+ // setiap render supaya perubahan pengaturan langsung berlaku.
+ const PR=()=>window.ForecastProducts;
+ const CATS=PR().CATS;
+ let ROWS=[];
+ function buildRows(){const core=PR().core(),out=[];for(const p of PR().CORE_ORDER){const c=core[p];if(c.ship)out.push([c.label,p,c.dot,c.cat]);}for(const x of PR().extra())out.push([x.name,x,x.dot,x.cat]);
+  // Urutkan per kategori, urutan dalam kategori tetap.
+  return CATS.flatMap((_,ci)=>out.filter(r=>r[3]===ci));}
  const REQ_ROWS=[['Ogura Cheese'],['Ogura Chocolate'],['Malmil Cheese'],['Malmil Choco'],['Mini pcs cheese'],['Mini pcs choco'],['Mini pcs durian'],['Chiffon Keju'],['Chiffon Ekstra Keju'],['Chiffon Lite Keju'],['Chiffon Lite Ekstra Keju'],['Chiffon Butter'],['Roti Manis Sosis'],['Roti Manis Abon'],['Roti Manis Coklat']];
  const REQ_ACCENT='#4f6378',FACTORY_ACCENT='#8a6a3b';
  const METHODS=['Diambil ke Pabrik','Diantar oleh Driver'];
@@ -47,7 +47,7 @@ window.ForecastShipping=(()=>{
  function qty(record,src,pct){
   if(!record)return null;const p=record.plan;let v=0;
   if(typeof src==='number'){if(!p.active?.[src])return 0;v=(p.regular[src]||0)+(p.orders[src]||0);}
-  else{const it=(p.customItems||[]).find(x=>String(x.name).trim().toLowerCase()===src.toLowerCase());v=it?(Number(it.regular)||0)+(Number(it.orders)||0):0;}
+  else{const it=PR().itemFor(p.customItems,src);v=it?(Number(it.regular)||0)+(Number(it.orders)||0):0;}
   return Math.round(v*pct/100);
  }
  const sumOf=vals=>{const k=vals.filter(v=>v!=null);return k.length?k.reduce((a,b)=>a+Number(b||0),0):null;};
@@ -60,12 +60,12 @@ window.ForecastShipping=(()=>{
  function factory(){const f=window.PcsPanels?.data?.()?.orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===date);const qty=r?r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0):Array(12).fill(0);return {qty,orders:r?.orders||0,partial:!!r?.qty?.some(v=>v===null),total:qty.reduce((a,b)=>a+b,0)};}
  const numCell=v=>v==null?'<td class="fs-nil">—</td>':Number(v)===0?'<td class="fs-zero">0</td>':`<td>${nf(v)}</td>`;
  function render(){
-  if(!date)date=shift(today(),1);
+  if(!date)date=shift(today(),1);ROWS=buildRows();
   const by=plans(),groups=groupData(by),missing=groups.flatMap(g=>g.cols.filter(c=>!c.record).map(c=>c.label)),reqs=requests();
   const body=g=>CATS.map((cat,ci)=>`<tr class="fs-cat"><td colspan="${g.cols.length+2}">${esc(cat)}</td></tr>${ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${g.cols.map(c=>numCell(c.values[ri])).join('')}${numCell(g.totals[ri]).replace('<td','<td data-tot')}</tr>`).join('')}`).join('');
   const table=g=>`<section class="fs-ship-card" style="--acc:${g.color};--acc-soft:${tint(g.color,.9)};--acc-ink:${shade(g.color,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">${esc(g.name)}</h3><span class="fs-ship-meta">${g.filled}/${g.cols.length} outlet terisi${g.grand!=null?` · ${nf(g.grand)} pcs`:''}</span></header><div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner" rowspan="2">Produk</th>${g.cols.map(c=>`<th class="${c.record?'':'fs-ship-missing'}" title="${c.record?'':'Belum ada rencana tersimpan'}">${esc(c.label)}</th>`).join('')}<th class="fs-ship-totalh" rowspan="2">Total</th></tr><tr class="fs-ship-pctrow">${g.cols.map(c=>`<th><label class="fs-ship-pct"><input type="number" min="0" max="100" step="5" value="${c.pct}" data-ship-pct="${esc(c.id)}" aria-label="Persen pengiriman pertama ${esc(c.label)}"><span>%</span></label></th>`).join('')}</tr></thead><tbody>${body(g)}</tbody></table></div></section>`;
   const reqTable=`<section class="fs-ship-card fs-req-card" style="--acc:${REQ_ACCENT};--acc-soft:${tint(REQ_ACCENT,.9)};--acc-ink:${shade(REQ_ACCENT,.3)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Request tambahan</h3><span class="fs-ship-meta">Pesanan manajemen sebelah · tersimpan di perangkat ini</span></header><div class="fs-ship-wrap"><table class="fs-ship fs-req"><thead><tr><th class="fs-ship-corner">Produk</th>${reqs.map((c,i)=>`<th><div class="fs-req-name"><input type="text" maxlength="40" value="${esc(c.name)}" data-req-name="${i}" placeholder="Nama peminta" aria-label="Nama peminta"><button type="button" class="fs-req-remove" data-req-remove="${i}" aria-label="Hapus kolom" title="Hapus kolom">×</button></div></th>`).join('')}<th class="fs-req-addcell"><button type="button" class="fs-req-add" data-req-add>+ Tambah peminta</button></th></tr></thead><tbody>${REQ_ROWS.map(([label],ri)=>`<tr><td>${esc(label)}</td>${reqs.map((c,i)=>`<td><input type="number" min="0" max="10000" step="1" value="${c.qty?.[ri]??''}" data-req-qty="${i}:${ri}" aria-label="${esc(label)}" placeholder="0"></td>`).join('')}<td></td></tr>`).join('')}<tr class="fs-cat"><td colspan="${reqs.length+2}">Pengambilan / pengiriman</td></tr><tr><td>Waktu</td>${reqs.map((c,i)=>`<td><input type="text" maxlength="30" value="${esc(c.time||'')}" data-req-time="${i}" placeholder="Pukul 09.30"></td>`).join('')}<td></td></tr><tr><td>Cara</td>${reqs.map((c,i)=>`<td><select data-req-method="${i}">${METHODS.map(m=>`<option ${c.method===m?'selected':''}>${m}</option>`).join('')}</select></td>`).join('')}<td></td></tr></tbody></table></div>${reqs.length?'':'<p class="fs-req-empty">Belum ada request. Klik <b>+ Tambah peminta</b> untuk menambah kolom (misalnya Admin Pogung atau Marketing HO).</p>'}</section>`;
-  const f=factory(),fRows=ROWS.map((r,ri)=>[r,ri]).filter(([r])=>typeof r[1]==='number');
+  const f=factory(),fRows=PR().CORE_ORDER.map(p=>PR().core()[p]).map(c=>[[c.label,c.p,c.dot,c.cat],c.p]);
   const factoryCard=`<section class="fs-ship-card fs-factory-card" style="--acc:${FACTORY_ACCENT};--acc-soft:${tint(FACTORY_ACCENT,.9)};--acc-ink:${shade(FACTORY_ACCENT,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Pesanan pabrik</h3><span class="fs-ship-meta">${f?`${f.orders} pesanan · ${nf(f.total)} pcs`:'menunggu sinkron pesanan'} · tidak masuk outlet</span></header>${!f?'<p class="fs-req-empty">Pesanan bertulisan "pabrik" di sheet PESANAN akan tampil di sini setelah sinkron pesanan berikutnya.</p>':!f.total?'<p class="fs-req-empty">Tidak ada pesanan untuk pabrik pada tanggal ini.</p>':`<div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner">Produk</th><th class="fs-ship-totalh">Pabrik</th></tr></thead><tbody>${fRows.filter(([r])=>f.qty[r[1]]>0).map(([[label,src,dot]])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${numCell(f.qty[src]).replace('<td','<td data-tot')}</tr>`).join('')}</tbody></table></div>${f.partial?'<p class="fs-req-empty">Sebagian varian pesanan belum pasti, cek sheet PESANAN.</p>':''}`}</section>`;
   const canShare=!!(navigator.canShare&&navigator.share);
   return `<div class="fs-ship-head"><label class="fs-ship-date">Tanggal kiriman<input type="date" id="fs-ship-date" value="${date}"></label><div class="fs-ship-actions">${canShare?'<button type="button" class="button fp-primary" data-ship-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ship-download>Unduh gambar</button></div></div>
@@ -117,11 +117,11 @@ window.ForecastShipping=(()=>{
   return cv;
  }
  function images(){
-  const by=plans(),groups=groupData(by),out=[];
+  ROWS=buildRows();const by=plans(),groups=groupData(by),out=[];
   for(const g of groups)out.push({name:`Pengiriman ${g.name} ${date}.png`,canvas:drawTable({title:`Pengiriman Pertama · ${g.name}`,accent:g.color,showTotal:true,colLabels:g.cols.map(c=>c.label),subLabels:g.cols.map(c=>c.record?c.pct+'%':'belum ada'),
    sections:CATS.map((cat,ci)=>({title:cat,rows:ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>({label,dot,values:g.cols.map(c=>c.values[ri]),total:g.totals[ri]}))}))})});
   const f=factory();
-  if(f&&f.total){const rows=ROWS.filter(r=>typeof r[1]==='number'&&f.qty[r[1]]>0).map(([label,src,dot])=>({label,dot,values:[f.qty[src]],total:null}));out.push({name:`Pesanan Pabrik ${date}.png`,canvas:drawTable({title:'Pesanan Pabrik',accent:FACTORY_ACCENT,showTotal:false,colLabels:['Pabrik'],sections:[{rows}]})});}
+  if(f&&f.total){const rows=PR().CORE_ORDER.map(p=>PR().core()[p]).filter(c=>f.qty[c.p]>0).map(c=>({label:c.label,dot:c.dot,values:[f.qty[c.p]],total:null}));out.push({name:`Pesanan Pabrik ${date}.png`,canvas:drawTable({title:'Pesanan Pabrik',accent:FACTORY_ACCENT,showTotal:false,colLabels:['Pabrik'],sections:[{rows}]})});}
   const reqs=requests().filter(c=>c.name||c.qty?.some(v=>v!==''&&v!=null));
   if(reqs.length){
    const rows=REQ_ROWS.map(([label],ri)=>{const values=reqs.map(c=>{const v=c.qty?.[ri];return v===''||v==null||Number(v)===0?'':String(Number(v));});return {label,values,total:values.some(v=>v!=='')?values.reduce((a,v)=>a+(Number(v)||0),0):''};});

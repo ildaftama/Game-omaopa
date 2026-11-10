@@ -10,6 +10,7 @@ window.ForecastSettings=(()=>{
   thresholds:{waste:3.5,lostSales:4.5,openHours:12,omzetHighlight:15,wasteLostHighlight:20,trendWindow:3},
   weather:{model:'best_match',rainLabelProb:45,highRiskProb:60},
   display:{trend:true,wasteLost:true,accuracy:true,weather:true,events:true,operations:true},
+  products:JSON.parse(JSON.stringify(window.ForecastProducts?.DEFAULTS||{core:[],extra:[]})),
  };
  const SOURCE_INFO={
   orders:{use:'Memisahkan pesanan dari omzet murni dan mengisi otomatis kolom pesanan di Forecast.',sync:'Otomatis tiap jam',fields:[['tab','Nama tab','text'],['startRow','Mulai baris','number']]},
@@ -37,9 +38,31 @@ window.ForecastSettings=(()=>{
  const SUPPORT_VIEWS=[['blind','Uji akurasi PCS'],['projection','Proyeksi bulanan'],['pcs','Penjualan PCS'],['orders','Pesanan'],['reference','Tren omzet & evaluasi'],['products','Produk & laba'],['events','Kegiatan & omzet'],['summary','Profil outlet'],['swot','SWOT'],['area','Sekitar outlet'],['access','Akses tim']];
  const merge=(base,over)=>Object.fromEntries(Object.entries(base).map(([k,v])=>[k,{...v,...(over?.[k]||{})}]));
  function get(){return merge(DEFAULTS,window.DATA_SOURCES?.preferences);}
- // Hanya akun Master (owner, 2026-11-10) -- Admin Utama pun hanya bisa melihat.
- const canEdit=()=>window.ForecastAuth?.role?.master===true;
- let section='sources',status='';
+ // Revisi owner 2026-11-10: yang dikunci khusus Master hanya "Data pendukung". Sumber data,
+ // ambang batas, tampilan & produk boleh diubah semua akun Forecast (rules settings/forecastSources
+ // ikut dilonggarkan ke forecastPlanner()).
+ const isMaster=()=>window.ForecastAuth?.role?.master===true;
+ const canEdit=()=>!!window.ForecastRolePolicy?.planner?.(window.ForecastAuth?.role);
+ let section='sources',status='',prod=null;
+ const P=()=>window.ForecastProducts;
+ // Draft daftar produk selama tab Produk dibuka (tambah/hapus baris tanpa kehilangan ketikan).
+ function prodDraft(){if(!prod){const c=P().core(),x=P().extra();prod={core:c.map(r=>({label:r.label,ship:r.ship})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name}))};}return prod;}
+ function syncProd(form){if(!prod||!form)return;
+  form.querySelectorAll('[data-prod-core-label]').forEach(el=>{prod.core[+el.dataset.prodCoreLabel].label=el.value;});
+  form.querySelectorAll('[data-prod-core-ship]').forEach(el=>{prod.core[+el.dataset.prodCoreShip].ship=el.checked;});
+  form.querySelectorAll('[data-prod-x-name]').forEach(el=>{prod.extra[+el.dataset.prodXName].name=el.value;});
+  form.querySelectorAll('[data-prod-x-cat]').forEach(el=>{prod.extra[+el.dataset.prodXCat].cat=Number(el.value);});}
+ function productsBody(dis){const d=prodDraft(),C=P().CATS,base=P().DEFAULTS.core;
+  return `<article class="workspace-card"><h3 class="fs-h3">Produk lain</h3><p class="fs-use">Tampil sebagai kolom di halaman Dari omzet, baris di Detail outlet, dan baris di Rincian kirim. Ganti nama aman: rencana lama dengan nama lama tetap terbaca. Menghapus produk dari daftar tidak menghapus angka di rencana yang sudah disimpan.</p>
+   <div class="fs-prod-list">${d.extra.map((x,i)=>`<div class="fs-prod-row"><input type="text" maxlength="60" data-prod-x-name="${i}" value="${esc(x.name)}" placeholder="Nama produk" aria-label="Nama produk" ${dis}><select data-prod-x-cat="${i}" aria-label="Kategori" ${dis}>${C.map((c,ci)=>`<option value="${ci}" ${x.cat===ci?'selected':''}>${esc(c)}</option>`).join('')}</select>${x.orig&&x.orig!==x.name.trim()&&x.name.trim()?`<small>dulu: ${esc(x.orig)}</small>`:''}${dis?'':`<button type="button" class="button quiet" data-prod-x-del="${i}">Hapus</button>`}</div>`).join('')||'<p class="fs-use">Belum ada produk lain.</p>'}</div>
+   ${dis?'':'<button type="button" class="button" data-prod-x-add>+ Tambah produk</button>'}</article>
+   <article class="workspace-card"><h3 class="fs-h3">12 produk inti</h3><p class="fs-use">Dikunci oleh mesin rekomendasi, jadi tidak bisa dihapus. Yang bisa diatur: nama di rincian kirim/gambar WA dan apakah ikut tampil di rincian kirim.</p>
+   <div class="fs-prod-list">${d.core.map((c,p)=>`<div class="fs-prod-row"><input type="text" maxlength="60" data-prod-core-label="${p}" value="${esc(c.label)}" placeholder="${esc(base[p].label)}" aria-label="Nama tampil ${esc(base[p].label)}" ${dis}><label class="fs-check"><input type="checkbox" data-prod-core-ship="${p}" ${c.ship?'checked':''} ${dis}><span>Tampil di rincian kirim</span></label><small>${esc(window.ForecastPlanner?.names?.[p]||'')}</small></div>`).join('')}</div></article>`;}
+ function collectProducts(form){syncProd(form);const d=prod,seen=new Set(),extra=[];
+  for(const x of d.extra){const name=String(x.name||'').trim().replace(/\s+/g,' ');if(!name)throw Error('Nama produk lain tidak boleh kosong (hapus barisnya kalau tidak dipakai).');const k=name.toLowerCase();if(seen.has(k))throw Error(`Produk "${name}" tercantum dua kali.`);seen.add(k);
+   const aliases=[...new Set([...(x.aliases||[]),...(x.orig&&x.orig!==name?[x.orig]:[])])].filter(a=>a.toLowerCase()!==k).slice(-10);extra.push({name,cat:Number.isInteger(x.cat)?x.cat:3,aliases});}
+  if(extra.length>20)throw Error('Maksimal 20 produk lain.');
+  return {core:d.core.map((c,p)=>({label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship})),extra};}
  function sourceCard(s,dis){
   const info=SOURCE_INFO[s.key]||{use:'',sync:'Diperbarui manual'},vals={...(info.defaults||{}),...s};
   const extra=(info.fields||[]).map(([k,label,type])=>`<label>${esc(label)}<input type="${type}" data-source-field="${esc(s.key)}:${k}" value="${esc(vals[k]??'')}" ${type==='number'?'min="1" step="1"':''} ${dis}></label>`).join('');
@@ -50,7 +73,7 @@ window.ForecastSettings=(()=>{
  }
  function render(){
   const p=get(),dis=canEdit()?'':'disabled',sources=window.DATA_SOURCES?.sources||[];
-  const tabs=[['sources','Sumber data'],['thresholds','Ambang batas'],['display','Tampilan'],['support','Data pendukung']].map(([k,l])=>`<button type="button" class="fs-tab ${section===k?'active':''}" data-settings-tab="${k}" aria-pressed="${section===k}">${l}</button>`).join('');
+  const tabs=[['sources','Sumber data'],['thresholds','Ambang batas'],['display','Tampilan'],['products','Produk'],['support','Data pendukung'+(isMaster()?'':' 🔒')]].map(([k,l])=>`<button type="button" class="fs-tab ${section===k?'active':''}" data-settings-tab="${k}" aria-pressed="${section===k}">${l}</button>`).join('');
   let body='';
   if(section==='sources')body=`<div class="fs-grid">${sources.map(s=>sourceCard(s,dis)).join('')}
    <article class="workspace-card fs-card"><div class="fs-card-head"><div><h3>Cuaca</h3><span class="fs-sync auto">Langsung saat dibuka</span></div><a href="https://open-meteo.com/en/docs" target="_blank" rel="noopener">Open-Meteo ↗</a></div><p class="fs-use">Ramalan publik Open-Meteo (gratis, tanpa key) dari koordinat tiap outlet; "Sekarang" diperbarui tiap 15 menit.</p><label>Model cuaca<select data-pref="weather:model" ${dis}>${WEATHER_MODELS.map(([v,l])=>`<option value="${v}" ${p.weather.model===v?'selected':''}>${esc(l)}</option>`).join('')}</select></label><div class="fs-row">${WEATHER_FIELDS.map(f=>numberField(f,'weather',p.weather[f[0]],dis)).join('')}</div></article>
@@ -58,8 +81,10 @@ window.ForecastSettings=(()=>{
    <article class="workspace-card fs-card fs-locked"><div class="fs-card-head"><div><h3>Akses Google Sheets</h3><span class="fs-sync auto">Dipakai sinkronisasi</span></div></div><p class="fs-use">API key Google Sheets disimpan sebagai rahasia GitHub (GOOGLE_SHEETS_API_KEY). Sheet cukup dibagikan "siapa saja yang punya link dapat melihat".</p></article></div>`;
   else if(section==='thresholds')body=`<article class="workspace-card"><div class="fs-num-grid">${THRESHOLD_FIELDS.map(f=>numberField(f,'thresholds',p.thresholds[f[0]],dis)).join('')}</div></article>`;
   else if(section==='display')body=`<article class="workspace-card"><p class="fs-use">Kartu yang tampil di Dashboard. Berlaku untuk seluruh tim.</p><div class="fs-checks">${DISPLAY_FIELDS.map(([k,l])=>`<label class="fs-check"><input type="checkbox" data-pref="display:${k}" ${p.display[k]?'checked':''} ${dis}><span>${esc(l)}</span></label>`).join('')}</div></article>`;
+  else if(section==='products')body=productsBody(dis);
+  else if(!isMaster())body=`<article class="workspace-card"><p class="fs-lock">🔒 Data pendukung hanya bisa dibuka akun Master.</p></article>`;
   else body=`<article class="workspace-card"><p class="fs-use">Data rinci & analisa pendukung. Pilih untuk membuka.</p><div class="fs-support">${SUPPORT_VIEWS.map(([k,l])=>`<button type="button" class="fs-support-btn" data-support-view="${k}">${esc(l)}<span>→</span></button>`).join('')}</div></article>`;
-  const actions=section==='support'?'':canEdit()?`<div class="fs-actions"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status)}</span></div>`:`<p class="fs-lock">🔒 Pengaturan dikunci. Hanya akun Master yang dapat mengubahnya.</p>`;
+  const actions=section==='support'?'':canEdit()?`<div class="fs-actions"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status)}</span></div>`:`<p class="fs-lock">🔒 Akun ini belum punya akses Forecast untuk mengubah pengaturan.</p>`;
   return `<div class="focus-intro"><h2>Pengaturan</h2><span>Berlaku untuk seluruh tim</span></div><div class="fs-tabs">${tabs}</div><form id="forecast-settings-form" novalidate>${body}${actions}</form>`;
  }
  function collect(form){
@@ -81,11 +106,12 @@ window.ForecastSettings=(()=>{
    else if(el.type==='number'){const n=Number(el.value),min=Number(el.min),max=Number(el.max);if(!Number.isFinite(n)||n<min||n>max)throw Error(`"${el.closest('label')?.firstChild?.textContent?.trim()}" harus antara ${min} dan ${max}.`);prefs[g][k]=n;}
    else prefs[g][k]=el.value;
   }
+  if(section==='products'&&prod)prefs.products=collectProducts(form);
   return {...cur,updatedAt:new Date().toISOString(),sources,preferences:prefs};
  }
  async function save(config){
   status='Menyimpan…';rerender();
-  try{await window.ForecastSourceCloud.save(config);window.DATA_SOURCES=config;status='Tersimpan. Dashboard memakai pengaturan baru; sinkronisasi memakai link baru di run berikutnya.';window.dispatchEvent(new Event('forecast-settings-changed'));}
+  try{await window.ForecastSourceCloud.save(config);window.DATA_SOURCES=config;prod=null;status='Tersimpan. Dashboard memakai pengaturan baru; sinkronisasi memakai link baru di run berikutnya.';window.dispatchEvent(new Event('forecast-settings-changed'));}
   catch(err){status=err.message||'Belum tersimpan. Coba kembali.';}
   rerender();
  }
@@ -97,11 +123,14 @@ window.ForecastSettings=(()=>{
   return true;
  }
  function click(e){
-  const t=e.target.closest('[data-settings-tab]');if(t){section=t.dataset.settingsTab;status='';return 'render';}
-  const sv=e.target.closest('[data-support-view]');if(sv)return {support:sv.dataset.supportView};
+  const t=e.target.closest('[data-settings-tab]');if(t){section=t.dataset.settingsTab;status='';prod=null;return 'render';}
+  const sv=e.target.closest('[data-support-view]');if(sv)return isMaster()?{support:sv.dataset.supportView}:false;
+  const form=e.target.closest('form');
+  if(e.target.closest('[data-prod-x-add]')){syncProd(form);prodDraft().extra.push({name:'',cat:3,aliases:[],orig:''});status='Isi nama produk baru, lalu Simpan untuk tim.';return 'render';}
+  const del=e.target.closest('[data-prod-x-del]');if(del){syncProd(form);const x=prodDraft().extra[+del.dataset.prodXDel];if(x&&(!x.orig||confirm(`Hapus produk "${x.orig}" dari daftar? Angka di rencana yang sudah disimpan tidak terhapus.`))){prod.extra.splice(+del.dataset.prodXDel,1);status='Belum tersimpan. Klik Simpan untuk tim.';}return 'render';}
   if(e.target.closest('[data-settings-reset]')){
-   if(!confirm('Kembalikan ambang batas, cuaca, dan tampilan ke bawaan? Link sumber data tidak berubah.'))return false;
-   const cur=window.DATA_SOURCES;save({...cur,updatedAt:new Date().toISOString(),preferences:JSON.parse(JSON.stringify(DEFAULTS))});return false;
+   if(!confirm('Kembalikan ambang batas, cuaca, dan tampilan ke bawaan? Link sumber data & daftar produk tidak berubah.'))return false;
+   const cur=window.DATA_SOURCES,def=JSON.parse(JSON.stringify(DEFAULTS));def.products=get().products;save({...cur,updatedAt:new Date().toISOString(),preferences:def});return false;
   }
   return false;
  }

@@ -46,9 +46,11 @@ function forecastMaster() {
     && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
     && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true;
 }
+// 2026-11-10 (owner, revisi): yang dikunci Master hanya "Data pendukung" (itu cuma navigasi di
+// client). Sumber data, ambang batas, tampilan & daftar produk boleh diubah semua akun Forecast.
 match /settings/forecastSources {
   allow read: if notRadarSyncAccount() && (true);
-  allow write: if notRadarSyncAccount() && (forecastMaster());
+  allow write: if notRadarSyncAccount() && (forecastPlanner());
 }
 function forecastReference(d, key) {
   return forecastManager() && d.schemaVersion == 2
@@ -118,9 +120,18 @@ match /forecastPlans/{key} {
     && request.resource.data.date == resource.data.date
     && request.resource.data.outlet == resource.data.outlet
     && request.resource.data.revision == resource.data.revision + 1
-    && request.resource.data.baseline == resource.data.baseline
-    && request.resource.data.firstSavedAt == resource.data.firstSavedAt
-    && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/$(string(request.resource.data.revision))).data == request.resource.data);
+    // Rencana yang sudah DIHAPUS (soft delete) lalu dibuat lagi: baseline & firstSavedAt mulai
+    // baru dari rencana baru (dihitung akurasi hanya kalau disimpan sebelum hari H). Selain itu
+    // baseline tetap terkunci seperti sebelumnya.
+    && ((resource.data.get('deleted', null) == null
+         && request.resource.data.baseline == resource.data.baseline
+         && request.resource.data.firstSavedAt == resource.data.firstSavedAt)
+      || (resource.data.get('deleted', null) != null
+         && request.resource.data.baseline == request.resource.data.plan
+         && request.resource.data.firstSavedAt == request.time))
+    && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/$(string(request.resource.data.revision))).data == request.resource.data)
+    || forecastDeleteMark() || forecastRestoreMark();
+  // Dokumen tidak pernah benar-benar dihapus: "hapus" = tanda deleted + entri log permanen.
   allow delete: if false;
   match /revisions/{revision} {
     allow read: if forecastPlanner();
@@ -146,6 +157,50 @@ match /forecastPlans/{key} {
       && request.resource.data.note is string && request.resource.data.note.size() <= 500;
     allow delete: if false;
   }
+}
+// Hapus rencana (soft delete, owner 2026-11-10): hanya menambah field "deleted" (alasan wajib),
+// isi rencana, baseline & revisi tidak berubah, dan WAJIB ada entri log di forecastPlanLog pada
+// tulisan yang sama. Akurasi memakai rencana yang tidak dihapus; manajer melihat log-nya.
+function forecastDeleteMark() {
+  return forecastPlanner()
+    && resource.data.get('deleted', null) == null
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted'])
+    && request.resource.data.deleted is map
+    && request.resource.data.deleted.keys().hasOnly(['reason','by','byName','at','revision','logId'])
+    && request.resource.data.deleted.reason is string
+    && request.resource.data.deleted.reason.size() >= 5 && request.resource.data.deleted.reason.size() <= 500
+    && request.resource.data.deleted.by == request.auth.uid
+    && request.resource.data.deleted.byName is string && request.resource.data.deleted.byName.size() <= 100
+    && request.resource.data.deleted.at == request.time
+    && request.resource.data.deleted.revision == resource.data.revision
+    && request.resource.data.deleted.logId is string
+    && getAfter(/databases/$(database)/documents/forecastPlanLog/$(request.resource.data.deleted.logId)).data.at == request.time;
+}
+// Pulihkan rencana yang dihapus: hanya Admin Utama/Master, juga tercatat di log.
+function forecastRestoreMark() {
+  return forecastManager()
+    && resource.data.get('deleted', null) != null
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted'])
+    && request.resource.data.get('deleted', null) == null;
+}
+match /forecastPlanLog/{id} {
+  allow read: if forecastPlanner();
+  allow create: if forecastPlanner()
+    && request.resource.data.keys().hasOnly(['schemaVersion','action','key','date','outlet','revision','reason','by','byName','at','regular','orders'])
+    && request.resource.data.schemaVersion == 1
+    && request.resource.data.action in ['delete','restore']
+    && request.resource.data.key == request.resource.data.date + '_' + request.resource.data.outlet
+    && request.resource.data.revision is int
+    && request.resource.data.reason is string
+    && request.resource.data.reason.size() >= 5 && request.resource.data.reason.size() <= 500
+    && request.resource.data.by == request.auth.uid
+    && request.resource.data.byName is string && request.resource.data.byName.size() <= 100
+    && request.resource.data.at == request.time
+    && forecastQuantities(request.resource.data.regular) && forecastQuantities(request.resource.data.orders)
+    && ((request.resource.data.action == 'delete'
+         && getAfter(/databases/$(database)/documents/forecastPlans/$(request.resource.data.key)).data.deleted.logId == id)
+      || (request.resource.data.action == 'restore' && forecastManager()));
+  allow update, delete: if false;
 }
 // Lean, non-financial bundle for forecaster-only accounts: outlet/product names, events,
 // price references for the plan's own revenue estimate, research notes. No revenue trend,
