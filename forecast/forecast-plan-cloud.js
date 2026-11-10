@@ -23,7 +23,9 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
    subscribe();
   };
   function subscribe(){
-   stop?.();stop=null;cloud.records=[];if(cloud.state!=='ready'||!range)return;
+   // Records lama TIDAK dikosongkan saat rentang melebar -- dulu dikosongkan, jadi render di
+   // antara langganan ulang & snapshot baru menampilkan tabel kosong sesaat (layar berkedip).
+   stop?.();stop=null;if(cloud.state!=='ready'||!range)return;
    const q=dbSDK.query(dbSDK.collection(db,'forecastPlans'),dbSDK.where('date','>=',range[0]),dbSDK.where('date','<=',range[1]),dbSDK.orderBy('date'));
    stop=dbSDK.onSnapshot(q,s=>{cloud.records=s.docs.map(d=>({...d.data(),key:d.id})).filter(r=>r.schemaVersion===1&&window.ForecastPlanner.validPlan(r.plan)&&window.ForecastPlanner.validPlan(r.baseline));cloud.message='Penyimpanan tim tersambung.';cloud.readError=false;emit();},()=>{cloud.readError=true;cloud.message='Izin membaca rencana tim belum tersedia. Draft tetap aman di perangkat ini.';emit();});
   }

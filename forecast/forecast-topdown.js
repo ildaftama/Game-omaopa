@@ -9,7 +9,11 @@
 // (ForecastPlanner.prices) -> total basis B. Semua basis dikali k = target / B lalu dibulatkan,
 // jadi porsi antar-outlet dan komposisi produk tiap outlet tetap mengikuti polanya masing-masing,
 // hanya levelnya yang mengikuti target. Pesanan tercatat ditambahkan terpisah (tidak ikut dibagi).
-// Disimpan memakai skema rencana yang sama (forecastPlans) -- tidak ada perubahan rules.
+//
+// Revisi 2026-11-10 (owner): semua yang dulu harus dibuka per outlet kini bisa langsung di
+// halaman ini -- produk lain (Box Mini, roti, Whip, dst.) jadi kolom di tabel utama dan bisa
+// ditambah dari atas; klik nama outlet untuk mengubah pesanan & catatan outlet itu.
+// Disimpan memakai skema rencana yang sama (forecastPlans, customItems) -- tidak ada perubahan rules.
 window.ForecastTopdown=(()=>{
  const model=window.ForecastPlanner;
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -20,6 +24,12 @@ window.ForecastTopdown=(()=>{
  const cloud=()=>window.ForecastPlanCloud||{state:'loading',records:[]};
  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
  const SHORT=[['Ogura','Cheese'],['Ogura','Choco'],['Malmil','Cheese'],['Malmil','Choco'],['Mini','Cheese'],['Mini','Choco'],['Mini','Durian'],['Classic','Keju'],['Classic','Ekstra'],['Chiffon','Butter'],['Lite','Ekstra'],['Lite','Keju']];
+ // Produk lain yang selalu tampil (sama dengan FIXED_EXTRA di forecast-operations.js dan baris
+ // rincian kirim). Roti punya penjualan ESB di indeks 12-14 -> diberi saran median hari sama.
+ const FIXED=['Box Mini','Chiffon Kurma','Roti Sosis','Roti Abon','Roti Coklat','Whip'];
+ const ROTI={'roti sosis':12,'roti abon':13,'roti coklat':14};
+ const low=s=>String(s||'').trim().toLowerCase();
+ const isFixed=nm=>FIXED.some(x=>low(x)===low(nm));
  const BUFFERS=[-5,-3,0,3,5];
  const pct1=n=>n.toLocaleString('id-ID',{maximumFractionDigits:1});
  // Saran buffer dari kondisi 7 tanggal terakhir yang sudah diisi tim (owner 2026-11-10: buffer
@@ -34,8 +44,8 @@ window.ForecastTopdown=(()=>{
   return {pct:0,kind:wHigh&&lHigh?'mix':'ok'};
  }
  function describe(r,W){const parts=[];if(r?.wastePct!=null)parts.push(`waste ${pct1(r.wastePct)}% (ambang ${pct1(W)}%)`);if(r?.lostPerDay!=null)parts.push(`habis stok ±${Math.round(r.lostPerDay)} mnt/hari`);return parts.join(', ');}
- let date=null,cache=null,draft=null,message='',saving=false;
- const draftKey=()=>'omaopa-topdown-v1:'+date;
+ let date=null,cache=null,draft=null,message='',saving=false,addOpen=false;
+ const draftKey=()=>'omaopa-topdown-v2:'+date;
  const dateLabel=d=>new Date(d+'T12:00:00+07:00').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
  const wd=d=>new Date(d+'T12:00:00Z').getUTCDay();
  const median=a=>a.length?model.quantile(a,.5):null;
@@ -47,6 +57,8 @@ window.ForecastTopdown=(()=>{
   return out;
  }
  function orderQty(id){const pre=data().orders.days.find(r=>r.date===date&&r.id===id);return pre?.qty?.map((v,p)=>Number.isInteger(v)?v:pre.knownQty?.[p]||0)||Array(12).fill(0);}
+ // Pesanan untuk pabrik (bukan outlet) -- direkap terpisah oleh pcs_orders.py (factoryDays).
+ function factoryOrders(d=date){const f=data().orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===d);return r?{...r,qty:r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0),partial:r.qty.some(v=>v===null)}:{date:d,qty:Array(12).fill(0),orders:0,partial:false};}
  // Dihitung sekali per tanggal (recommend 28 outlet cukup berat).
  function compute(){
   const d=data(),key=date+'|'+d.sales.days.length+'|'+(d.orders?.days?.length||0);
@@ -58,7 +70,8 @@ window.ForecastTopdown=(()=>{
    const recs=model.recommend(d.sales,d.orders,id,date),prices=model.prices(window.FORECAST_REALIZED_PRICES,id,date),hist=byOutlet.get(id)||[];
    const base=recs.map((r,p)=>{if(r.central!=null)return r.central;const m=median(hist.map(x=>x.qty[p]||0));return m==null?0:m;});
    const value=base.reduce((s,q,p)=>s+q*(prices[p].value||0),0);B+=value;
-   outlets.set(id,{id,recs,prices,base,value,orders:orderQty(id)});
+   const roti={};for(const [nm,i] of Object.entries(ROTI)){const v=hist.filter(x=>x.qty.length>i).map(x=>x.qty[i]||0);roti[nm]=v.length>=3?Math.round(median(v)):null;}
+   outlets.set(id,{id,recs,prices,base,value,orders:orderQty(id),roti});
   }
   const pred=window.ForecastDashboard?.predict?.(date)||null;
   let wl=null;try{wl=window.ForecastDashboard?.recentWasteLost?.(7)||null;}catch{}
@@ -82,6 +95,29 @@ window.ForecastTopdown=(()=>{
   for(const id in cells)cells[id]=cells[id].map(String);
   return cells;
  }
+ // Nilai awal produk lain untuk outlet tanpa rencana tersimpan: roti = median penjualan hari
+ // yang sama (kalau datanya cukup), lainnya 0.
+ function extraDefault(o,nm){const v=o.roti[low(nm)];return {r:v==null?'0':String(v),o:'0'};}
+ // Isi satu outlet dari rencana tim yang tersimpan (reguler, pesanan, produk lain, catatan).
+ function seed(id,r){
+  const p=r.plan;draft.cells[id]=p.regular.map(String);draft.orders[id]=p.orders.map(String);draft.notes[id]=p.note||'';
+  const ex={};for(const it of p.customItems||[]){const nm=String(it.name||'').trim();if(!nm)continue;let col=draft.names.find(x=>low(x)===low(nm));if(!col){col=nm;draft.names.push(nm);}ex[col]={r:String(it.regular||0),o:String(it.orders||0)};}
+  for(const nm of draft.names)if(!ex[nm])ex[nm]={r:'0',o:'0'};
+  draft.extra[id]=ex;draft.seen[id]=r.revision;
+ }
+ function ensureShape(c){
+  for(const k of ['cells','orders','extra','notes','seen'])if(!draft[k]||typeof draft[k]!=='object')draft[k]={};
+  if(!Array.isArray(draft.names))draft.names=[...FIXED];
+  for(const nm of FIXED)if(!draft.names.some(x=>low(x)===low(nm)))draft.names.splice(FIXED.indexOf(nm),0,nm);
+  for(const id of c.ids){const o=c.outlets.get(id);
+   if(!Array.isArray(draft.cells[id]))draft.cells[id]=draft.auto?.[id]||o.base.map(()=>'0');
+   if(!Array.isArray(draft.orders[id]))draft.orders[id]=o.orders.map(String);
+   if(!draft.extra[id])draft.extra[id]={};
+   for(const nm of draft.names)if(!draft.extra[id][nm])draft.extra[id][nm]=extraDefault(o,nm);
+   if(draft.notes[id]==null)draft.notes[id]='';
+  }
+  if(!Array.isArray(draft.open))draft.open=[];
+ }
  function prepare(){
   if(!date){const t=model.shift(today(),1);date=t;}
   cloud().watch?.(date,date);
@@ -89,27 +125,59 @@ window.ForecastTopdown=(()=>{
   if(!draft||draft.date!==date){
    try{const s=JSON.parse(localStorage.getItem(draftKey())||'null');if(s?.date===date&&s.cells)draft=s;else draft=null;}catch{draft=null;}
    if(!draft){
-    const suggestion=Math.round((c.pred?.pure||c.B||0)*(1+c.net.pct/100)),auto=allocate(suggestion,true),cells={};
-    for(const id of c.ids){const r=record(id);cells[id]=r?r.plan.regular.map(String):auto[id];}
-    draft={date,target:suggestion,auto,cells,pristine:true,perOutlet:true};
+    const suggestion=Math.round((c.pred?.pure||c.B||0)*(1+c.net.pct/100)),auto=allocate(suggestion,true);
+    draft={date,target:suggestion,auto,cells:JSON.parse(JSON.stringify(auto)),orders:{},extra:{},notes:{},seen:{},names:[...FIXED],perOutlet:true,open:[]};
+    ensureShape(c);persist();
    }
   }
   if(draft.perOutlet===undefined)draft.perOutlet=true;
-  if(draft.pristine)for(const id of c.ids){const r=record(id);if(r)draft.cells[id]=r.plan.regular.map(String);}
+  ensureShape(c);
+  // Rencana tim yang LEBIH BARU dari yang terakhir dilihat draft ini (disimpan dari halaman ini,
+  // dari tab detail outlet, atau oleh rekan) selalu menang -- tabel ikut angka tim terbaru.
+  let synced=false;for(const id of c.ids){const r=record(id);if(r&&(draft.seen[id]||0)<r.revision){seed(id,r);synced=true;}}
+  if(synced){ensureShape(c);persist();}
   return c;
  }
  const qtyOf=v=>{const n=Number(v);return Number.isFinite(n)&&n>=0?n:0;};
- function outletTotals(c,id){const o=c.outlets.get(id),cells=draft.cells[id]||[];let pcs=0,val=0;cells.forEach((v,p)=>{const q=qtyOf(v);pcs+=q;val+=q*(o.prices[p].value||0);});return {pcs,val,orders:o.orders.reduce((a,b)=>a+b,0)};}
- function totals(c){let pcs=0,val=0,orders=0;for(const id of c.ids){const t=outletTotals(c,id);pcs+=t.pcs;val+=t.val;orders+=t.orders;}return {pcs,val,orders};}
- function statusOf(id){const r=record(id),cells=draft.cells[id];if(!r)return ['new','Belum disimpan'];const same=r.plan.regular.every((v,p)=>v===qtyOf(cells[p]));return same?['saved',`Tersimpan v${r.revision}`]:['changed',`Berubah · v${r.revision}`];}
+ function outletTotals(c,id){const o=c.outlets.get(id),cells=draft.cells[id]||[];let pcs=0,val=0;cells.forEach((v,p)=>{const q=qtyOf(v);pcs+=q;val+=q*(o.prices[p].value||0);});const ex=draft.extra[id]||{};let extra=0,exOrd=0;for(const nm of draft.names){extra+=qtyOf(ex[nm]?.r);exOrd+=qtyOf(ex[nm]?.o);}return {pcs,val,extra,orders:(draft.orders[id]||[]).reduce((a,b)=>a+qtyOf(b),0)+exOrd};}
+ function totals(c){let pcs=0,val=0,orders=0,extra=0;for(const id of c.ids){const t=outletTotals(c,id);pcs+=t.pcs;val+=t.val;orders+=t.orders;extra+=t.extra;}return {pcs,val,orders,extra};}
+ // customItems yang akan disimpan untuk outlet ini: kolom produk lain yang bernilai > 0, plus
+ // item lama di rencana tim yang namanya tidak ada di kolom (tidak pernah dihapus diam-diam).
+ function customItemsOf(id){
+  const ex=draft.extra[id]||{},out=[];
+  for(const nm of draft.names){const r=qtyOf(ex[nm]?.r),o=qtyOf(ex[nm]?.o);if(r||o)out.push({name:nm,regular:Math.round(r),orders:Math.round(o)});}
+  for(const it of record(id)?.plan?.customItems||[])if(!draft.names.some(x=>low(x)===low(it.name)))out.push({name:it.name,regular:it.regular,orders:it.orders});
+  return out;
+ }
+ const sameItems=(a,b)=>{const k=x=>x.map(it=>low(it.name)+'='+(it.regular||0)+'/'+(it.orders||0)).sort().join('|');return k(a||[])===k(b||[]);};
+ function statusOf(id){const r=record(id);if(!r)return ['new','Belum disimpan'];const p=r.plan,cells=draft.cells[id],ord=draft.orders[id]||[];const same=p.regular.every((v,p2)=>v===qtyOf(cells[p2]))&&p.orders.every((v,p2)=>v===qtyOf(ord[p2]))&&String(p.note||'')===String(draft.notes[id]||'')&&sameItems(p.customItems,customItemsOf(id));return same?['saved',`Tersimpan v${r.revision}`]:['changed',`Berubah · v${r.revision}`];}
+ const shortName=nm=>{const w=String(nm).split(' ');return w.length>1?`${esc(w[0])}<br><small>${esc(w.slice(1).join(' '))}</small>`:esc(nm);};
+ function detailRow(c,id,span){
+  const o=c.outlets.get(id),ord=draft.orders[id],ex=draft.extra[id],known=o.orders,r=record(id);
+  const cell=(attr,v,label,hint)=>`<label class="ft-dcell"><span>${label}</span><input class="ft-cell" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(v)}" ${attr}>${hint||''}</label>`;
+  return `<tr class="ft-detail" data-ft-detail-row="${esc(id)}"><td colspan="${span}"><div class="ft-detail-box">
+   <div class="ft-detail-head"><b>Pesanan · ${esc(name(id))}</b><span>Ditambahkan di luar reguler. Angka awal dari rekap pesanan${r?' / rencana tim':''}.</span></div>
+   <div class="ft-dgrid">${model.names.map((nm,p)=>cell(`data-ft-ord="${esc(id)}:${p}"`,ord[p],esc(SHORT[p].join(' ')),known[p]>0&&qtyOf(ord[p])!==known[p]?`<small class="ft-dwarn">tercatat ${known[p]}</small>`:'')).join('')}${draft.names.map((nm,i)=>cell(`data-ft-xo="${esc(id)}:${i}"`,ex[nm].o,esc(nm))).join('')}</div>
+   <label class="ft-dnote">Catatan outlet<textarea rows="2" maxlength="500" data-ft-note="${esc(id)}" placeholder="Contoh: ada acara kampus, kiriman ditambah">${esc(draft.notes[id])}</textarea></label>
+   <div class="ft-detail-foot"><span>Saran rentang per produk & realisasi kirim ada di detail outlet.</span><button type="button" class="button" data-ft-open-outlet="${esc(id)}">Buka detail outlet ↗</button></div>
+  </div></td></tr>`;
+ }
+ function factoryBlock(){
+  const f=factoryOrders();
+  if(!f)return '<div class="ft-factory"><b>Pesanan pabrik</b><span>Belum tersinkron. Pesanan bertulisan "pabrik" akan muncul di sini setelah sinkron pesanan berikutnya.</span></div>';
+  const items=f.qty.map((q,p)=>[q,p]).filter(([q])=>q>0);
+  return `<div class="ft-factory"><b>Pesanan pabrik · ${nf(f.qty.reduce((a,b)=>a+b,0))} pcs</b>${items.length?`<span>${items.map(([q,p])=>`${esc(model.names[p])} <b>${q}</b>`).join(' · ')}</span>`:'<span>Tidak ada pesanan untuk pabrik pada tanggal ini.</span>'}${f.partial?'<em>Sebagian varian belum pasti, cek sheet PESANAN.</em>':''}<small>Diproduksi terpisah, tidak masuk outlet mana pun. Tampil juga di Rincian kirim.</small></div>`;
+ }
  function render(){
   if(!data().sales||!data().orders)return '<div class="fp-empty">Memuat riwayat penjualan dan pesanan…</div>';
-  const c=prepare(),t=totals(c),pred=c.pred?.pure,diff=pred?((draft.target/pred-1)*100):null;
-  const head=`<thead><tr><th class="ft-outlet">Outlet</th><th class="ft-num">Omzet</th>${SHORT.map(([a,b],p)=>`<th class="ft-sku" title="${esc(model.names[p])}">${a}<br><small>${b}</small></th>`).join('')}<th class="ft-num">Reguler</th><th class="ft-num">Pesanan</th><th>Status</th></tr></thead>`;
-  const row=id=>{const o=c.outlets.get(id),tt=outletTotals(c,id),[sk,sl]=statusOf(id),auto=draft.auto?.[id]||[];const adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'';return `<tr data-ft-row="${esc(id)}"><td class="ft-outlet">${esc(name(id))}${adj}</td><td class="ft-num" data-ft-val="${esc(id)}">${rp(tt.val)}</td>${draft.cells[id].map((v,p)=>`<td><input class="ft-cell${auto[p]!=null&&String(auto[p])!==String(v)?' ft-edited':''}" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(v)}" data-ft-cell="${esc(id)}:${p}" aria-label="${esc(name(id))} ${esc(model.names[p])}" title="Saran awal: ${esc(auto[p]??'—')}"></td>`).join('')}<td class="ft-num ft-strong" data-ft-pcs="${esc(id)}">${nf(tt.pcs)}</td><td class="ft-num ${tt.orders?'':'ft-muted'}">${tt.orders?nf(tt.orders):'—'}</td><td><span class="ft-pill ${sk}" data-ft-status="${esc(id)}">${sl}</span></td></tr>`;};
-  const body=c.groups.map(g=>`<tr class="ft-group" style="--acc:${g.color}"><td colspan="${SHORT.length+5}">${esc(g.name)}</td></tr>${g.ids.map(row).join('')}`).join('');
+  const c=prepare(),t=totals(c),pred=c.pred?.pure,diff=pred?((draft.target/pred-1)*100):null,span=SHORT.length+draft.names.length+5;
+  const head=`<thead><tr><th class="ft-outlet">Outlet</th><th class="ft-num">Omzet</th>${SHORT.map(([a,b],p)=>`<th class="ft-sku" title="${esc(model.names[p])}">${a}<br><small>${b}</small></th>`).join('')}${draft.names.map((nm,i)=>`<th class="ft-sku ft-xh${i===0?' ft-xfirst':''}" title="${esc(nm)} · diisi manual">${shortName(nm)}${isFixed(nm)?'':`<button type="button" class="ft-xdel" data-ft-xdel="${i}" aria-label="Hapus kolom ${esc(nm)}" title="Hapus kolom">×</button>`}</th>`).join('')}<th class="ft-num">Reguler</th><th class="ft-num">Pesanan</th><th>Status</th></tr></thead>`;
+  const row=id=>{const o=c.outlets.get(id),tt=outletTotals(c,id),[sk,sl]=statusOf(id),auto=draft.auto?.[id]||[],open=draft.open.includes(id),ex=draft.extra[id];const adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'';const note=draft.notes[id]?'<span class="ft-notedot" title="Ada catatan">✎</span>':'';
+   return `<tr data-ft-row="${esc(id)}" class="${open?'ft-open':''}"><td class="ft-outlet"><button type="button" class="ft-oname" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Ubah pesanan & catatan outlet ini"><span class="ft-caret">${open?'▾':'▸'}</span>${esc(name(id))}</button>${adj}${note}</td><td class="ft-num" data-ft-val="${esc(id)}">${rp(tt.val)}</td>${draft.cells[id].map((v,p)=>`<td><input class="ft-cell${auto[p]!=null&&String(auto[p])!==String(v)?' ft-edited':''}" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(v)}" data-ft-cell="${esc(id)}:${p}" aria-label="${esc(name(id))} ${esc(model.names[p])}" title="Saran awal: ${esc(auto[p]??'—')}"></td>`).join('')}${draft.names.map((nm,i)=>`<td class="${i===0?'ft-xfirst':''}"><input class="ft-cell ft-xcell" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(ex[nm].r)}" data-ft-xr="${esc(id)}:${i}" aria-label="${esc(name(id))} ${esc(nm)}" ${ROTI[low(nm)]!=null?`title="Saran median hari sama: ${o.roti[low(nm)]??'data belum cukup'}"`:''}></td>`).join('')}<td class="ft-num ft-strong" data-ft-pcs="${esc(id)}">${nf(tt.pcs+tt.extra)}</td><td class="ft-num ${tt.orders?'':'ft-muted'}" data-ft-ord-total="${esc(id)}">${tt.orders?nf(tt.orders):'—'}</td><td><span class="ft-pill ${sk}" data-ft-status="${esc(id)}">${sl}</span></td></tr>${open?detailRow(c,id,span):''}`;};
+  const body=c.groups.map(g=>`<tr class="ft-group" style="--acc:${g.color}"><td colspan="${span}">${esc(g.name)}</td></tr>${g.ids.map(row).join('')}`).join('');
   const adjN=c.ids.filter(id=>c.outlets.get(id).adj.pct).length;
   const changedN=c.ids.filter(id=>statusOf(id)[0]!=='saved').length,existing=c.ids.filter(id=>record(id)).length;
+  const fo=factoryOrders(),foN=fo?fo.qty.reduce((a,b)=>a+b,0):null;
   return `<div class="ft-wrap">
    <div class="ft-top">
     <label class="ft-date">Tanggal kiriman<input type="date" id="ft-date" value="${date}"></label>
@@ -120,17 +188,19 @@ window.ForecastTopdown=(()=>{
      <button type="button" class="button fp-primary" data-ft-allocate>Bagi otomatis ke outlet & produk</button>
     </div>
    </div>
-   <p class="ft-sub">${esc(dateLabel(date))} · ${diff==null?'':Math.abs(diff)<.05?'Target sesuai prediksi · ':`Target ${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi · `}porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir. Kotak berwarna = sudah diubah dari hasil bagi otomatis.</p>
+   <div class="ft-extras"><div><b>Produk lain (diisi manual)</b><span>${draft.names.map(esc).join(' · ')}. Tampil sebagai kolom di kanan tabel, tidak ikut dibagi dari omzet.</span></div>${addOpen?`<div class="ft-xadd"><input type="text" id="ft-xname" maxlength="60" placeholder="Nama produk, mis. Roti Pisang Coklat" autocomplete="off"><button type="button" class="button fp-primary" data-ft-xadd-ok>Tambah kolom</button><button type="button" class="button" data-ft-xadd-cancel>Batal</button></div>`:'<button type="button" class="button" data-ft-xadd>+ Tambah produk</button>'}</div>
+   <p class="ft-sub">${esc(dateLabel(date))} · ${diff==null?'':Math.abs(diff)<.05?'Target sesuai prediksi · ':`Target ${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi · `}porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir. Kotak kuning = sudah diubah dari hasil bagi otomatis. Klik nama outlet untuk mengubah pesanan & catatannya.</p>
    <div class="ft-summary">
-    <div><span>Omzet hasil bagi</span><strong data-ft-total-val>${rp(t.val)}</strong></div>
-    <div><span>Total reguler</span><strong data-ft-total-pcs>${nf(t.pcs)} pcs</strong></div>
-    <div><span>Pesanan tercatat</span><strong>${nf(t.orders)} pcs</strong><small>ditambahkan terpisah</small></div>
-    <div><span>Outlet</span><strong>${c.ids.length}</strong><small>${existing?`${existing} sudah punya rencana`:'belum ada yang disimpan'}</small></div>
+    <div><span>Omzet hasil bagi</span><strong data-ft-total-val>${rp(t.val)}</strong><small>12 produk inti</small></div>
+    <div><span>Total reguler</span><strong data-ft-total-pcs>${nf(t.pcs+t.extra)} pcs</strong><small data-ft-total-extra>${t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi'}</small></div>
+    <div><span>Pesanan outlet</span><strong data-ft-total-ord>${nf(t.orders)} pcs</strong><small>ditambahkan terpisah</small></div>
+    <div><span>Pesanan pabrik</span><strong>${foN==null?'—':nf(foN)+' pcs'}</strong><small>${foN==null?'menunggu sinkron':'tidak masuk outlet'}</small></div>
    </div>
+   ${factoryBlock()}
    ${date<=today()?'<p class="fs-ship-note">Tanggal ini sudah berjalan/berlalu. Rencana yang disimpan sekarang tidak dihitung sebagai forecast sebelum penjualan.</p>':''}
    <div class="ft-table-wrap"><table class="ft-table">${head}<tbody>${body}</tbody></table></div>
    <div class="ft-save"><span role="status" class="ft-msg">${esc(message||(changedN?`${changedN} outlet belum tersimpan / berubah. Teliti angkanya, lalu simpan.`:'Semua outlet sudah tersimpan sesuai angka di tabel.'))}</span><button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN?'disabled':''}>${saving?'Menyimpan…':`Simpan ${changedN} outlet ke tim`}</button></div>
-   <p class="ft-foot">Produk lain (Box Mini, roti, Whip, dll.) dan catatan tetap diatur per outlet di tab <b>Edit per outlet</b>; nilai yang sudah ada tidak terhapus saat disimpan dari sini.</p>
+   <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}. Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>
   </div>`;
  }
  function netWhy(c){
@@ -142,20 +212,30 @@ window.ForecastTopdown=(()=>{
    :`Saran sesuai prediksi · 7 hari terakhir ${d}${per}. Waste dan habis stok masih dalam batas.`;
   return `<p class="ft-why ft-why-${n.kind}">${esc(txt)}</p>`;
  }
+ const q=s=>document.querySelector(s);
+ function saveLabel(){const c=compute(),n=c.ids.filter(x=>statusOf(x)[0]!=='saved').length,btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!n;btn.textContent=`Simpan ${n} outlet ke tim`;}}
  function refreshTotals(id){
-  const c=compute(),tt=outletTotals(c,id),t=totals(c),q=s=>document.querySelector(s);
-  const v=q(`[data-ft-val="${CSS.escape(id)}"]`);if(v)v.textContent=rp(tt.val);
-  const pc=q(`[data-ft-pcs="${CSS.escape(id)}"]`);if(pc)pc.textContent=nf(tt.pcs);
-  const st=q(`[data-ft-status="${CSS.escape(id)}"]`);if(st){const [k,l]=statusOf(id);st.className='ft-pill '+k;st.textContent=l;}
+  const c=compute(),tt=outletTotals(c,id),t=totals(c),E=CSS.escape(id);
+  const v=q(`[data-ft-val="${E}"]`);if(v)v.textContent=rp(tt.val);
+  const pc=q(`[data-ft-pcs="${E}"]`);if(pc)pc.textContent=nf(tt.pcs+tt.extra);
+  const od=q(`[data-ft-ord-total="${E}"]`);if(od){od.textContent=tt.orders?nf(tt.orders):'—';od.classList.toggle('ft-muted',!tt.orders);}
+  const st=q(`[data-ft-status="${E}"]`);if(st){const [k,l]=statusOf(id);st.className='ft-pill '+k;st.textContent=l;}
   const tv=q('[data-ft-total-val]');if(tv)tv.textContent=rp(t.val);
-  const tp=q('[data-ft-total-pcs]');if(tp)tp.textContent=nf(t.pcs)+' pcs';
-  const n=c.ids.filter(x=>statusOf(x)[0]!=='saved').length,btn=q('[data-ft-save]');
-  if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!n;btn.textContent=`Simpan ${n} outlet ke tim`;}
+  const tp=q('[data-ft-total-pcs]');if(tp)tp.textContent=nf(t.pcs+t.extra)+' pcs';
+  const tx=q('[data-ft-total-extra]');if(tx)tx.textContent=t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi';
+  const to=q('[data-ft-total-ord]');if(to)to.textContent=nf(t.orders)+' pcs';
+  saveLabel();
  }
+ const split=s=>{const i=s.lastIndexOf(':');return [s.slice(0,i),+s.slice(i+1)];};
  function input(e){
-  const t=e.target;
-  if(t.dataset.ftCell){const [id,p]=t.dataset.ftCell.split(':');draft.cells[id][+p]=t.value;draft.pristine=false;persist();const auto=draft.auto?.[id]?.[+p];t.classList.toggle('ft-edited',auto!=null&&String(auto)!==String(t.value));refreshTotals(id);return false;}
+  const t=e.target;if(!draft)return null;
+  if(t.dataset.ftCell){const [id,p]=split(t.dataset.ftCell);draft.cells[id][p]=t.value;persist();const auto=draft.auto?.[id]?.[p];t.classList.toggle('ft-edited',auto!=null&&String(auto)!==String(t.value));refreshTotals(id);return false;}
+  if(t.dataset.ftXr){const [id,i]=split(t.dataset.ftXr);draft.extra[id][draft.names[i]].r=t.value;persist();refreshTotals(id);return false;}
+  if(t.dataset.ftXo){const [id,i]=split(t.dataset.ftXo);draft.extra[id][draft.names[i]].o=t.value;persist();refreshTotals(id);return false;}
+  if(t.dataset.ftOrd){const [id,p]=split(t.dataset.ftOrd);draft.orders[id][p]=t.value;persist();refreshTotals(id);return false;}
+  if(t.dataset.ftNote!==undefined){draft.notes[t.dataset.ftNote]=t.value;persist();refreshTotals(t.dataset.ftNote);return false;}
   if(t.id==='ft-target'){const n=Number(String(t.value).replace(/\D/g,''));draft.target=n;persist();return false;}
+  if(t.id==='ft-xname')return false;
   return null;
  }
  function change(e){
@@ -163,35 +243,70 @@ window.ForecastTopdown=(()=>{
   if(t.id==='ft-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){date=t.value;draft=null;message='';return true;}
   if(t.id==='ft-target'){input(e);return true;}
   if(t.id==='ft-per-outlet'){draft.perOutlet=t.checked;const edited=hasEdits();if(!edited){draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));message='Pembagian diperbarui.';}else message='Klik "Bagi otomatis" untuk menerapkan pengaturan ini.';persist();return true;}
-  if(t.dataset.ftCell){input(e);return false;}
+  if(t.dataset.ftCell||t.dataset.ftXr||t.dataset.ftXo||t.dataset.ftOrd||t.dataset.ftNote!==undefined){input(e);return false;}
+  if(t.id==='ft-xname')return false;
   return false;
+ }
+ function addColumn(){
+  const el=document.getElementById('ft-xname'),nm=String(el?.value||'').trim().replace(/\s+/g,' ');
+  if(!nm){message='Isi nama produk dulu.';return;}
+  if(draft.names.some(x=>low(x)===low(nm))){message=`${nm} sudah ada di tabel.`;addOpen=false;return;}
+  if(draft.names.length>=20){message='Maksimal 20 produk lain per rencana.';return;}
+  draft.names.push(nm);const c=compute();for(const id of c.ids)draft.extra[id][nm]={r:'0',o:'0'};
+  addOpen=false;persist();message=`Kolom ${nm} ditambahkan untuk semua outlet. Isi jumlahnya per outlet.`;
  }
  function click(e){
   const b=e.target.closest('[data-ft-buffer]');
   if(b){const c=compute();if(c.pred?.pure){draft.target=Math.round(c.pred.pure*(1+Number(b.dataset.ftBuffer)/100));persist();}return true;}
+  const tg=e.target.closest('[data-ft-toggle]');
+  if(tg){const id=tg.dataset.ftToggle,i=draft.open.indexOf(id);if(i<0)draft.open.push(id);else draft.open.splice(i,1);persist();return true;}
+  const oo=e.target.closest('[data-ft-open-outlet]');
+  if(oo){window.ForecastWorkspace?.openOutlet?.(oo.dataset.ftOpenOutlet,date);return true;}
+  if(e.target.closest('[data-ft-xadd]')){addOpen=true;return true;}
+  if(e.target.closest('[data-ft-xadd-cancel]')){addOpen=false;return true;}
+  if(e.target.closest('[data-ft-xadd-ok]')){addColumn();return true;}
+  const xd=e.target.closest('[data-ft-xdel]');
+  if(xd){const i=+xd.dataset.ftXdel,nm=draft.names[i];if(nm&&!isFixed(nm)){const c=compute(),used=c.ids.some(id=>qtyOf(draft.extra[id][nm]?.r)||qtyOf(draft.extra[id][nm]?.o));if(used&&!confirm(`Kolom ${nm} sudah berisi angka. Hapus untuk semua outlet?`))return false;draft.names.splice(i,1);for(const id of c.ids)delete draft.extra[id][nm];persist();message=`Kolom ${nm} dihapus.`;}return true;}
   if(e.target.closest('[data-ft-allocate]')){
    const tgt=document.getElementById('ft-target');if(tgt)draft.target=Number(String(tgt.value).replace(/\D/g,''))||0;
    if(!draft.target){message='Isi target omzet dulu.';return true;}
    const edited=hasEdits();
-   if(edited&&!confirm('Angka yang sudah diubah manual akan diganti hasil bagi otomatis. Lanjutkan?'))return false;
-   draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));draft.pristine=false;persist();message=`Target ${rp(draft.target)} sudah dibagi ke ${compute().ids.length} outlet. Teliti angkanya, lalu simpan.`;return true;
+   if(edited&&!confirm('Angka reguler yang sudah diubah manual akan diganti hasil bagi otomatis. Pesanan, produk lain & catatan tidak berubah. Lanjutkan?'))return false;
+   draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));persist();message=`Target ${rp(draft.target)} sudah dibagi ke ${compute().ids.length} outlet. Teliti angkanya, lalu simpan.`;return true;
   }
   if(e.target.closest('[data-ft-save]')){saveAll();return true;}
   return false;
  }
+ function keydown(e){if(e.target.id==='ft-xname'&&e.key==='Enter'){e.preventDefault();addColumn();return true;}return false;}
  function hasEdits(){return compute().ids.some(id=>draft.cells[id].some((v,p)=>draft.auto?.[id]?.[p]!=null&&String(draft.auto[id][p])!==String(v)));}
  const rerender=()=>window.dispatchEvent(new Event('forecast-operations-changed'));
+ // Selama menyimpan, layar TIDAK dirender ulang tiap outlet (dulu 28 outlet x snapshot Firestore
+ // = puluhan render penuh dalam beberapa detik -> layar berkedip). Pesan progres diperbarui di
+ // tempat; render penuh sekali di akhir.
+ const say=t=>{message=t;const m=q('.ft-msg');if(m)m.textContent=t;};
  async function saveAll(){
-  const c=compute(),todo=c.ids.filter(id=>statusOf(id)[0]!=='saved');
-  for(const id of todo){for(const v of draft.cells[id]){const n=Number(v);if(v===''||!model.integer(n)){message=`Angka ${name(id)} belum valid (harus bilangan bulat 0–10000).`;rerender();return;}}}
-  saving=true;let ok=0;const fail=[];
+  const c=compute(),todo=c.ids.filter(id=>statusOf(id)[0]!=='saved'),bad=v=>v===''||!model.integer(Number(v));
   for(const id of todo){
-   message=`Menyimpan ${ok+fail.length+1}/${todo.length}: ${name(id)}…`;rerender();
-   const o=c.outlets.get(id),r=record(id),regular=draft.cells[id].map(Number),orders=o.orders.map(Number);
-   const plan={date,outlet:id,active:regular.map((q,p)=>q>0||orders[p]>0),regular,orders,note:r?.plan?.note||`Dibagi otomatis dari target omzet reguler ${rp(draft.target)}.`,prices:o.prices,recommendations:o.recs,method:o.recs.find(x=>x.method)?.method||'weekday-median-trend-v1',cutoff:o.recs.map(x=>x.through).filter(Boolean).sort().at(-1)||null,...(r?.plan?.customItems?.length?{customItems:r.plan.customItems}:{})};
-   try{await cloud().save(plan,r?.revision||0);ok++;}catch(err){fail.push(name(id)+(String(err.message).includes('CONFLICT')?' (diubah orang lain, muat ulang)':''));}
+   if(draft.cells[id].some(bad)||draft.orders[id].some(bad)){message=`Angka ${name(id)} belum valid (harus bilangan bulat 0–10000).`;rerender();return;}
+   for(const nm of draft.names){const x=draft.extra[id][nm];if(!model.integer(qtyOf(x.r))||!model.integer(qtyOf(x.o))){message=`Angka ${nm} di ${name(id)} belum valid.`;rerender();return;}}
+   if(customItemsOf(id).length>20){message=`${name(id)}: maksimal 20 produk lain.`;rerender();return;}
   }
-  saving=false;message=fail.length?`${ok} outlet tersimpan. Gagal: ${fail.join(', ')}.`:`${ok} outlet tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
+  saving=true;let ok=0;const fail=[];
+  const btn=q('[data-ft-save]');if(btn){btn.disabled=true;btn.textContent='Menyimpan…';}
+  for(const id of todo){
+   say(`Menyimpan ${ok+fail.length+1}/${todo.length}: ${name(id)}…`);
+   const o=c.outlets.get(id),r=record(id),regular=draft.cells[id].map(Number),orders=draft.orders[id].map(Number),items=customItemsOf(id);
+   const plan={date,outlet:id,active:regular.map((v,p)=>v>0||orders[p]>0),regular,orders,note:String(draft.notes[id]||'').trim()||`Dibagi otomatis dari target omzet reguler ${rp(draft.target)}.`,prices:o.prices,recommendations:o.recs,method:o.recs.find(x=>x.method)?.method||'weekday-median-trend-v1',cutoff:o.recs.map(x=>x.through).filter(Boolean).sort().at(-1)||null,...(items.length?{customItems:items}:{})};
+   if(!plan.active.some(Boolean))plan.active[2]=true;
+   try{await cloud().save(plan,r?.revision||0);ok++;if(!draft.notes[id])draft.notes[id]=plan.note;}catch(err){fail.push(name(id)+(String(err.message).includes('diubah rekan')?' (diubah rekan, muat ulang)':''));}
+  }
+  persist();saving=false;message=fail.length?`${ok} outlet tersimpan. Gagal: ${fail.join(', ')}.`:`${ok} outlet tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
  }
- return {render,input,change,click};
+ // Dipakai tab detail outlet: angka hasil bagi untuk outlet+tanggal ini (kalau belum ada rencana
+ // tim), supaya detail outlet langsung berisi angka yang sama dengan halaman utama.
+ function cellsFor(d,id){
+  try{if(!data().sales||!data().orders)return null;if(date!==d){date=d;draft=null;}const c=prepare();if(!c.outlets.has(id))return null;
+   return {regular:[...draft.cells[id]],orders:[...draft.orders[id]],note:draft.notes[id]||'',customItems:draft.names.map(nm=>({name:nm,regular:draft.extra[id][nm].r,orders:draft.extra[id][nm].o}))};}catch{return null;}
+ }
+ return {render,input,change,click,keydown,cellsFor,factoryOrders,busy:()=>saving};
 })();

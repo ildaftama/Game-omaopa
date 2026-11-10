@@ -9,6 +9,9 @@ class OrdersTest(unittest.TestCase):
     def test_units_and_factory(self):
         a=aggregate([row(5577,46023),row(5578,46023,destination='Pabrik')]);self.assertEqual(a['days'][0]['qty'][2],2);self.assertEqual(a['excludedRecords'],1)
         self.assertEqual(mini('1 mix','Mini 1 box mix')['composition'],{'cheese':3,'choco':3,'durian':3})
+        self.assertEqual(a['factoryDays'][0]['qty'][2],2);self.assertEqual(a['factoryDays'][0]['orders'],1)
+    def test_text_for_factory_goes_to_factory_orders(self):
+        a=aggregate([row(5577,46023,text='Malmil Cheese (3) untuk pabrik',qty=3,destination='')]);self.assertFalse(a['days']);self.assertEqual(a['factoryDays'][0]['qty'][2],3)
     def test_changed_note_cannot_inherit_old_review(self):
         r=row(5577,46023);review={fingerprint(r):{'nonSale':True}};self.assertEqual(aggregate([r],review)['excludedRecords'],1)
         r['3']['value']='Malmil Cheese (3)';self.assertEqual(aggregate([r],review)['excludedRecords'],0)

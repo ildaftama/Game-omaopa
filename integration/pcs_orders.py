@@ -132,7 +132,7 @@ def aggregate(rows,reviews=None):
         header=date_header(r)
         if header:groups.append(header);current=header
         if str(val(r,3)or'').strip()and current:current['orders'].append(r)
-    dates=set();blocked=set();days={};previous=None;excluded=0;unresolved=0
+    dates=set();blocked=set();days={};factory={};previous=None;excluded=0;unresolved=0
     for i,g in enumerate(groups):
         following=next((x['raw']for x in groups[i+1:i+4]if x['raw']),None)
         date,method,_=resolve_date(g,previous,following)
@@ -147,6 +147,18 @@ def aggregate(rows,reviews=None):
                 pickup=re.search(r'(?im)^\s*[*_ ]*outlet\s+pengambilan\s*:\s*([^\n]+)',text)
                 if pickup:channel,oid,_=outlet(pickup[1])
             if review.get('outletId'):channel='outlet';oid=review['outletId']
+            # Pesanan untuk pabrik (owner 2026-11-10): tidak masuk outlet mana pun, tapi tetap
+            # harus diproduksi -> direkap terpisah di factoryDays (jumlah kue per tanggal saja).
+            if channel!='outlet' and not review.get('outletId') and re.search(r'(?i)\b(?:untuk|ambil|diambil|pengambilan|kirim|dikirim|antar)\s+(?:di\s+|ke\s+)?pabrik\b',text):channel='factory'
+            if channel=='factory':
+                f=factory.setdefault(date,{'date':date,'qty':[0]*12,'knownQty':[0]*12,'orders':0,'unresolved':0});f['orders']+=1
+                fq=quantities(r)
+                if re.search(r'\b(refund|batal|cancel)\b',status,re.I)and not review.get('refundReconciled'):fq=[None]*12
+                if any(v is None for v in fq):f['unresolved']+=1
+                for p,v in enumerate(fq):
+                    if v is None:f['qty'][p]=None
+                    elif f['qty'][p]is not None:f['qty'][p]+=v
+                    if v is not None:f['knownQty'][p]+=v
             if channel in ['factory','external']:excluded+=1;continue
             if channel!='outlet':blocked.add(date);unresolved+=1;continue
             key=(date,oid);d=days.setdefault(key,{'date':date,'id':oid,'qty':[0]*12,'knownQty':[0]*12,'frequency':[0]*12,'orders':0,'unresolved':0});d['orders']+=1
@@ -159,7 +171,7 @@ def aggregate(rows,reviews=None):
                 if v is not None:d['knownQty'][p]+=v
                 if v is not None and v>0:d['frequency'][p]+=1
     if unresolved>max(100,len(rows)//5):raise ValueError('Struktur atau tanggal pesanan berubah; hasil lama dipertahankan.')
-    return {'schemaVersion':1,'updatedAt':dt.datetime.now(dt.timezone.utc).isoformat(),'products':PRODUCTS,'coveredDates':sorted(dates),'blockedDates':sorted(blocked),'days':sorted(days.values(),key=lambda r:(r['date'],r['id'])),'excludedRecords':excluded,'unresolvedRecords':unresolved}
+    return {'schemaVersion':1,'updatedAt':dt.datetime.now(dt.timezone.utc).isoformat(),'products':PRODUCTS,'coveredDates':sorted(dates),'blockedDates':sorted(blocked),'days':sorted(days.values(),key=lambda r:(r['date'],r['id'])),'factoryDays':sorted(factory.values(),key=lambda r:r['date']),'excludedRecords':excluded,'unresolvedRecords':unresolved}
 
 def fetch_source(config):
     s=next(s for s in config['sources']if s['key']=='orders');m=re.fullmatch(r'https://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]+)(?:/.*)?',s['url'])

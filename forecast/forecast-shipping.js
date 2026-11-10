@@ -27,7 +27,7 @@ window.ForecastShipping=(()=>{
   ['Roti Manis Sosis','Roti Sosis','#d6918b',3],['Roti Manis Abon','Roti Abon','#7b95c4',3],['Roti Manis Coklat Meses','Roti Coklat','#8b5e3c',3],['Whip','Whip','#e3a77d',3],
  ];
  const REQ_ROWS=[['Ogura Cheese'],['Ogura Chocolate'],['Malmil Cheese'],['Malmil Choco'],['Mini pcs cheese'],['Mini pcs choco'],['Mini pcs durian'],['Chiffon Keju'],['Chiffon Ekstra Keju'],['Chiffon Lite Keju'],['Chiffon Lite Ekstra Keju'],['Chiffon Butter'],['Roti Manis Sosis'],['Roti Manis Abon'],['Roti Manis Coklat']];
- const REQ_ACCENT='#4f6378';
+ const REQ_ACCENT='#4f6378',FACTORY_ACCENT='#8a6a3b';
  const METHODS=['Diambil ke Pabrik','Diantar oleh Driver'];
  const mix=(hex,to,a)=>{const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),A=p(hex),B=p(to);return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*a).toString(16).padStart(2,'0')).join('');};
  const tint=(h,a)=>mix(h,'#ffffff',a),shade=(h,a)=>mix(h,'#000000',a);
@@ -56,6 +56,8 @@ window.ForecastShipping=(()=>{
   return GROUPS.map(g=>{const cols=g.outlets.map(([id,label])=>{const r=by.get(id),pct=Number.isFinite(P[id])?P[id]:100;return {id,label,pct,record:r,values:ROWS.map(([,src])=>qty(r,src,pct))};});
    const totals=ROWS.map((_,ri)=>sumOf(cols.map(c=>c.values[ri])));return {...g,cols,totals,grand:sumOf(totals),filled:cols.filter(c=>c.record).length};});
  }
+ // Pesanan untuk pabrik (bukan outlet), dari rekap sheet PESANAN (factoryDays, pcs_orders.py).
+ function factory(){const f=window.PcsPanels?.data?.()?.orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===date);const qty=r?r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0):Array(12).fill(0);return {qty,orders:r?.orders||0,partial:!!r?.qty?.some(v=>v===null),total:qty.reduce((a,b)=>a+b,0)};}
  const numCell=v=>v==null?'<td class="fs-nil">—</td>':Number(v)===0?'<td class="fs-zero">0</td>':`<td>${nf(v)}</td>`;
  function render(){
   if(!date)date=shift(today(),1);
@@ -63,12 +65,14 @@ window.ForecastShipping=(()=>{
   const body=g=>CATS.map((cat,ci)=>`<tr class="fs-cat"><td colspan="${g.cols.length+2}">${esc(cat)}</td></tr>${ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${g.cols.map(c=>numCell(c.values[ri])).join('')}${numCell(g.totals[ri]).replace('<td','<td data-tot')}</tr>`).join('')}`).join('');
   const table=g=>`<section class="fs-ship-card" style="--acc:${g.color};--acc-soft:${tint(g.color,.9)};--acc-ink:${shade(g.color,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">${esc(g.name)}</h3><span class="fs-ship-meta">${g.filled}/${g.cols.length} outlet terisi${g.grand!=null?` · ${nf(g.grand)} pcs`:''}</span></header><div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner" rowspan="2">Produk</th>${g.cols.map(c=>`<th class="${c.record?'':'fs-ship-missing'}" title="${c.record?'':'Belum ada rencana tersimpan'}">${esc(c.label)}</th>`).join('')}<th class="fs-ship-totalh" rowspan="2">Total</th></tr><tr class="fs-ship-pctrow">${g.cols.map(c=>`<th><label class="fs-ship-pct"><input type="number" min="0" max="100" step="5" value="${c.pct}" data-ship-pct="${esc(c.id)}" aria-label="Persen pengiriman pertama ${esc(c.label)}"><span>%</span></label></th>`).join('')}</tr></thead><tbody>${body(g)}</tbody></table></div></section>`;
   const reqTable=`<section class="fs-ship-card fs-req-card" style="--acc:${REQ_ACCENT};--acc-soft:${tint(REQ_ACCENT,.9)};--acc-ink:${shade(REQ_ACCENT,.3)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Request tambahan</h3><span class="fs-ship-meta">Pesanan manajemen sebelah · tersimpan di perangkat ini</span></header><div class="fs-ship-wrap"><table class="fs-ship fs-req"><thead><tr><th class="fs-ship-corner">Produk</th>${reqs.map((c,i)=>`<th><div class="fs-req-name"><input type="text" maxlength="40" value="${esc(c.name)}" data-req-name="${i}" placeholder="Nama peminta" aria-label="Nama peminta"><button type="button" class="fs-req-remove" data-req-remove="${i}" aria-label="Hapus kolom" title="Hapus kolom">×</button></div></th>`).join('')}<th class="fs-req-addcell"><button type="button" class="fs-req-add" data-req-add>+ Tambah peminta</button></th></tr></thead><tbody>${REQ_ROWS.map(([label],ri)=>`<tr><td>${esc(label)}</td>${reqs.map((c,i)=>`<td><input type="number" min="0" max="10000" step="1" value="${c.qty?.[ri]??''}" data-req-qty="${i}:${ri}" aria-label="${esc(label)}" placeholder="0"></td>`).join('')}<td></td></tr>`).join('')}<tr class="fs-cat"><td colspan="${reqs.length+2}">Pengambilan / pengiriman</td></tr><tr><td>Waktu</td>${reqs.map((c,i)=>`<td><input type="text" maxlength="30" value="${esc(c.time||'')}" data-req-time="${i}" placeholder="Pukul 09.30"></td>`).join('')}<td></td></tr><tr><td>Cara</td>${reqs.map((c,i)=>`<td><select data-req-method="${i}">${METHODS.map(m=>`<option ${c.method===m?'selected':''}>${m}</option>`).join('')}</select></td>`).join('')}<td></td></tr></tbody></table></div>${reqs.length?'':'<p class="fs-req-empty">Belum ada request. Klik <b>+ Tambah peminta</b> untuk menambah kolom (misalnya Admin Pogung atau Marketing HO).</p>'}</section>`;
+  const f=factory(),fRows=ROWS.map((r,ri)=>[r,ri]).filter(([r])=>typeof r[1]==='number');
+  const factoryCard=`<section class="fs-ship-card fs-factory-card" style="--acc:${FACTORY_ACCENT};--acc-soft:${tint(FACTORY_ACCENT,.9)};--acc-ink:${shade(FACTORY_ACCENT,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Pesanan pabrik</h3><span class="fs-ship-meta">${f?`${f.orders} pesanan · ${nf(f.total)} pcs`:'menunggu sinkron pesanan'} · tidak masuk outlet</span></header>${!f?'<p class="fs-req-empty">Pesanan bertulisan "pabrik" di sheet PESANAN akan tampil di sini setelah sinkron pesanan berikutnya.</p>':!f.total?'<p class="fs-req-empty">Tidak ada pesanan untuk pabrik pada tanggal ini.</p>':`<div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner">Produk</th><th class="fs-ship-totalh">Pabrik</th></tr></thead><tbody>${fRows.filter(([r])=>f.qty[r[1]]>0).map(([[label,src,dot]])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${numCell(f.qty[src]).replace('<td','<td data-tot')}</tr>`).join('')}</tbody></table></div>${f.partial?'<p class="fs-req-empty">Sebagian varian pesanan belum pasti, cek sheet PESANAN.</p>':''}`}</section>`;
   const canShare=!!(navigator.canShare&&navigator.share);
   return `<div class="fs-ship-head"><label class="fs-ship-date">Tanggal kiriman<input type="date" id="fs-ship-date" value="${date}"></label><div class="fs-ship-actions">${canShare?'<button type="button" class="button fp-primary" data-ship-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ship-download>Unduh gambar</button></div></div>
    <p class="fs-ship-sub">${esc(dateLabel(date))} · dari rencana terakhir forecaster (reguler + pesanan). Ubah persen bila pengiriman pertama tidak 100%.</p>
    ${missing.length?`<p class="fs-ship-note"><b>${missing.length} outlet</b> belum punya rencana tersimpan, kolomnya tampil abu-abu: ${esc(missing.join(', '))}.</p>`:''}
-   ${status?`<p class="fs-ship-sub" role="status">${esc(status)}</p>`:''}
-   <div class="fs-ship-list">${groups.map(table).join('')}${reqTable}</div>`;
+   <p class="fs-ship-sub fs-ship-status" role="status" ${status?'':'hidden'}>${esc(status)}</p>
+   <div class="fs-ship-list">${groups.map(table).join('')}${factoryCard}${reqTable}</div>`;
  }
  // ---- Gambar (canvas) ----
  function drawTable({title,accent,colLabels,subLabels,sections,showTotal}){
@@ -116,6 +120,8 @@ window.ForecastShipping=(()=>{
   const by=plans(),groups=groupData(by),out=[];
   for(const g of groups)out.push({name:`Pengiriman ${g.name} ${date}.png`,canvas:drawTable({title:`Pengiriman Pertama · ${g.name}`,accent:g.color,showTotal:true,colLabels:g.cols.map(c=>c.label),subLabels:g.cols.map(c=>c.record?c.pct+'%':'belum ada'),
    sections:CATS.map((cat,ci)=>({title:cat,rows:ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>({label,dot,values:g.cols.map(c=>c.values[ri]),total:g.totals[ri]}))}))})});
+  const f=factory();
+  if(f&&f.total){const rows=ROWS.filter(r=>typeof r[1]==='number'&&f.qty[r[1]]>0).map(([label,src,dot])=>({label,dot,values:[f.qty[src]],total:null}));out.push({name:`Pesanan Pabrik ${date}.png`,canvas:drawTable({title:'Pesanan Pabrik',accent:FACTORY_ACCENT,showTotal:false,colLabels:['Pabrik'],sections:[{rows}]})});}
   const reqs=requests().filter(c=>c.name||c.qty?.some(v=>v!==''&&v!=null));
   if(reqs.length){
    const rows=REQ_ROWS.map(([label],ri)=>{const values=reqs.map(c=>{const v=c.qty?.[ri];return v===''||v==null||Number(v)===0?'':String(Number(v));});return {label,values,total:values.some(v=>v!=='')?values.reduce((a,v)=>a+(Number(v)||0),0):''};});
@@ -126,16 +132,23 @@ window.ForecastShipping=(()=>{
  }
  const wrap=s=>{const w=String(s).split(' ');if(w.length<3)return s;const h=Math.ceil(w.length/2);return w.slice(0,h).join(' ')+'\n'+w.slice(h).join(' ');};
  const toBlob=cv=>new Promise(r=>cv.toBlob(r,'image/png'));
+ // Status diperbarui di tempat, tanpa render ulang seluruh halaman (dulu render ulang setelah
+ // unduh membuat tabel lebar meloncat ke awal = terlihat berkedip). Semua gambar dibuat dulu,
+ // baru diunduh berurutan, supaya tidak ada jeda berat di antara unduhan.
+ function say(t){status=t;const el=document.querySelector('.fs-ship-status');if(el){el.textContent=t;el.hidden=!t;}}
+ let busy=false;
  async function download(){
-  const imgs=images();
-  for(const im of imgs){const b=await toBlob(im.canvas),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=im.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000);await new Promise(r=>setTimeout(r,300));}
-  status=`${imgs.length} gambar diunduh.`;rerender();
+  if(busy)return;busy=true;say('Menyiapkan gambar…');
+  try{const imgs=images(),blobs=[];for(const im of imgs)blobs.push({name:im.name,blob:await toBlob(im.canvas)});
+   for(const {name,blob} of blobs){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);await new Promise(r=>setTimeout(r,250));}
+   say(`${blobs.length} gambar diunduh: ${blobs.map(b=>b.name.replace(/ \d{4}-\d{2}-\d{2}\.png$/,'')).join(', ')}.`);}
+  catch(e){say('Gagal membuat gambar: '+e.message);}
+  busy=false;
  }
  async function share(){
   const imgs=images(),files=[];for(const im of imgs)files.push(new File([await toBlob(im.canvas)],im.name,{type:'image/png'}));
-  try{if(navigator.canShare({files})){await navigator.share({files,title:'Rincian pengiriman '+date});status='Dibagikan.';}else{status='Perangkat ini tidak bisa membagikan gambar langsung; gunakan Unduh gambar.';}}
-  catch(e){if(e.name!=='AbortError')status='Gagal membagikan: '+e.message;}
-  rerender();
+  try{if(navigator.canShare({files})){await navigator.share({files,title:'Rincian pengiriman '+date});say('Dibagikan.');}else{say('Perangkat ini tidak bisa membagikan gambar langsung; gunakan Unduh gambar.');}}
+  catch(e){if(e.name!=='AbortError')say('Gagal membagikan: '+e.message);}
  }
  const rerender=()=>window.dispatchEvent(new Event('forecast-operations-changed'));
  function updateReq(fn){const r=requests();fn(r);save(reqKey(),r);}
