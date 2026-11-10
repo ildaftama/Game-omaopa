@@ -37,7 +37,8 @@ window.ForecastSettings=(()=>{
  const SUPPORT_VIEWS=[['blind','Uji akurasi PCS'],['projection','Proyeksi bulanan'],['pcs','Penjualan PCS'],['orders','Pesanan'],['reference','Tren omzet & evaluasi'],['products','Produk & laba'],['events','Kegiatan & omzet'],['summary','Profil outlet'],['swot','SWOT'],['area','Sekitar outlet'],['access','Akses tim']];
  const merge=(base,over)=>Object.fromEntries(Object.entries(base).map(([k,v])=>[k,{...v,...(over?.[k]||{})}]));
  function get(){return merge(DEFAULTS,window.DATA_SOURCES?.preferences);}
- const canEdit=()=>!!window.ForecastRolePolicy?.manager(window.ForecastAuth?.role);
+ // Hanya akun Master (owner, 2026-11-10) -- Admin Utama pun hanya bisa melihat.
+ const canEdit=()=>window.ForecastAuth?.role?.master===true;
  let section='sources',status='';
  function sourceCard(s,dis){
   const info=SOURCE_INFO[s.key]||{use:'',sync:'Diperbarui manual'},vals={...(info.defaults||{}),...s};
@@ -58,7 +59,7 @@ window.ForecastSettings=(()=>{
   else if(section==='thresholds')body=`<article class="workspace-card"><div class="fs-num-grid">${THRESHOLD_FIELDS.map(f=>numberField(f,'thresholds',p.thresholds[f[0]],dis)).join('')}</div></article>`;
   else if(section==='display')body=`<article class="workspace-card"><p class="fs-use">Kartu yang tampil di Dashboard. Berlaku untuk seluruh tim.</p><div class="fs-checks">${DISPLAY_FIELDS.map(([k,l])=>`<label class="fs-check"><input type="checkbox" data-pref="display:${k}" ${p.display[k]?'checked':''} ${dis}><span>${esc(l)}</span></label>`).join('')}</div></article>`;
   else body=`<article class="workspace-card"><p class="fs-use">Data rinci & analisa pendukung. Pilih untuk membuka.</p><div class="fs-support">${SUPPORT_VIEWS.map(([k,l])=>`<button type="button" class="fs-support-btn" data-support-view="${k}">${esc(l)}<span>→</span></button>`).join('')}</div></article>`;
-  const actions=section==='support'?'':canEdit()?`<div class="fs-actions"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status)}</span></div>`:`<p class="workspace-note">Hanya Admin Utama atau Master yang dapat mengubah pengaturan.</p>`;
+  const actions=section==='support'?'':canEdit()?`<div class="fs-actions"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status)}</span></div>`:`<p class="fs-lock">🔒 Pengaturan dikunci. Hanya akun Master yang dapat mengubahnya.</p>`;
   return `<div class="focus-intro"><h2>Pengaturan</h2><span>Berlaku untuk seluruh tim</span></div><div class="fs-tabs">${tabs}</div><form id="forecast-settings-form" novalidate>${body}${actions}</form>`;
  }
  function collect(form){

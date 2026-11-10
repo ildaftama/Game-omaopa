@@ -814,12 +814,6 @@ window.ForecastDashboard=(()=>{
   return '';
  }
  function srcTag(src){return src==='kirim'?'dikirim vs laku':'';}
- function wasteLostFlag(r,kind){
-  const icon=kind==='both'?'⚠️':kind==='waste'?'🗑️':'⏳';
-  const text=kind==='lost'?lostSentence(r):kind==='waste'?wasteSentence(r):`${wasteSentence(r)} ${lostSentence(r)}`;
-  const tag=[srcTag(r.wasteSrc),kind!=='waste'?srcTag(r.lostSrc):''].filter(Boolean)[0];
-  return `<button type="button" class="fd-trend-flag fd-trend-down" data-outlet-detail="${esc(r.id)}"><b>${icon} ${esc(r.name)}</b><span>${text} ${adviceText(r)}${tag?` <i class="fd-wl-src">(${tag})</i>`:''}</span></button>`;
- }
  function wasteLostTable(list){
   const cell=(v,over,extra)=>`<td class="${v==null?'fd-wl-stale':over?'fd-wl-bad':'fd-wl-good'}">${pct1(v)}${extra||''}</td>`;
   const rows=list.slice().sort((a,b)=>(b.wastePct??-1)-(a.wastePct??-1)).map(r=>`<tr><td><button type="button" class="fd-wl-link" data-outlet-detail="${esc(r.id)}">${esc(r.name)}</button></td>${cell(r.wastePct,r.wasteOver)}${cell(r.lostPct,r.lostOver,r.lostPerDay!=null?` <small>${Math.round(r.lostPerDay)} mnt</small>`:'')}</tr>`).join('');
@@ -837,7 +831,6 @@ window.ForecastDashboard=(()=>{
    return `<article class="workspace-card fd-wl-card ${r.wasteOver||r.lostOver?'fd-waste-warning':'fd-wl-ok'}">${label}<p class="fd-wl-summary">${lines}${advice?` <b>${advice}</b>`:''}</p></article>`;
   }
   const wOver=s.list.filter(r=>r.wasteOver).sort((a,b)=>b.wastePct-a.wastePct),lOver=s.list.filter(r=>r.lostOver).sort((a,b)=>b.lostPct-a.lostPct);
-  const both=wOver.filter(r=>r.lostOver);
   const tile=(big,small,tone)=>`<div class="fd-overview-stat${tone?' fd-overview-'+tone:''}"><b>${big}</b><span>${small}</span></div>`;
   const tiles=[
    s.net.wastePct!=null?tile(pct1(s.net.wastePct),'waste jaringan',s.net.wastePct>WASTE_THRESHOLD?'down':'up'):'',
@@ -852,14 +845,28 @@ window.ForecastDashboard=(()=>{
   }
   if(lOver.length)sentences.push(`${lOver.length} outlet sering kehabisan stok, terutama ${nameList(lOver.slice(0,2).map(r=>r.name))}.`);
   else if(s.net.lostPerDay!=null)sentences.push('Lost sales semua outlet masih dalam batas wajar.');
-  if(both.length)sentences.push(`${nameList(both.map(r=>r.name),2)} mengalami keduanya — sisa tinggi namun stok juga sering habis, perlu peninjauan komposisi produk.`);
-  const groups=[];
-  const wOnly=wOver.filter(r=>!r.lostOver).slice(0,3),lOnly=lOver.filter(r=>!r.wasteOver).slice(0,3);
-  if(both.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Waste tinggi &amp; sering kehabisan</span><div class="fd-trend-grid">${both.slice(0,3).map(r=>wasteLostFlag(r,'both')).join('')}</div></div>`);
-  if(wOnly.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Waste paling tinggi</span><div class="fd-trend-grid">${wOnly.map(r=>wasteLostFlag(r,'waste')).join('')}</div></div>`);
-  if(lOnly.length)groups.push(`<div class="fd-trend-group"><span class="fd-trend-group-title">Paling sering kehabisan</span><div class="fd-trend-grid">${lOnly.map(r=>wasteLostFlag(r,'lost')).join('')}</div></div>`);
+  // Tabel "perlu perhatian" menggantikan 3 kelompok kartu berkalimat panjang (owner: kurang
+  // rapi). Satu baris per outlet: angka, status, dan saran singkat; penjelasan lengkap tetap
+  // ada di dialog outlet (klik nama).
+  const prio=r=>(r.wasteOver&&r.lostOver?0:r.wasteOver?1:2);
+  const sev=r=>(r.wastePct??0)/WASTE_THRESHOLD+(r.lostPct??0)/LOST_SALES_THRESHOLD;
+  const attention=s.list.filter(r=>r.wasteOver||r.lostOver).sort((x,y)=>prio(x)-prio(y)||sev(y)-sev(x));
+  const status=r=>r.wasteOver&&r.lostOver?['both','Waste tinggi & sering habis']:r.wasteOver?['waste','Waste tinggi']:['lost','Sering habis'];
+  const shortAdvice=r=>{
+   const prod=r.topCore!=null?CORE_SHORT[r.topCore]:'kiriman';
+   if(r.wasteOver&&r.lostOver)return 'Sesuaikan komposisi produk';
+   if(r.wasteOver&&r.omzetPct!=null&&r.omzetPct>=OMZET_HL)return `Tahan ${prod}, omzet sedang naik`;
+   if(r.wasteOver)return `Kurangi ${prod}`;
+   return r.wastePct!=null&&r.wastePct<WASTE_THRESHOLD*.6?'Tambah kiriman':'Tambah bertahap';
+  };
+  const cell=(v,over,txt)=>`<td class="${v==null?'fd-wl-stale':over?'fd-wl-bad':'fd-wl-good'}">${txt}</td>`;
+  const row=r=>{const [k,l]=status(r);return `<tr><td><button type="button" class="fd-wl-link" data-outlet-detail="${esc(r.id)}">${esc(r.name)}</button></td>${cell(r.wastePct,r.wasteOver,pct1(r.wastePct))}${cell(r.lostPerDay,r.lostOver,r.lostPerDay!=null?Math.round(r.lostPerDay)+' mnt':'—')}<td><span class="fd-wl-pill ${k}">${l}</span></td><td class="fd-wl-advice">${esc(shortAdvice(r))}</td></tr>`;};
+  const head='<thead><tr><th>Outlet</th><th>Waste</th><th>Habis stok/hari</th><th>Status</th><th>Saran</th></tr></thead>';
+  const TOP=8,top=attention.slice(0,TOP),rest=attention.slice(TOP);
+  const tableHtml=list=>`<div class="fd-outlet-table-wrap"><table class="fd-outlet-table fd-wl-table fd-wl-attn">${head}<tbody>${list.map(row).join('')}</tbody></table></div>`;
+  const table=attention.length?`<span class="fd-trend-group-title">Perlu perhatian · klik nama untuk rincian</span>${tableHtml(top)}${rest.length?`<details class="fd-trend-full"><summary>Lihat ${rest.length} outlet lain yang perlu perhatian</summary>${tableHtml(rest)}</details>`:''}`:'';
   const alarm=wOver.length||lOver.length;
-  return `<article class="workspace-card fd-wl-card ${alarm?'fd-waste-warning':'fd-wl-ok'}">${label}<div class="fd-overview">${tiles}</div>${sentences.length?`<p class="fd-wl-summary">${sentences.join(' ')}</p>`:''}${groups.join('')}${wasteLostTable(s.list)}</article>`;
+  return `<article class="workspace-card fd-wl-card ${alarm?'fd-waste-warning':'fd-wl-ok'}">${label}<div class="fd-overview">${tiles}</div>${sentences.length?`<p class="fd-wl-summary">${sentences.join(' ')}</p>`:''}${table}${wasteLostTable(s.list)}</article>`;
  }
 
  // Pemetaan outlet -> area tim forecaster (3 area operasional sesuai pembagian wilayah owner,
@@ -1119,24 +1126,45 @@ window.ForecastDashboard=(()=>{
  function accuracyCard(trend,outletId){
   const days=trend.rows.filter(r=>r.date.startsWith(trend.ym)&&trend.lastActual&&r.date<=trend.lastActual&&r.actualTotal!=null&&r.forecastTotal!=null);
   if(!days.length)return '';
-  const A=days.reduce((s,r)=>s+r.actualTotal,0),F=days.reduce((s,r)=>s+r.forecastTotal,0),E=days.reduce((s,r)=>s+Math.abs(r.forecastTotal-r.actualTotal),0);
-  const acc=Math.max(0,100-E/A*100),bias=(F-A)/A*100,hit=days.filter(r=>Math.abs(r.forecastTotal-r.actualTotal)/r.actualTotal<=.1).length;
-  let team=null;
+  const rows=[];
+  // 1) Prediksi sistem: versi H-1 yang dibekukan vs omzet real (semua produk, termasuk pesanan).
+  {const A=days.reduce((s,r)=>s+r.actualTotal,0),F=days.reduce((s,r)=>s+r.forecastTotal,0),E=days.reduce((s,r)=>s+Math.abs(r.forecastTotal-r.actualTotal),0);
+   rows.push({label:'Prediksi sistem',sub:`${days.length} hari`,acc:Math.max(0,100-E/A*100),bias:(F-A)/A*100,F,A,verb:'kiriman dari angka prediksi'});}
+  // 2) & 3) Forecaster, dalam RUPIAH (owner, 2026-11-10) supaya sebanding dengan prediksi sistem:
+  // per SKU inti, |rencana - laku reguler| x harga yang tersimpan di rencana itu. "Rencana awal" =
+  // baseline yang diisi malam sebelumnya (tidak bisa diubah setelah tahu hasil); "Pengiriman real" =
+  // jumlah yang benar2 dikirim setelah penyesuaian produksi (gagal/kelebihan produksi).
   const cloud=window.ForecastPlanCloud,panels=window.PcsPanels.data(),planner=window.ForecastPlanner;
   if(cloud?.state==='ready'&&panels.sales&&panels.orders){
-   const valid=(cloud.records||[]).filter(r=>r.date.startsWith(trend.ym)&&r.date<=trend.lastActual&&(outletId==='__all__'||r.outlet===outletId)).map(r=>planner.compare(r,panels.sales,panels.orders)).filter(c=>c.eligible&&c.complete);
-   const act=valid.reduce((s,c)=>s+c.actual,0);
-   if(valid.length&&act)team={acc:Math.max(0,100-valid.reduce((s,c)=>s+c.absolute,0)/act*100),n:valid.length};
+   const plan={F:0,A:0,E:0,n:0},ship={F:0,A:0,E:0,n:0};
+   for(const r of cloud.records||[]){
+    if(!r.date.startsWith(trend.ym)||r.date>trend.lastActual||(outletId!=='__all__'&&r.outlet!==outletId))continue;
+    const fc=fulfillmentFor(r.key),shipped=!fc.loading&&fc.data?fc.data.shipped:null;
+    const c=planner.compare(r,panels.sales,panels.orders,shipped);if(!c.eligible||!c.complete)continue;
+    const price=p=>Number(r.baseline.prices?.[p]?.value)||0;
+    let pf=0,pa=0,pe=0,sf=0,se=0;
+    for(const row of c.rows){const v=price(row.p);pf+=row.planned*v;pa+=row.actual*v;pe+=Math.abs(row.planned-row.actual)*v;if(c.hasShipped){sf+=row.shipped*v;se+=Math.abs(row.shipped-row.actual)*v;}}
+    if(!(pa>0))continue;
+    plan.F+=pf;plan.A+=pa;plan.E+=pe;plan.n++;
+    if(c.hasShipped){ship.F+=sf;ship.A+=pa;ship.E+=se;ship.n++;}
+   }
+   const add=(o,label,verb,empty)=>rows.push(o.n&&o.A>0?{label,sub:`${o.n} rencana`,acc:Math.max(0,100-o.E/o.A*100),bias:(o.F-o.A)/o.A*100,F:o.F,A:o.A,verb}:{label,empty});
+   add(plan,'Rencana forecaster (awal)','rencana','Belum ada rencana bulan ini');
+   add(ship,'Pengiriman real','kiriman','Jumlah kiriman real belum dicatat');
   }
   const month=months[Number(trend.ym.slice(5,7))-1];
-  const tone=v=>v>=90?'up':v>=80?'':'down';
-  const tile=(big,small,cls)=>`<div class="fd-overview-stat${cls?' fd-overview-'+cls:''}"><b>${big}</b><span>${small}</span></div>`;
-  return `<article class="workspace-card fd-accuracy"><span class="micro-label">AKURASI ${month.toUpperCase()} · ${dateRange(days[0].date,days.at(-1).date).toUpperCase()}</span><div class="fd-overview">
-   ${tile(pct1(acc),'akurasi prediksi harian',tone(acc))}
-   ${tile((bias>=0?'+':'')+pct1(bias),'selisih total vs real',Math.abs(bias)<=3?'up':Math.abs(bias)<=8?'':'down')}
-   ${tile(`${hit}/${days.length}`,'hari meleset ≤10%',hit/days.length>=.7?'up':'')}
-   ${team?tile(pct1(team.acc),`akurasi rencana tim (${team.n} rencana)`,tone(team.acc)):''}
-  </div><p class="fd-accuracy-note">Prediksi ${moneyBig(F)} · real ${moneyBig(A)}</p></article>`;
+  const tone=v=>v>=90?'good':v>=80?'mid':'bad';
+  const sign=v=>(v>=0?'+':'')+pct1(v);
+  const line=r=>r.empty?`<tr class="fd-acc-empty"><td><b>${esc(r.label)}</b></td><td colspan="3">${esc(r.empty)}</td></tr>`
+   :`<tr><td><b>${esc(r.label)}</b><small>${esc(r.sub)}</small></td><td><span class="fd-acc-pill ${tone(r.acc)}">${pct1(r.acc)}</span></td><td class="${Math.abs(r.bias)>=3?'fd-acc-warnc':''}">${sign(r.bias)}</td><td>${moneyBig(r.F)} <span class="fd-acc-vs">vs</span> ${moneyBig(r.A)}</td></tr>`;
+  // Peringatan arah (owner): selisih total >=3% -> sarankan koreksi sebesar selisihnya.
+  const warns=rows.filter(r=>!r.empty&&Math.abs(r.bias)>=3).map(r=>{
+   const up=r.bias>0,k=Math.round(Math.abs(r.bias));
+   return `<li class="${up?'over':'under'}"><b>${esc(r.label)}</b> cenderung ${pct1(Math.abs(r.bias))} ${up?'di atas':'di bawah'} real (${moneyBig(r.F)} vs ${moneyBig(r.A)}). ${up?'Kurangi':'Tambah'} ${esc(r.verb)} sekitar ${k}% ${up?'agar waste tidak menumpuk':'agar tidak kehabisan stok'}.</li>`;
+  });
+  return `<article class="workspace-card fd-accuracy"><span class="micro-label">AKURASI ${month.toUpperCase()} · ${dateRange(days[0].date,days.at(-1).date).toUpperCase()} · DALAM RUPIAH</span>
+   <div class="fd-outlet-table-wrap"><table class="fd-acc-table"><thead><tr><th></th><th>Akurasi</th><th>Selisih total</th><th>Rencana vs real</th></tr></thead><tbody>${rows.map(line).join('')}</tbody></table></div>
+   ${warns.length?`<ul class="fd-acc-warn">${warns.join('')}</ul>`:`<p class="fd-accuracy-note">Semua masih dalam selisih ±3% dari real.</p>`}</article>`;
  }
  function render(outletId){
   applySettings();

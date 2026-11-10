@@ -35,9 +35,16 @@ match /forecastAccess/{uid} {
 // Tempatkan match ini SEBELUM/terpisah dari match /settings/{id} yang sudah ada, dan jangan
 // hapus match /settings/{id} itu sendiri. Pertahankan juga pembungkus notRadarSyncAccount()
 // yang sudah dipakai pada seluruh rule lain di rules penuh.
+// 2026-11-10 (owner): Pengaturan Forecast hanya boleh diubah akun MASTER -- Admin Utama pun
+// hanya bisa membaca, supaya website tidak sembarangan diubah.
+function forecastMaster() {
+  return request.auth != null
+    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+    && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true;
+}
 match /settings/forecastSources {
   allow read: if notRadarSyncAccount() && (true);
-  allow write: if notRadarSyncAccount() && (forecastManager());
+  allow write: if notRadarSyncAccount() && (forecastMaster());
 }
 function forecastReference(d, key) {
   return forecastManager() && d.schemaVersion == 2
