@@ -51,7 +51,17 @@ window.ForecastTopdown=(()=>{
   cache={key,ids,outlets,B,pred,groups:groups(ids)};return cache;
  }
  const record=id=>cloud().records.find(r=>r.date===date&&r.outlet===id);
- function allocate(target){const c=compute(),k=c.B>0?target/c.B:0,cells={};for(const [id,o] of c.outlets)cells[id]=o.base.map(q=>String(Math.max(0,Math.round(q*k))));return cells;}
+ // Pembulatan "sisa terbesar": semua dibulatkan ke bawah dulu, lalu PCS ditambahkan satu per
+ // satu ke sel dengan pecahan terbesar sampai omzet hasil bagi mendekati target (selisih kurang
+ // dari harga 1 PCS) -- pembulatan biasa bisa meleset ratusan ribu rupiah di 28 outlet x 12 produk.
+ function allocate(target){
+  const c=compute(),k=c.B>0?target/c.B:0,cells={},frac=[];let val=0;
+  for(const [id,o] of c.outlets){cells[id]=o.base.map((q,p)=>{const raw=Math.max(0,q*k),fl=Math.floor(raw),pr=o.prices[p].value||0;val+=fl*pr;if(pr>0&&raw-fl>0)frac.push({id,p,f:raw-fl,pr});return fl;});}
+  frac.sort((a,b)=>b.f-a.f);
+  for(const x of frac){if(val+x.pr/2>target)continue;cells[x.id][x.p]++;val+=x.pr;}
+  for(const id in cells)cells[id]=cells[id].map(String);
+  return cells;
+ }
  function prepare(){
   if(!date){const t=model.shift(today(),1);date=t;}
   cloud().watch?.(date,date);
@@ -87,7 +97,7 @@ window.ForecastTopdown=(()=>{
      <button type="button" class="button fp-primary" data-ft-allocate>Bagi otomatis ke outlet & produk</button>
     </div>
    </div>
-   <p class="ft-sub">${esc(dateLabel(date))} · ${diff==null?'':`Target ${diff>=0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi · `}porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir. Kotak berwarna = sudah diubah dari hasil bagi otomatis.</p>
+   <p class="ft-sub">${esc(dateLabel(date))} · ${diff==null?'':Math.abs(diff)<.05?'Target sesuai prediksi · ':`Target ${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi · `}porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir. Kotak berwarna = sudah diubah dari hasil bagi otomatis.</p>
    <div class="ft-summary">
     <div><span>Omzet hasil bagi</span><strong data-ft-total-val>${rp(t.val)}</strong></div>
     <div><span>Total reguler</span><strong data-ft-total-pcs>${nf(t.pcs)} pcs</strong></div>
