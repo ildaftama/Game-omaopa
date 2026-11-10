@@ -459,3 +459,18 @@
 .fh-pointer{margin-top:10px}
 .fp-link-inline{border:0;background:none;padding:0;color:#1f5567;font:inherit;font-weight:600;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 @media (max-width:820px){.fh-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.fh-item{grid-template-columns:48px 1fr}.fh-body{grid-column:1 / -1}}
+/* Riwayat per sesi */
+.fh-item{display:block!important;padding:0!important}
+.fh-row{all:unset;box-sizing:border-box;width:100%;display:grid;grid-template-columns:96px 80px 1fr 16px;gap:10px;align-items:start;padding:11px 14px;cursor:pointer;font-size:13px;color:#24323f}
+.fh-row:hover{background:#f8fafb}
+.fh-row:focus-visible{outline:2px solid #2e6f86;outline-offset:-2px}
+.fh-item.open>.fh-row{background:#f4f8fa}
+.fh-item.late>.fh-row{background:#fdf6f3}
+.fh-row .fh-body{display:grid;gap:4px}
+.fh-caret{color:#8592a0;font-size:11px;padding-top:3px}
+.fh-detail{padding:4px 14px 14px;background:#f9fbfc;border-top:1px solid #edf1f4;overflow-x:auto}
+.fh-detail .fp-table{background:#fff}
+.fh-detail small{display:block;font-size:10.5px}
+.fh-vrow>td{background:#f4f7f9!important;padding:8px!important}
+.fh-late-row td{background:#fdf6f3}
+@media (max-width:820px){.fh-row{grid-template-columns:auto auto 1fr 14px}.fh-row .fh-body{grid-column:1 / -1;grid-row:2}}
