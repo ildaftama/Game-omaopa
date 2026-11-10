@@ -489,3 +489,5 @@
 .fp-day-box{padding:10px 12px 14px;display:grid;gap:8px}
 .fp-day-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:#4d5d6c}
 .fp-day-box .fp-table{background:#fff}
+.fp-step{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;margin-right:6px;border-radius:50%;background:#e4ebf0;color:#3d5566;font-size:10.5px;font-weight:700;vertical-align:1px}
+.fp-subnav button[aria-pressed="true"] .fp-step{background:#fff;color:#1f3a4d}

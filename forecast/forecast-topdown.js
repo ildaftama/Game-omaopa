@@ -202,7 +202,7 @@ window.ForecastTopdown=(()=>{
    ${factoryBlock()}
    ${date<=today()?'<p class="fs-ship-note">Tanggal ini sudah berjalan/berlalu. Rencana yang disimpan sekarang tidak dihitung sebagai forecast sebelum penjualan.</p>':''}
    <div class="ft-table-wrap"><table class="ft-table">${head}<tbody>${body}</tbody></table></div>
-   <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN?'disabled':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button></span></div>
+   <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
    <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}. Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>
   </div>`;
  }
@@ -221,7 +221,7 @@ window.ForecastTopdown=(()=>{
  function pendingInfo(c){const ids=c.ids.filter(x=>statusOf(x)[0]!=='saved'),areas=c.groups.map(g=>[g.name,g.ids.filter(id=>ids.includes(id)).length]).filter(([,n])=>n);return {n:ids.length,areas:areas.map(([a,n])=>`${a} ${n}`).join(', ')};}
  const saveText=i=>i.n?`Simpan ${i.n} outlet ke tim`:'Semua outlet tersimpan';
  const pendingMsg=i=>i.n?`${i.n} outlet belum tersimpan / berubah (${i.areas}). Teliti angkanya, lalu simpan.`:'Semua outlet sudah tersimpan sesuai angka di tabel.';
- function saveLabel(){const c=compute(),i=pendingInfo(c),btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!i.n;btn.textContent=saveText(i);btn.title=i.n?`Per area: ${i.areas}`:'';}const m=q('.ft-msg');if(m&&!message)m.textContent=pendingMsg(i);}
+ function saveLabel(){const c=compute(),i=pendingInfo(c),btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!i.n;btn.textContent=saveText(i);btn.title=i.n?`Per area: ${i.areas}`:'';const any=c.ids.some(x=>record(x));btn.hidden=!i.n&&any;const nx=q('[data-ft-next]');if(nx)nx.hidden=!!i.n||!any;}const m=q('.ft-msg');if(m&&!message)m.textContent=pendingMsg(i);}
  function refreshTotals(id){
   const c=compute(),tt=outletTotals(c,id),t=totals(c),E=CSS.escape(id);
   const v=q(`[data-ft-val="${E}"]`);if(v)v.textContent=rp(tt.val);
