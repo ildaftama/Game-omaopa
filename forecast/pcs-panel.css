@@ -195,7 +195,8 @@
 .fd-acc-pill.good{background:#e4f4ea;color:#1f6b45}.fd-acc-pill.mid{background:#fff3d6;color:#8a5a0f}.fd-acc-pill.bad{background:#fdeceb;color:#a4302a}
 .fd-acc-warnc{color:#a0620f;font-weight:700}
 .fd-acc-vs{color:#8a97a3;font-size:11px}
-.fd-acc-empty td{color:#8a97a3;font-size:12px}
+.fd-acc-empty td{color:#8a97a3;font-size:12px;white-space:normal}
+@media(max-width:550px){.fd-acc-table{font-size:11.5px}.fd-acc-table td,.fd-acc-table th{padding:7px 6px}.fd-acc-table td:first-child{min-width:96px}}
 .fd-acc-warn{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .fd-acc-warn li{font-size:12.5px;line-height:1.5;padding:8px 12px;border-radius:8px;color:#33475a}
 .fd-acc-warn li.over{background:#fff3e8;border-left:3px solid #d9822b}
