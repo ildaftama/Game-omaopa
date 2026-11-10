@@ -45,24 +45,43 @@ window.ForecastSettings=(()=>{
  const canEdit=()=>!!window.ForecastRolePolicy?.planner?.(window.ForecastAuth?.role);
  let section='sources',status='',prod=null;
  const P=()=>window.ForecastProducts;
- // Draft daftar produk selama tab Produk dibuka (tambah/hapus baris tanpa kehilangan ketikan).
- function prodDraft(){if(!prod){const c=P().core(),x=P().extra();prod={core:c.map(r=>({label:r.label,ship:r.ship})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name}))};}return prod;}
+ // Tab Produk (desain ulang 2026-11-10): produk dikelompokkan per kategori seperti urutan di
+ // rincian kirim; tambah lewat form khusus; hapus = ditandai dulu (bisa dibatalkan) sampai
+ // disimpan; ada penanda "belum disimpan". Draft disimpan di memori selama tab dibuka.
+ let prodBase='',newCat=3;
+ function prodDraft(){if(!prod){const c=P().core(),x=P().extra();prod={core:c.map(r=>({label:r.label,ship:r.ship})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false}))};prodBase=JSON.stringify(prod);}return prod;}
+ const prodDirty=()=>!!prod&&JSON.stringify(prod)!==prodBase;
  function syncProd(form){if(!prod||!form)return;
   form.querySelectorAll('[data-prod-core-label]').forEach(el=>{prod.core[+el.dataset.prodCoreLabel].label=el.value;});
   form.querySelectorAll('[data-prod-core-ship]').forEach(el=>{prod.core[+el.dataset.prodCoreShip].ship=el.checked;});
   form.querySelectorAll('[data-prod-x-name]').forEach(el=>{prod.extra[+el.dataset.prodXName].name=el.value;});
   form.querySelectorAll('[data-prod-x-cat]').forEach(el=>{prod.extra[+el.dataset.prodXCat].cat=Number(el.value);});}
- function productsBody(dis){const d=prodDraft(),C=P().CATS,base=P().DEFAULTS.core;
-  return `<article class="workspace-card"><h3 class="fs-h3">Produk lain</h3><p class="fs-use">Tampil sebagai kolom di halaman Dari omzet, baris di Detail outlet, dan baris di Rincian kirim. Ganti nama aman: rencana lama dengan nama lama tetap terbaca. Menghapus produk dari daftar tidak menghapus angka di rencana yang sudah disimpan.</p>
-   <div class="fs-prod-list">${d.extra.map((x,i)=>`<div class="fs-prod-row"><input type="text" maxlength="60" data-prod-x-name="${i}" value="${esc(x.name)}" placeholder="Nama produk" aria-label="Nama produk" ${dis}><select data-prod-x-cat="${i}" aria-label="Kategori" ${dis}>${C.map((c,ci)=>`<option value="${ci}" ${x.cat===ci?'selected':''}>${esc(c)}</option>`).join('')}</select>${x.orig&&x.orig!==x.name.trim()&&x.name.trim()?`<small>dulu: ${esc(x.orig)}</small>`:''}${dis?'':`<button type="button" class="button quiet" data-prod-x-del="${i}">Hapus</button>`}</div>`).join('')||'<p class="fs-use">Belum ada produk lain.</p>'}</div>
-   ${dis?'':'<button type="button" class="button" data-prod-x-add>+ Tambah produk</button>'}</article>
-   <article class="workspace-card"><h3 class="fs-h3">12 produk inti</h3><p class="fs-use">Dikunci oleh mesin rekomendasi, jadi tidak bisa dihapus. Yang bisa diatur: nama di rincian kirim/gambar WA dan apakah ikut tampil di rincian kirim.</p>
-   <div class="fs-prod-list">${d.core.map((c,p)=>`<div class="fs-prod-row"><input type="text" maxlength="60" data-prod-core-label="${p}" value="${esc(c.label)}" placeholder="${esc(base[p].label)}" aria-label="Nama tampil ${esc(base[p].label)}" ${dis}><label class="fs-check"><input type="checkbox" data-prod-core-ship="${p}" ${c.ship?'checked':''} ${dis}><span>Tampil di rincian kirim</span></label><small>${esc(window.ForecastPlanner?.names?.[p]||'')}</small></div>`).join('')}</div></article>`;}
+ function productsBody(dis){
+  const d=prodDraft(),C=P().CATS,base=P().DEFAULTS.core,core=P().core(),active=d.extra.filter(x=>!x.removed).length;
+  const catSel=(attr,val)=>`<select ${attr} ${dis} aria-label="Kategori">${C.map((c,ci)=>`<option value="${ci}" ${val===ci?'selected':''}>${esc(c)}</option>`).join('')}</select>`;
+  const xRow=(x,i)=>{const renamed=x.orig&&x.name.trim()&&x.orig!==x.name.trim(),isNew=!x.orig;
+   if(x.removed)return `<div class="fsp-row removed"><span class="fsp-dot"></span><div class="fsp-main"><b>${esc(x.orig||x.name)}</b><small>Akan dihapus dari daftar saat disimpan. Angka di rencana lama tetap aman.</small></div><button type="button" class="fsp-link" data-prod-x-undo="${i}">Batalkan</button></div>`;
+   return `<div class="fsp-row ${isNew?'new':''}"><span class="fsp-dot" style="background:${P().extra()[i]?.dot||'#c9b9a4'}"></span><div class="fsp-main"><input type="text" maxlength="60" data-prod-x-name="${i}" value="${esc(x.name)}" placeholder="Nama produk" aria-label="Nama produk" ${dis}>${isNew?'<small class="fsp-tag">Baru</small>':renamed?`<small class="fsp-tag">Ganti nama dari "${esc(x.orig)}" · rencana lama tetap terbaca</small>`:''}</div>${catSel(`data-prod-x-cat="${i}"`,x.cat)}${dis?'':`<button type="button" class="fsp-icon" data-prod-x-del="${i}" title="Hapus produk" aria-label="Hapus ${esc(x.name||'produk')}">✕</button>`}</div>`;};
+  const groups=C.map((cat,ci)=>{const rows=d.extra.map((x,i)=>[x,i]).filter(([x])=>x.cat===ci);return rows.length?`<div class="fsp-group"><div class="fsp-ghead">${esc(cat)}<span>${rows.length}</span></div>${rows.map(([x,i])=>xRow(x,i)).join('')}</div>`:'';}).join('');
+  const coreGroups=C.map((cat,ci)=>{const rows=P().CORE_ORDER.filter(p=>core[p].cat===ci);return rows.length?`<div class="fsp-group"><div class="fsp-ghead">${esc(cat)}<span>${rows.length}</span></div>${rows.map(p=>{const c=d.core[p];return `<div class="fsp-row ${c.ship?'':'muted'}"><span class="fsp-dot" style="background:${core[p].dot}"></span><div class="fsp-main"><input type="text" maxlength="60" data-prod-core-label="${p}" value="${esc(c.label)}" placeholder="${esc(base[p].label)}" aria-label="Nama di rincian kirim untuk ${esc(base[p].label)}" ${dis}><small>Nama sistem: ${esc(window.ForecastPlanner?.names?.[p]||base[p].label)}</small></div><label class="fsp-switch" title="Tampil di rincian kirim & gambar WA"><input type="checkbox" data-prod-core-ship="${p}" ${c.ship?'checked':''} ${dis}><span class="fsp-track"></span><em>${c.ship?'Tampil':'Disembunyikan'}</em></label></div>`;}).join('')}</div>`:'';}).join('');
+  return `<div class="fsp">
+   <article class="workspace-card fsp-intro"><div><h3 class="fs-h3">Daftar produk</h3><p class="fs-use">Atur produk yang muncul saat menyusun forecast dan di rincian kirim. Perubahan berlaku untuk seluruh tim setelah <b>Simpan untuk tim</b>.</p></div><div class="fsp-where"><span><b>${active}</b> produk lain</span><span><b>${d.core.filter(c=>c.ship).length}/12</b> produk inti tampil di rincian kirim</span></div></article>
+   <article class="workspace-card"><div class="fsp-head"><div><h3 class="fs-h3">Produk lain <small>diisi manual</small></h3><p class="fs-use">Muncul sebagai kolom di <b>Dari omzet</b>, baris di <b>Detail outlet</b>, dan baris di <b>Rincian kirim</b> sesuai kategorinya. Tidak ada saran otomatis.</p></div></div>
+    ${groups||'<p class="fsp-empty">Belum ada produk lain. Tambahkan di bawah.</p>'}
+    ${dis?'':`<div class="fsp-add"><div class="fsp-add-title">+ Tambah produk baru</div><div class="fsp-add-row"><input type="text" id="fs-prod-new-name" maxlength="60" placeholder="Nama produk, misalnya Roti Pisang Coklat" autocomplete="off">${catSel('id="fs-prod-new-cat"',newCat)}<button type="button" class="button fp-primary" data-prod-add>Tambah</button></div></div>`}
+   </article>
+   <details class="workspace-card fsp-core"><summary><div><h3 class="fs-h3">12 produk inti <small>nama di rincian kirim & gambar WA</small></h3><p class="fs-use">Dipakai mesin rekomendasi, jadi tidak bisa dihapus atau dipindah kategori. Anda bisa mengganti nama tampilnya atau menyembunyikannya dari rincian kirim.</p></div><span class="fsp-chev">▾</span></summary>${coreGroups}</details>
+  </div>`;
+ }
  function collectProducts(form){syncProd(form);const d=prod,seen=new Set(),extra=[];
-  for(const x of d.extra){const name=String(x.name||'').trim().replace(/\s+/g,' ');if(!name)throw Error('Nama produk lain tidak boleh kosong (hapus barisnya kalau tidak dipakai).');const k=name.toLowerCase();if(seen.has(k))throw Error(`Produk "${name}" tercantum dua kali.`);seen.add(k);
+  for(const x of d.extra){if(x.removed)continue;const name=String(x.name||'').trim().replace(/\s+/g,' ');if(!name)throw Error('Ada produk tanpa nama. Isi namanya atau hapus barisnya.');const k=name.toLowerCase();if(seen.has(k))throw Error(`Produk "${name}" tercantum dua kali.`);seen.add(k);
    const aliases=[...new Set([...(x.aliases||[]),...(x.orig&&x.orig!==name?[x.orig]:[])])].filter(a=>a.toLowerCase()!==k).slice(-10);extra.push({name,cat:Number.isInteger(x.cat)?x.cat:3,aliases});}
   if(extra.length>20)throw Error('Maksimal 20 produk lain.');
   return {core:d.core.map((c,p)=>({label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship})),extra};}
+ function addProduct(form){syncProd(form);const el=form?.querySelector('#fs-prod-new-name'),cs=form?.querySelector('#fs-prod-new-cat'),name=String(el?.value||'').trim().replace(/\s+/g,' ');newCat=Number(cs?.value??newCat);
+  if(!name){status='Ketik nama produk baru dulu.';return;}
+  if(prodDraft().extra.some(x=>!x.removed&&x.name.trim().toLowerCase()===name.toLowerCase())){status=`"${name}" sudah ada di daftar.`;return;}
+  prod.extra.push({name,cat:newCat,aliases:[],orig:'',removed:false});status=`"${name}" ditambahkan. Klik Simpan untuk tim agar berlaku.`;}
  function sourceCard(s,dis){
   const info=SOURCE_INFO[s.key]||{use:'',sync:'Diperbarui manual'},vals={...(info.defaults||{}),...s};
   const extra=(info.fields||[]).map(([k,label,type])=>`<label>${esc(label)}<input type="${type}" data-source-field="${esc(s.key)}:${k}" value="${esc(vals[k]??'')}" ${type==='number'?'min="1" step="1"':''} ${dis}></label>`).join('');
@@ -84,7 +103,7 @@ window.ForecastSettings=(()=>{
   else if(section==='products')body=productsBody(dis);
   else if(!isMaster())body=`<article class="workspace-card"><p class="fs-lock">🔒 Data pendukung hanya bisa dibuka akun Master.</p></article>`;
   else body=`<article class="workspace-card"><p class="fs-use">Data rinci & analisa pendukung. Pilih untuk membuka.</p><div class="fs-support">${SUPPORT_VIEWS.map(([k,l])=>`<button type="button" class="fs-support-btn" data-support-view="${k}">${esc(l)}<span>→</span></button>`).join('')}</div></article>`;
-  const actions=section==='support'?'':canEdit()?`<div class="fs-actions"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status)}</span></div>`:`<p class="fs-lock">🔒 Akun ini belum punya akses Forecast untuk mengubah pengaturan.</p>`;
+  const actions=section==='support'?'':canEdit()?`<div class="fs-actions ${section==='products'?'fsp-actions'+(prodDirty()?' dirty':''):''}"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status||(section==='products'&&prodDirty()?'Ada perubahan yang belum disimpan.':''))}</span></div>`:`<p class="fs-lock">🔒 Akun ini belum punya akses Forecast untuk mengubah pengaturan.</p>`;
   return `<div class="focus-intro"><h2>Pengaturan</h2><span>Berlaku untuk seluruh tim</span></div><div class="fs-tabs">${tabs}</div><form id="forecast-settings-form" novalidate>${body}${actions}</form>`;
  }
  function collect(form){
@@ -119,6 +138,7 @@ window.ForecastSettings=(()=>{
  function submit(e){
   if(e.target.id!=='forecast-settings-form')return false;
   e.preventDefault();
+  if(document.activeElement?.id==='fs-prod-new-name'){addProduct(e.target);rerender();setTimeout(()=>document.getElementById('fs-prod-new-name')?.focus(),0);return true;}
   try{save(collect(e.target));}catch(err){status=err.message;rerender();}
   return true;
  }
@@ -126,13 +146,16 @@ window.ForecastSettings=(()=>{
   const t=e.target.closest('[data-settings-tab]');if(t){section=t.dataset.settingsTab;status='';prod=null;return 'render';}
   const sv=e.target.closest('[data-support-view]');if(sv)return isMaster()?{support:sv.dataset.supportView}:false;
   const form=e.target.closest('form');
-  if(e.target.closest('[data-prod-x-add]')){syncProd(form);prodDraft().extra.push({name:'',cat:3,aliases:[],orig:''});status='Isi nama produk baru, lalu Simpan untuk tim.';return 'render';}
-  const del=e.target.closest('[data-prod-x-del]');if(del){syncProd(form);const x=prodDraft().extra[+del.dataset.prodXDel];if(x&&(!x.orig||confirm(`Hapus produk "${x.orig}" dari daftar? Angka di rencana yang sudah disimpan tidak terhapus.`))){prod.extra.splice(+del.dataset.prodXDel,1);status='Belum tersimpan. Klik Simpan untuk tim.';}return 'render';}
+  if(e.target.closest('[data-prod-add]')){addProduct(form);return 'render';}
+  const del=e.target.closest('[data-prod-x-del]');if(del){syncProd(form);const i=+del.dataset.prodXDel,x=prodDraft().extra[i];if(x){if(!x.orig)prod.extra.splice(i,1);else x.removed=true;status='';}return 'render';}
+  const undo=e.target.closest('[data-prod-x-undo]');if(undo){syncProd(form);const x=prodDraft().extra[+undo.dataset.prodXUndo];if(x)x.removed=false;return 'render';}
   if(e.target.closest('[data-settings-reset]')){
    if(!confirm('Kembalikan ambang batas, cuaca, dan tampilan ke bawaan? Link sumber data & daftar produk tidak berubah.'))return false;
    const cur=window.DATA_SOURCES,def=JSON.parse(JSON.stringify(DEFAULTS));def.products=get().products;save({...cur,updatedAt:new Date().toISOString(),preferences:def});return false;
   }
   return false;
  }
- return {get,render,submit,click,DEFAULTS};
+ // Ganti kategori / tampil di rincian kirim -> render ulang supaya baris pindah kelompok.
+ function change(e){const t=e.target;if(section!=='products'||!prod)return false;if(t.dataset.prodXCat!==undefined||t.dataset.prodCoreShip!==undefined){syncProd(t.closest('form'));return true;}if(t.id==='fs-prod-new-cat'){newCat=Number(t.value);return false;}return false;}
+ return {get,render,submit,click,change,DEFAULTS};
 })();
