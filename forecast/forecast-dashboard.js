@@ -1259,5 +1259,8 @@ window.ForecastDashboard=(()=>{
   tip.style.left=Math.max(6,Math.min(rect.width-6,cx))+'px';
   tip.style.top=Math.max(0,cy-14)+'px';
  }
- return {render,inspect,change,mount,click};
+ // Dipakai "Forecast dari omzet": prediksi omzet reguler/pesanan jaringan untuk satu tanggal
+ // (bulan ini & bulan depan), angka yang sama dengan garis prediksi di grafik dashboard.
+ function predict(date){try{const r=revenueTrend('__all__')?.rows.find(x=>x.date===date);return r?{pure:r.forecastPure,total:r.forecastTotal}:null;}catch{return null;}}
+ return {render,inspect,change,mount,click,predict};
 })();

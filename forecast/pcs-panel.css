@@ -250,3 +250,47 @@
 .fs-req-add{border:1px dashed #b7c3cf;background:#fff;color:var(--acc-ink);border-radius:8px;padding:5px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .fs-req-add:hover{border-color:var(--acc);background:#fff}
 .fs-req-empty{margin:0;padding:10px 16px 14px;font-size:12.5px;color:#7a8896}
+.ft-wrap{display:grid;gap:12px}
+.ft-top{display:grid;grid-template-columns:auto 1fr 1.4fr;gap:12px;align-items:stretch}
+.ft-date{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:#5b6b7a}
+.ft-stat,.ft-target{background:#fff;border:1px solid #e3e8ee;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.ft-stat span,.ft-target>label,.ft-summary span{font-size:11.5px;font-weight:600;color:#6b7a88;letter-spacing:.02em}
+.ft-stat strong{font-size:20px;color:#1c2b38;font-variant-numeric:tabular-nums}
+.ft-stat small,.ft-summary small{font-size:11.5px;color:#8592a0}
+.ft-target{gap:8px;border-color:#cfdde6;background:#f8fbfc}
+.ft-target-input{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #c9d6df;border-radius:9px;padding:4px 10px}
+.ft-target-input span{font-weight:700;color:#5b6b7a}
+.ft-target-input input{border:0;outline:0;font:inherit;font-size:20px;font-weight:700;color:#1c2b38;width:100%;background:transparent;font-variant-numeric:tabular-nums}
+.ft-target-input:focus-within{border-color:#2e6f86;box-shadow:0 0 0 3px #e1eef3}
+.ft-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ft-chip{border:1px solid #d5dee6;background:#fff;color:#33414e;border-radius:999px;padding:4px 11px;font:inherit;font-size:12px;cursor:pointer}
+.ft-chip:hover{border-color:#2e6f86}
+.ft-chip.on{background:#1f3a4d;border-color:#1f3a4d;color:#fff}
+.ft-sub,.ft-foot{margin:0;font-size:12.5px;color:#6b7a88;line-height:1.5}
+.ft-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.ft-summary>div{background:#fff;border:1px solid #e3e8ee;border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:2px}
+.ft-summary strong{font-size:16px;color:#1c2b38;font-variant-numeric:tabular-nums}
+.ft-table-wrap{overflow:auto;max-height:70vh;border:1px solid #e3e8ee;border-radius:12px;background:#fff}
+.ft-table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+.ft-table th,.ft-table td{padding:5px 6px;border-bottom:1px solid #eef1f4;white-space:nowrap;text-align:center}
+.ft-table thead th{position:sticky;top:0;z-index:2;background:#f4f6f9;color:#4d5d6c;font-size:11px;font-weight:700;line-height:1.25;border-bottom:1px solid #dfe5eb}
+.ft-table thead th small{font-weight:500;color:#7a8896}
+.ft-table .ft-outlet{position:sticky;left:0;z-index:1;background:#fff;text-align:left;font-weight:600;color:#24323f;min-width:120px;border-right:1px solid #e3e8ee}
+.ft-table thead .ft-outlet{z-index:3;background:#f4f6f9}
+.ft-num{text-align:right!important;color:#33414e}
+.ft-strong{font-weight:700;color:#1c2b38}
+.ft-muted{color:#b7c0ca}
+.ft-group td{background:#f8fafb;text-align:left!important;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);border-top:2px solid var(--acc);position:sticky;left:0}
+.ft-cell{width:52px;padding:4px 3px;text-align:center;border:1px solid transparent;border-radius:6px;background:#f6f8fa;font:inherit;font-size:12.5px;color:#1c2b38}
+.ft-cell:hover{border-color:#d3dce4}
+.ft-cell:focus{outline:0;border-color:#2e6f86;background:#fff;box-shadow:0 0 0 3px #e1eef3}
+.ft-cell.ft-edited{background:#fff4dc;border-color:#f0d79b}
+.ft-table tbody tr:not(.ft-group):hover td{background:#fafcfd}
+.ft-table tbody tr:not(.ft-group):hover .ft-outlet{background:#fafcfd}
+.ft-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.ft-pill.new{background:#eef1f5;color:#5b6b7a}
+.ft-pill.saved{background:#e3f3ea;color:#2c7a4b}
+.ft-pill.changed{background:#fff1d6;color:#8a6212}
+.ft-save{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e3e8ee;border-radius:12px;padding:10px 14px;position:sticky;bottom:8px;z-index:4;box-shadow:0 4px 14px rgba(20,40,60,.08)}
+.ft-msg{font-size:12.5px;color:#4d5d6c}
+@media (max-width:820px){.ft-top{grid-template-columns:1fr}.ft-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}

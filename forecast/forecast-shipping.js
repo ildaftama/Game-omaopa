@@ -161,5 +161,5 @@ window.ForecastShipping=(()=>{
   if(t.dataset.shipPct!==undefined){input(e);return true;}
   const r=input(e);return r===null?false:r;
  }
- return {render,click,input,change};
+ return {render,click,input,change,groups:GROUPS};
 })();
