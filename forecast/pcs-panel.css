@@ -478,3 +478,14 @@
 .fh-row{white-space:normal;overflow-wrap:anywhere}
 .fh-row .fh-body{min-width:0}
 .fh-detail{overflow-x:auto}
+/* Monitoring per tanggal */
+.fp-days tr.fp-day{cursor:pointer}
+.fp-days tr.fp-day:hover td{background:#f6f9fb}
+.fp-days tr.fp-day.open td{background:#f1f6f8}
+.fp-days tr.fp-day td:first-child b{font-weight:600;color:#1f3a4d}
+.fp-days tr.fp-day td:first-child small{display:block;font-size:11px;color:#8592a0;margin-left:16px}
+.fp-caret{display:inline-block;width:16px;font-size:10px;color:#8592a0}
+.fp-day-detail>td{padding:0!important;background:#f8fafb}
+.fp-day-box{padding:10px 12px 14px;display:grid;gap:8px}
+.fp-day-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:#4d5d6c}
+.fp-day-box .fp-table{background:#fff}
