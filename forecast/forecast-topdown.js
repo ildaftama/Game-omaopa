@@ -152,9 +152,10 @@ window.ForecastTopdown=(()=>{
  const prodSig=pl=>pl.rows.map(r=>r.p+':'+r.total+':'+r.diff).join('|');
  function productionBlock(c){
   if(!PD())return '';
-  const ins=prodInputs(c),pl=PD().plan(ins,factoryOrders()?.qty,draft.prodOverride||{}),m=pl.mode,stale=proposal&&proposal.sig!==prodSig(pl);
+  const ins=prodInputs(c),pl=PD().plan(ins,factoryOrders()?.qty,draft.prodOverride||{},{miniStock:draft.miniStock}),m=pl.mode,stale=proposal&&proposal.sig!==prodSig(pl);
   const plus=pl.rows.filter(r=>r.diff>0).reduce((a,r)=>a+r.diff,0),minus=pl.rows.filter(r=>r.diff<0).reduce((a,r)=>a-r.diff,0),batches=pl.rows.reduce((a,r)=>a+r.batches,0);
   const fam=PD().families().map(f=>{const rs=pl.rows.filter(r=>r.family.key===f.key);return `<tr class="fpd-fam"><td colspan="5">${esc(f.label)} <span>1 angkatan = ${f.size} pcs${f.unit?` (${f.unit})`:''}</span></td></tr>${rs.map(r=>{
+   if(r.combined)return `<tr><td><b>Mini Ogura · campur 3 rasa</b><small>${r.per.map(x=>`${esc(SHORT[x.p][1])} ${nf(x.total)}`).join(' · ')}${r.box?` (termasuk Box Mini ${nf(r.box)} pcs)`:''}</small><label class="fpd-stock">Stok Mini dari produksi sebelumnya <input type="number" inputmode="numeric" min="0" max="10000" step="1" data-ft-mini-stock value="${esc(draft.miniStock??'')}" placeholder="0"> pcs</label></td><td class="ft-num">${nf(r.total)}</td><td class="ft-num"><b>${r.batches}</b> angkatan<small>= ${nf(r.target)} pcs</small></td><td>${r.batches?`<span class="fpd-ok">Selalu dibulatkan naik</span><small>sisa ${nf(r.leftover)} pcs jadi stok hari berikutnya (dirapel)</small>`:`<span class="fpd-ok">Stok cukup</span><small>tidak perlu produksi · sisa stok ${nf(r.leftover)} pcs</small>`}</td><td></td></tr>`;
    const parts=[`reguler ${nf(r.regular)}`,r.orders?`pesanan ${nf(r.orders)}`:'',r.factory?`pabrik ${nf(r.factory)}`:'',r.box?`Box Mini ${nf(r.box)}`:''].filter(Boolean).join(' · ');
    const adj=r.diff>0?`<span class="fpd-plus">+${r.diff} pcs</span><small>dibulatkan naik · lebih ${r.diff} pcs</small>`:r.diff<0?`<span class="fpd-minus">−${-r.diff} pcs</span><small>dibulatkan turun · kurang ${-r.diff} pcs</small>`:'<span class="fpd-ok">Pas</span>';
    return `<tr><td><b>${esc(model.names[r.p])}</b><small>${parts}</small></td><td class="ft-num">${nf(r.total)}</td><td class="ft-num"><b>${r.batches}</b> angkatan<small>= ${nf(r.target)} pcs</small></td><td>${adj}${r.overridden?'<small class="fpd-manual">diubah manual</small>':''}</td><td>${r.rem?`<button type="button" class="fpd-flip" data-ft-prod-flip="${r.p}" title="Sisa ${r.rem} dari ${r.size} pcs">${r.dir==='up'?'Bulatkan turun':'Bulatkan naik'}</button>`:''}</td></tr>`;}).join('')}`;}).join('');
@@ -169,7 +170,7 @@ window.ForecastTopdown=(()=>{
    ${plus||minus?(proposal&&!stale?prop:`<div class="fpd-cta">${stale?'<span class="fpd-muted">Angka berubah sejak usulan dibuat, hitung ulang.</span>':`<span>Selisih ${plus?`+${plus} pcs`:''}${plus&&minus?' dan ':''}${minus?`−${minus} pcs`:''} perlu dibagi ke outlet supaya kiriman pas dengan produksi.</span>`}<button type="button" class="button fp-primary" data-ft-prod-propose>Bagi otomatis ke outlet</button></div>`):'<p class="fpd-done">Semua rasa sudah pas dengan angkatan. Tidak ada sisa atau kekurangan.</p>'}
   </section>`;
  }
- function scheduleProd(){clearTimeout(prodTimer);prodTimer=setTimeout(()=>{const el=q('#ft-prod');if(el&&draft)el.innerHTML=productionBlock(compute());},250);}
+ function scheduleProd(){clearTimeout(prodTimer);prodTimer=setTimeout(()=>{const el=q('#ft-prod');if(!el||!draft)return;const keep=document.activeElement?.matches?.('[data-ft-mini-stock]');el.innerHTML=productionBlock(compute());if(keep)el.querySelector('[data-ft-mini-stock]')?.focus({preventScroll:true});},250);}
  const LW_ALERT=25;
  // Kunci setelah hari H (owner 2026-11-10): mulai 00.00 WIB tanggal kiriman, rencana hanya bisa
  // disimpan/dihapus akun Master -- juga dijaga rules Firestore (forecastOpenDate).
@@ -280,6 +281,7 @@ window.ForecastTopdown=(()=>{
   if(t.dataset.ftXo){const [id,i]=split(t.dataset.ftXo);draft.extra[id][draft.names[i]].o=t.value;persist();refreshTotals(id);return false;}
   if(t.dataset.ftOrd){const [id,p]=split(t.dataset.ftOrd);draft.orders[id][p]=t.value;persist();refreshTotals(id);return false;}
   if(t.dataset.ftNote!==undefined){draft.notes[t.dataset.ftNote]=t.value;persist();refreshTotals(t.dataset.ftNote);return false;}
+  if(t.dataset.ftMiniStock!==undefined){draft.miniStock=t.value;persist();scheduleProd();return false;}
   if(t.id==='ft-target'){const n=Number(String(t.value).replace(/\D/g,''));draft.target=n;persist();return false;}
   return null;
  }
@@ -307,8 +309,8 @@ window.ForecastTopdown=(()=>{
    draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));persist();message=`Target ${rp(draft.target)} sudah dibagi ke ${compute().ids.length} outlet. Teliti angkanya, lalu simpan.`;return true;
   }
   const fl=e.target.closest('[data-ft-prod-flip]');
-  if(fl){const p=+fl.dataset.ftProdFlip,c=compute(),r=PD().plan(prodInputs(c),factoryOrders()?.qty,draft.prodOverride||{}).rows.find(x=>x.p===p);if(r){draft.prodOverride=draft.prodOverride||{};const next=r.dir==='up'?'down':'up';if(next===r.auto)delete draft.prodOverride[p];else draft.prodOverride[p]=next;persist();proposal=null;}return true;}
-  if(e.target.closest('[data-ft-prod-propose]')){const c=compute(),ins=prodInputs(c),pl=PD().plan(ins,factoryOrders()?.qty,draft.prodOverride||{});proposal={sig:prodSig(pl),map:PD().propose(pl.rows,ins)};return true;}
+  if(fl){const p=+fl.dataset.ftProdFlip,c=compute(),r=PD().plan(prodInputs(c),factoryOrders()?.qty,draft.prodOverride||{},{miniStock:draft.miniStock}).rows.find(x=>x.p===p);if(r){draft.prodOverride=draft.prodOverride||{};const next=r.dir==='up'?'down':'up';if(next===r.auto)delete draft.prodOverride[p];else draft.prodOverride[p]=next;persist();proposal=null;}return true;}
+  if(e.target.closest('[data-ft-prod-propose]')){const c=compute(),ins=prodInputs(c),pl=PD().plan(ins,factoryOrders()?.qty,draft.prodOverride||{},{miniStock:draft.miniStock});proposal={sig:prodSig(pl),map:PD().propose(pl.rows,ins)};return true;}
   if(e.target.closest('[data-ft-prod-cancel]')){proposal=null;return true;}
   if(e.target.closest('[data-ft-prod-apply]')){if(proposal){const ids=new Set();for(const [p,pr] of proposal.map)for(const x of pr.list){const cur=qtyOf(draft.cells[x.id][p]);draft.cells[x.id][p]=String(Math.max(0,cur+x.delta));ids.add(x.id);}persist();message=`Penyesuaian angkatan diterapkan ke ${ids.size} outlet (kotak kuning). Teliti lalu simpan ke tim.`;proposal=null;}return true;}
   if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.';return true;}saveAll();return true;}

@@ -10,11 +10,14 @@
 // Selisihnya (lebih/kurang) diusulkan ke outlet: kelebihan ke outlet yang paling sering habis
 // stok, kekurangan diambil dari outlet yang waste-nya paling tinggi; pesanan tidak pernah dikurangi.
 // Usulan baru berlaku setelah forecaster menekan "Terapkan".
+// MINI OGURA (owner 2026-11-10): 1 angkatan = 90 pcs CAMPURAN 3 rasa dan bisa dipakai beberapa hari
+// (dirapel). Jadi dihitung gabungan 3 rasa, selalu dibulatkan NAIK (tidak pernah "tidak diproduksi"),
+// dikurangi stok Mini dari produksi sebelumnya; sisanya jadi stok hari berikutnya, tidak dibagi ke outlet.
 window.ForecastProduction=(()=>{
  const FAMILIES=[
   {key:'ogura',label:'Ogura',ps:[0,1],size:18},
   {key:'malmil',label:'Malmil',ps:[2,3],size:36},
-  {key:'mini',label:'Mini Ogura',ps:[4,5,6],size:90,unit:'10 pax × 9 pcs'},
+  {key:'mini',label:'Mini Ogura',ps:[4,5,6],size:90,unit:'10 pax × 9 pcs, campur 3 rasa',combined:true},
   {key:'chiffon',label:'Chiffon Classic',ps:[7,8,9],size:12},
   {key:'lite',label:'Chiffon Lite',ps:[10,11],size:12},
  ];
@@ -34,14 +37,22 @@ window.ForecastProduction=(()=>{
   return {kind:wh&&lh?'mix':w==null&&l==null?'nodata':'normal',threshold:.5,title:'Mode normal',text:`${facts?`28 hari terakhir ${facts}. `:''}Dibulatkan ke angkatan terdekat (sisa ≥ 50% naik).`};
  }
  // outlets: [{id, regular[12], orders[12], boxMini}] ; factory: qty[12] ; overrides: {p:'up'|'down'}
- function plan(outlets,factory,overrides={}){
+ function plan(outlets,factory,overrides={},opts={}){
   const m=mode(),rows=[];
-  for(const f of families())for(const p of f.ps){
+  for(const f of families()){
+   if(f.combined){
+    const per=f.ps.map(p=>{const regular=outlets.reduce((s,o)=>s+(o.regular[p]||0),0),orders=outlets.reduce((s,o)=>s+(o.orders[p]||0),0),fac=factory?.[p]||0,box=outlets.reduce((s,o)=>s+(o.boxMini||0),0)*BOX_MINI[p-f.ps[0]];return {p,regular,orders,factory:fac,box,total:regular+orders+fac+box};});
+    const total=per.reduce((s,x)=>s+x.total,0),stock=Math.max(0,Math.round(Number(opts.miniStock)||0)),need=Math.max(0,total-stock),batches=Math.ceil(need/f.size),target=batches*f.size;
+    rows.push({p:null,combined:true,family:f,size:f.size,per,regular:per.reduce((s,x)=>s+x.regular,0),orders:per.reduce((s,x)=>s+x.orders,0),factory:per.reduce((s,x)=>s+x.factory,0),box:per.reduce((s,x)=>s+x.box,0),total,stock,batches,target,leftover:target+stock-total,rem:0,dir:'exact',diff:0});
+    continue;
+   }
+   for(const p of f.ps){
    const regular=outlets.reduce((s,o)=>s+(o.regular[p]||0),0),orders=outlets.reduce((s,o)=>s+(o.orders[p]||0),0),fac=factory?.[p]||0;
    const box=f.key==='mini'?outlets.reduce((s,o)=>s+(o.boxMini||0),0)*BOX_MINI[p-4]:0;
    const total=regular+orders+fac+box,full=Math.floor(total/f.size),rem=total-full*f.size,auto=rem>0&&rem>=f.size*m.threshold?'up':'down';
    const dir=rem?(overrides[p]||auto):'exact',batches=dir==='up'?full+1:full,target=batches*f.size;
    rows.push({p,family:f,size:f.size,regular,orders,factory:fac,box,total,rem,auto,dir,overridden:!!overrides[p]&&overrides[p]!==auto,batches,target,diff:target-total});
+   }
   }
   return {mode:m,rows};
  }
