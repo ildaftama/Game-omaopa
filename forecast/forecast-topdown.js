@@ -136,10 +136,10 @@ window.ForecastTopdown=(()=>{
  function netWhy(c){
   const n=c.net,d=describe(c.wl?.net,c.W),per=c.wl?.wasteFrom&&c.wl?.wasteTo?` (${c.wl.wasteFrom.slice(8)}/${c.wl.wasteFrom.slice(5,7)}–${c.wl.wasteTo.slice(8)}/${c.wl.wasteTo.slice(5,7)})`:'';
   const txt=n.kind==='nodata'?'Data waste & habis stok 7 hari terakhir belum cukup, saran: sesuai prediksi.'
-   :n.kind==='minus'?`Saran ${n.pct}%: ${d}${per}. waste di atas ambang dan stok jarang habis, kiriman bisa dikurangi.`
-   :n.kind==='plus'?`Saran +${n.pct}%: ${d}${per}. stok sering habis sementara waste rendah, kiriman bisa ditambah.`
-   :n.kind==='mix'?`Saran sesuai prediksi: ${d}${per}. waste dan habis stok sama-sama tinggi, berarti komposisi produk yang perlu diatur, bukan jumlahnya.`
-   :`Saran sesuai prediksi: ${d}${per}. waste dan habis stok masih dalam batas.`;
+   :n.kind==='minus'?`Saran −${Math.abs(n.pct)}% · 7 hari terakhir ${d}${per}. Waste di atas ambang dan stok jarang habis, kiriman bisa dikurangi.`
+   :n.kind==='plus'?`Saran +${n.pct}% · 7 hari terakhir ${d}${per}. Stok sering habis sementara waste rendah, kiriman bisa ditambah.`
+   :n.kind==='mix'?`Saran sesuai prediksi · 7 hari terakhir ${d}${per}. Waste dan habis stok sama-sama tinggi, berarti komposisi produk yang perlu diatur, bukan jumlahnya.`
+   :`Saran sesuai prediksi · 7 hari terakhir ${d}${per}. Waste dan habis stok masih dalam batas.`;
   return `<p class="ft-why ft-why-${n.kind}">${esc(txt)}</p>`;
  }
  function refreshTotals(id){
