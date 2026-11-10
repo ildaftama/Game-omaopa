@@ -37,6 +37,10 @@ match /forecastAccess/{uid} {
 // yang sudah dipakai pada seluruh rule lain di rules penuh.
 // 2026-11-10 (owner): Pengaturan Forecast hanya boleh diubah akun MASTER -- Admin Utama pun
 // hanya bisa membaca, supaya website tidak sembarangan diubah.
+// PENTING: match generik /settings/{id} di rules penuh mengizinkan isSuper() menulis SEMUA
+// dokumen settings -- dan Firestore memberi akses kalau SATU rule saja mengizinkan. Jadi rule
+// generik itu juga diubah (dipublikasikan 2026-11-10) menjadi:
+//   allow write: if notRadarSyncAccount() && (isSuper() && id != 'forecastSources');
 function forecastMaster() {
   return request.auth != null
     && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
