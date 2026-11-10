@@ -431,14 +431,15 @@ window.ForecastDashboard=(()=>{
  // metode yang diuji mentok di 73-76%. Diterapkan sebagai faktor pengali di atas mesin outlet
  // (rasio gabungan / pola outlet), supaya pemisahan omzet murni vs pesanan tetap utuh.
  const yoyGrowthCache=new Map();
- function yoyMapAt(V,tag,origin,date,planner){
+ function yoyMapAt(V,tag,origin,date,planner,robust){
   const gk=tag+'|'+origin;
   if(!yoyGrowthCache.has(gk)){let a=0,b=0,n=0;for(let k=0;k<56;k++){const d=planner.shift(origin,-k),x=V.get(d),y=V.get(planner.shift(d,-364));if(x!=null&&y!=null){a+=x;b+=y;n++;}}yoyGrowthCache.set(gk,n>=14&&b>0?a/b:null);}
   const g=yoyGrowthCache.get(gk);if(g==null)return null;
   const md=date.slice(5),hol=d=>{const m=d.slice(5);return m>='12-18'||m<='01-04';};
   if(md>='12-18'||md<='01-04'){const x=V.get(shiftYearDate(date,-1));if(x!=null)return x*g;}
-  let s=0,w=0;[-14,-7,0,7,14].forEach((o,i)=>{const src=planner.shift(date,o-364);if(hol(src))return;const x=V.get(src);if(x!=null){const wt=[1,2,3,2,1][i];s+=x*wt;w+=wt;}});
-  return w?s/w*g:null;
+  const vals=[];let s=0,w=0;[-14,-7,0,7,14].forEach((o,i)=>{const src=planner.shift(date,o-364);if(hol(src))return;const x=V.get(src);if(x!=null){const wt=[1,2,3,2,1][i];s+=x*wt;w+=wt;vals.push(x);}});
+  if(!w)return null;
+  return (robust?planner.quantile(vals,.5):s/w)*g;
  }
  function makeOutletAdjust(id,planner){
   const ds=dailyOutletProductSeries(),own=ds?.byOutlet.get(id);if(!own)return null;
@@ -448,9 +449,14 @@ window.ForecastDashboard=(()=>{
   return (date,origin)=>{
    const key=date+'|'+origin;if(cache.has(key))return cache.get(key);
    let r=1;
+   // a = pola outlet versi mesin (rata-rata berbobot) -- yang akan dikoreksi; ar = versi tahan
+   // lonjakan: nilai tengah tahun lalu, dibatasi 1,3x median hari-minggu yang sama 8 minggu
+   // terakhir (uji mundur: harian 76,4% -> 76,8%, meleset sebulan 9,6% -> 9,2%).
    const a=yoyMapAt(V,'o:'+id,origin,date,planner),n=yoyMapAt(N,'net',origin,date,planner);
-   let so=0,sn=0;for(let k=0;k<56;k++){const x=planner.shift(origin,-k);if(wd(x)!==wd(date))continue;const v=V.get(x),t=N.get(x);if(v!=null&&t){so+=v;sn+=t;}}
-   if(a>0&&n!=null&&sn>0)r=(.5*a+.5*n*(so/sn))/a;
+   let ar=yoyMapAt(V,'o:'+id,origin,date,planner,true);
+   const recent=[];let so=0,sn=0;for(let k=0;k<56;k++){const x=planner.shift(origin,-k);if(wd(x)!==wd(date))continue;const v=V.get(x),t=N.get(x);if(v!=null)recent.push(v);if(v!=null&&t){so+=v;sn+=t;}}
+   if(ar!=null&&recent.length>=3)ar=Math.min(ar,planner.quantile(recent,.5)*1.3);
+   if(a>0&&ar!=null&&n!=null&&sn>0)r=(.5*ar+.5*n*(so/sn))/a;
    cache.set(key,r);return r;
   };
  }
@@ -626,7 +632,10 @@ window.ForecastDashboard=(()=>{
   const adj=date=>outletAdjust&&lastActual?outletAdjust(date,isPast(date)?planner.shift(date,-1):lastActual):1;
   const forecastPureAt=date=>{const v=isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);return v==null?null:v*adj(date);};
   function forecastPesananAt(date){
-   if(isPast(date)){const k=knownPesananAt(date);if(k!=null)return k;const v=frozenAt(date).pes;return v==null?null:v*adj(date);}
+   // Tanggal lewat yang sudah tercakup sheet PESANAN: outlet tanpa baris pesanan = 0, bukan
+   // "tidak diketahui". Sebelumnya jatuh ke tebakan pola tahun lalu -- per outlet itu menyalin
+   // pesanan besar tahun lalu (Muntilan 1-9 Nov: tebakan 6,2 jt vs pesanan real 2,7 jt).
+   if(isPast(date)){const k=knownPesananAt(date);if(k!=null)return k;if(coveredSet.has(date)&&!blockedSet.has(date))return 0;const v=frozenAt(date).pes;return v==null?null:v*adj(date);}
    const known=knownPesananAt(date);if(known!=null)return known;
    const v=pesananEngine.forecastAt(date);return v==null?null:v*adj(date);
   }
