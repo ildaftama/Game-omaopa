@@ -64,7 +64,11 @@
  function loadContext(k){context=null;window.ForecastReasons.contextFor(outlet,target).then(lines=>{if(cacheKey===k){context=lines;changed();}}).catch(()=>{if(cacheKey===k){context=[];changed();}});}
  function loadFulfillment(k){fulfillment=null;fulfillmentDraft=null;cloud().getFulfillment(planKey()).then(f=>{if(cacheKey===k){fulfillment=f;fulfillmentDraft=f?f.shipped.map(String):Array(12).fill('');fulfillmentKey=k;changed();}}).catch(()=>{if(cacheKey===k){fulfillmentDraft=Array(12).fill('');fulfillmentKey=k;changed();}});}
  // Dipakai monitoring(): cache per rencana supaya tabel histori tidak memanggil ulang getFulfillment setiap render.
- function fulfillmentFor(record){if(!fulfillmentCache.has(record.key)){fulfillmentCache.set(record.key,{loading:true,data:null});cloud().getFulfillment(record.key).then(f=>{fulfillmentCache.set(record.key,{loading:false,data:f});changed();}).catch(()=>fulfillmentCache.set(record.key,{loading:false,data:null}));}return fulfillmentCache.get(record.key);}
+ // Anti kedip: dulu tiap rencana yang selesai dimuat memicu render sendiri (28 rencana = 28 render
+ // beruntun dalam ~1,5 detik). Sekarang render sekali saja setelah SEMUA yang sedang dimuat selesai.
+ let fulfillmentPending=0;
+ const fulfillmentDone=()=>{if(--fulfillmentPending===0)changed();};
+ function fulfillmentFor(record){if(!fulfillmentCache.has(record.key)){fulfillmentCache.set(record.key,{loading:true,data:null});fulfillmentPending++;cloud().getFulfillment(record.key).then(f=>{fulfillmentCache.set(record.key,{loading:false,data:f});}).catch(()=>fulfillmentCache.set(record.key,{loading:false,data:null})).finally(fulfillmentDone);}return fulfillmentCache.get(record.key);}
  // Pesanan yang sudah tercatat di sheet PESANAN untuk outlet+tanggal ini SEKARANG (dipanggil
  // ulang tiap render, bukan sekali) -- dipakai untuk mengisi draft baru otomatis (forecaster
  // tidak perlu ketik ulang) DAN untuk memberi tahu kalau forecaster mengedit jadi beda dari
