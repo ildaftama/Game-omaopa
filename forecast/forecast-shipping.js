@@ -66,7 +66,8 @@ window.ForecastShipping=(()=>{
   const all=[...rest,...(combo?[combo]:[])];
   return {rows:all,batches:all.reduce((s,r)=>s+r.full+(r.rem?1:0),0),odd:rest.filter(r=>r.rem).length};}
  const numCell=v=>v==null?'<td class="fs-nil">—</td>':Number(v)===0?'<td class="fs-zero">0</td>':`<td>${nf(v)}</td>`;
- function render(){
+ // view 'production' = menu Rencana produksi (untuk dapur); default = Rincian kirim (untuk logistik).
+ function render(view){
   if(!date)date=shift(today(),1);ROWS=buildRows();
   const by=plans(),groups=groupData(by),missing=groups.flatMap(g=>g.cols.filter(c=>!c.record).map(c=>c.label)),reqs=requests();
   const body=g=>CATS.map((cat,ci)=>`<tr class="fs-cat"><td colspan="${g.cols.length+2}">${esc(cat)}</td></tr>${ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${g.cols.map(c=>numCell(c.values[ri])).join('')}${numCell(g.totals[ri]).replace('<td','<td data-tot')}</tr>`).join('')}`).join('');
@@ -77,11 +78,17 @@ window.ForecastShipping=(()=>{
   const pr=production(by),core=PR().core();
   const prodCard=pr?`<section class="fs-ship-card fs-prod-card" style="--acc:#3d5566;--acc-soft:${tint('#3d5566',.9)};--acc-ink:${shade('#3d5566',.2)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Rencana produksi</h3><span class="fs-ship-meta">${pr.batches} angkatan · dari ${by.size} rencana tersimpan${f?.total?' + pesanan pabrik':''}</span></header>${pr.odd?`<p class="fs-req-empty">${pr.odd} rasa belum pas kelipatan angkatan. Sesuaikan di <b>Buat forecast › Rencana produksi</b> lalu simpan ulang.</p>`:''}<div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner">Produk</th><th>Total pcs</th><th class="fs-ship-totalh">Angkatan</th></tr></thead><tbody>${window.ForecastProduction.families().map(fm=>`<tr class="fs-cat"><td colspan="3">${esc(fm.label)} · ${fm.size} pcs/angkatan</td></tr>${pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?`<tr><td><span class="fs-dot" style="background:#a597c7"></span>Mini campur 3 rasa<small class="fs-prod-sub">${r.per.map(x=>`${esc(core[x.p].label.replace(/^Mini | \(pcs\)$/g,''))} ${nf(x.total)}`).join(' · ')}${r.stock?` · stok ${nf(r.stock)}`:''} · sisa ${nf(r.leftover)} untuk besok</small></td><td>${nf(r.total)}</td><td data-tot>${r.full}</td></tr>`:`<tr><td><span class="fs-dot" style="background:${core[r.p].dot}"></span>${esc(core[r.p].label)}</td><td>${nf(r.total)}</td><td data-tot>${r.rem?`${r.full} <small class="fs-prod-rem">+${r.rem} pcs</small>`:r.full}</td></tr>`).join('')}`).join('')}</tbody></table></div></section>`:'';
   const canShare=!!(navigator.canShare&&navigator.share);
+  if(view==='production'){const n=by.size;
+   return `<div class="fs-ship-head"><label class="fs-ship-date">Tanggal kiriman<input type="date" id="fs-ship-date" value="${date}"></label><div class="fs-ship-actions">${canShare&&pr?'<button type="button" class="button fp-primary" data-prod-share>Bagikan ke WA</button>':''}${pr?`<button type="button" class="button ${canShare?'':'fp-primary'}" data-prod-download>Unduh gambar</button>`:''}</div></div>
+    <p class="fs-ship-sub">${esc(dateLabel(date))} · jumlah angkatan untuk dapur, dihitung dari rencana yang sudah disimpan tim (reguler + pesanan outlet${f?.total?' + pesanan pabrik':''}).</p>
+    ${n&&missing.length?`<p class="fs-ship-note"><b>${missing.length} outlet</b> belum punya rencana tersimpan, jadi belum ikut dihitung: ${esc(missing.join(', '))}.</p>`:''}
+    <p class="fs-ship-sub fs-ship-status" role="status" ${status?'':'hidden'}>${esc(status)}</p>
+    ${pr?`<div class="fs-ship-list">${prodCard}</div>`:`<div class="fp-empty"><h3>Belum ada rencana tersimpan untuk tanggal ini</h3><p>Susun dan simpan di <button type="button" class="fp-link-inline" data-fp-mode="topdown">1 · Buat forecast</button>, lalu rencana produksi muncul di sini.</p></div>`}`;}
   return `<div class="fs-ship-head"><label class="fs-ship-date">Tanggal kiriman<input type="date" id="fs-ship-date" value="${date}"></label><div class="fs-ship-actions">${canShare?'<button type="button" class="button fp-primary" data-ship-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ship-download>Unduh gambar</button></div></div>
    <p class="fs-ship-sub">${esc(dateLabel(date))} · dari rencana terakhir forecaster (reguler + pesanan). Ubah persen bila pengiriman pertama tidak 100%.</p>
    ${missing.length?`<p class="fs-ship-note"><b>${missing.length} outlet</b> belum punya rencana tersimpan, kolomnya tampil abu-abu: ${esc(missing.join(', '))}.</p>`:''}
    <p class="fs-ship-sub fs-ship-status" role="status" ${status?'':'hidden'}>${esc(status)}</p>
-   <div class="fs-ship-list">${prodCard}${groups.map(table).join('')}${factoryCard}${reqTable}</div>`;
+   <div class="fs-ship-list">${groups.map(table).join('')}${factoryCard}${reqTable}</div>`;
  }
  // ---- Gambar (canvas) ----
  function drawTable({title,accent,colLabels,subLabels,sections,showTotal,totalLabel}){
@@ -125,12 +132,12 @@ window.ForecastShipping=(()=>{
   text(`Dibuat dari Forecast Oma Opa · ${stamp} WIB`,PAD,y+FOOT/2+2,{size:10.5,color:'#97a3ae'});
   return cv;
  }
- function images(){
+ function images(view){
   ROWS=buildRows();const by=plans(),groups=groupData(by),out=[];
+  if(view==='production'){const pr=production(by);if(pr){const core=PR().core();out.push({name:`Rencana Produksi ${date}.png`,canvas:drawTable({title:'Rencana Produksi (angkatan)',accent:'#3d5566',showTotal:true,totalLabel:'ANGKATAN',colLabels:['Total pcs'],sections:window.ForecastProduction.families().map(fm=>({title:`${fm.label} · ${fm.size} pcs/angkatan`,rows:pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?{label:`Mini campur 3 rasa (sisa ${r.leftover})`,dot:'#a597c7',values:[r.total],total:String(r.full)}:{label:core[r.p].label,dot:core[r.p].dot,values:[r.total],total:r.rem?`${r.full} +${r.rem}`:String(r.full)})}))})});}return out;}
   for(const g of groups)out.push({name:`Pengiriman ${g.name} ${date}.png`,canvas:drawTable({title:`Pengiriman Pertama · ${g.name}`,accent:g.color,showTotal:true,colLabels:g.cols.map(c=>c.label),subLabels:g.cols.map(c=>c.record?c.pct+'%':'belum ada'),
    sections:CATS.map((cat,ci)=>({title:cat,rows:ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>({label,dot,values:g.cols.map(c=>c.values[ri]),total:g.totals[ri]}))}))})});
-  const pr=production(by);
-  if(pr){const core=PR().core();out.unshift({name:`Rencana Produksi ${date}.png`,canvas:drawTable({title:'Rencana Produksi (angkatan)',accent:'#3d5566',showTotal:true,totalLabel:'ANGKATAN',colLabels:['Total pcs'],sections:window.ForecastProduction.families().map(fm=>({title:`${fm.label} · ${fm.size} pcs/angkatan`,rows:pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?{label:`Mini campur 3 rasa (sisa ${r.leftover})`,dot:'#a597c7',values:[r.total],total:String(r.full)}:{label:core[r.p].label,dot:core[r.p].dot,values:[r.total],total:r.rem?`${r.full} +${r.rem}`:String(r.full)})}))})});}
+  if(false){const core=PR().core();out.unshift({name:`Rencana Produksi ${date}.png`,canvas:drawTable({title:'Rencana Produksi (angkatan)',accent:'#3d5566',showTotal:true,totalLabel:'ANGKATAN',colLabels:['Total pcs'],sections:window.ForecastProduction.families().map(fm=>({title:`${fm.label} · ${fm.size} pcs/angkatan`,rows:pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?{label:`Mini campur 3 rasa (sisa ${r.leftover})`,dot:'#a597c7',values:[r.total],total:String(r.full)}:{label:core[r.p].label,dot:core[r.p].dot,values:[r.total],total:r.rem?`${r.full} +${r.rem}`:String(r.full)})}))})});}
   const f=factory();
   if(f&&f.total){const rows=PR().CORE_ORDER.map(p=>PR().core()[p]).filter(c=>f.qty[c.p]>0).map(c=>({label:c.label,dot:c.dot,values:[f.qty[c.p]],total:null}));out.push({name:`Pesanan Pabrik ${date}.png`,canvas:drawTable({title:'Pesanan Pabrik',accent:FACTORY_ACCENT,showTotal:false,colLabels:['Pabrik'],sections:[{rows}]})});}
   const reqs=requests().filter(c=>c.name||c.qty?.some(v=>v!==''&&v!=null));
@@ -148,16 +155,16 @@ window.ForecastShipping=(()=>{
  // baru diunduh berurutan, supaya tidak ada jeda berat di antara unduhan.
  function say(t){status=t;const el=document.querySelector('.fs-ship-status');if(el){el.textContent=t;el.hidden=!t;}}
  let busy=false;
- async function download(){
+ async function download(view){
   if(busy)return;busy=true;say('Menyiapkan gambar…');
-  try{const imgs=images(),blobs=[];for(const im of imgs)blobs.push({name:im.name,blob:await toBlob(im.canvas)});
+  try{const imgs=images(view),blobs=[];for(const im of imgs)blobs.push({name:im.name,blob:await toBlob(im.canvas)});
    for(const {name,blob} of blobs){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);await new Promise(r=>setTimeout(r,250));}
    say(`${blobs.length} gambar diunduh: ${blobs.map(b=>b.name.replace(/ \d{4}-\d{2}-\d{2}\.png$/,'')).join(', ')}.`);}
   catch(e){say('Gagal membuat gambar: '+e.message);}
   busy=false;
  }
- async function share(){
-  const imgs=images(),files=[];for(const im of imgs)files.push(new File([await toBlob(im.canvas)],im.name,{type:'image/png'}));
+ async function share(view){
+  const imgs=images(view),files=[];for(const im of imgs)files.push(new File([await toBlob(im.canvas)],im.name,{type:'image/png'}));
   try{if(navigator.canShare({files})){await navigator.share({files,title:'Rincian pengiriman '+date});say('Dibagikan.');}else{say('Perangkat ini tidak bisa membagikan gambar langsung; gunakan Unduh gambar.');}}
   catch(e){if(e.name!=='AbortError')say('Gagal membagikan: '+e.message);}
  }
@@ -165,6 +172,8 @@ window.ForecastShipping=(()=>{
  function updateReq(fn){const r=requests();fn(r);save(reqKey(),r);}
  function click(e){
   if(e.target.closest('[data-ship-download]')){download();return false;}
+  if(e.target.closest('[data-prod-download]')){download('production');return false;}
+  if(e.target.closest('[data-prod-share]')){share('production');return false;}
   if(e.target.closest('[data-ship-share]')){share();return false;}
   if(e.target.closest('[data-req-add]')){updateReq(r=>r.push({name:'',qty:REQ_ROWS.map(()=>''),time:'',method:METHODS[0]}));return true;}
   const rm=e.target.closest('[data-req-remove]');if(rm){updateReq(r=>r.splice(+rm.dataset.reqRemove,1));return true;}
