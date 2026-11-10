@@ -420,3 +420,8 @@
 .fsp-actions.dirty{border-color:#f0d79b;background:#fffaf0}
 .fsp-actions.dirty #fs-status{color:#8a6212;font-weight:600}
 @media (max-width:640px){.fsp-row{flex-wrap:wrap}.fsp-row select{flex:1 1 auto}.fsp-switch em{min-width:0}}
+.fsp-row select,.fsp-add-row select{width:180px!important;flex:0 0 180px!important}
+.fsp-main{flex:1 1 0!important}
+.fsp-add-row input{width:auto!important}
+.fsp-add-row .button{flex:0 0 auto}
+@media (max-width:640px){.fsp-row select{flex:1 1 140px!important;width:auto!important}.fsp-main{flex:1 1 100%!important}}
