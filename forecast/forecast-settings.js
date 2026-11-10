@@ -49,13 +49,14 @@ window.ForecastSettings=(()=>{
  // rincian kirim; tambah lewat form khusus; hapus = ditandai dulu (bisa dibatalkan) sampai
  // disimpan; ada penanda "belum disimpan". Draft disimpan di memori selama tab dibuka.
  let prodBase='',newCat=3;
- function prodDraft(){if(!prod){const c=P().core(),x=P().extra();prod={core:c.map(r=>({label:r.label,ship:r.ship})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false}))};prodBase=JSON.stringify(prod);}return prod;}
+ function prodDraft(){if(!prod){const c=P().core(),x=P().extra();prod={core:c.map(r=>({label:r.label,ship:r.ship})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false})),batch:{...(window.ForecastProduction?.sizes?.()||{})}};prodBase=JSON.stringify(prod);}return prod;}
  const prodDirty=()=>!!prod&&JSON.stringify(prod)!==prodBase;
  function syncProd(form){if(!prod||!form)return;
   form.querySelectorAll('[data-prod-core-label]').forEach(el=>{prod.core[+el.dataset.prodCoreLabel].label=el.value;});
   form.querySelectorAll('[data-prod-core-ship]').forEach(el=>{prod.core[+el.dataset.prodCoreShip].ship=el.checked;});
   form.querySelectorAll('[data-prod-x-name]').forEach(el=>{prod.extra[+el.dataset.prodXName].name=el.value;});
-  form.querySelectorAll('[data-prod-x-cat]').forEach(el=>{prod.extra[+el.dataset.prodXCat].cat=Number(el.value);});}
+  form.querySelectorAll('[data-prod-x-cat]').forEach(el=>{prod.extra[+el.dataset.prodXCat].cat=Number(el.value);});
+  form.querySelectorAll('[data-prod-batch]').forEach(el=>{prod.batch[el.dataset.prodBatch]=Number(el.value);});}
  function productsBody(dis){
   const d=prodDraft(),C=P().CATS,base=P().DEFAULTS.core,core=P().core(),active=d.extra.filter(x=>!x.removed).length;
   const catSel=(attr,val)=>`<select ${attr} ${dis} aria-label="Kategori">${C.map((c,ci)=>`<option value="${ci}" ${val===ci?'selected':''}>${esc(c)}</option>`).join('')}</select>`;
@@ -70,6 +71,7 @@ window.ForecastSettings=(()=>{
     ${groups||'<p class="fsp-empty">Belum ada produk lain. Tambahkan di bawah.</p>'}
     ${dis?'':`<div class="fsp-add"><div class="fsp-add-title">+ Tambah produk baru</div><div class="fsp-add-row"><input type="text" id="fs-prod-new-name" maxlength="60" placeholder="Nama produk, misalnya Roti Pisang Coklat" autocomplete="off">${catSel('id="fs-prod-new-cat"',newCat)}<button type="button" class="button fp-primary" data-prod-add>Tambah</button></div></div>`}
    </article>
+   <article class="workspace-card"><h3 class="fs-h3">Isi 1 angkatan produksi <small>pcs per rasa</small></h3><p class="fs-use">Dipakai untuk menyusun <b>Rencana produksi (angkatan)</b> di Buat forecast. Semua rasa dalam satu varian memakai isi yang sama.</p><div class="fsp-batch">${(window.ForecastProduction?.families?.()||[]).map(f=>`<label><span>${esc(f.label)}</span><span class="fsp-batch-in"><input type="number" min="1" max="500" step="1" data-prod-batch="${f.key}" value="${esc(d.batch?.[f.key]??f.size)}" ${dis}><em>pcs</em></span>${f.unit?`<small>${esc(f.unit)}</small>`:''}</label>`).join('')}</div></article>
    <details class="workspace-card fsp-core"><summary><div><h3 class="fs-h3">12 produk inti <small>nama di rincian kirim & gambar WA</small></h3><p class="fs-use">Dipakai mesin rekomendasi, jadi tidak bisa dihapus atau dipindah kategori. Anda bisa mengganti nama tampilnya atau menyembunyikannya dari rincian kirim.</p></div><span class="fsp-chev">▾</span></summary>${coreGroups}</details>
   </div>`;
  }
@@ -77,7 +79,8 @@ window.ForecastSettings=(()=>{
   for(const x of d.extra){if(x.removed)continue;const name=String(x.name||'').trim().replace(/\s+/g,' ');if(!name)throw Error('Ada produk tanpa nama. Isi namanya atau hapus barisnya.');const k=name.toLowerCase();if(seen.has(k))throw Error(`Produk "${name}" tercantum dua kali.`);seen.add(k);
    const aliases=[...new Set([...(x.aliases||[]),...(x.orig&&x.orig!==name?[x.orig]:[])])].filter(a=>a.toLowerCase()!==k).slice(-10);extra.push({name,cat:Number.isInteger(x.cat)?x.cat:3,aliases});}
   if(extra.length>20)throw Error('Maksimal 20 produk lain.');
-  return {core:d.core.map((c,p)=>({label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship})),extra};}
+  const batch={};for(const [k,v] of Object.entries(d.batch||{})){if(!Number.isInteger(v)||v<1||v>500)throw Error('Isi 1 angkatan harus angka bulat 1–500 pcs.');batch[k]=v;}
+  return {core:d.core.map((c,p)=>({label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship})),extra,batch};}
  function addProduct(form){syncProd(form);const el=form?.querySelector('#fs-prod-new-name'),cs=form?.querySelector('#fs-prod-new-cat'),name=String(el?.value||'').trim().replace(/\s+/g,' ');newCat=Number(cs?.value??newCat);
   if(!name){status='Ketik nama produk baru dulu.';return;}
   if(prodDraft().extra.some(x=>!x.removed&&x.name.trim().toLowerCase()===name.toLowerCase())){status=`"${name}" sudah ada di daftar.`;return;}

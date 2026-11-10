@@ -145,6 +145,31 @@ window.ForecastTopdown=(()=>{
  }
  // Pembanding: reguler terjual hari yang sama minggu lalu (ESB 12 produk inti dikurangi pesanan
  // tercatat). Selisih > 25% disorot supaya angka janggal cepat terlihat saat meneliti.
+ // ---- Rencana produksi per angkatan (forecast-production.js) ----
+ let proposal=null,prodTimer=0;
+ const PD=()=>window.ForecastProduction;
+ function prodInputs(c){const box=PR().match('Box Mini')?.name;return c.ids.map(id=>{const o=c.outlets.get(id),ex=draft.extra[id]||{};return {id,regular:draft.cells[id].map(qtyOf),orders:(draft.orders[id]||[]).map(qtyOf),boxMini:box?qtyOf(ex[box]?.r)+qtyOf(ex[box]?.o):0,wastePct:o.wl?.wastePct,lostPct:o.wl?.lostPct};});}
+ const prodSig=pl=>pl.rows.map(r=>r.p+':'+r.total+':'+r.diff).join('|');
+ function productionBlock(c){
+  if(!PD())return '';
+  const ins=prodInputs(c),pl=PD().plan(ins,factoryOrders()?.qty,draft.prodOverride||{}),m=pl.mode,stale=proposal&&proposal.sig!==prodSig(pl);
+  const plus=pl.rows.filter(r=>r.diff>0).reduce((a,r)=>a+r.diff,0),minus=pl.rows.filter(r=>r.diff<0).reduce((a,r)=>a-r.diff,0),batches=pl.rows.reduce((a,r)=>a+r.batches,0);
+  const fam=PD().families().map(f=>{const rs=pl.rows.filter(r=>r.family.key===f.key);return `<tr class="fpd-fam"><td colspan="5">${esc(f.label)} <span>1 angkatan = ${f.size} pcs${f.unit?` (${f.unit})`:''}</span></td></tr>${rs.map(r=>{
+   const parts=[`reguler ${nf(r.regular)}`,r.orders?`pesanan ${nf(r.orders)}`:'',r.factory?`pabrik ${nf(r.factory)}`:'',r.box?`Box Mini ${nf(r.box)}`:''].filter(Boolean).join(' · ');
+   const adj=r.diff>0?`<span class="fpd-plus">+${r.diff} pcs</span><small>dibulatkan naik · lebih ${r.diff} pcs</small>`:r.diff<0?`<span class="fpd-minus">−${-r.diff} pcs</span><small>dibulatkan turun · kurang ${-r.diff} pcs</small>`:'<span class="fpd-ok">Pas</span>';
+   return `<tr><td><b>${esc(model.names[r.p])}</b><small>${parts}</small></td><td class="ft-num">${nf(r.total)}</td><td class="ft-num"><b>${r.batches}</b> angkatan<small>= ${nf(r.target)} pcs</small></td><td>${adj}${r.overridden?'<small class="fpd-manual">diubah manual</small>':''}</td><td>${r.rem?`<button type="button" class="fpd-flip" data-ft-prod-flip="${r.p}" title="Sisa ${r.rem} dari ${r.size} pcs">${r.dir==='up'?'Bulatkan turun':'Bulatkan naik'}</button>`:''}</td></tr>`;}).join('')}`;}).join('');
+  let prop='';
+  if(proposal&&!stale){
+   const rows=pl.rows.filter(r=>proposal.map.has(r.p)),nOut=new Set();for(const r of rows)for(const x of proposal.map.get(r.p).list)nOut.add(x.id);
+   prop=`<div class="fpd-prop"><div class="fpd-prop-head"><b>Usulan penyesuaian ke outlet</b><span>${nOut.size} outlet berubah. Kelebihan ke outlet yang sering habis stok, kekurangan dari outlet yang waste-nya tinggi. Pesanan tidak diubah.</span></div>${rows.map(r=>{const pr=proposal.map.get(r.p),add=r.diff>0;return `<details class="fpd-item"><summary><span class="${add?'fpd-plus':'fpd-minus'}">${add?'+':'−'}${Math.abs(r.diff)}</span> <b>${esc(model.names[r.p])}</b> <span class="fpd-muted">${add?'ditambah ke':'dikurangi dari'} ${pr.list.length} outlet${pr.unplaced?` · ${Math.abs(pr.unplaced)} pcs tidak bisa dibagi (jadi sisa)`:''}</span></summary><div class="fpd-chips">${pr.list.map(x=>`<span class="${x.delta>0?'up':'down'}">${esc(name(x.id))} <b>${x.delta>0?'+':'−'}${Math.abs(x.delta)}</b></span>`).join('')}</div></details>`;}).join('')}<div class="fpd-prop-actions"><button type="button" class="button" data-ft-prod-cancel>Batal</button><button type="button" class="button fp-primary" data-ft-prod-apply>Terapkan ke tabel</button></div></div>`;
+  }
+  return `<section class="fpd"><div class="fpd-head"><div><h3>Rencana produksi (angkatan)</h3><p>Total semua outlet + pesanan pabrik, dibulatkan ke angkatan dapur.</p></div><div class="fpd-mode fpd-${m.kind}"><b>${esc(m.title)}</b><span>${esc(m.text)}</span></div></div>
+   <div class="fpd-sum"><div><span>Total angkatan</span><strong>${batches}</strong></div><div><span>Kelebihan (dibulatkan naik)</span><strong class="${plus?'fpd-plus':''}">${plus?'+'+plus:0} pcs</strong></div><div><span>Kekurangan (dibulatkan turun)</span><strong class="${minus?'fpd-minus':''}">${minus?'−'+minus:0} pcs</strong></div></div>
+   <div class="ft-table-wrap fpd-wrap"><table class="ft-table fpd-table"><thead><tr><th class="fpd-l">Produk</th><th class="ft-num">Total rencana</th><th class="ft-num">Produksi</th><th class="fpd-l">Penyesuaian</th><th></th></tr></thead><tbody>${fam}</tbody></table></div>
+   ${plus||minus?(proposal&&!stale?prop:`<div class="fpd-cta">${stale?'<span class="fpd-muted">Angka berubah sejak usulan dibuat, hitung ulang.</span>':`<span>Selisih ${plus?`+${plus} pcs`:''}${plus&&minus?' dan ':''}${minus?`−${minus} pcs`:''} perlu dibagi ke outlet supaya kiriman pas dengan produksi.</span>`}<button type="button" class="button fp-primary" data-ft-prod-propose>Bagi otomatis ke outlet</button></div>`):'<p class="fpd-done">Semua rasa sudah pas dengan angkatan. Tidak ada sisa atau kekurangan.</p>'}
+  </section>`;
+ }
+ function scheduleProd(){clearTimeout(prodTimer);prodTimer=setTimeout(()=>{const el=q('#ft-prod');if(el&&draft)el.innerHTML=productionBlock(compute());},250);}
  const LW_ALERT=25;
  // Kunci setelah hari H (owner 2026-11-10): mulai 00.00 WIB tanggal kiriman, rencana hanya bisa
  // disimpan/dihapus akun Master -- juga dijaga rules Firestore (forecastOpenDate).
@@ -212,6 +237,7 @@ window.ForecastTopdown=(()=>{
    ${factoryBlock()}
    ${locked()?'<p class="fp-lock-note">🔒 Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.</p>':date<=today()?'<p class="fs-ship-note">Hari H sudah dimulai. Anda Master, jadi masih bisa mengubah, tapi rencana yang disimpan sekarang tidak dihitung di akurasi.</p>':''}
    <div class="ft-table-wrap"><table class="ft-table">${head}<tbody>${body}</tbody></table></div>
+   <div id="ft-prod">${productionBlock(c)}</div>
    <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
    <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}. Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>
   </div>`;
@@ -244,7 +270,7 @@ window.ForecastTopdown=(()=>{
   const tp=q('[data-ft-total-pcs]');if(tp)tp.textContent=nf(t.pcs+t.extra)+' pcs';
   const tx=q('[data-ft-total-extra]');if(tx)tx.textContent=t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi';
   const to=q('[data-ft-total-ord]');if(to)to.textContent=nf(t.orders)+' pcs';
-  saveLabel();
+  saveLabel();scheduleProd();
  }
  const split=s=>{const i=s.lastIndexOf(':');return [s.slice(0,i),+s.slice(i+1)];};
  function input(e){
@@ -259,7 +285,7 @@ window.ForecastTopdown=(()=>{
  }
  function change(e){
   const t=e.target;
-  if(t.id==='ft-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){date=t.value;draft=null;message='';return true;}
+  if(t.id==='ft-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){date=t.value;draft=null;message='';proposal=null;return true;}
   if(t.id==='ft-target'){input(e);return true;}
   if(t.id==='ft-per-outlet'){draft.perOutlet=t.checked;const edited=hasEdits();if(!edited){draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));message='Pembagian diperbarui.';}else message='Klik "Bagi otomatis" untuk menerapkan pengaturan ini.';persist();return true;}
   if(t.dataset.ftCell||t.dataset.ftXr||t.dataset.ftXo||t.dataset.ftOrd||t.dataset.ftNote!==undefined){input(e);return false;}
@@ -280,6 +306,11 @@ window.ForecastTopdown=(()=>{
    if(edited&&!confirm('Angka reguler yang sudah diubah manual akan diganti hasil bagi otomatis. Pesanan, produk lain & catatan tidak berubah. Lanjutkan?'))return false;
    draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));persist();message=`Target ${rp(draft.target)} sudah dibagi ke ${compute().ids.length} outlet. Teliti angkanya, lalu simpan.`;return true;
   }
+  const fl=e.target.closest('[data-ft-prod-flip]');
+  if(fl){const p=+fl.dataset.ftProdFlip,c=compute(),r=PD().plan(prodInputs(c),factoryOrders()?.qty,draft.prodOverride||{}).rows.find(x=>x.p===p);if(r){draft.prodOverride=draft.prodOverride||{};const next=r.dir==='up'?'down':'up';if(next===r.auto)delete draft.prodOverride[p];else draft.prodOverride[p]=next;persist();proposal=null;}return true;}
+  if(e.target.closest('[data-ft-prod-propose]')){const c=compute(),ins=prodInputs(c),pl=PD().plan(ins,factoryOrders()?.qty,draft.prodOverride||{});proposal={sig:prodSig(pl),map:PD().propose(pl.rows,ins)};return true;}
+  if(e.target.closest('[data-ft-prod-cancel]')){proposal=null;return true;}
+  if(e.target.closest('[data-ft-prod-apply]')){if(proposal){const ids=new Set();for(const [p,pr] of proposal.map)for(const x of pr.list){const cur=qtyOf(draft.cells[x.id][p]);draft.cells[x.id][p]=String(Math.max(0,cur+x.delta));ids.add(x.id);}persist();message=`Penyesuaian angkatan diterapkan ke ${ids.size} outlet (kotak kuning). Teliti lalu simpan ke tim.`;proposal=null;}return true;}
   if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.';return true;}saveAll();return true;}
   return false;
  }
