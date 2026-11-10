@@ -41,11 +41,7 @@ match /forecastAccess/{uid} {
 // dokumen settings -- dan Firestore memberi akses kalau SATU rule saja mengizinkan. Jadi rule
 // generik itu juga diubah (dipublikasikan 2026-11-10) menjadi:
 //   allow write: if notRadarSyncAccount() && (isSuper() && id != 'forecastSources');
-function forecastMaster() {
-  return request.auth != null
-    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
-    && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true;
-}
+// forecastMaster() dihapus 2026-11-10: tidak terpakai lagi (Firestore menolak fungsi tak terpakai).
 // 2026-11-10 (owner, revisi): yang dikunci Master hanya "Data pendukung" (itu cuma navigasi di
 // client). Sumber data, ambang batas, tampilan & daftar produk boleh diubah semua akun Forecast.
 match /settings/forecastSources {
