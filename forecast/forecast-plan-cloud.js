@@ -69,13 +69,15 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
    if(cloud.state!=='ready'||!auth.currentUser)throw Error('Masuk dengan akun staf terlebih dahulu.');
    reason=String(reason||'').trim();if(reason.length<5)throw Error('Tulis alasan penghapusan (minimal 5 huruf).');
    const uid=auth.currentUser.uid,fail=[];let ok=0;
-   for(const r of records){
-    onProgress?.(ok+fail.length+1,records.length,r);
-    const logId=`${r.key}_r${r.revision}_del_${Date.now()}`,stamp=dbSDK.serverTimestamp(),b=dbSDK.writeBatch(db);
+   const one=async(r,i)=>{
+    const logId=`${r.key}_r${r.revision}_del_${Date.now()}_${i}`,stamp=dbSDK.serverTimestamp(),b=dbSDK.writeBatch(db);
     b.set(dbSDK.doc(db,'forecastPlanLog',logId),{schemaVersion:1,action:'delete',key:r.key,date:r.date,outlet:r.outlet,revision:r.revision,reason,by:uid,byName:staffName,at:stamp,regular:r.plan.regular,orders:r.plan.orders});
     b.update(dbSDK.doc(db,'forecastPlans',r.key),{deleted:{reason,by:uid,byName:staffName,at:stamp,revision:r.revision,logId}});
     try{await b.commit();ok++;}catch(e){fail.push({r,error:e.code==='permission-denied'?'izin hapus belum aktif':'gagal tersimpan'});}
-   }
+    onProgress?.(ok+fail.length,records.length,r);
+   };
+   // 5 outlet sekaligus (tiap outlet tetap satu tulisan atomik rencana+log).
+   for(let i=0;i<records.length;i+=5)await Promise.all(records.slice(i,i+5).map((r,j)=>one(r,i+j)));
    return {ok,fail};
   };
   cloud.restorePlan=async(record,reason)=>{

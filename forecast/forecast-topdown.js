@@ -287,13 +287,16 @@ window.ForecastTopdown=(()=>{
   }
   saving=true;let ok=0;const fail=[];
   const btn=q('[data-ft-save]');if(btn){btn.disabled=true;btn.textContent='Menyimpan…';}
-  for(const id of todo){
-   say(`Menyimpan ${ok+fail.length+1}/${todo.length}: ${name(id)}…`);
+  const saveOne=async id=>{
+
    const o=c.outlets.get(id),r=record(id),regular=draft.cells[id].map(Number),orders=draft.orders[id].map(Number),items=customItemsOf(id);
    const plan={date,outlet:id,active:regular.map((v,p)=>v>0||orders[p]>0),regular,orders,note:String(draft.notes[id]||'').trim()||`Dibagi otomatis dari target omzet reguler ${rp(draft.target)}.`,prices:o.prices,recommendations:o.recs,method:o.recs.find(x=>x.method)?.method||'weekday-median-trend-v1',cutoff:o.recs.map(x=>x.through).filter(Boolean).sort().at(-1)||null,...(items.length?{customItems:items}:{})};
    if(!plan.active.some(Boolean))plan.active[2]=true;
    try{await cloud().save(plan,r?.revision||0);ok++;if(!draft.notes[id])draft.notes[id]=plan.note;}catch(err){fail.push(name(id)+(String(err.message).includes('diubah rekan')?' (diubah rekan, muat ulang)':''));}
-  }
+   say(`Menyimpan… ${ok+fail.length}/${todo.length} outlet selesai`);
+  };
+  // 5 outlet sekaligus; tiap outlet tetap satu transaksi sendiri (cek konflik versi per outlet).
+  for(let i=0;i<todo.length;i+=5)await Promise.all(todo.slice(i,i+5).map(saveOne));
   persist();saving=false;message=fail.length?`${ok} outlet tersimpan. Gagal: ${fail.join(', ')}.`:`${ok} outlet tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
  }
  // Dipakai tab detail outlet: angka hasil bagi untuk outlet+tanggal ini (kalau belum ada rencana
