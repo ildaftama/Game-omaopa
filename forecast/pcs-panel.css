@@ -573,3 +573,30 @@
 .fpp-status.draft{background:#fbf8f2;border:1px solid #eadfca;color:#5a4a2a}.fpp-status.draft b{color:#8a6212}
 .fpp-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
 @media (max-width:820px){.fpp-top{grid-template-columns:1fr}.fpp-actions{justify-content:flex-start}.fpd-seg{grid-template-columns:1fr 1fr}}
+
+/* Pengaturan > Eksperimen (grafik PCS, khusus Master) */
+.fx-intro{display:flex;flex-direction:column;gap:10px}
+.fx-controls{display:flex;gap:12px;flex-wrap:wrap}
+.fx-controls label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#536b7d}
+.fx-controls select{font:inherit;font-size:13px;padding:7px 10px;border:1px solid #d9e2e8;border-radius:8px;background:#fff;min-width:180px}
+.fx-note{margin:0;font-size:11.5px;color:#8592a0;line-height:1.5}
+.fx-card{display:flex;flex-direction:column;gap:12px}
+.fx-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px;vertical-align:0}
+.fx-chart{width:100%;height:auto;display:block;overflow:visible}
+.fx-grid{stroke:#e2e7ef;stroke-width:1}
+.fx-ax{font-size:10px;fill:#8592a0}
+.fx-wk{fill:#f1f3f6}
+.fx-pred{fill:none;stroke:#8592a0;stroke-width:1.6;stroke-dasharray:5 4}
+.fx-next{fill:#fff;stroke:#1c2b38;stroke-width:2}
+.fx-table-wrap{overflow-x:auto}
+.fx-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.fx-table th{font-weight:600;color:#536b7d;text-align:right;padding:6px 8px;border-bottom:1px solid #e2e7ef;white-space:nowrap}
+.fx-table th:first-child,.fx-table td:first-child{text-align:left}
+.fx-table td{padding:6px 8px;border-bottom:1px solid #f0f2f5}
+.fx-num{text-align:right;font-variant-numeric:tabular-nums}
+.fx-strong{font-weight:700;color:#1c2b38}
+.fx-warn{color:#b25d38;font-weight:600}
+.fx-minis{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.fx-mini{border:1px solid #eef1f5;border-radius:10px;padding:8px 10px}
+.fx-mini-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#536b7d;margin-bottom:4px}
+.fx-mini-head b{color:#1c2b38}
