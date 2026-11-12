@@ -242,11 +242,19 @@ window.ForecastTopdown=(()=>{
    <div class="ft-detail-foot"><span>Saran rentang per produk & realisasi kirim ada di detail outlet.</span><button type="button" class="button" data-ft-open-outlet="${esc(id)}">Buka detail outlet ↗</button></div>
   </div></td></tr>`;
  }
- function factoryBlock(){
-  const f=factoryOrders();
+ // Omzet pesanan pabrik (owner 2026-11-12): dihitung TERPISAH dan TIDAK PERNAH masuk omzet outlet
+ // maupun total omzet (target, omzet hasil bagi, prediksi = outlet saja). Pabrik tidak punya harga
+ // sendiri, jadi tiap produk dihargai median harga realisasi outlet tanggal itu.
+ function factoryValue(c,f){
+  if(!f)return null;let v=0;
+  f.qty.forEach((q,p)=>{if(!q)return;const ps=[...c.outlets.values()].map(o=>o.prices[p]?.value).filter(x=>x>0).sort((a,b)=>a-b);if(ps.length)v+=q*ps[Math.floor(ps.length/2)];});
+  return v;
+ }
+ function factoryBlock(c){
+  const f=factoryOrders(),fv=factoryValue(c,f);
   if(!f)return '<div class="ft-factory"><b>Pesanan pabrik</b><span>Belum tersinkron. Pesanan bertulisan "pabrik" akan muncul di sini setelah sinkron pesanan berikutnya.</span></div>';
   const items=f.qty.map((q,p)=>[q,p]).filter(([q])=>q>0);
-  return `<div class="ft-factory"><b>Pesanan pabrik · ${nf(f.qty.reduce((a,b)=>a+b,0))} pcs</b>${items.length?`<span>${items.map(([q,p])=>`${esc(model.names[p])} <b>${q}</b>`).join(' · ')}</span>`:'<span>Tidak ada pesanan untuk pabrik pada tanggal ini.</span>'}${f.partial?'<em>Sebagian varian belum pasti, cek sheet PESANAN.</em>':''}<small>Diproduksi terpisah, tidak masuk outlet mana pun. Tampil juga di Rincian kirim.</small></div>`;
+  return `<div class="ft-factory"><b>Pesanan pabrik · ${nf(f.qty.reduce((a,b)=>a+b,0))} pcs${fv?` · ${rp(fv)}`:''}</b>${items.length?`<span>${items.map(([q,p])=>`${esc(model.names[p])} <b>${q}</b>`).join(' · ')}</span>`:'<span>Tidak ada pesanan untuk pabrik pada tanggal ini.</span>'}${f.partial?'<em>Sebagian varian belum pasti, cek sheet PESANAN.</em>':''}<small>Diproduksi terpisah. Omzetnya dihitung sendiri (harga median outlet) dan tidak masuk omzet outlet maupun total omzet. Tampil juga di Rincian kirim.</small></div>`;
  }
  // Menu "3 · Rencana produksi" (owner 2026-11-10): angkatan langsung mengikuti forecast yang SEDANG
  // disusun (draft halaman Buat forecast), tidak menunggu disimpan. Unduh/bagikan gambar untuk dapur
@@ -270,7 +278,7 @@ window.ForecastTopdown=(()=>{
   const body=c.groups.map(g=>`<tr class="ft-group" style="--acc:${g.color}"><td colspan="${span}">${esc(g.name)}</td></tr>${g.ids.map(row).join('')}`).join('');
   const adjN=c.ids.filter(id=>c.outlets.get(id).adj.pct).length;
   const changedN=c.ids.filter(id=>statusOf(id)[0]!=='saved').length,existing=c.ids.filter(id=>record(id)).length;
-  const fo=factoryOrders(),foN=fo?fo.qty.reduce((a,b)=>a+b,0):null;
+  const fo=factoryOrders(),foN=fo?fo.qty.reduce((a,b)=>a+b,0):null,foV=factoryValue(c,fo);
   return `<div class="ft-wrap">
    <div class="ft-top">
     <label class="ft-date">Tanggal kiriman<input type="date" id="ft-date" value="${date}"></label>
@@ -284,12 +292,12 @@ window.ForecastTopdown=(()=>{
    <div class="ft-extras"><div><b>Produk lain (diisi manual)</b><span>${draft.names.length?draft.names.map(esc).join(' · '):'Belum ada'}. Tampil sebagai kolom di kanan tabel, tidak ikut dibagi dari omzet. Tambah, ganti nama, atau hapus produk di <b>Pengaturan › Produk</b>.</span></div></div>
    <p class="ft-sub">${esc(dateLabel(date))} · ${diff==null?'':Math.abs(diff)<.05?'Target sesuai prediksi · ':`Target ${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi · `}porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir. Kotak kuning = sudah diubah dari hasil bagi otomatis. Klik nama outlet untuk mengubah pesanan & catatannya.</p>
    <div class="ft-summary">
-    <div><span>Omzet hasil bagi</span><strong data-ft-total-val>${rp(t.val)}</strong><small>12 produk inti</small></div>
+    <div><span>Omzet hasil bagi · total outlet</span><strong data-ft-total-val>${rp(t.val)}</strong><small>12 produk inti, tanpa pesanan pabrik</small></div>
     <div><span>Total reguler</span><strong data-ft-total-pcs>${nf(t.pcs+t.extra)} pcs</strong><small data-ft-lw-total>${esc(lwTotal(c))}</small><small data-ft-total-extra>${t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi'}</small></div>
     <div><span>Pesanan outlet</span><strong data-ft-total-ord>${nf(t.orders)} pcs</strong><small>ditambahkan terpisah</small></div>
-    <div><span>Pesanan pabrik</span><strong>${foN==null?'—':nf(foN)+' pcs'}</strong><small>${foN==null?'menunggu sinkron':'tidak masuk outlet'}</small></div>
+    <div><span>Omzet pesanan pabrik</span><strong>${foN==null?'—':rp(foV||0)}</strong><small>${foN==null?'menunggu sinkron':`${nf(foN)} pcs · terpisah, tidak masuk total`}</small></div>
    </div>
-   ${factoryBlock()}
+   ${factoryBlock(c)}
    ${locked()?'<p class="fp-lock-note">🔒 Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.</p>':date<=today()?'<p class="fs-ship-note">Hari H sudah dimulai. Anda Master, jadi masih bisa mengubah, tapi rencana yang disimpan sekarang tidak dihitung di akurasi.</p>':''}
    <div class="ft-table-wrap"><table class="ft-table">${head}<tbody>${body}</tbody></table></div>
    <div id="ft-prod">${productionBlock(c)}</div>
