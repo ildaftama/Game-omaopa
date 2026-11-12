@@ -51,12 +51,15 @@ window.ForecastExperiment=(()=>{
   const ck=k+'|'+target;if(cache.pred.has(ck))return cache.pred.get(ck);
   const v=predictRaw(m,target);cache.pred.set(ck,v);return v;
  }
+ // Tanggal sebagai nomor hari (integer) -- jauh lebih cepat daripada objek Date per langkah.
+ const dn=s=>Math.round(Date.parse(s+'T00:00:00Z')/864e5);
  function predictRaw(m,target){
-  const from=shift(target,-56),rows=[];
-  for(let d=from;d<target;d=shift(d,1))if(m.has(d))rows.push([d,m.get(d)]);
+  if(!m.byNum)m.byNum=new Map([...m].map(([d,v])=>[dn(d),v]));
+  const T=dn(target),rows=[];
+  for(let d=T-56;d<T;d++)if(m.byNum.has(d))rows.push([d,m.byNum.get(d)]);
   if(!rows.length)return null;
-  const same=rows.filter(([d])=>dow(d)===dow(target)),sel=same.length>=3?same:rows.slice(-14);
-  const recent=rows.filter(([d])=>d>=shift(target,-14)).map(r=>r[1]),prior=rows.filter(([d])=>d<shift(target,-14)&&d>=shift(target,-28)).map(r=>r[1]);
+  const same=rows.filter(([d])=>(T-d)%7===0),sel=same.length>=3?same:rows.slice(-14);
+  const recent=rows.filter(([d])=>d>=T-14).map(r=>r[1]),prior=rows.filter(([d])=>d<T-14&&d>=T-28).map(r=>r[1]);
   const a=median(recent),b=median(prior),trend=a!=null&&b>0?Math.max(.85,Math.min(1.15,a/b)):1;
   return Math.round(median(sel.map(r=>r[1]))*trend);
  }
