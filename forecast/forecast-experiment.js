@@ -6,9 +6,12 @@
 // harga per pcs tiap produk berbeda, jadi satu pengali omzet untuk semua produk bisa bias.
 //
 // Prediksi tiap tanggal D dihitung HANYA dari data sebelum D (tidak bocor ke masa depan), dengan
-// metode yang sama seperti saran reguler ForecastPlanner.recommend versi tanpa snapshot: median
-// hari yang sama 8 minggu terakhir (min. 3 titik, kalau kurang: median 14 hari terakhir) x tren
-// (median 14 hari terakhir / 14 hari sebelumnya, dibatasi 0,85-1,15). Prediksi kategori = jumlah
+// pola yang sama seperti saran reguler ForecastPlanner.recommend versi tanpa snapshot -- hari yang
+// sama 8 minggu terakhir (min. 3 titik, kalau kurang: 14 hari terakhir) x tren (14 hari terakhir /
+// 14 hari sebelumnya, dibatasi 0,85-1,15) -- TAPI memakai RATA-RATA, bukan median (2026-11-12):
+// Mini Ogura per outlet cuma 0-3 pcs/hari, median-nya 0 di ±20 dari 28 outlet sehingga total
+// prediksi cuma separuh real (akurasi 48%, bias -45%). Rata-rata: 65%, bias -5%; Malmil/Ogura
+// praktis sama (diuji 28 hari, semua outlet). Prediksi kategori = jumlah
 // prediksi rasanya. Semua outlet = jumlah per outlet (outlet-hari yang datanya belum lengkap dilewati).
 window.ForecastExperiment=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -19,7 +22,7 @@ window.ForecastExperiment=(()=>{
  const dow=s=>new Date(s+'T12:00:00Z').getUTCDay();
  const DAY=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
  const short=s=>{const [,m,d]=s.split('-');return `${+d}/${+m}`;};
- const median=a=>{if(!a.length)return null;const b=[...a].sort((x,y)=>x-y),i=(b.length-1)/2;return (b[Math.floor(i)]+b[Math.ceil(i)])/2;};
+ const mean=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
  const CATS=[
   {name:'Malmil',color:'#b25d38',items:[[2,'Cheese'],[3,'Choco']]},
   {name:'Ogura',color:'#244c78',items:[[0,'Cheese'],[1,'Choco']]},
@@ -60,8 +63,8 @@ window.ForecastExperiment=(()=>{
   if(!rows.length)return null;
   const same=rows.filter(([d])=>(T-d)%7===0),sel=same.length>=3?same:rows.slice(-14);
   const recent=rows.filter(([d])=>d>=T-14).map(r=>r[1]),prior=rows.filter(([d])=>d<T-14&&d>=T-28).map(r=>r[1]);
-  const a=median(recent),b=median(prior),trend=a!=null&&b>0?Math.max(.85,Math.min(1.15,a/b)):1;
-  return Math.round(median(sel.map(r=>r[1]))*trend);
+  const a=mean(recent),b=mean(prior),trend=a!=null&&b>0?Math.max(.85,Math.min(1.15,a/b)):1;
+  return Math.round(mean(sel.map(r=>r[1]))*trend);
  }
  // Untuk satu produk: per tanggal {real, pred}, dijumlah atas outlet terpilih.
  function productDays(p,dates){
@@ -122,7 +125,7 @@ window.ForecastExperiment=(()=>{
     <div class="fx-minis">${minis}</div></article>`;
   }).join('');
   return `<article class="workspace-card fx-intro"><div><h3 class="fs-h3">Grafik PCS per kategori & rasa <small>eksperimen · hanya Master</small></h3>
-   <p class="fs-use">Garis tebal = penjualan <b>reguler real tanpa pesanan</b>. Garis putus-putus = prediksi PCS yang dihitung hanya dari data sebelum tanggal itu (median hari yang sama 8 minggu × tren). Titik bulat = prediksi untuk hari yang belum ada datanya. Area abu-abu = Sabtu/Minggu. Arahkan kursor ke grafik untuk melihat angka per hari. Halaman ini tidak mengubah forecast tim.</p></div>
+   <p class="fs-use">Garis tebal = penjualan <b>reguler real tanpa pesanan</b>. Garis putus-putus = prediksi PCS yang dihitung hanya dari data sebelum tanggal itu (rata-rata hari yang sama 8 minggu × tren). Titik bulat = prediksi untuk hari yang belum ada datanya. Area abu-abu = Sabtu/Minggu. Arahkan kursor ke grafik untuk melihat angka per hari. Halaman ini tidak mengubah forecast tim.</p></div>
    <div class="fx-controls"><label>Outlet<select data-fx-outlet>${opts}</select></label><label>Periode<select data-fx-range>${RANGES.map(([n,l])=>`<option value="${n}" ${range===n?'selected':''}>${l}</option>`).join('')}</select></label></div>
    <p class="fx-note">Akurasi = 100% − selisih absolut ÷ penjualan real (rumus sama dengan akurasi di Dashboard), dihitung per hari untuk ${outlet==='__all__'?'total semua outlet':'outlet ini'}. Bias + = prediksi cenderung kelebihan. Data real terakhir: ${last?esc(last):'—'}.${gaps.length?` <b>Tanggal tanpa data PCS:</b> ${esc(gaps)} (garis terputus).`:''}</p></article>${cards}`;
  }
