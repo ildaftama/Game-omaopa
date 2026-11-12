@@ -33,18 +33,25 @@ window.ForecastExperiment=(()=>{
  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
 
  // Seri reguler real per outlet x produk, di-cache per versi data penjualan/pesanan.
- let cache={key:'',series:new Map()};
+ // Data dipotong per outlet SEKALI (estimatedPartition memindai seluruh hari penjualan tiap
+ // dipanggil -- tanpa ini "Semua outlet" butuh ±9 detik).
+ let cache={key:'',series:new Map(),pred:new Map(),byId:null};
  function series(id,p){
   const {sales,orders}=data(),key=(sales?.updatedAt||'')+'|'+(orders?.updatedAt||'')+'|'+(sales?.days?.length||0);
-  if(cache.key!==key)cache={key,series:new Map()};
+  if(cache.key!==key)cache={key,series:new Map(),pred:new Map(),byId:null};
   const k=id+'|'+p;if(cache.series.has(k))return cache.series.get(k);
-  const dates=[...new Set((sales.days||[]).filter(r=>r.id===id).map(r=>r.date))].sort();
+  if(!cache.byId){const b=new Map(),pick=(src,f)=>{for(const r of src?.days||[]){const e=b.get(r.id)||{s:[],o:[]};e[f].push(r);b.set(r.id,e);}};pick(sales,'s');pick(orders,'o');cache.byId=b;}
+  const e=cache.byId.get(id)||{s:[],o:[]},dates=[...new Set(e.s.map(r=>r.date))].sort();
   const m=new Map();
-  for(const r of window.PcsMath.estimatedPartition(sales,orders,[id],p,dates))if(r.retail.complete&&r.retail.value!=null)m.set(r.date,r.retail.value);
+  for(const r of window.PcsMath.estimatedPartition({...sales,days:e.s},{...orders,days:e.o},[id],p,dates))if(r.retail.complete&&r.retail.value!=null)m.set(r.date,r.retail.value);
   cache.series.set(k,m);return m;
  }
  // Prediksi untuk tanggal target dari seri m, hanya memakai tanggal < target.
- function predict(m,target){
+ function predict(m,target,k){
+  const ck=k+'|'+target;if(cache.pred.has(ck))return cache.pred.get(ck);
+  const v=predictRaw(m,target);cache.pred.set(ck,v);return v;
+ }
+ function predictRaw(m,target){
   const from=shift(target,-56),rows=[];
   for(let d=from;d<target;d=shift(d,1))if(m.has(d))rows.push([d,m.get(d)]);
   if(!rows.length)return null;
@@ -59,7 +66,7 @@ window.ForecastExperiment=(()=>{
   const out=dates.map(date=>({date,real:null,pred:null,pairReal:0,pairPred:0}));
   for(const id of ids){
    const m=series(id,p);
-   out.forEach(o=>{const pr=predict(m,o.date),re=m.has(o.date)?m.get(o.date):null;
+   out.forEach(o=>{const pr=predict(m,o.date,id+'|'+p),re=m.has(o.date)?m.get(o.date):null;
     if(pr!=null)o.pred=(o.pred||0)+pr;if(re!=null)o.real=(o.real||0)+re;
     if(pr!=null&&re!=null){o.pairReal+=re;o.pairPred+=pr;}});
   }
