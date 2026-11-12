@@ -596,7 +596,7 @@
 .fx-num{text-align:right;font-variant-numeric:tabular-nums}
 .fx-strong{font-weight:700;color:#1c2b38}
 .fx-warn{color:#b25d38;font-weight:600}
-.fx-minis{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.fx-minis{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
 .fx-mini{border:1px solid #eef1f5;border-radius:10px;padding:8px 10px}
 .fx-mini-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#536b7d;margin-bottom:4px}
 .fx-mini-head b{color:#1c2b38}
