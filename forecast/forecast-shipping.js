@@ -29,8 +29,12 @@ window.ForecastShipping=(()=>{
  // Kunci: indeks SKU inti, atau nama produk lain (huruf kecil; nama lama/alias ikut dicek).
  const ROW_BG={4:'#fff6a8',5:'#fbd2a6',6:'#b9efbf',7:'#fdeadd',8:'#fdeadd',9:'#fde0a6',10:'#d3e3f6',11:'#d3e3f6',
   'box mini':'#e2dcf0','chiffon kurma':'#f4c6a6','roti sosis':'#f7d6d2','roti manis sosis':'#f7d6d2','roti abon':'#bdd3f6','roti manis abon':'#bdd3f6',
-  'roti coklat':'#d6eacb','roti manis coklat meses':'#d6eacb','whip':'#f8d3b8'};
- const rowBg=src=>typeof src==='number'?ROW_BG[src]||null:[src.name,...(src.aliases||[])].map(n=>ROW_BG[String(n).trim().toLowerCase()]).find(Boolean)||null;
+  'roti coklat':'#d6eacb','roti manis coklat meses':'#d6eacb','whip':'#f8d3b8',
+  // Roti baru (belum ada di format lama) -- warna lembut sendiri yang tidak bentrok.
+  'roti coklat keju':'#ecdcc8','roti manis coklat keju':'#ecdcc8','roti pisang coklat':'#e4eec4','roti manis coklat pisang':'#e4eec4','roti vanilla':'#f4edc9','roti manis vanilla':'#f4edc9'};
+ // Cocok NAMA SEKARANG saja: alias = nama lama yang bisa jadi milik produk lain (mis. "Roti Coklat
+ // Keju" dulunya "Roti Sosis"), jadi warna tidak boleh ikut alias.
+ const rowBg=src=>typeof src==='number'?ROW_BG[src]||null:ROW_BG[String(src.name).trim().toLowerCase()]||null;
  function buildRows(){const core=PR().core(),out=[];for(const p of PR().CORE_ORDER){const c=core[p];if(c.ship)out.push([c.label,p,c.dot,c.cat,rowBg(p)]);}for(const x of PR().extra())out.push([x.name,x,x.dot,x.cat,rowBg(x)]);
   // Urutkan per kategori, urutan dalam kategori tetap.
   return CATS.flatMap((_,ci)=>out.filter(r=>r[3]===ci));}
