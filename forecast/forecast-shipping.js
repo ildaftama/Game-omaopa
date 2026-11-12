@@ -8,14 +8,16 @@ window.ForecastShipping=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
  const shift=(d,n)=>window.ForecastPlanner.shift(d,n);
- // Warna dibuat kalem & seragam (owner 2026-11-10: versi pertama terlalu kontras). Tiap rute
- // punya satu warna aksen lembut; produk dibedakan lewat titik warna kecil + kelompok kategori,
- // bukan latar baris mencolok, supaya tetap mudah dibaca di layar HP grup WA.
+ // Warna (owner 2026-11-12): tim packing SUDAH HAFAL warna format logistik lama -- latar baris per
+ // produk (Mini Cheese kuning, Mini Choco oranye, Durian hijau, Chiffon Classic peach, Lite biru,
+ // dst.) dan warna header per rute (Semarang & Magelang ungu muda, Solo hijau, Jogja toska).
+ // Versi "kalem" 2026-11-10 menggantinya dengan baris abu-abu -> pembagian kue jadi rawan salah.
+ // Warnanya dikembalikan dengan HUE yang sama, hanya dilembutkan (bukan diganti).
  const GROUPS=[
-  {name:'Semarang',color:'#6c5b9e',outlets:[['unnes','UNNES'],['sampangan','SAMPANGAN'],['undip','UNDIP'],['udinus','UDINUS'],['unimus','UNIMUS'],['ngaliyan','NGALIYAN'],['gajah-raya','GAJAH RAYA']]},
-  {name:'Magelang – Salatiga',color:'#9a5f84',outlets:[['muntilann','MUNTILAN'],['pemuda-magelang','MAGELANG'],['temanggung','TEMANGGUNG'],['uksw','UKSW'],['ambarawa','AMBARAWA']]},
-  {name:'Solo',color:'#4e8a5e',outlets:[['merbabu','MERBABU'],['rajawali','RAJAWALI'],['ums','UMS'],['makamhaji','MAKAMHAJI'],['laweyan','LAWEYAN'],['sukoharjo','SUKOHARJO'],['nusukan','NUSUKAN'],['uns','JEBRES'],['sragen','SRAGEN'],['karanganyar','KARANGANYAR'],['boyolali','BOYOLALI']]},
-  {name:'Jogja',color:'#2e7f8f',outlets:[['nusa-indah','NUSA INDAH'],['umy','UMY'],['jakal-uii','JAKAL'],['tajem','TAJEM'],['godean','GODEAN']]},
+  {name:'Semarang',color:'#7a5f9a',soft:'#e6d6ee',outlets:[['unnes','UNNES'],['sampangan','SAMPANGAN'],['undip','UNDIP'],['udinus','UDINUS'],['unimus','UNIMUS'],['ngaliyan','NGALIYAN'],['gajah-raya','GAJAH RAYA']]},
+  {name:'Magelang – Salatiga',color:'#7a5f9a',soft:'#e6d6ee',outlets:[['muntilann','MUNTILAN'],['pemuda-magelang','MAGELANG'],['temanggung','TEMANGGUNG'],['uksw','UKSW'],['ambarawa','AMBARAWA']]},
+  {name:'Solo',color:'#4e8a5e',soft:'#d2ebce',outlets:[['merbabu','MERBABU'],['rajawali','RAJAWALI'],['ums','UMS'],['makamhaji','MAKAMHAJI'],['laweyan','LAWEYAN'],['sukoharjo','SUKOHARJO'],['nusukan','NUSUKAN'],['uns','JEBRES'],['sragen','SRAGEN'],['karanganyar','KARANGANYAR'],['boyolali','BOYOLALI']]},
+  {name:'Jogja',color:'#2a8f99',soft:'#bfeef0',outlets:[['nusa-indah','NUSA INDAH'],['umy','UMY'],['jakal-uii','JAKAL'],['tajem','TAJEM'],['godean','GODEAN']]},
  ];
  // Baris = [label, sumber, titik warna, kategori]; sumber = indeks SKU inti atau objek produk
  // lain. Daftar & nama mengikuti Pengaturan › Produk (forecast-products.js), dibangun ulang
@@ -23,7 +25,13 @@ window.ForecastShipping=(()=>{
  const PR=()=>window.ForecastProducts;
  const CATS=PR().CATS;
  let ROWS=[];
- function buildRows(){const core=PR().core(),out=[];for(const p of PR().CORE_ORDER){const c=core[p];if(c.ship)out.push([c.label,p,c.dot,c.cat]);}for(const x of PR().extra())out.push([x.name,x,x.dot,x.cat]);
+ // Latar baris = warna format logistik lama, dilembutkan (hue sama). Ogura/Malmil memang putih.
+ // Kunci: indeks SKU inti, atau nama produk lain (huruf kecil; nama lama/alias ikut dicek).
+ const ROW_BG={4:'#fff6a8',5:'#fbd2a6',6:'#b9efbf',7:'#fdeadd',8:'#fdeadd',9:'#fde0a6',10:'#d3e3f6',11:'#d3e3f6',
+  'box mini':'#e2dcf0','chiffon kurma':'#f4c6a6','roti sosis':'#f7d6d2','roti manis sosis':'#f7d6d2','roti abon':'#bdd3f6','roti manis abon':'#bdd3f6',
+  'roti coklat':'#d6eacb','roti manis coklat meses':'#d6eacb','whip':'#f8d3b8'};
+ const rowBg=src=>typeof src==='number'?ROW_BG[src]||null:[src.name,...(src.aliases||[])].map(n=>ROW_BG[String(n).trim().toLowerCase()]).find(Boolean)||null;
+ function buildRows(){const core=PR().core(),out=[];for(const p of PR().CORE_ORDER){const c=core[p];if(c.ship)out.push([c.label,p,c.dot,c.cat,rowBg(p)]);}for(const x of PR().extra())out.push([x.name,x,x.dot,x.cat,rowBg(x)]);
   // Urutkan per kategori, urutan dalam kategori tetap.
   return CATS.flatMap((_,ci)=>out.filter(r=>r[3]===ci));}
  const REQ_ROWS=[['Ogura Cheese'],['Ogura Chocolate'],['Malmil Cheese'],['Malmil Choco'],['Mini pcs cheese'],['Mini pcs choco'],['Mini pcs durian'],['Chiffon Keju'],['Chiffon Ekstra Keju'],['Chiffon Lite Keju'],['Chiffon Lite Ekstra Keju'],['Chiffon Butter'],['Roti Manis Sosis'],['Roti Manis Abon'],['Roti Manis Coklat']];
@@ -70,8 +78,8 @@ window.ForecastShipping=(()=>{
  function render(view){
   if(!date)date=shift(today(),1);ROWS=buildRows();
   const by=plans(),groups=groupData(by),missing=groups.flatMap(g=>g.cols.filter(c=>!c.record).map(c=>c.label)),reqs=requests();
-  const body=g=>CATS.map((cat,ci)=>`<tr class="fs-cat"><td colspan="${g.cols.length+2}">${esc(cat)}</td></tr>${ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${g.cols.map(c=>numCell(c.values[ri])).join('')}${numCell(g.totals[ri]).replace('<td','<td data-tot')}</tr>`).join('')}`).join('');
-  const table=g=>`<section class="fs-ship-card" style="--acc:${g.color};--acc-soft:${tint(g.color,.9)};--acc-ink:${shade(g.color,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">${esc(g.name)}</h3><span class="fs-ship-meta">${g.filled}/${g.cols.length} outlet terisi${g.grand!=null?` · ${nf(g.grand)} pcs`:''}</span></header><div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner" rowspan="2">Produk</th>${g.cols.map(c=>`<th class="${c.record?'':'fs-ship-missing'}" title="${c.record?'':'Belum ada rencana tersimpan'}">${esc(c.label)}</th>`).join('')}<th class="fs-ship-totalh" rowspan="2">Total</th></tr><tr class="fs-ship-pctrow">${g.cols.map(c=>`<th><label class="fs-ship-pct"><input type="number" min="0" max="100" step="5" value="${c.pct}" data-ship-pct="${esc(c.id)}" aria-label="Persen pengiriman pertama ${esc(c.label)}"><span>%</span></label></th>`).join('')}</tr></thead><tbody>${body(g)}</tbody></table></div></section>`;
+  const body=g=>CATS.map((cat,ci)=>`<tr class="fs-cat"><td colspan="${g.cols.length+2}">${esc(cat)}</td></tr>${ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot,,bg],ri])=>`<tr${bg?` class="fs-row-bg" style="--row:${bg}"`:''}><td>${bg?'':`<span class="fs-dot" style="background:${dot}"></span>`}${esc(label)}</td>${g.cols.map(c=>numCell(c.values[ri])).join('')}${numCell(g.totals[ri]).replace('<td','<td data-tot')}</tr>`).join('')}`).join('');
+  const table=g=>`<section class="fs-ship-card" style="--acc:${g.color};--acc-soft:${g.soft||tint(g.color,.9)};--acc-ink:${shade(g.color,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">${esc(g.name)}</h3><span class="fs-ship-meta">${g.filled}/${g.cols.length} outlet terisi${g.grand!=null?` · ${nf(g.grand)} pcs`:''}</span></header><div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner" rowspan="2">Produk</th>${g.cols.map(c=>`<th class="${c.record?'':'fs-ship-missing'}" title="${c.record?'':'Belum ada rencana tersimpan'}">${esc(c.label)}</th>`).join('')}<th class="fs-ship-totalh" rowspan="2">Total</th></tr><tr class="fs-ship-pctrow">${g.cols.map(c=>`<th><label class="fs-ship-pct"><input type="number" min="0" max="100" step="5" value="${c.pct}" data-ship-pct="${esc(c.id)}" aria-label="Persen pengiriman pertama ${esc(c.label)}"><span>%</span></label></th>`).join('')}</tr></thead><tbody>${body(g)}</tbody></table></div></section>`;
   const reqTable=`<section class="fs-ship-card fs-req-card" style="--acc:${REQ_ACCENT};--acc-soft:${tint(REQ_ACCENT,.9)};--acc-ink:${shade(REQ_ACCENT,.3)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Request tambahan</h3><span class="fs-ship-meta">Pesanan manajemen sebelah · tersimpan di perangkat ini</span></header><div class="fs-ship-wrap"><table class="fs-ship fs-req"><thead><tr><th class="fs-ship-corner">Produk</th>${reqs.map((c,i)=>`<th><div class="fs-req-name"><input type="text" maxlength="40" value="${esc(c.name)}" data-req-name="${i}" placeholder="Nama peminta" aria-label="Nama peminta"><button type="button" class="fs-req-remove" data-req-remove="${i}" aria-label="Hapus kolom" title="Hapus kolom">×</button></div></th>`).join('')}<th class="fs-req-addcell"><button type="button" class="fs-req-add" data-req-add>+ Tambah peminta</button></th></tr></thead><tbody>${REQ_ROWS.map(([label],ri)=>`<tr><td>${esc(label)}</td>${reqs.map((c,i)=>`<td><input type="number" min="0" max="10000" step="1" value="${c.qty?.[ri]??''}" data-req-qty="${i}:${ri}" aria-label="${esc(label)}" placeholder="0"></td>`).join('')}<td></td></tr>`).join('')}<tr class="fs-cat"><td colspan="${reqs.length+2}">Pengambilan / pengiriman</td></tr><tr><td>Waktu</td>${reqs.map((c,i)=>`<td><input type="text" maxlength="30" value="${esc(c.time||'')}" data-req-time="${i}" placeholder="Pukul 09.30"></td>`).join('')}<td></td></tr><tr><td>Cara</td>${reqs.map((c,i)=>`<td><select data-req-method="${i}">${METHODS.map(m=>`<option ${c.method===m?'selected':''}>${m}</option>`).join('')}</select></td>`).join('')}<td></td></tr></tbody></table></div>${reqs.length?'':'<p class="fs-req-empty">Belum ada request. Klik <b>+ Tambah peminta</b> untuk menambah kolom (misalnya Admin Pogung atau Marketing HO).</p>'}</section>`;
   const f=factory(),fRows=PR().CORE_ORDER.map(p=>PR().core()[p]).map(c=>[[c.label,c.p,c.dot,c.cat],c.p]);
   const factoryCard=`<section class="fs-ship-card fs-factory-card" style="--acc:${FACTORY_ACCENT};--acc-soft:${tint(FACTORY_ACCENT,.9)};--acc-ink:${shade(FACTORY_ACCENT,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Pesanan pabrik</h3><span class="fs-ship-meta">${f?`${f.orders} pesanan · ${nf(f.total)} pcs`:'menunggu sinkron pesanan'} · tidak masuk outlet</span></header>${!f?'<p class="fs-req-empty">Pesanan bertulisan "pabrik" di sheet PESANAN akan tampil di sini setelah sinkron pesanan berikutnya.</p>':!f.total?'<p class="fs-req-empty">Tidak ada pesanan untuk pabrik pada tanggal ini.</p>':`<div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner">Produk</th><th class="fs-ship-totalh">Pabrik</th></tr></thead><tbody>${fRows.filter(([r])=>f.qty[r[1]]>0).map(([[label,src,dot]])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${numCell(f.qty[src]).replace('<td','<td data-tot')}</tr>`).join('')}</tbody></table></div>${f.partial?'<p class="fs-req-empty">Sebagian varian pesanan belum pasti, cek sheet PESANAN.</p>':''}`}</section>`;
@@ -91,13 +99,13 @@ window.ForecastShipping=(()=>{
    <div class="fs-ship-list">${groups.map(table).join('')}${factoryCard}${reqTable}</div>`;
  }
  // ---- Gambar (canvas) ----
- function drawTable({title,accent,colLabels,subLabels,sections,showTotal,totalLabel}){
+ function drawTable({title,accent,soft:headSoft,colLabels,subLabels,sections,showTotal,totalLabel}){
   const F='"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
   const LW=232,CW=98,TW=showTotal?88:0,RH=30,CH=26,HH=44,SH=24,PAD=28,HEAD=86,FOOT=40;
   const cols=colLabels.length,bodyH=sections.reduce((a,s)=>a+(s.title?CH:0)+s.rows.length*RH,0);
   const TWD=LW+CW*cols+TW,W=PAD*2+TWD,headH=HH+(subLabels?SH:0),H=PAD+HEAD+headH+bodyH+FOOT;
   const cv=document.createElement('canvas'),scale=2;cv.width=W*scale;cv.height=H*scale;const x=cv.getContext('2d');x.scale(scale,scale);
-  const soft=tint(accent,.88),ink=shade(accent,.35),totBg=tint(accent,.95);
+  const soft=headSoft||tint(accent,.88),ink=shade(accent,.35),totBg=tint(accent,.95);
   const text=(t,tx,ty,{size=13,weight=400,color='#1f2d3a',align='left'}={})=>{x.font=`${weight} ${size}px ${F}`;x.fillStyle=color;x.textAlign=align;x.textBaseline='middle';const ls=String(t).split('\n'),lh=size+3;ls.forEach((l,i)=>x.fillText(l,tx,ty-(ls.length-1)*lh/2+i*lh));};
   const rect=(rx,ry,w,h,c)=>{x.fillStyle=c;x.fillRect(rx,ry,w,h);};
   const hline=(ry,c='#e5e9ee',w=1)=>{x.strokeStyle=c;x.lineWidth=w;x.beginPath();x.moveTo(PAD,ry+.5);x.lineTo(PAD+TWD,ry+.5);x.stroke();};
@@ -116,8 +124,9 @@ window.ForecastShipping=(()=>{
   for(const s of sections){
    if(s.title){rect(PAD,y,TWD,CH,'#f1f4f7');text(s.title.toUpperCase(),PAD+14,y+CH/2,{size:10.5,weight:700,color:'#66768a'});y+=CH;hline(y,'#e5e9ee');zebra=0;}
    for(const r of s.rows){
-    rect(PAD,y,TWD,RH,zebra++%2?'#fafbfc':'#ffffff');if(showTotal)rect(PAD+LW+CW*cols,y,TW,RH,totBg);
-    let lx=PAD+14;if(r.dot){x.fillStyle=r.dot;x.beginPath();x.arc(lx+4,y+RH/2,4.5,0,Math.PI*2);x.fill();lx+=16;}
+    if(r.bg){rect(PAD,y,TWD,RH,r.bg);if(showTotal)rect(PAD+LW+CW*cols,y,TW,RH,shade(r.bg,.06));zebra++;}
+    else{rect(PAD,y,TWD,RH,zebra++%2?'#fafbfc':'#ffffff');if(showTotal)rect(PAD+LW+CW*cols,y,TW,RH,totBg);}
+    let lx=PAD+14;if(r.dot&&!r.bg){x.fillStyle=r.dot;x.beginPath();x.arc(lx+4,y+RH/2,4.5,0,Math.PI*2);x.fill();lx+=16;}
     text(r.label,lx,y+RH/2,{size:13,color:'#24323f'});
     const cellTxt=(v,px,bold)=>{if(v==null||v==='')return text(v==null?'—':'',px,y+RH/2,{size:13,color:'#b7c0ca',align:'center'});if(typeof v==='number'||/^\d+$/.test(String(v))){const n=Number(v);return text(nf(n),px,y+RH/2,{size:13,weight:n?700:400,color:n?(bold?ink:'#1c2b38'):'#b7c0ca',align:'center'});}text(v,px,y+RH/2,{size:11.5,color:'#24323f',align:'center'});};
     r.values.forEach((v,i)=>cellTxt(v,cx(i)));
@@ -135,8 +144,8 @@ window.ForecastShipping=(()=>{
  function images(view){
   ROWS=buildRows();const by=plans(),groups=groupData(by),out=[];
   if(view==='production'){const pr=production(by);if(pr){const core=PR().core();out.push({name:`Rencana Produksi ${date}.png`,canvas:drawTable({title:'Rencana Produksi (angkatan)',accent:'#3d5566',showTotal:true,totalLabel:'ANGKATAN',colLabels:['Total pcs'],sections:window.ForecastProduction.families().map(fm=>({title:`${fm.label} · ${fm.size} pcs/angkatan`,rows:pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?{label:`Mini campur 3 rasa (sisa ${r.leftover})`,dot:'#a597c7',values:[r.total],total:String(r.full)}:{label:core[r.p].label,dot:core[r.p].dot,values:[r.total],total:r.rem?`${r.full} +${r.rem}`:String(r.full)})}))})});}return out;}
-  for(const g of groups)out.push({name:`Pengiriman ${g.name} ${date}.png`,canvas:drawTable({title:`Pengiriman Pertama · ${g.name}`,accent:g.color,showTotal:true,colLabels:g.cols.map(c=>c.label),subLabels:g.cols.map(c=>c.record?c.pct+'%':'belum ada'),
-   sections:CATS.map((cat,ci)=>({title:cat,rows:ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot],ri])=>({label,dot,values:g.cols.map(c=>c.values[ri]),total:g.totals[ri]}))}))})});
+  for(const g of groups)out.push({name:`Pengiriman ${g.name} ${date}.png`,canvas:drawTable({title:`Pengiriman Pertama · ${g.name}`,accent:g.color,soft:g.soft,showTotal:true,colLabels:g.cols.map(c=>c.label),subLabels:g.cols.map(c=>c.record?c.pct+'%':'belum ada'),
+   sections:CATS.map((cat,ci)=>({title:cat,rows:ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot,,bg],ri])=>({label,dot,bg,values:g.cols.map(c=>c.values[ri]),total:g.totals[ri]}))}))})});
   if(false){const core=PR().core();out.unshift({name:`Rencana Produksi ${date}.png`,canvas:drawTable({title:'Rencana Produksi (angkatan)',accent:'#3d5566',showTotal:true,totalLabel:'ANGKATAN',colLabels:['Total pcs'],sections:window.ForecastProduction.families().map(fm=>({title:`${fm.label} · ${fm.size} pcs/angkatan`,rows:pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?{label:`Mini campur 3 rasa (sisa ${r.leftover})`,dot:'#a597c7',values:[r.total],total:String(r.full)}:{label:core[r.p].label,dot:core[r.p].dot,values:[r.total],total:r.rem?`${r.full} +${r.rem}`:String(r.full)})}))})});}
   const f=factory();
   if(f&&f.total){const rows=PR().CORE_ORDER.map(p=>PR().core()[p]).filter(c=>f.qty[c.p]>0).map(c=>({label:c.label,dot:c.dot,values:[f.qty[c.p]],total:null}));out.push({name:`Pesanan Pabrik ${date}.png`,canvas:drawTable({title:'Pesanan Pabrik',accent:FACTORY_ACCENT,showTotal:false,colLabels:['Pabrik'],sections:[{rows}]})});}

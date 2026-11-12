@@ -600,3 +600,8 @@
 .fx-mini{border:1px solid #eef1f5;border-radius:10px;padding:8px 10px}
 .fx-mini-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#536b7d;margin-bottom:4px}
 .fx-mini-head b{color:#1c2b38}
+
+/* Rincian kirim: latar baris per produk (warna format logistik lama yang dihafal tim packing) */
+.fs-ship tbody tr.fs-row-bg td,.fs-ship tbody tr.fs-row-bg:hover td{background:var(--row)}
+.fs-ship tbody tr.fs-row-bg td[data-tot]{background:color-mix(in srgb,var(--row) 88%,#000)}
+.fs-ship tbody tr.fs-row-bg td{border-bottom-color:rgba(0,0,0,.06)}
