@@ -7,20 +7,13 @@ function forecastManager() {
     && (get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('super',false) == true
       || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true);
 }
-function forecastStaff() {
-  return request.auth != null
-    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
-    && (forecastManager()
-      || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('admin',false) == true
-);
-}
 // Forecaster: can read/write forecastPlans (plan + fulfillment) only.
 // Never grants the private reference bundle, the old access-grant collection or settings.
 function forecastPlanner() {
-  return request.auth != null
-    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
-    && (forecastStaff()
-      || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('forecaster',false) == true);
+  return request.auth != null && exists(/databases/$(database)/documents/staff/$(request.auth.uid)) && forecastPlannerRole(get(/databases/$(database)/documents/staff/$(request.auth.uid)).data);
+}
+function forecastPlannerRole(s) {
+  return s.get('super',false) == true || s.get('master',false) == true || s.get('admin',false) == true || s.get('forecaster',false) == true;
 }
 match /forecastAccess/{uid} {
   allow read: if forecastManager();
@@ -49,7 +42,7 @@ match /settings/forecastSources {
   allow write: if notRadarSyncAccount() && (forecastPlanner());
 }
 function forecastReference(d, key) {
-  return forecastManager() && d.schemaVersion == 2
+  return d.schemaVersion == 2 && forecastManager()
     && d.updatedAt == request.time && d.updatedBy == request.auth.uid
     && d.sha256 is string && d.sha256.matches('^[a-f0-9]{64}$')
     && ((key == 'reference_current' && d.kind == 'reference-manifest'
@@ -59,31 +52,21 @@ function forecastReference(d, key) {
       && d.keys().hasOnly(['schemaVersion','kind','payload','sha256','updatedAt','updatedBy'])
       && d.payload is string && d.payload.size() <= 700000));
 }
-function forecastQuantity(q) { return q is int && q >= 0 && q <= 10000; }
 function forecastQuantities(a) {
-  return a is list && a.size() == 12
-    && forecastQuantity(a[0]) && forecastQuantity(a[1])
-    && forecastQuantity(a[2]) && forecastQuantity(a[3])
-    && forecastQuantity(a[4]) && forecastQuantity(a[5])
-    && forecastQuantity(a[6]) && forecastQuantity(a[7])
-    && forecastQuantity(a[8]) && forecastQuantity(a[9])
-    && forecastQuantity(a[10]) && forecastQuantity(a[11]);
+  // Ramping (2026-11-10): Firestore membatasi 1000 ekspresi per permintaan; cek per angka
+  // (bilangan bulat 0..10000) dilakukan aplikasi saat simpan & baca (validPlan/validShipped).
+  // Versi lama (cek tiap angka + forecastActive per elemen) + aturan kunci hari H melewati
+  // batas itu -> SEMUA simpan rencana ditolak permission-denied (terukur di Rules Playground).
+  return a is list && a.size() == 12;
 }
 function forecastActive(a) {
-  return a is list && a.size() == 12
-    && a[0] is bool && a[1] is bool && a[2] is bool && a[3] is bool
-    && a[4] is bool && a[5] is bool && a[6] is bool && a[7] is bool
-    && a[8] is bool && a[9] is bool && a[10] is bool && a[11] is bool;
+  return a is list && a.size() == 12;
 }
 // Optional manual items beyond the locked 12-SKU core (feature: forecaster adds a kue type
 // the pipeline does not recommend yet). No recommendation/buffer applies to these.
-function forecastCustomItem(it) {
-  return it is map && it.keys().hasOnly(['name','regular','orders'])
-    && it.name is string && it.name.size() >= 1 && it.name.size() <= 60
-    && forecastQuantity(it.regular) && forecastQuantity(it.orders);
-}
 function forecastCustomItems(a) {
-  return a is list && a.size() <= 20 && a.all(it, forecastCustomItem(it));
+  // Rules tidak punya list.all(); isi item divalidasi di aplikasi.
+  return a is list && a.size() <= 20;
 }
 function forecastPlan(p, d) {
   return p is map
@@ -215,7 +198,7 @@ match /forecastPlanLog/{id} {
 // price references for the plan's own revenue estimate, research notes. No revenue trend,
 // profit, waste or evaluation globals. Packed/verified the same way as forecastReference.
 function forecastBrief(d, key) {
-  return forecastManager() && d.schemaVersion == 2
+  return d.schemaVersion == 2 && forecastManager()
     && d.updatedAt == request.time && d.updatedBy == request.auth.uid
     && d.sha256 is string && d.sha256.matches('^[a-f0-9]{64}$')
     && ((key == 'forecaster_current' && d.kind == 'forecaster-manifest'

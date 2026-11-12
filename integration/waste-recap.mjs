@@ -94,16 +94,25 @@ function parseDateHeaderCell(label) {
 }
 
 // Format panjang: Tanggal, Outlet, Ochis, Ocho, Mchis, Mcho, ...(produk lain h-1/h-2/h-3),
-// Nominal (kolom 36), Area (37). Dijumlah per outlet+tanggal (jaga-jaga ada baris duplikat).
+// Nominal, Area. Dijumlah per outlet+tanggal (jaga-jaga ada baris duplikat).
+// Kolom Nominal DICARI dari judul header, bukan posisi tetap: tim menambah produk (Roti Manis
+// Sosis/Abon/... + "Coming Soon") sehingga Nominal pindah dari kolom 36 ke 54 -- parser lama
+// diam-diam membaca kolom produk kosong, waste nominal jadi 0 di SEMUA tanggal (dashboard
+// "waste jaringan 0%", dilaporkan owner 2026-11-12). Kolom 36 hanya cadangan kalau header hilang.
+export function wasteNominalColumn(rows) {
+ const i = (rows[0] || []).findIndex(c => /^\s*nominal\b/i.test(String(c)));
+ return i >= 0 ? i : 36;
+}
 export function parseWasteTab(input, getId) {
  const rows = toRows(input);
+ const nominalCol = wasteNominalColumn(rows);
  const byDate = {};
  for (let i = 1; i < rows.length; i++) {
   const r = rows[i]; if (!r[0] || !r[1]) continue;
   const date = parseIsoDate(r[0]), id = getId(r[1]);
   if (!date || !id) continue;
   const core = [0, 1, 2, 3].map(k => num(r[2 + k]) || 0);
-  const nominal = num(r[36]) || 0;
+  const nominal = num(r[nominalCol]) || 0;
   const day = byDate[date] || (byDate[date] = {});
   const entry = day[id] || (day[id] = { core: [0, 0, 0, 0], nominal: 0 });
   entry.core = entry.core.map((v, k) => v + core[k]); entry.nominal += nominal;

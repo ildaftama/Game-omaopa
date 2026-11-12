@@ -21,6 +21,15 @@ test('parseWasteTab reads core SKU qty and nominal, sums duplicate rows', () => 
  assert.deepEqual(out['2026-01-01']['jakal-uii'], { core: [2, 0, 0, 0], nominal: 100000 });
 });
 
+test('parseWasteTab finds the Nominal column by header after new product columns are inserted', () => {
+ // Tata letak sheet sejak tim menambah produk Roti Manis: Nominal di kolom 54, Area 55.
+ const header = ['Tanggal', 'Outlet', 'Ochis', 'Ocho', 'Mchis', 'Mcho', ...Array(48).fill(''), 'Nominal ', 'Area '];
+ header[36] = 'Roti Manis Coklat Keju h-1';
+ const row = ['01 January 2026', 'Tajem', '1', '1', '', '', ...Array(48).fill(''), '40300', 'Area 1'];
+ const out = parseWasteTab(csvRow(header) + '\n' + csvRow(row), getId);
+ assert.deepEqual(out['2026-01-01'].tajem, { core: [1, 1, 0, 0], nominal: 40300 });
+});
+
 test('parseWasteTab skips rows with an unknown outlet name or unparseable date', () => {
  const header = Array(38).fill('').join(',');
  const bad1 = ['31 Februari 2026', 'Jakal', '1', '', '', '', ...Array(30).fill(''), '1000', 'Area 1', ''].join(',');
