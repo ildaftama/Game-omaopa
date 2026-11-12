@@ -49,14 +49,30 @@ window.ForecastSettings=(()=>{
  // rincian kirim; tambah lewat form khusus; hapus = ditandai dulu (bisa dibatalkan) sampai
  // disimpan; ada penanda "belum disimpan". Draft disimpan di memori selama tab dibuka.
  let prodBase='',newCat=3;
- function prodDraft(){if(!prod){const c=P().core(),x=P().extra();prod={core:c.map(r=>({label:r.label,ship:r.ship})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false})),batch:{...(window.ForecastProduction?.sizes?.()||{})}};prodBase=JSON.stringify(prod);}return prod;}
+ function prodDraft(){if(!prod){const c=P().core(),x=P().extra();const sp=get().products||{};prod={core:c.map((r,p)=>({label:r.label,ship:r.ship,color:P().hex(sp.core?.[p]?.color)||''})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false,color:P().hex((sp.extra||[]).find(e=>String(e?.name||'').trim()===r.name)?.color)||''})),routes:{...(sp.routes||{})},batch:{...(window.ForecastProduction?.sizes?.()||{})}};prodBase=JSON.stringify(prod);}return prod;}
  const prodDirty=()=>!!prod&&JSON.stringify(prod)!==prodBase;
  function syncProd(form){if(!prod||!form)return;
   form.querySelectorAll('[data-prod-core-label]').forEach(el=>{prod.core[+el.dataset.prodCoreLabel].label=el.value;});
   form.querySelectorAll('[data-prod-core-ship]').forEach(el=>{prod.core[+el.dataset.prodCoreShip].ship=el.checked;});
   form.querySelectorAll('[data-prod-x-name]').forEach(el=>{prod.extra[+el.dataset.prodXName].name=el.value;});
   form.querySelectorAll('[data-prod-x-cat]').forEach(el=>{prod.extra[+el.dataset.prodXCat].cat=Number(el.value);});
-  form.querySelectorAll('[data-prod-batch]').forEach(el=>{prod.batch[el.dataset.prodBatch]=Number(el.value);});}
+  form.querySelectorAll('[data-prod-batch]').forEach(el=>{prod.batch[el.dataset.prodBatch]=Number(el.value);});
+  form.querySelectorAll('[data-color-core]').forEach(el=>{prod.core[+el.dataset.colorCore].color=el.value.toLowerCase();});
+  form.querySelectorAll('[data-color-x]').forEach(el=>{prod.extra[+el.dataset.colorX].color=el.value.toLowerCase();});
+  form.querySelectorAll('[data-color-route]').forEach(el=>{prod.routes[el.dataset.colorRoute]=el.value.toLowerCase();});}
+ // Kartu "Warna rincian kirim" (owner 2026-11-12): tim packing menghafal warna baris produk &
+ // header rute, jadi tim sendiri yang mengatur warnanya di sini. Putih = tanpa warna.
+ function colorsCard(dis){
+  const d=prodDraft(),core=P().core(),routes=window.ForecastShipping?.groups||[];
+  const inp=(attr,val,label)=>`<input type="color" ${attr} value="${esc(val||'#ffffff')}" aria-label="Warna ${esc(label)}" ${dis}>`;
+  const row=(label,attr,val)=>`<label class="fsc-row" style="--row:${esc(val||'#ffffff')}"><span>${esc(label)}</span>${inp(attr,val,label)}</label>`;
+  const coreRows=P().CORE_ORDER.filter(p=>d.core[p].ship).map(p=>row(d.core[p].label||core[p].label,`data-color-core="${p}"`,d.core[p].color||core[p].bg));
+  const xRows=d.extra.map((x,i)=>[x,i]).filter(([x])=>!x.removed&&String(x.name||'').trim()).map(([x,i])=>row(x.name,`data-color-x="${i}"`,x.color||P().defaultExtraBg(x.name)));
+  const rRows=routes.map(g=>row(g.name,`data-color-route="${esc(g.name)}"`,d.routes[g.name]||P().routeBg(g.name)));
+  return `<article class="workspace-card fsc"><div class="fsp-head"><div><h3 class="fs-h3">Warna rincian kirim <small>tabel & gambar WA</small></h3><p class="fs-use">Warna latar baris produk dan header rute di <b>Rincian kirim</b>, sama di tabel dan gambar yang diunduh. Klik kotak warna untuk mengganti. Putih = tanpa warna.</p></div>${dis?'':'<button type="button" class="button quiet" data-color-reset>Kembalikan warna bawaan</button>'}</div>
+   <div class="fsc-group"><div class="fsp-ghead">Header rute</div><div class="fsc-grid">${rRows.join('')}</div></div>
+   <div class="fsc-group"><div class="fsp-ghead">Baris produk</div><div class="fsc-grid">${[...coreRows,...xRows].join('')}</div></div></article>`;
+ }
  function productsBody(dis){
   const d=prodDraft(),C=P().CATS,base=P().DEFAULTS.core,core=P().core(),active=d.extra.filter(x=>!x.removed).length;
   const catSel=(attr,val)=>`<select ${attr} ${dis} aria-label="Kategori">${C.map((c,ci)=>`<option value="${ci}" ${val===ci?'selected':''}>${esc(c)}</option>`).join('')}</select>`;
@@ -72,15 +88,17 @@ window.ForecastSettings=(()=>{
     ${dis?'':`<div class="fsp-add"><div class="fsp-add-title">+ Tambah produk baru</div><div class="fsp-add-row"><input type="text" id="fs-prod-new-name" maxlength="60" placeholder="Nama produk, misalnya Roti Pisang Coklat" autocomplete="off">${catSel('id="fs-prod-new-cat"',newCat)}<button type="button" class="button fp-primary" data-prod-add>Tambah</button></div></div>`}
    </article>
    <article class="workspace-card"><h3 class="fs-h3">Isi 1 angkatan produksi <small>pcs per rasa</small></h3><p class="fs-use">Dipakai untuk menyusun <b>Rencana produksi (angkatan)</b> di Buat forecast. Semua rasa dalam satu varian memakai isi yang sama.</p><div class="fsp-batch">${(window.ForecastProduction?.families?.()||[]).map(f=>`<label><span>${esc(f.label)}</span><span class="fsp-batch-in"><input type="number" min="1" max="500" step="1" data-prod-batch="${f.key}" value="${esc(d.batch?.[f.key]??f.size)}" ${dis}><em>pcs</em></span>${f.unit?`<small>${esc(f.unit)}</small>`:''}</label>`).join('')}</div></article>
+   ${colorsCard(dis)}
    <details class="workspace-card fsp-core"><summary><div><h3 class="fs-h3">12 produk inti <small>nama di rincian kirim & gambar WA</small></h3><p class="fs-use">Dipakai mesin rekomendasi, jadi tidak bisa dihapus atau dipindah kategori. Anda bisa mengganti nama tampilnya atau menyembunyikannya dari rincian kirim.</p></div><span class="fsp-chev">▾</span></summary>${coreGroups}</details>
   </div>`;
  }
  function collectProducts(form){syncProd(form);const d=prod,seen=new Set(),extra=[];
   for(const x of d.extra){if(x.removed)continue;const name=String(x.name||'').trim().replace(/\s+/g,' ');if(!name)throw Error('Ada produk tanpa nama. Isi namanya atau hapus barisnya.');const k=name.toLowerCase();if(seen.has(k))throw Error(`Produk "${name}" tercantum dua kali.`);seen.add(k);
-   const aliases=[...new Set([...(x.aliases||[]),...(x.orig&&x.orig!==name?[x.orig]:[])])].filter(a=>a.toLowerCase()!==k).slice(-10);extra.push({name,cat:Number.isInteger(x.cat)?x.cat:3,aliases});}
+   const aliases=[...new Set([...(x.aliases||[]),...(x.orig&&x.orig!==name?[x.orig]:[])])].filter(a=>a.toLowerCase()!==k).slice(-10);const color=P().hex(x.color);extra.push({name,cat:Number.isInteger(x.cat)?x.cat:3,aliases,...(color?{color}:{})});}
   if(extra.length>20)throw Error('Maksimal 20 produk lain.');
   const batch={};for(const [k,v] of Object.entries(d.batch||{})){if(!Number.isInteger(v)||v<1||v>500)throw Error('Isi 1 angkatan harus angka bulat 1–500 pcs.');batch[k]=v;}
-  return {core:d.core.map((c,p)=>({label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship})),extra,batch};}
+  const routes={};for(const [k,v] of Object.entries(d.routes||{})){const h=P().hex(v);if(h)routes[k]=h;}
+  return {core:d.core.map((c,p)=>{const color=P().hex(c.color);return {label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship,...(color?{color}:{})};}),extra,batch,routes};}
  function addProduct(form){syncProd(form);const el=form?.querySelector('#fs-prod-new-name'),cs=form?.querySelector('#fs-prod-new-cat'),name=String(el?.value||'').trim().replace(/\s+/g,' ');newCat=Number(cs?.value??newCat);
   if(!name){status='Ketik nama produk baru dulu.';return;}
   if(prodDraft().extra.some(x=>!x.removed&&x.name.trim().toLowerCase()===name.toLowerCase())){status=`"${name}" sudah ada di daftar.`;return;}
@@ -153,6 +171,7 @@ window.ForecastSettings=(()=>{
   const form=e.target.closest('form');
   if(e.target.closest('[data-prod-add]')){addProduct(form);return 'render';}
   const del=e.target.closest('[data-prod-x-del]');if(del){syncProd(form);const i=+del.dataset.prodXDel,x=prodDraft().extra[i];if(x){if(!x.orig)prod.extra.splice(i,1);else x.removed=true;status='';}return 'render';}
+  if(e.target.closest('[data-color-reset]')){syncProd(form);prodDraft().core.forEach(c=>{c.color='';});prod.extra.forEach(x=>{x.color='';});prod.routes={};status='Warna kembali ke bawaan. Klik Simpan untuk tim agar berlaku.';return 'render';}
   const undo=e.target.closest('[data-prod-x-undo]');if(undo){syncProd(form);const x=prodDraft().extra[+undo.dataset.prodXUndo];if(x)x.removed=false;return 'render';}
   if(e.target.closest('[data-settings-reset]')){
    if(!confirm('Kembalikan ambang batas, cuaca, dan tampilan ke bawaan? Link sumber data & daftar produk tidak berubah.'))return false;
@@ -161,6 +180,6 @@ window.ForecastSettings=(()=>{
   return false;
  }
  // Ganti kategori / tampil di rincian kirim -> render ulang supaya baris pindah kelompok.
- function change(e){const t=e.target;if(section==='experiment')return !!window.ForecastExperiment?.change(e);if(section!=='products'||!prod)return false;if(t.dataset.prodXCat!==undefined||t.dataset.prodCoreShip!==undefined){syncProd(t.closest('form'));return true;}if(t.id==='fs-prod-new-cat'){newCat=Number(t.value);return false;}return false;}
+ function change(e){const t=e.target;if(section==='experiment')return !!window.ForecastExperiment?.change(e);if(section!=='products'||!prod)return false;if(t.dataset.colorCore!==undefined||t.dataset.colorX!==undefined||t.dataset.colorRoute!==undefined){syncProd(t.closest('form'));return true;}if(t.dataset.prodXCat!==undefined||t.dataset.prodCoreShip!==undefined){syncProd(t.closest('form'));return true;}if(t.id==='fs-prod-new-cat'){newCat=Number(t.value);return false;}return false;}
  return {get,render,submit,click,change,DEFAULTS};
 })();

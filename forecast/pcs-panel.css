@@ -605,3 +605,11 @@
 .fs-ship tbody tr.fs-row-bg td,.fs-ship tbody tr.fs-row-bg:hover td{background:var(--row)}
 .fs-ship tbody tr.fs-row-bg td[data-tot]{background:color-mix(in srgb,var(--row) 88%,#000)}
 .fs-ship tbody tr.fs-row-bg td{border-bottom-color:rgba(0,0,0,.06)}
+
+/* Pengaturan > Produk > Warna rincian kirim */
+.fsc .fsp-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.fsc-group{margin-top:12px}
+.fsc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-top:6px}
+.fsc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px 6px 12px;border:1px solid #e3e8ee;border-radius:9px;background:var(--row);font-size:12.5px;color:#24323f;cursor:pointer}
+.fsc-row input[type=color]{width:34px;height:26px;padding:0;border:1px solid rgba(0,0,0,.15);border-radius:6px;background:#fff;cursor:pointer}
+.fsc-row input[type=color]:disabled{cursor:default;opacity:.7}

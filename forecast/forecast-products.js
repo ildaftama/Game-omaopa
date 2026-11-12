@@ -14,14 +14,27 @@ window.ForecastProducts=(()=>{
  const DEFAULT_EXTRA=[['Box Mini',1],['Chiffon Kurma',2],['Roti Sosis',3],['Roti Abon',3],['Roti Coklat',3],['Whip',3]];
  const DOTS=['#a597c7','#b97b55','#d6918b','#7b95c4','#8b5e3c','#e3a77d','#7fae6b','#c48fb0','#6fa3a8','#c9a55a'];
  const low=s=>String(s||'').trim().toLowerCase();
+ // Warna latar baris & header rute di Rincian kirim (owner 2026-11-12). Bawaan = warna format
+ // logistik lama yang dihafal tim packing (dilembutkan); tim bisa mengubahnya sendiri di
+ // Pengaturan › Produk › Warna rincian kirim. Putih (#ffffff) = tanpa warna.
+ const CORE_BG={4:'#fff6a8',5:'#fbd2a6',6:'#b9efbf',7:'#fdeadd',8:'#fdeadd',9:'#fde0a6',10:'#d3e3f6',11:'#d3e3f6'};
+ const EXTRA_BG={'box mini':'#e2dcf0','chiffon kurma':'#f4c6a6','roti sosis':'#f7d6d2','roti manis sosis':'#f7d6d2','roti abon':'#bdd3f6','roti manis abon':'#bdd3f6',
+  'roti coklat':'#d6eacb','roti manis coklat meses':'#d6eacb','whip':'#f8d3b8','roti coklat keju':'#ecdcc8','roti manis coklat keju':'#ecdcc8',
+  'roti pisang coklat':'#e4eec4','roti manis coklat pisang':'#e4eec4','roti vanilla':'#f4edc9','roti manis vanilla':'#f4edc9'};
+ const ROUTE_BG={'Semarang':'#e6d6ee','Magelang – Salatiga':'#e6d6ee','Solo':'#d2ebce','Jogja':'#bfeef0'};
+ const hex=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)?v.toLowerCase():null;
+ const bgOr=v=>v==='#ffffff'?null:v;
+ const defaultCoreBg=p=>CORE_BG[p]||null,defaultExtraBg=name=>EXTRA_BG[low(name)]||null;
  const DEFAULTS={core:CORE.map(([label])=>({label,ship:true})),extra:DEFAULT_EXTRA.map(([name,cat])=>({name,cat,aliases:[]}))};
  function prefs(){const p=window.ForecastSettings?.get?.()?.products||{};return {core:Array.isArray(p.core)&&p.core.length===12?p.core:DEFAULTS.core,extra:Array.isArray(p.extra)?p.extra:DEFAULTS.extra};}
- function core(){const c=prefs().core;return CORE.map(([label,dot,cat],p)=>({p,label:String(c[p]?.label||label),ship:c[p]?.ship!==false,dot,cat}));}
- function extra(){return prefs().extra.filter(x=>String(x?.name||'').trim()).map((x,i)=>({name:String(x.name).trim(),cat:Number.isInteger(x.cat)&&x.cat>=0&&x.cat<CATS.length?x.cat:3,aliases:Array.isArray(x.aliases)?x.aliases.map(String):[],dot:DOTS[i%DOTS.length]}));}
+ function core(){const c=prefs().core;return CORE.map(([label,dot,cat],p)=>({p,label:String(c[p]?.label||label),ship:c[p]?.ship!==false,dot,cat,bg:bgOr(hex(c[p]?.color)??defaultCoreBg(p))}));}
+ function extra(){return prefs().extra.filter(x=>String(x?.name||'').trim()).map((x,i)=>({name:String(x.name).trim(),cat:Number.isInteger(x.cat)&&x.cat>=0&&x.cat<CATS.length?x.cat:3,aliases:Array.isArray(x.aliases)?x.aliases.map(String):[],dot:DOTS[i%DOTS.length],bg:bgOr(hex(x.color)??defaultExtraBg(x.name))}));}
  const names=()=>extra().map(x=>x.name);
  // Produk lain yang cocok dengan nama item rencana (nama sekarang atau nama lama).
  function match(itemName){const n=low(itemName);return extra().find(x=>low(x.name)===n||x.aliases.some(a=>low(a)===n))||null;}
  // Nilai item rencana untuk satu produk lain (cocok nama atau alias).
  function itemFor(items,product){return (items||[]).find(it=>{const n=low(it.name);return n===low(product.name)||product.aliases.some(a=>low(a)===n);})||null;}
- return {CATS,CORE_ORDER,DEFAULTS,core,extra,names,match,itemFor,low};
+ // Warna header rute (nama rute -> warna latar lembut).
+ function routeBg(name){const r=window.ForecastSettings?.get?.()?.products?.routes||{};return hex(r[name])||ROUTE_BG[name]||null;}
+ return {CATS,CORE_ORDER,DEFAULTS,core,extra,names,match,itemFor,low,hex,routeBg,defaultCoreBg,defaultExtraBg,ROUTE_BG};
 })();

@@ -529,6 +529,41 @@ window.ForecastDashboard=(()=>{
  // disimpan, tidak dihapus) sampai diverifikasi ulang dengan akses ESB langsung -- Dashboard
  // tetap pakai rekonstruksi PCS x harga (pola lama, dipahami, tidak sempurna tapi tidak salah
  // arah) supaya tidak menampilkan angka yang malah lebih salah daripada sebelumnya.
+ // ---- Penyesuaian prediksi dari performa tim (owner 2026-11-12) ----
+ // Prediksi omzet REGULER hari berikutnya digeser sesuai waste & lost sales jaringan bulan
+ // berjalan (3 hari pertama bulan / data < 3 tanggal: 7 tanggal terisi terakhir). WASTE
+ // PRIORITAS: kalau waste di atas target, prediksi diturunkan (sebesar kelebihannya, maks 6%),
+ // walaupun lost sales juga tinggi. Lost sales di atas ambang hanya menaikkan prediksi kalau
+ // waste masih di bawah target, dan kenaikannya tidak boleh melebihi sisa ruang waste (maks 4%).
+ // Target waste INTERNAL = ambang di Pengaturan - 0,3 poin (mis. 3,3% -> 3,0%) -- sengaja TIDAK
+ // ditampilkan di web supaya forecaster tidak bingung dengan dua angka target.
+ // Ini lapis OTOMATIS yang tidak ditampilkan (owner: "double buffer" -- saran buffer di Buat
+ // forecast tetap tampil & dipakai seperti biasa, lapis ini sudah ada di dalam angka prediksi).
+ // Hanya berlaku untuk tanggal >= PERF_FROM supaya prediksi hari-hari yang sudah lewat (dibekukan)
+ // tidak berubah; tanggal lewat memakai data sebelum tanggal itu (sama seperti saat ditampilkan).
+ const PERF_FROM='2026-11-13',PERF_MARGIN=0.3,PERF_MAX_CUT=6,PERF_MAX_ADD=4,PERF_LOST_GAIN=0.5;
+ const perfCache=new Map();
+ function perfAdjust(asOf){
+  const recap=window.DAILY_RECAP_SUMMARY;
+  const key=asOf+'|'+(recap?.updatedAt||'')+'|'+WASTE_THRESHOLD+'|'+LOST_SALES_THRESHOLD+'|'+(window.PcsPanels.data().sales?.days?.length||0);
+  if(perfCache.has(key))return perfCache.get(key);
+  const ds=dailyOutletProductSeries(),rev=new Map();
+  if(ds)for(const [id,ser] of ds.byOutlet)for(const pt of ser)rev.set(pt.date+'|'+id,pt.gross);
+  const ids=window.PcsPanels.data().sales?.outletIds||[],monthStart=asOf.slice(0,8)+'01',floor=window.ForecastPlanner.shift(asOf,-28);
+  const pick=all=>{const m=all.filter(d=>d<asOf&&d>=monthStart);return m.length>=MIN_RECAP_DAYS?m:all.filter(d=>d<asOf&&d>=floor).slice(-RECAP_WINDOW_DAYS);};
+  const wDates=pick(Object.keys(recap?.waste||{}).filter(d=>Object.keys(recap.waste[d]).length).sort());
+  let wn=0,wr=0;for(const d of wDates)for(const id of ids){const g=rev.get(d+'|'+id);if(!(g>0))continue;wn+=recap.waste[d][id]?.nominal||0;wr+=g;}
+  const lDates=pick(Object.keys(recap?.lostSalesMinutes||{}).sort());
+  let lm=0,ln=0;for(const d of lDates)for(const m of Object.values(recap.lostSalesMinutes[d]||{}))if(Number.isFinite(m)){lm+=m;ln++;}
+  const wastePct=wDates.length>=MIN_RECAP_DAYS&&wr>0?wn/wr*100:null,lostPct=lDates.length>=MIN_RECAP_DAYS&&ln>0?lm/ln/OPEN_MINUTES*100:null;
+  const Wt=WASTE_THRESHOLD-PERF_MARGIN,L=LOST_SALES_THRESHOLD;
+  let pct=0,kind='ok';
+  if(wastePct==null&&lostPct==null)kind='nodata';
+  else if(wastePct!=null&&wastePct>Wt){pct=-Math.min(PERF_MAX_CUT,wastePct-Wt);kind='waste';}
+  else if(lostPct!=null&&lostPct>L){const room=wastePct==null?PERF_MAX_ADD:Math.max(0,Wt-wastePct);pct=Math.min(PERF_MAX_ADD,(lostPct-L)*PERF_LOST_GAIN,room);kind=pct>0?'lost':'ok';}
+  const v={pct:Math.round(pct*10)/10,kind,wastePct,lostPct,monthly:wDates[0]>=monthStart,from:wDates[0]||null,to:wDates.at(-1)||null};
+  perfCache.set(key,v);return v;
+ }
  function revenueTrend(outletId){
   const panels=window.PcsPanels.data(),planner=window.ForecastPlanner,cloud=window.ForecastPlanCloud,math=window.PcsMath;
   if(!panels.sales||!panels.orders)return null;
@@ -630,7 +665,10 @@ window.ForecastDashboard=(()=>{
   const outletAdjust=outletId==='__all__'?null:makeOutletAdjust(outletId,planner);
   // Tanggal lewat: faktor dihitung dengan data s.d. H-1 (ikut dibekukan seperti prediksinya).
   const adj=date=>outletAdjust&&lastActual?outletAdjust(date,isPast(date)?planner.shift(date,-1):lastActual):1;
-  const forecastPureAt=date=>{const v=isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);return v==null?null:v*adj(date);};
+  // Penyesuaian performa tim (lihat perfAdjust): tanggal lewat memakai data sebelum tanggal itu,
+  // tanggal mendatang memakai data s.d. kemarin.
+  const perf=date=>{if(date<PERF_FROM)return 1;try{return 1+perfAdjust(isPast(date)?date:today()).pct/100;}catch{return 1;}};
+  const forecastPureAt=date=>{const v=isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);return v==null?null:v*adj(date)*perf(date);};
   function forecastPesananAt(date){
    // Tanggal lewat yang sudah tercakup sheet PESANAN: outlet tanpa baris pesanan = 0, bukan
    // "tidak diketahui". Sebelumnya jatuh ke tebakan pola tahun lalu -- per outlet itu menyalin
