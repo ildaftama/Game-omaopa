@@ -71,8 +71,8 @@ window.ForecastTopdown=(()=>{
   if(pr<lab&&!on)return '';
   const mm=d.precipitationMm!=null?` · ${d.precipitationMm.toLocaleString('id-ID',{maximumFractionDigits:1})} mm`:'';
   const chip=`<span class="ft-rain ${cut?'hi':''}" title="Peluang hujan ${pr}%${mm}">🌧️ ${pr}%</span>`;
-  if(on)return chip+`<button type="button" class="ft-rain-btn on" data-ft-rain-undo="${esc(id)}" title="Kiriman outlet ini sudah diturunkan ${Math.abs(on.pct)}% karena hujan. Klik untuk membatalkan.">✓ ${on.pct}% · batal</button>`;
-  return chip+(cut?`<button type="button" class="ft-rain-btn" data-ft-rain-apply="${esc(id)}:${cut}" title="Saran: turunkan reguler 12 produk inti outlet ini ${Math.abs(cut)}% karena peluang hujan tinggi">${cut}%</button>`:'');
+  if(on)return chip+`<button type="button" class="ft-rain-btn on" data-ft-rain-undo="${esc(id)}" title="Kiriman outlet ini sudah diturunkan ${Math.abs(on.pct)}% karena hujan. Klik untuk membatalkan.">✓ −${Math.abs(on.pct)}% · batal</button>`;
+  return chip+(cut?`<button type="button" class="ft-rain-btn" data-ft-rain-apply="${esc(id)}:${cut}" title="Saran: turunkan reguler 12 produk inti outlet ini ${Math.abs(cut)}% karena peluang hujan tinggi">−${Math.abs(cut)}%</button>`:'');
  }
  function rainSummary(c){
   const t=today();if(date<t||date>model.shift(t,15))return '';
@@ -351,7 +351,7 @@ window.ForecastTopdown=(()=>{
   const b=e.target.closest('[data-ft-buffer]');
   if(b){const c=compute();if(c.pred?.pure){draft.target=Math.round(c.pred.pure*(1+Number(b.dataset.ftBuffer)/100));persist();}return true;}
   const ra=e.target.closest('[data-ft-rain-apply]');
-  if(ra){const [id,pct]=ra.dataset.ftRainApply.split(':');applyRain(id,Number(pct));persist();message=`${name(id)}: kiriman reguler diturunkan ${pct}% karena peluang hujan tinggi.`;return true;}
+  if(ra){const [id,pct]=ra.dataset.ftRainApply.split(':');applyRain(id,Number(pct));persist();message=`${name(id)}: kiriman reguler diturunkan ${Math.abs(Number(pct))}% karena peluang hujan tinggi.`;return true;}
   const ru=e.target.closest('[data-ft-rain-undo]');
   if(ru){undoRain(ru.dataset.ftRainUndo);persist();message='Penurunan karena hujan dibatalkan.';return true;}
   if(e.target.closest('[data-ft-rain-all]')){let n=0;for(const id of compute().ids){const d=rainOf(id),cut=d?rainCut(d.probability):0;if(cut&&!draft.rain?.[id]){applyRain(id,cut);n++;}}persist();message=`${n} outlet diturunkan 10–15% karena peluang hujan tinggi. Bisa dibatalkan per outlet.`;return true;}
