@@ -111,7 +111,24 @@ export function mergeSales(previous,results){
  const map=new Map((previous?.days||[]).map(r=>[r.date+'|'+r.id,r]));
  for(const r of results)if(r.complete){const key=r.date+'|'+r.id,old=map.get(key);if(!old||(r.mappingVersion||1)>=(old.mappingVersion||1))map.set(key,r);}
  const failed=[...new Map([...(previous?.failed||[]),...results.filter(r=>!r.complete)].filter(r=>!map.has(r.date+'|'+r.id)).map(r=>[r.date+'|'+r.id,{date:r.date,id:r.id,...(r.reason?{reason:r.reason}:{})}])).values()];
- return {schemaVersion:1,products:PRODUCTS,labels:LABELS,outletIds:[...new Set([...(previous?.outletIds||[]),...results.map(r=>r.id)])].sort(),updatedAt:new Date().toISOString(),days:[...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)),failed,...(previous?.history?{history:previous.history}:{})};
+ return {schemaVersion:1,products:PRODUCTS,labels:LABELS,outletIds:[...new Set([...(previous?.outletIds||[]),...results.map(r=>r.id)])].sort(),updatedAt:new Date().toISOString(),days:[...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)),failed,...(previous?.history?{history:previous.history}:{}),...keepIntraday(previous,map)};
+}
+// Omzet hari berjalan (owner 2026-11-12): ditarik tiap jam 18-20 WIB sebagai data SEMENTARA,
+// disimpan TERPISAH dari `days` (yang hanya berisi hari tuntas, complete:true) supaya tidak
+// pernah dikira hari penuh. `intraday` = tarikan terakhir; `intradayLog` = catatan tiap tarikan
+// (omzet bersih per outlet s.d. jam itu, 60 hari) untuk mempelajari pola "jam X biasanya sudah
+// Y% dari omzet sehari". intraday dibuang begitu hari itu sudah final di `days`.
+export function keepIntraday(previous,map){
+ const out={};const it=previous?.intraday;
+ if(it&&![...map.keys()].some(k=>k.startsWith(it.date+'|')))out.intraday=it;
+ if(Array.isArray(previous?.intradayLog))out.intradayLog=previous.intradayLog;
+ return out;
+}
+export function mergeIntraday(previous,results,date,asOf){
+ const rows=results.filter(r=>r.complete).map(r=>({id:r.id,qty:r.qty,netSales:r.netSales}));
+ const log=[...(previous?.intradayLog||[]),{date,asOf,net:Object.fromEntries(rows.map(r=>[r.id,r.netSales]))}];
+ const floor=new Date(Date.parse(date+'T00:00:00Z')-60*86400000).toISOString().slice(0,10);
+ return {...previous,intraday:{date,asOf,rows,expected:results.length},intradayLog:log.filter(x=>x.date>=floor)};
 }
 async function main(){
  const config=JSON.parse(fs.readFileSync('integration/pcs-branches.json','utf8'));
@@ -122,6 +139,15 @@ async function main(){
  // otomasi 21:02 WIB, setelah jam tutup 21:00) -- caller itu yang menanggung risiko transaksi
  // menit-menit terakhir terlewat; caller lain (manual/backfill) tetap seketat sebelumnya.
  const today=fmt(new Date());
+ if(process.env.INTRADAY==='1'){
+  // Tarikan SEMENTARA hari berjalan -- tidak masuk `days`, tidak menandai hari selesai.
+  const client=createEsbClient({username:process.env.ESB_USERNAME,password:process.env.ESB_PASSWORD});let results;
+  try{results=await collect(config.branches,[today],client);}finally{client.close();}
+  const path='forecast/pcs-sales.json',previous=fs.existsSync(path)?JSON.parse(fs.readFileSync(path,'utf8')):null;
+  fs.writeFileSync(path,JSON.stringify(mergeIntraday(previous,results,today,new Date().toISOString())));
+  console.log('Omzet sementara hari ini terbaca: '+results.filter(r=>r.complete).length+'/'+results.length+' outlet.');
+  return;
+ }
  if(to>(process.env.ALLOW_TODAY==='1'?today:fmt(yesterday)))throw Error('Hanya tanggal yang sudah selesai boleh ditarik.');
  const client=createEsbClient({username:process.env.ESB_USERNAME,password:process.env.ESB_PASSWORD});let results;
  try{results=await collect(config.branches,range(from,to),client);}finally{client.close();}

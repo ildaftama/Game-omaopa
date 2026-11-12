@@ -613,3 +613,10 @@
 .fsc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px 6px 12px;border:1px solid #e3e8ee;border-radius:9px;background:var(--row);font-size:12.5px;color:#24323f;cursor:pointer}
 .fsc-row input[type=color]{width:34px;height:26px;padding:0;border:1px solid rgba(0,0,0,.15);border-radius:6px;background:#fff;cursor:pointer}
 .fsc-row input[type=color]:disabled{cursor:default;opacity:.7}
+
+/* Dashboard: omzet real hari ini (sementara) */
+.fd-today{display:flex;flex-wrap:wrap;gap:10px 28px;align-items:flex-end;margin:0 0 14px;padding:12px 16px;border:1px solid #dfe7ef;border-left:4px solid #2a8f99;border-radius:12px;background:#f6fbfc}
+.fd-today div{display:flex;flex-direction:column;gap:2px}
+.fd-today span{font-size:11.5px;color:#5f6f7e}
+.fd-today strong{font-size:18px;color:#1c2b38}
+.fd-today small{flex-basis:100%;font-size:11.5px;color:#7a8896}

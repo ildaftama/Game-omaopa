@@ -22,6 +22,9 @@ on:
       backfill_to:
         description: 'Backfill saja (opsional): tanggal akhir YYYY-MM-DD. Wajib diisi kalau backfill_from diisi.'
         required: false
+      intraday:
+        description: 'Isi 1 untuk tarikan SEMENTARA omzet hari berjalan (jam 18-20 WIB, sebelum outlet tutup). Dipicu otomatis oleh Google Apps Script.'
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -78,6 +81,12 @@ jobs:
           WIB_HOUR=$(node -e "console.log(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jakarta',hour:'2-digit',hour12:false}).format(new Date()))")
           FROM="${{ github.event.inputs.backfill_from }}"
           TO="${{ github.event.inputs.backfill_to }}"
+          # Tarikan sementara (owner 2026-11-12): omzet hari berjalan s.d. jam ini, disimpan
+          # terpisah (intraday) -- hari itu TIDAK ditandai selesai. Dipicu Apps Script jam 18-20.
+          if [ "${{ github.event.inputs.intraday }}" = "1" ]; then
+            INTRADAY=1 node integration/pcs-sales.mjs || echo "::warning::Tarikan sementara hari ini belum lengkap."
+            exit 0
+          fi
           # GitHub Actions cron BISA tertunda jauh dari jadwal (pernah lebih dari 6 jam) --
           # kalau run ini ternyata baru benar-benar jalan dini hari (bukan ~21.02 WIB seperti
           # seharusnya), "$DAY" dari new Date() sudah berganti ke HARI BARU yang BARU MULAI
@@ -86,7 +95,9 @@ jobs:
           # pcs-sales.mjs) -- padahal cuma belum mulai. Pengaman: HANYA tarik hari berjalan kalau
           # run ini benar-benar terjadi jam 20.00-23.59 WIB (dekat jadwal asli 21.02 WIB).
           if [ -z "$FROM" ]; then
-            if [ "$WIB_HOUR" -ge 20 ]; then
+            # >= 21 (bukan 20): outlet tutup 21.00. Sejak 2026-11-12 jam 18-20 ditarik sebagai
+            # data sementara (input intraday), jadi tarikan "final" tidak boleh sebelum tutup.
+            if [ "$WIB_HOUR" -ge 21 ]; then
               FROM="$DAY"; TO="$DAY"
             else
               echo "::warning::Run ini jalan jam ${WIB_HOUR}:xx WIB, jauh dari jadwal 21.02 WIB (kemungkinan tertunda GitHub Actions sampai lewat tengah malam). Melewati tarikan hari berjalan supaya tidak salah menandai hari yang baru mulai sebagai 'selesai & kosong'. Hari ini akan tertarik lewat sinkronisasi tiap jam di siang hari atau sinkronisasi malam berikutnya."
