@@ -635,3 +635,4 @@
 .fop-table td,.fop-table th{white-space:nowrap}
 .fop-table tfoot td{font-weight:600;border-top:2px solid #e3e8ee}
 .fop-under{color:#a0671a}
+.fop-rev{margin:0;padding:6px 10px;border-radius:8px;background:#fff7e8;border:1px solid #f0dcb4;font-size:12px;color:#6a4a14}
