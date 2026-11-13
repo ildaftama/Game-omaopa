@@ -833,3 +833,4 @@ main{max-width:1680px!important}
 @media (min-width:1100px){.ft-area .ft-grid .ft-tcol{position:static}.ft-area .ft-grid thead th.ft-tcol,.ft-area .ft-grid thead th{position:sticky;top:52px}}
 @media (max-width:1099px){.ft-bar{height:auto;flex-wrap:wrap;position:static}}
 .fp-workspace{overflow:visible}
+@media (min-width:900px){.topbar{padding:0 max(24px,calc((100% - 1680px)/2 + 24px))!important}}
