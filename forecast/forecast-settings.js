@@ -49,7 +49,7 @@ window.ForecastSettings=(()=>{
  // rincian kirim; tambah lewat form khusus; hapus = ditandai dulu (bisa dibatalkan) sampai
  // disimpan; ada penanda "belum disimpan". Draft disimpan di memori selama tab dibuka.
  let prodBase='',newCat=3;
- function prodDraft(){if(!prod){const c=P().core(),x=P().extra();const sp=get().products||{};prod={core:c.map((r,p)=>({label:r.label,ship:r.ship,color:P().hex(sp.core?.[p]?.color)||'',hpp:String(P().hpp()[p])})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false,color:P().hex((sp.extra||[]).find(e=>String(e?.name||'').trim()===r.name)?.color)||''})),routes:{...(sp.routes||{})},batch:{...(window.ForecastProduction?.sizes?.()||{})}};prodBase=JSON.stringify(prod);}return prod;}
+ function prodDraft(){if(!prod){const c=P().core(),x=P().extra();const sp=get().products||{};prod={core:c.map((r,p)=>({label:r.label,ship:r.ship,color:P().hex(sp.core?.[p]?.color)||'',hpp:String(P().hpp()[p])})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false,color:P().hex((sp.extra||[]).find(e=>String(e?.name||'').trim()===r.name)?.color)||''})),routes:{...(sp.routes||{})},batch:{...(window.ForecastProduction?.sizes?.()||{})},areas:(window.ForecastProduction?.areas?.()||[]).map(a=>({name:a.name,time:a.time||'',round:a.round||'up',routes:[...(a.routes||[])]})),areaThr:String(window.ForecastProduction?.areaThreshold?.()??0.8)};prodBase=JSON.stringify(prod);}return prod;}
  const prodDirty=()=>!!prod&&JSON.stringify(prod)!==prodBase;
  function syncProd(form){if(!prod||!form)return;
   form.querySelectorAll('[data-prod-core-label]').forEach(el=>{prod.core[+el.dataset.prodCoreLabel].label=el.value;});
@@ -57,6 +57,12 @@ window.ForecastSettings=(()=>{
   form.querySelectorAll('[data-prod-x-name]').forEach(el=>{prod.extra[+el.dataset.prodXName].name=el.value;});
   form.querySelectorAll('[data-prod-x-cat]').forEach(el=>{prod.extra[+el.dataset.prodXCat].cat=Number(el.value);});
   form.querySelectorAll('[data-prod-hpp]').forEach(el=>{prod.core[+el.dataset.prodHpp].hpp=el.value;});
+  form.querySelectorAll('[data-area-name]').forEach(el=>{prod.areas[+el.dataset.areaName].name=el.value;});
+  form.querySelectorAll('[data-area-time]').forEach(el=>{prod.areas[+el.dataset.areaTime].time=el.value;});
+  form.querySelectorAll('[data-area-round]').forEach(el=>{prod.areas[+el.dataset.areaRound].round=el.value;});
+  form.querySelectorAll('[data-area-route]').forEach(el=>{if(!el.checked)return;});
+  if(form.querySelector('[data-area-route]')){prod.areas.forEach(a=>{a.routes=[];});form.querySelectorAll('[data-area-route]:checked').forEach(el=>{const [i,rt]=el.value.split('|');prod.areas[+i]?.routes.push(rt);});}
+  const thr=form.querySelector('#fs-area-thr');if(thr)prod.areaThr=thr.value;
   form.querySelectorAll('[data-prod-batch]').forEach(el=>{prod.batch[el.dataset.prodBatch]=Number(el.value);});
   form.querySelectorAll('[data-color-core]').forEach(el=>{prod.core[+el.dataset.colorCore].color=el.value.toLowerCase();});
   form.querySelectorAll('[data-color-x]').forEach(el=>{prod.extra[+el.dataset.colorX].color=el.value.toLowerCase();});
@@ -74,6 +80,13 @@ window.ForecastSettings=(()=>{
    <div class="fsc-group"><div class="fsp-ghead">Header rute</div><div class="fsc-grid">${rRows.join('')}</div></div>
    <div class="fsc-group"><div class="fsp-ghead">Baris produk</div><div class="fsc-grid">${[...coreRows,...xRows].join('')}</div></div></article>`;
  }
+ // Pembagian angkatan per area untuk pesan "Request Malam" (feedback forecaster 2026-11-13).
+ function areasCard(dis){
+  const d=prodDraft(),routes=(window.ForecastShipping?.groups||[]).map(g=>g.name),R=[['up','Ke atas'],['down','Ke bawah'],['thr','Naik kalau pecahan ≥ ambang'],['rest','Sisa dari total produksi']];
+  return `<article class="workspace-card"><h3 class="fs-h3">Pembagian angkatan per area <small>Request Malam · Rencana produksi</small></h3><p class="fs-use">Kebutuhan tiap area (outlet di rute yang dicentang) ÷ isi 1 angkatan, lalu dibulatkan. Area <b>sisa</b> mendapat total produksi dikurangi area lain (termasuk pesanan pabrik & pengurangan). Jam tampil di teks untuk grup WA.</p>
+   <div class="fsa-grid">${d.areas.map((a,i)=>`<div class="fsa-area"><label>Nama area<input type="text" maxlength="30" data-area-name="${i}" value="${esc(a.name)}" ${dis}></label><label>Jam<input type="text" maxlength="12" data-area-time="${i}" value="${esc(a.time)}" placeholder="03.30" ${dis}></label><label>Pembulatan<select data-area-round="${i}" ${dis}>${R.map(([v,l])=>`<option value="${v}" ${a.round===v?'selected':''}>${l}</option>`).join('')}</select></label><div class="fsa-routes"><span>Rute</span>${routes.map(rt=>`<label><input type="checkbox" data-area-route value="${i}|${esc(rt)}" ${a.routes.includes(rt)?'checked':''} ${dis}>${esc(rt)}</label>`).join('')}</div></div>`).join('')}</div>
+   <label class="fsa-thr">Ambang "naik kalau pecahan ≥" <input type="number" id="fs-area-thr" min="0.05" max="0.95" step="0.05" value="${esc(d.areaThr)}" ${dis}> <small>contoh 0,8: 1,1–1,7 → 1 angkatan, 1,8–1,9 → 2 angkatan</small></label></article>`;
+ }
  function productsBody(dis){
   const d=prodDraft(),C=P().CATS,base=P().DEFAULTS.core,core=P().core(),active=d.extra.filter(x=>!x.removed).length;
   const catSel=(attr,val)=>`<select ${attr} ${dis} aria-label="Kategori">${C.map((c,ci)=>`<option value="${ci}" ${val===ci?'selected':''}>${esc(c)}</option>`).join('')}</select>`;
@@ -90,6 +103,7 @@ window.ForecastSettings=(()=>{
    </article>
    <article class="workspace-card"><h3 class="fs-h3">Isi 1 angkatan produksi <small>pcs per rasa</small></h3><p class="fs-use">Dipakai untuk menyusun <b>Rencana produksi (angkatan)</b> di Buat forecast. Semua rasa dalam satu varian memakai isi yang sama.</p><div class="fsp-batch">${(window.ForecastProduction?.families?.()||[]).map(f=>`<label><span>${esc(f.label)}</span><span class="fsp-batch-in"><input type="number" min="1" max="500" step="1" data-prod-batch="${f.key}" value="${esc(d.batch?.[f.key]??f.size)}" ${dis}><em>pcs</em></span>${f.unit?`<small>${esc(f.unit)}</small>`:''}</label>`).join('')}</div></article>
    <article class="workspace-card"><h3 class="fs-h3">HPP outlet <small>Rp per pcs · harga jual pabrik ke outlet</small></h3><p class="fs-use">Dipakai menghitung nominal <b>estimasi waste</b> di Dashboard & Monitoring (kue sisa × HPP). Persen waste tetap dibagi omzet terjual. Produk lain (roti dll.) belum dihitung.</p><div class="fsp-batch">${P().CORE_ORDER.map(p=>`<label><span>${esc(window.ForecastPlanner?.names?.[p]||base[p].label)}</span><span class="fsp-batch-in"><em>Rp</em><input type="number" min="0" max="1000000" step="1" data-prod-hpp="${p}" value="${esc(d.core[p].hpp)}" ${dis}></span>${Number(d.core[p].hpp)!==P().DEFAULT_HPP[p]?`<small>Bawaan Rp${P().DEFAULT_HPP[p].toLocaleString('id-ID')}</small>`:''}</label>`).join('')}</div></article>
+   ${areasCard(dis)}
    ${colorsCard(dis)}
    <details class="workspace-card fsp-core"><summary><div><h3 class="fs-h3">12 produk inti <small>nama di rincian kirim & gambar WA</small></h3><p class="fs-use">Dipakai mesin rekomendasi, jadi tidak bisa dihapus atau dipindah kategori. Anda bisa mengganti nama tampilnya atau menyembunyikannya dari rincian kirim.</p></div><span class="fsp-chev">▾</span></summary>${coreGroups}</details>
   </div>`;
@@ -100,8 +114,12 @@ window.ForecastSettings=(()=>{
   if(extra.length>20)throw Error('Maksimal 20 produk lain.');
   const batch={};for(const [k,v] of Object.entries(d.batch||{})){if(!Number.isInteger(v)||v<1||v>500)throw Error('Isi 1 angkatan harus angka bulat 1–500 pcs.');batch[k]=v;}
   const routes={};for(const [k,v] of Object.entries(d.routes||{})){const h=P().hex(v);if(h)routes[k]=h;}
+  const areas=(d.areas||[]).map(a=>{const name=String(a.name||'').trim();if(!name)throw Error('Nama area produksi tidak boleh kosong.');if(!['up','down','thr','rest'].includes(a.round))throw Error('Pilihan pembulatan area tidak dikenal.');return {name,time:String(a.time||'').trim().slice(0,12),round:a.round,routes:[...new Set(a.routes||[])]};});
+  if(areas.filter(a=>a.round==='rest').length>1)throw Error('Hanya satu area yang boleh memakai pembulatan "sisa dari total".');
+  const seenRt=new Set();for(const a of areas)for(const r of a.routes){if(seenRt.has(r))throw Error(`Rute ${r} dicentang di lebih dari satu area.`);seenRt.add(r);}
+  const areaThr=Number(String(d.areaThr).replace(',','.'));if(!(areaThr>0&&areaThr<1))throw Error('Ambang pembulatan area harus antara 0 dan 1, misalnya 0,8.');
   const hpps=d.core.map((c,p)=>{const v=Number(c.hpp);if(String(c.hpp).trim()===''||!Number.isInteger(v)||v<0||v>1000000)throw Error(`HPP ${window.ForecastPlanner?.names?.[p]||P().DEFAULTS.core[p].label} harus angka bulat 0–1.000.000.`);return v;});
-  return {core:d.core.map((c,p)=>{const color=P().hex(c.color);return {label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship,hpp:hpps[p],...(color?{color}:{})};}),extra,batch,routes};}
+  return {core:d.core.map((c,p)=>{const color=P().hex(c.color);return {label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship,hpp:hpps[p],...(color?{color}:{})};}),extra,batch,routes,areas,areaThr};}
  function addProduct(form){syncProd(form);const el=form?.querySelector('#fs-prod-new-name'),cs=form?.querySelector('#fs-prod-new-cat'),name=String(el?.value||'').trim().replace(/\s+/g,' ');newCat=Number(cs?.value??newCat);
   if(!name){status='Ketik nama produk baru dulu.';return;}
   if(prodDraft().extra.some(x=>!x.removed&&x.name.trim().toLowerCase()===name.toLowerCase())){status=`"${name}" sudah ada di daftar.`;return;}

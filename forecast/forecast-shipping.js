@@ -63,12 +63,15 @@ window.ForecastShipping=(()=>{
  // Pesanan untuk pabrik (bukan outlet), dari rekap sheet PESANAN (factoryDays, pcs_orders.py).
  function factory(){const f=window.PcsPanels?.data?.()?.orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===date);const qty=r?r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0):Array(12).fill(0);return {qty,orders:r?.orders||0,partial:!!r?.qty?.some(v=>v===null),total:qty.reduce((a,b)=>a+b,0)};}
  // Rencana produksi dari rencana tersimpan (+ pesanan pabrik), dalam angkatan dapur.
- function production(by){const PD=window.ForecastProduction;if(!PD)return null;const box=PR().match('Box Mini');const ins=[...by.values()].map(r=>({id:r.outlet,regular:r.plan.regular,orders:r.plan.orders,boxMini:box?(()=>{const it=PR().itemFor(r.plan.customItems,box);return it?(Number(it.regular)||0)+(Number(it.orders)||0):0;})():0}));if(!ins.length)return null;const f=factory();const rows=PD.families().flatMap(fm=>fm.ps.map(p=>{const regular=ins.reduce((s,o)=>s+(o.regular[p]||0),0),orders=ins.reduce((s,o)=>s+(o.orders[p]||0),0),fac=f?.qty?.[p]||0,bx=fm.key==='mini'?ins.reduce((s,o)=>s+o.boxMini,0)*3:0,total=regular+orders+fac+bx,full=Math.floor(total/fm.size),rem=total-full*fm.size;return {p,fam:fm,total,full,rem};}));
-  // Mini: 1 angkatan campur 3 rasa, selalu dibulatkan naik setelah dikurangi stok (dari draft Buat forecast di perangkat ini).
-  const mini=rows.filter(r=>r.fam.combined),rest=rows.filter(r=>!r.fam.combined);let combo=null;
-  if(mini.length){let stock=0;try{stock=Math.max(0,Math.round(Number(JSON.parse(localStorage.getItem('omaopa-topdown-v2:'+date)||'null')?.miniStock)||0));}catch{}const fm=mini[0].fam,total=mini.reduce((s,r)=>s+r.total,0),batches=Math.ceil(Math.max(0,total-stock)/fm.size);combo={combined:true,fam:fm,total,stock,full:batches,rem:0,leftover:batches*fm.size+stock-total,per:mini};}
-  const all=[...rest,...(combo?[combo]:[])];
-  return {rows:all,batches:all.reduce((s,r)=>s+r.full,0),odd:rest.filter(r=>r.rem).length};}
+ // Rencana produksi dari rencana TERSIMPAN (+ pesanan pabrik), dalam angkatan dapur. Pilihan
+ // naik/turun, stok Mini per rasa & pengurangan Chiffon diambil dari draft Buat forecast di
+ // perangkat ini, jadi gambar = yang terlihat di menu 3 · Rencana produksi.
+ function production(by){const PD=window.ForecastProduction;if(!PD)return null;const box=PR().match('Box Mini');
+  const ins=[...by.values()].map(r=>({id:r.outlet,regular:r.plan.regular.map((v,p)=>r.plan.active[p]?v:0),orders:r.plan.orders.map((v,p)=>r.plan.active[p]?v:0),boxMini:box?(()=>{const it=PR().itemFor(r.plan.customItems,box);return it?(Number(it.regular)||0)+(Number(it.orders)||0):0;})():0}));if(!ins.length)return null;
+  let d=null;try{d=JSON.parse(localStorage.getItem('omaopa-topdown-v2:'+date)||'null');}catch{}
+  const f=factory(),pl=PD.plan(ins,f?.qty,d?.prodOverride||{},{miniStock:d?.miniStock&&typeof d.miniStock==='object'?d.miniStock:{},extra:d?.prodExtra||{}});
+  const byId=new Map(ins.map(o=>[o.id,o])),byRoute=new Map(GROUPS.map(g=>[g.name,g.outlets.map(([id])=>byId.get(id)).filter(Boolean)]));
+  return {pl,rows:pl.rows,split:PD.areaSplit(pl.rows,byRoute),batches:pl.rows.reduce((s,r)=>s+r.batches,0),odd:0};}
  const numCell=v=>v==null?'<td class="fs-nil">—</td>':Number(v)===0?'<td class="fs-zero">0</td>':`<td>${nf(v)}</td>`;
  // view 'production' = menu Rencana produksi (untuk dapur); default = Rincian kirim (untuk logistik).
  function render(view){
@@ -80,7 +83,7 @@ window.ForecastShipping=(()=>{
   const f=factory(),fRows=PR().CORE_ORDER.map(p=>PR().core()[p]).map(c=>[[c.label,c.p,c.dot,c.cat],c.p]);
   const factoryCard=`<section class="fs-ship-card fs-factory-card" style="--acc:${FACTORY_ACCENT};--acc-soft:${tint(FACTORY_ACCENT,.9)};--acc-ink:${shade(FACTORY_ACCENT,.35)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Pesanan pabrik</h3><span class="fs-ship-meta">${f?`${f.orders} pesanan · ${nf(f.total)} pcs`:'menunggu sinkron pesanan'} · tidak masuk outlet</span></header>${!f?'<p class="fs-req-empty">Pesanan bertulisan "pabrik" di sheet PESANAN akan tampil di sini setelah sinkron pesanan berikutnya.</p>':!f.total?'<p class="fs-req-empty">Tidak ada pesanan untuk pabrik pada tanggal ini.</p>':`<div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner">Produk</th><th class="fs-ship-totalh">Pabrik</th></tr></thead><tbody>${fRows.filter(([r])=>f.qty[r[1]]>0).map(([[label,src,dot]])=>`<tr><td><span class="fs-dot" style="background:${dot}"></span>${esc(label)}</td>${numCell(f.qty[src]).replace('<td','<td data-tot')}</tr>`).join('')}</tbody></table></div>${f.partial?'<p class="fs-req-empty">Sebagian varian pesanan belum pasti, cek sheet PESANAN.</p>':''}`}</section>`;
   const pr=production(by),core=PR().core();
-  const prodCard=pr?`<section class="fs-ship-card fs-prod-card" style="--acc:#3d5566;--acc-soft:${tint('#3d5566',.9)};--acc-ink:${shade('#3d5566',.2)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Rencana produksi</h3><span class="fs-ship-meta">${pr.batches} angkatan penuh${pr.odd?` · ${pr.odd} rasa belum pas`:''} · dari ${by.size} rencana tersimpan${f?.total?' + pesanan pabrik':''}</span></header>${pr.odd?`<p class="fs-req-empty">${pr.odd} rasa belum pas kelipatan angkatan. Sesuaikan di <b>Buat forecast › Rencana produksi</b> lalu simpan ulang.</p>`:''}<div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner">Produk</th><th>Total pcs</th><th class="fs-ship-totalh">Angkatan</th></tr></thead><tbody>${window.ForecastProduction.families().map(fm=>`<tr class="fs-cat"><td colspan="3">${esc(fm.label)} · ${fm.size} pcs/angkatan</td></tr>${pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?`<tr><td><span class="fs-dot" style="background:#a597c7"></span>Mini campur 3 rasa<small class="fs-prod-sub">${r.per.map(x=>`${esc(core[x.p].label.replace(/^Mini | \(pcs\)$/g,''))} ${nf(x.total)}`).join(' · ')}${r.stock?` · stok ${nf(r.stock)}`:''} · sisa ${nf(r.leftover)} untuk besok</small></td><td>${nf(r.total)}</td><td data-tot>${r.full}</td></tr>`:`<tr><td><span class="fs-dot" style="background:${core[r.p].dot}"></span>${esc(core[r.p].label)}</td><td>${nf(r.total)}</td><td data-tot>${r.rem?`${r.full} <small class="fs-prod-rem">+${r.rem} pcs</small>`:r.full}</td></tr>`).join('')}`).join('')}</tbody></table></div></section>`:'';
+  const prodCard=pr?`<section class="fs-ship-card fs-prod-card" style="--acc:#3d5566;--acc-soft:${tint('#3d5566',.9)};--acc-ink:${shade('#3d5566',.2)}"><header class="fs-ship-card-head"><h3 class="fs-ship-title">Rencana produksi</h3><span class="fs-ship-meta">${pr.batches} angkatan · dari ${by.size} rencana tersimpan${f?.total?' + pesanan pabrik':''}</span></header><div class="fs-ship-wrap"><table class="fs-ship"><thead><tr><th class="fs-ship-corner">Produk</th><th>Total pcs</th><th class="fs-ship-totalh">Angkatan</th></tr></thead><tbody>${pr.rows.map(r=>r.combined?`<tr><td>Mini campur 3 rasa<small class="fs-prod-sub">${r.per.map(x=>`${esc(core[x.p].label.replace(/^Mini | \(pcs\)$/g,''))} ${nf(x.make)}`).join(' · ')} · sisa ${nf(r.leftover)} untuk besok</small></td><td>${nf(r.total)}</td><td data-tot>${r.batches}</td></tr>`:`<tr><td>${esc(core[r.p].label)}</td><td>${nf(r.total)}</td><td data-tot>${r.batches}</td></tr>`).join('')}</tbody></table></div></section>`:'';
   const canShare=!!(navigator.canShare&&navigator.share);
   if(view==='production'){const n=by.size;
    return `<div class="fs-ship-head"><label class="fs-ship-date">Tanggal kiriman<input type="date" id="fs-ship-date" value="${date}"></label><div class="fs-ship-actions">${canShare&&pr?'<button type="button" class="button fp-primary" data-prod-share>Bagikan ke WA</button>':''}${pr?`<button type="button" class="button ${canShare?'':'fp-primary'}" data-prod-download>Unduh gambar</button>`:''}</div></div>
@@ -104,7 +107,7 @@ window.ForecastShipping=(()=>{
   const soft=headSoft||tint(accent,.88),ink=shade(accent,.35),totBg=tint(accent,.95);
   const text=(t,tx,ty,{size=13,weight=400,color='#1f2d3a',align='left'}={})=>{x.font=`${weight} ${size}px ${F}`;x.fillStyle=color;x.textAlign=align;x.textBaseline='middle';const ls=String(t).split('\n'),lh=size+3;ls.forEach((l,i)=>x.fillText(l,tx,ty-(ls.length-1)*lh/2+i*lh));};
   const rect=(rx,ry,w,h,c)=>{x.fillStyle=c;x.fillRect(rx,ry,w,h);};
-  const hline=(ry,c='#e5e9ee',w=1)=>{x.strokeStyle=c;x.lineWidth=w;x.beginPath();x.moveTo(PAD,ry+.5);x.lineTo(PAD+TWD,ry+.5);x.stroke();};
+  const GRID='#cdd6df';const hline=(ry,c=GRID,w=1)=>{x.strokeStyle=c;x.lineWidth=w;x.beginPath();x.moveTo(PAD,ry+.5);x.lineTo(PAD+TWD,ry+.5);x.stroke();};
   rect(0,0,W,H,'#ffffff');rect(0,0,W,6,accent);
   text('OMA OPA CAKERY',PAD,PAD+6,{size:11,weight:700,color:'#8592a0'});
   text(title,PAD,PAD+32,{size:21,weight:700,color:'#1c2b38'});
@@ -118,7 +121,7 @@ window.ForecastShipping=(()=>{
   y+=headH;hline(y-1,accent,2);
   let zebra=0;
   for(const s of sections){
-   if(s.title){rect(PAD,y,TWD,CH,'#f1f4f7');text(s.title.toUpperCase(),PAD+14,y+CH/2,{size:10.5,weight:700,color:'#66768a'});y+=CH;hline(y,'#e5e9ee');zebra=0;}
+   if(s.title){rect(PAD,y,TWD,CH,'#f1f4f7');text(s.title.toUpperCase(),PAD+14,y+CH/2,{size:10.5,weight:700,color:'#66768a'});y+=CH;hline(y);zebra=0;}
    for(const r of s.rows){
     if(r.bg){rect(PAD,y,TWD,RH,r.bg);if(showTotal)rect(PAD+LW+CW*cols,y,TW,RH,shade(r.bg,.06));zebra++;}
     else{rect(PAD,y,TWD,RH,zebra++%2?'#fafbfc':'#ffffff');if(showTotal)rect(PAD+LW+CW*cols,y,TW,RH,totBg);}
@@ -130,8 +133,8 @@ window.ForecastShipping=(()=>{
     y+=RH;hline(y);
    }
   }
-  x.strokeStyle='#dbe1e7';x.lineWidth=1;x.strokeRect(PAD+.5,PAD+HEAD+.5,TWD-1,y-PAD-HEAD-1);
-  x.strokeStyle='#eef1f4';for(let i=0;i<=cols;i++){if(i===0||i===cols&&!showTotal)continue;const vx=PAD+LW+i*CW+.5;x.beginPath();x.moveTo(vx,PAD+HEAD+headH);x.lineTo(vx,y);x.stroke();}
+  x.strokeStyle='#b9c4cf';x.lineWidth=1;x.strokeRect(PAD+.5,PAD+HEAD+.5,TWD-1,y-PAD-HEAD-1);
+  x.strokeStyle=GRID;for(let i=0;i<=cols;i++){if(i===0||i===cols&&!showTotal)continue;const vx=PAD+LW+i*CW+.5;x.beginPath();x.moveTo(vx,PAD+HEAD);x.lineTo(vx,y);x.stroke();}
   x.strokeStyle='#dbe1e7';const vx0=PAD+LW+.5;x.beginPath();x.moveTo(vx0,PAD+HEAD);x.lineTo(vx0,y);x.stroke();
   const stamp=new Date().toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   text(`Dibuat dari Forecast Oma Opa · ${stamp} WIB`,PAD,y+FOOT/2+2,{size:10.5,color:'#97a3ae'});
@@ -139,7 +142,9 @@ window.ForecastShipping=(()=>{
  }
  function images(view){
   ROWS=buildRows();const by=plans(),groups=groupData(by),out=[];
-  if(view==='production'){const pr=production(by);if(pr){const core=PR().core();out.push({name:`Rencana Produksi ${date}.png`,canvas:drawTable({title:'Rencana Produksi (angkatan)',accent:'#3d5566',showTotal:true,totalLabel:'ANGKATAN',colLabels:['Total pcs'],sections:window.ForecastProduction.families().map(fm=>({title:`${fm.label} · ${fm.size} pcs/angkatan`,rows:pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?{label:`Mini campur 3 rasa (sisa ${r.leftover})`,dot:'#a597c7',values:[r.total],total:String(r.full)}:{label:core[r.p].label,dot:core[r.p].dot,values:[r.total],total:r.rem?`${r.full} +${r.rem}`:String(r.full)})}))})});}return out;}
+  if(view==='production'){const pr=production(by);if(pr){const core=PR().core(),A=pr.split.areas;
+   out.push({name:`Rencana Produksi ${date}.png`,canvas:drawTable({title:'Rencana Produksi (angkatan)',accent:'#3d5566',showTotal:true,totalLabel:'TOTAL',colLabels:[...A.map(a=>a.name),'Total pcs'],subLabels:[...A.map(a=>'pukul '+(a.time||'-')),''],
+    sections:window.ForecastProduction.families().map(fm=>({title:`${fm.label} · ${fm.size} pcs/angkatan`,rows:pr.rows.filter(r=>r.family.key===fm.key).map(r=>{if(r.combined)return {label:`Mini campur (${r.per.map(x=>x.make).join('/')})`,values:[...A.map(()=>''),r.total],total:String(r.batches)};const l=pr.split.lines.find(x=>x.p===r.p);return {label:core[r.p].label,bg:core[r.p].bg,values:[...A.map((_,i)=>l?l.got[i]:0),r.total],total:String(r.batches)};})}))})});}return out;}
   for(const g of groups)out.push({name:`Pengiriman ${g.name} ${date}.png`,canvas:drawTable({title:`Pengiriman Pertama · ${g.name}`,accent:g.color,soft:PR().routeBg(g.name)||g.soft,showTotal:true,colLabels:g.cols.map(c=>c.label),subLabels:g.cols.map(c=>c.record?c.pct+'%':'belum ada'),
    sections:CATS.map((cat,ci)=>({title:cat,rows:ROWS.map((r,ri)=>[r,ri]).filter(([r])=>r[3]===ci).map(([[label,,dot,,bg],ri])=>({label,dot,bg,values:g.cols.map(c=>c.values[ri]),total:g.totals[ri]}))}))})});
   if(false){const core=PR().core();out.unshift({name:`Rencana Produksi ${date}.png`,canvas:drawTable({title:'Rencana Produksi (angkatan)',accent:'#3d5566',showTotal:true,totalLabel:'ANGKATAN',colLabels:['Total pcs'],sections:window.ForecastProduction.families().map(fm=>({title:`${fm.label} · ${fm.size} pcs/angkatan`,rows:pr.rows.filter(r=>r.fam.key===fm.key).map(r=>r.combined?{label:`Mini campur 3 rasa (sisa ${r.leftover})`,dot:'#a597c7',values:[r.total],total:String(r.full)}:{label:core[r.p].label,dot:core[r.p].dot,values:[r.total],total:r.rem?`${r.full} +${r.rem}`:String(r.full)})}))})});}

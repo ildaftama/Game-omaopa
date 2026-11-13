@@ -650,3 +650,83 @@
 .fp-backbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:8px 10px;border-radius:10px;background:#f2f6f9}
 .fp-backbar b{font-size:14px;color:#1c2b38}
 .fp-backbar .button:last-child{margin-left:auto}
+
+/* ---- Buat forecast per area (feedback forecaster 2026-11-13) ---- */
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.ft-area-tabs{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 12px;padding:3px;border-radius:10px;background:#eef2f6;width:max-content;max-width:100%}
+.ft-area-tabs button{border:0;background:transparent;padding:7px 14px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;color:#5f6f7e;cursor:pointer}
+.ft-area-tabs button[aria-selected="true"]{background:#fff;color:#1c2b38;box-shadow:0 1px 3px rgba(20,40,60,.12)}
+.ft-area{margin:0 0 18px;padding:12px 14px 14px;border:1px solid #e3e8ee;border-top:4px solid var(--acc);border-radius:12px;background:#fff}
+.ft-area-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+.ft-area-head h3{margin:0;font-size:16px;color:#1c2b38}
+.ft-area-head span{font-size:12px;color:#7a8896}
+.ft-sub-h{display:flex;align-items:baseline;gap:10px;margin:12px 0 6px}
+.ft-sub-h b{font-size:13px;color:#24323f}
+.ft-sub-h span{font-size:11.5px;color:#7a8896}
+.ft-sub-kir b{color:#1f5567}
+.ft-grid-wrap{max-height:none}
+.ft-grid{border-collapse:separate;border-spacing:0;border-top:1px solid #d5dde5;border-left:1px solid #d5dde5;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+.ft-grid th,.ft-grid td{border:0;border-right:1px solid #d5dde5;border-bottom:1px solid #d5dde5;padding:3px 4px;text-align:center;white-space:nowrap}
+.ft-grid thead th{background:var(--acc-soft);color:#2a3a48;font-size:11.5px;font-weight:700;vertical-align:top;position:sticky;top:0;z-index:2}
+.ft-grid .ft-pcol{position:sticky;left:0;z-index:1;text-align:left;background:#fff;min-width:170px;font-weight:600;color:#24323f}
+.ft-grid thead .ft-pcol{z-index:3;background:var(--acc-soft)}
+.ft-grid .ft-tcol{background:#f3f6f9;font-weight:700;min-width:56px}
+.ft-grid thead .ft-tcol{background:var(--acc-soft)}
+.ft-grid tr.ft-rbg td{background:var(--row)}
+.ft-grid tr.ft-rbg td.ft-tcol{background:color-mix(in srgb,var(--row) 88%,#000)}
+.ft-grid tr.ft-cat td{background:#f1f4f7;text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#66768a}
+.ft-grid tfoot td{background:#f7f9fb;font-weight:700}
+.ft-grid tfoot .ft-pcol{background:#f7f9fb}
+.ft-grid .ft-ctot{font-size:12px}
+.ft-grid .ft-cell{width:46px;background:rgba(255,255,255,.75);border:1px solid #cfd8e0}
+.ft-grid .ft-cell.ft-edited{background:#fff4dc;border-color:#e8c777}
+.ft-grid .ft-cell.ft-ordwarn{border-color:#e0a050}
+.ft-grid .ft-kv{font-weight:700;color:#1c2b38;min-width:46px}
+.ft-grid .ft-z{color:#b7c0ca;font-weight:400}
+.ft-grid .ft-ocol{min-width:78px;max-width:110px;white-space:normal}
+.ft-grid .ft-ocol .ft-oname{display:block;font-weight:700;font-size:11.5px;line-height:1.25;color:#1c2b38}
+.ft-grid .ft-ochips{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;margin:2px 0}
+.ft-grid .ft-ochips .ft-rain,.ft-grid .ft-ochips .ft-rain-btn{margin:0}
+.ft-grid .ft-ocol .ft-pill{display:inline-block;margin-top:2px;font-size:9.5px;padding:1px 5px}
+.ft-notes{display:grid;gap:8px;margin:6px 0}
+.ft-note-box{display:grid;grid-template-columns:120px 1fr auto auto;gap:8px;align-items:center;padding:8px 10px;border-radius:10px;background:#f7fafb;border:1px solid #e3e8ee}
+.ft-note-box textarea{width:100%;box-sizing:border-box;font:inherit;font-size:12.5px;border:1px solid #d3dce4;border-radius:8px;padding:6px 8px;resize:vertical}
+.ft-note-x{border:0;background:none;font-size:18px;color:#7a8896;cursor:pointer}
+@media (max-width:720px){.ft-note-box{grid-template-columns:1fr}.ft-grid .ft-pcol{min-width:120px}}
+
+/* Rincian kirim: garis tipis antar sel (feedback forecaster 2026-11-13) */
+.fs-ship{border-collapse:separate;border-spacing:0;border-top:1px solid #d5dde5;border-left:1px solid #d5dde5}
+.fs-ship th,.fs-ship td{border-right:1px solid #d5dde5!important;border-bottom:1px solid #d5dde5!important}
+
+/* Pengaturan › Produk: pembagian angkatan per area */
+.fsa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:10px}
+.fsa-area{display:grid;gap:6px;padding:10px;border:1px solid #e3e8ee;border-radius:10px;background:#fafbfc}
+.fsa-area>label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600;color:#4d5d6c}
+.fsa-area input[type=text],.fsa-area select{font:inherit;font-size:13px;border:1px solid #d3dce4;border-radius:8px;padding:6px 8px}
+.fsa-routes{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:#4d5d6c}
+.fsa-routes>span{flex-basis:100%;font-weight:600}
+.fsa-routes label{display:inline-flex;gap:4px;align-items:center}
+.fsa-thr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;font-size:12.5px;color:#4d5d6c}
+.fsa-thr input{width:70px;font:inherit;border:1px solid #d3dce4;border-radius:8px;padding:5px 7px}
+/* Rencana produksi: Mini per rasa, pengurangan, per area, teks WA */
+.fpd-mini{display:grid;gap:6px;text-align:left}
+.fpd-mini-h{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.fpd-mini-h span{font-size:12px;color:#5f6f7e}
+.fpd-mini-t{border-collapse:separate;border-spacing:0;border-top:1px solid #d5dde5;border-left:1px solid #d5dde5;font-size:12.5px;width:auto}
+.fpd-mini-t th,.fpd-mini-t td{border-right:1px solid #d5dde5;border-bottom:1px solid #d5dde5;padding:4px 10px;text-align:center}
+.fpd-mini-t th{background:#f4f6f9;font-size:11.5px}
+.fpd-mini-t tfoot td{font-weight:700;background:#f7f9fb}
+.fpd-mini-t .ft-cell{width:60px}
+.fpd-extra{display:flex;gap:6px;align-items:center;margin-top:4px;font-size:11.5px;color:#6a5a2e}
+.fpd-extra .ft-cell{width:52px}
+.fpd-area{margin-top:16px;display:grid;gap:8px}
+.fpd-area h4{margin:0;font-size:14px}
+.fpd-area p{margin:2px 0 0;font-size:12px;color:#6b7a88}
+.fpd-area-t th small,.fpd-area-t td small{display:block;font-size:10px;font-weight:400;color:#7a8896}
+.fpd-area-t{--acc-soft:#eef2f6}
+.fpd-area-t tr.fpd-bad td{background:#fff4ec}
+.fpd-warn{margin:0;font-size:12px;color:#a0531a}
+.fpd-wa{display:grid;gap:6px}
+.fpd-wa-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fpd-wa textarea{width:100%;box-sizing:border-box;font:13px/1.45 ui-monospace,Consolas,monospace;border:1px solid #d3dce4;border-radius:10px;padding:10px;background:#fbfcfd;resize:vertical}

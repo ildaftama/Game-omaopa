@@ -41,17 +41,21 @@ window.ForecastProduction=(()=>{
   const m=mode(),rows=[];
   for(const f of families()){
    if(f.combined){
-    const per=f.ps.map(p=>{const regular=outlets.reduce((s,o)=>s+(o.regular[p]||0),0),orders=outlets.reduce((s,o)=>s+(o.orders[p]||0),0),fac=factory?.[p]||0,box=outlets.reduce((s,o)=>s+(o.boxMini||0),0)*BOX_MINI[p-f.ps[0]];return {p,regular,orders,factory:fac,box,total:regular+orders+fac+box};});
-    const total=per.reduce((s,x)=>s+x.total,0),stock=Math.max(0,Math.round(Number(opts.miniStock)||0)),need=Math.max(0,total-stock),batches=Math.ceil(need/f.size),target=batches*f.size;
-    rows.push({p:null,combined:true,family:f,size:f.size,per,regular:per.reduce((s,x)=>s+x.regular,0),orders:per.reduce((s,x)=>s+x.orders,0),factory:per.reduce((s,x)=>s+x.factory,0),box:per.reduce((s,x)=>s+x.box,0),total,stock,batches,target,leftover:target+stock-total,rem:0,dir:'exact',diff:0});
+    // Stok Mini PER RASA (feedback forecaster 2026-11-13). Data lama (satu angka gabungan) tetap terbaca.
+    const ms=opts.miniStock,perStock=ms&&typeof ms==='object';
+    const per=f.ps.map(p=>{const regular=outlets.reduce((s,o)=>s+(o.regular[p]||0),0),orders=outlets.reduce((s,o)=>s+(o.orders[p]||0),0),fac=factory?.[p]||0,box=outlets.reduce((s,o)=>s+(o.boxMini||0),0)*BOX_MINI[p-f.ps[0]],ex=Math.max(0,Math.round(Number(opts.extra?.[p])||0)),total=regular+orders+fac+box+ex,stock=perStock?Math.max(0,Math.round(Number(ms[p])||0)):0;return {p,regular,orders,factory:fac,box,extra:ex,total,stock,need:Math.max(0,total-stock)};});
+    const total=per.reduce((s,x)=>s+x.total,0),stock=perStock?per.reduce((s,x)=>s+x.stock,0):Math.max(0,Math.round(Number(ms)||0)),need=perStock?per.reduce((s,x)=>s+x.need,0):Math.max(0,total-stock),batches=Math.ceil(need/f.size),target=batches*f.size;
+    // Isi angkatan per rasa: kebutuhan tiap rasa dulu, sisa kapasitas dibagi sebanding kebutuhan.
+    {let spare=target-(perStock?need:Math.min(target,need));const base=per.map(x=>perStock?x.need:Math.round(x.total*(need/(total||1))));let used=base.reduce((a,b)=>a+b,0);spare=target-used;const w=per.map(x=>x.total||1),W=w.reduce((a,b)=>a+b,0);const add=w.map(v=>Math.floor(spare*v/W));let left=spare-add.reduce((a,b)=>a+b,0);for(let i=0;left>0;i=(i+1)%per.length,left--)add[i]++;per.forEach((x,i)=>{x.make=Math.max(0,base[i]+add[i]);x.leftover=x.make+x.stock-x.total;});}
+    rows.push({p:null,combined:true,family:f,size:f.size,per,perStock,regular:per.reduce((s,x)=>s+x.regular,0),orders:per.reduce((s,x)=>s+x.orders,0),factory:per.reduce((s,x)=>s+x.factory,0),box:per.reduce((s,x)=>s+x.box,0),extra:per.reduce((s,x)=>s+x.extra,0),total,stock,batches,target,leftover:target+stock-total,rem:0,dir:'exact',diff:0});
     continue;
    }
    for(const p of f.ps){
    const regular=outlets.reduce((s,o)=>s+(o.regular[p]||0),0),orders=outlets.reduce((s,o)=>s+(o.orders[p]||0),0),fac=factory?.[p]||0;
    const box=f.key==='mini'?outlets.reduce((s,o)=>s+(o.boxMini||0),0)*BOX_MINI[p-4]:0;
-   const total=regular+orders+fac+box,full=Math.floor(total/f.size),rem=total-full*f.size,auto=rem>0&&rem>=f.size*m.threshold?'up':'down';
+   const ex=Math.max(0,Math.round(Number(opts.extra?.[p])||0)),total=regular+orders+fac+box+ex,full=Math.floor(total/f.size),rem=total-full*f.size,auto=rem>0&&rem>=f.size*m.threshold?'up':'down';
    const dir=rem?(overrides[p]||auto):'exact',batches=dir==='up'?full+1:full,target=batches*f.size;
-   rows.push({p,family:f,size:f.size,regular,orders,factory:fac,box,total,rem,auto,dir,overridden:!!overrides[p]&&overrides[p]!==auto,batches,target,diff:target-total});
+   rows.push({p,family:f,size:f.size,regular,orders,factory:fac,box,extra:ex,total,rem,auto,dir,overridden:!!overrides[p]&&overrides[p]!==auto,batches,target,diff:target-total});
    }
   }
   return {mode:m,rows};
@@ -68,5 +72,40 @@ window.ForecastProduction=(()=>{
   }
   return out;
  }
- return {FAMILIES,DEFAULT_SIZES,families,sizes,mode,plan,propose};
+ // ---- Pembagian angkatan per AREA (feedback forecaster 2026-11-13) ----
+ // Untuk pesan "Request Malam" di grup Perencanaan Produksi: kebutuhan tiap area (reguler +
+ // pesanan outlet di rute area itu) dibagi isi 1 angkatan, lalu dibulatkan sesuai pengaturan area:
+ //   up = ke atas, down = ke bawah, thr = naik kalau pecahan >= ambang, rest = SISA dari total
+ //   produksi (total angkatan produk itu dikurangi area lain; menampung pesanan pabrik & pengurangan).
+ // Contoh tim: total 14, Semarang 6,6 -> 7, Solo 5,4 -> 6, Jogja = 14 - 13 = 1.
+ const DEFAULT_AREAS=[
+  {name:'Semarang',time:'03.30',round:'up',routes:['Semarang','Magelang – Salatiga']},
+  {name:'Solo',time:'04.30',round:'up',routes:['Solo']},
+  {name:'Jogja',time:'06.00',round:'rest',routes:['Jogja']},
+ ];
+ function areas(){const a=window.ForecastSettings?.get?.()?.products?.areas;return Array.isArray(a)&&a.length?a.map((x,i)=>({...DEFAULT_AREAS[i]||{},...x,routes:Array.isArray(x.routes)?x.routes:(DEFAULT_AREAS[i]?.routes||[])})):DEFAULT_AREAS.map(x=>({...x,routes:[...x.routes]}));}
+ function areaThreshold(){const v=Number(window.ForecastSettings?.get?.()?.products?.areaThr);return v>0&&v<1?v:.8;}
+ // planRows: hasil plan().rows ; byRoute: Map(routeName -> [{regular[12],orders[12]}])
+ function areaSplit(planRows,byRoute){
+  const A=areas(),thr=areaThreshold();
+  const lines=planRows.filter(r=>!r.combined).map(r=>{
+   const dem=A.map(a=>a.routes.reduce((s,rt)=>s+(byRoute.get(rt)||[]).reduce((t,o)=>t+(o.regular[r.p]||0)+(o.orders[r.p]||0),0),0));
+   const frac=dem.map(d=>d/r.size);
+   const got=frac.map((f,i)=>{const m=A[i].round;if(m==='rest')return null;if(m==='down')return Math.floor(f+1e-9);if(m==='thr'){const fl=Math.floor(f+1e-9);return f-fl>=thr-1e-9?fl+1:fl;}return Math.ceil(f-1e-9);});
+   const fixed=got.reduce((s,v)=>s+(v||0),0),ri=got.findIndex(v=>v===null);
+   if(ri>=0){got[ri]=Math.max(0,r.batches-fixed);got.forEach((v,i)=>{if(v===null)got[i]=0;});}
+   const sum=got.reduce((a,b)=>a+b,0);
+   return {p:r.p,size:r.size,batches:r.batches,dem,frac,got,diff:sum-r.batches};
+  });
+  return {areas:A,lines};
+ }
+ // Teks siap tempel ke grup WA Perencanaan Produksi.
+ function waText(split,names,dateLabel,miniRow){
+  const out=[`Perencanaan Produksi · ${dateLabel}`,''];
+  if(miniRow&&miniRow.batches)out.push(`Mini Ogura (H-1): ${miniRow.batches} angkatan = ${miniRow.per.map(x=>`${names[x.p]} ${x.make}`).join(', ')} pcs`,'');
+  out.push('Request Malam :');
+  split.areas.forEach((a,i)=>{const ls=split.lines.filter(l=>l.got[i]>0);if(!ls.length)return;out.push('',`${a.name} pukul ${a.time||'-'}`);for(const l of ls)out.push(`${l.got[i]} ${names[l.p]}`);});
+  return out.join('\n');
+ }
+ return {FAMILIES,DEFAULT_SIZES,DEFAULT_AREAS,families,sizes,mode,plan,propose,areas,areaThreshold,areaSplit,waText};
 })();
