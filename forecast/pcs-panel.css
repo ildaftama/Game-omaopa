@@ -734,3 +734,98 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .fsa-routes label{white-space:nowrap}
 .ft-grid td{padding:2px 3px}
 .ft-grid .ft-cell{padding:3px 2px;height:24px;box-sizing:border-box}
+
+/* ===== Buat forecast v2 (UX, owner 2026-11-13): lebih lebar, panel atas ringkas, tabel rapat ===== */
+main{max-width:1680px!important}
+.ft-hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+.ft-ctrl{display:grid;gap:10px;padding:14px 16px;border:1px solid #e3e8ee;border-radius:14px;background:#fff}
+.ft-ctrl-row{display:grid;grid-template-columns:auto auto minmax(220px,1fr);gap:18px;align-items:start}
+.ft-ctrl .ft-date{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:600;color:#6b7a88}
+.ft-ctrl .ft-date input{font:inherit;font-size:14px;padding:7px 9px;border:1px solid #d3dce4;border-radius:9px;color:#1c2b38}
+.ft-ctrl .ft-date small,.ft-ctrl .ft-target small,.ft-ctrl .ft-stat small{font-size:11px;color:#8592a0;font-weight:500}
+.ft-ctrl .ft-stat{display:flex;flex-direction:column;gap:2px;padding:0;border:0;background:none;min-width:150px}
+.ft-ctrl .ft-stat span{font-size:11.5px;font-weight:600;color:#6b7a88}
+.ft-ctrl .ft-stat strong{font-size:20px;color:#1c2b38;font-variant-numeric:tabular-nums}
+.ft-ctrl .ft-target{display:flex;flex-direction:column;gap:4px;padding:0;border:0;background:none}
+.ft-ctrl .ft-target>label{font-size:11.5px;font-weight:600;color:#6b7a88}
+.ft-ctrl .ft-target-input{display:flex;align-items:center;gap:6px;border:1.5px solid #2e6f86;border-radius:10px;padding:4px 10px;background:#fff}
+.ft-ctrl .ft-target-input span{color:#6b7a88;font-weight:600}
+.ft-ctrl .ft-target-input input{border:0;outline:0;font:inherit;font-size:20px;font-weight:700;color:#1c2b38;width:100%;font-variant-numeric:tabular-nums;padding:2px 0;background:transparent}
+.ft-ctrl .ft-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0}
+.ft-chips-l{font-size:11.5px;font-weight:600;color:#6b7a88;margin-right:2px}
+.ft-ctrl .ft-why{margin:0}
+.ft-ctrl-act{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.ft-ctrl-act .ft-toggle{margin:0;font-size:12.5px}
+.ft-ctrl-act .button{padding:10px 18px}
+.ft-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start}
+.ft-kpis>div{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid #e3e8ee;border-radius:14px;background:#fff;min-width:0}
+.ft-kpis span{font-size:11.5px;font-weight:600;color:#6b7a88}
+.ft-kpis strong{font-size:19px;color:#1c2b38;font-variant-numeric:tabular-nums}
+.ft-kpis small{font-size:11px;color:#8592a0}
+.ft-kpi-fac{background:#fbf8f2!important;border-color:#eadfca!important}
+.ft-fac-items{color:#6a5a3a!important;margin-top:2px}
+@media (max-width:1100px){.ft-hero{grid-template-columns:1fr}}
+@media (max-width:640px){.ft-ctrl-row{grid-template-columns:1fr 1fr}.ft-ctrl .ft-target{grid-column:1/-1}.ft-kpis{grid-template-columns:1fr 1fr}}
+.ft-bar{position:sticky;top:0;z-index:6;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin:6px 0 4px;padding:8px 0;background:linear-gradient(#fff 85%,rgba(255,255,255,0))}
+.ft-bar .ft-area-tabs{margin:0}
+.ft-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:#6b7a88;align-items:center}
+.ft-legend span{display:inline-flex;align-items:center;gap:5px}
+.ft-lg-edit{display:inline-block;width:12px;height:12px;border-radius:3px;background:#fff4dc;border:1px solid #e8c777}
+.ft-lg-key{padding:2px 8px;border-radius:6px;background:#f1f4f7}
+.ft-sdot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;background:#c3ccd5}
+.ft-sdot.saved{background:#2f9e6a}.ft-sdot.changed{background:#e0a030}.ft-sdot.new{background:#c3ccd5}
+.ft-sub{margin:2px 0 10px;font-size:12px;color:#7a8896}
+/* kartu area */
+.ft-area{padding:0;overflow:hidden;border:1px solid #dfe5eb;border-top:0;border-radius:14px;box-shadow:0 1px 2px rgba(20,40,60,.04)}
+.ft-area-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin:0;padding:10px 14px;background:var(--acc-soft);border-top:4px solid var(--acc)}
+.ft-area-head h3{font-size:16px}
+.ft-area-n{font-size:12px;color:#5f6f7e}
+.ft-area-kpi{margin-left:auto;display:flex;gap:14px;font-size:12px;color:#4d5d6c}
+.ft-area-kpi b{color:#1c2b38;font-variant-numeric:tabular-nums}
+.ft-area .ft-notes{padding:8px 14px 0}
+.ft-area .ft-sub-h{margin:0;padding:12px 14px 6px}
+.ft-area .ft-grid-wrap{margin:0 14px;border-radius:10px}
+.ft-area>.ft-grid-wrap:last-child{margin-bottom:14px}
+.ft-linkbtn{margin-left:auto;border:0;background:none;font:inherit;font-size:12px;font-weight:600;color:#1f5567;cursor:pointer;padding:0}
+.ft-linkbtn:hover{text-decoration:underline}
+/* tabel */
+.ft-grid{table-layout:fixed;width:max-content;min-width:100%;font-size:12.5px}
+.ft-grid col.ft-cw-p{width:200px}.ft-grid col.ft-cw-o{width:88px}.ft-grid col.ft-cw-t{width:80px}
+.ft-grid th,.ft-grid td{padding:0;height:28px;vertical-align:middle}
+.ft-grid thead th{position:sticky;top:0;padding:6px 4px;height:auto;vertical-align:bottom;font-size:11.5px;line-height:1.2}
+.ft-grid .ft-pcol{padding:0 10px;font-weight:600;font-size:12.5px;text-align:left;overflow:hidden;text-overflow:ellipsis}
+.ft-grid thead .ft-pcol{vertical-align:bottom;padding-bottom:7px}
+.ft-grid .ft-ocol .ft-oname{display:flex;align-items:center;justify-content:center;gap:5px;width:100%;font-size:11.5px;font-weight:700;color:#1c2b38;text-align:center;white-space:normal;line-height:1.2;border-radius:6px;padding:3px 2px}
+.ft-grid .ft-ocol .ft-oname:hover,.ft-grid .ft-ocol .ft-oname.on{background:rgba(255,255,255,.7)}
+.ft-hasnote{font-style:normal;color:#a0671a}
+.ft-grid .ft-ochips{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:3px}
+.ft-grid .ft-ochips .ft-adj{font-size:10px;padding:0 5px;margin:0}
+.ft-grid tr.ft-cat th{height:22px;padding:0 10px;background:#eef2f6;text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#5f6f7e;position:static}
+.ft-grid tbody tr.ft-r:hover>*{box-shadow:inset 0 0 0 9999px rgba(30,80,110,.045)}
+.ft-grid tbody tr.ft-r:focus-within>*{box-shadow:inset 0 0 0 9999px rgba(30,110,140,.08)}
+.ft-grid .ft-colhi{box-shadow:inset 0 0 0 9999px rgba(30,110,140,.08)}
+.ft-grid thead th.ft-colhi{box-shadow:inset 0 -3px 0 #2e6f86}
+.ft-grid tr.ft-rbg>*{background:var(--row)}
+.ft-grid tr.ft-rbg .ft-pcol{background:var(--row)}
+.ft-grid td>.ft-cell{display:block;width:100%;height:28px;margin:0;padding:0 4px;border:0;border-radius:0;background:transparent;text-align:center;font:inherit;font-size:13px;font-weight:600;color:#1c2b38;font-variant-numeric:tabular-nums;box-sizing:border-box}
+.ft-grid td>.ft-cell:hover{background:rgba(255,255,255,.55)}
+.ft-grid td>.ft-cell:focus{outline:2px solid #2e6f86;outline-offset:-2px;background:#fff;box-shadow:none}
+.ft-grid td>.ft-cell.z{color:#b3bdc7;font-weight:400}
+.ft-grid td>.ft-cell.ft-edited{background:#fff1cc;color:#5a3d00}
+.ft-grid td>.ft-cell.ft-ordwarn{box-shadow:inset 0 -2px 0 #e0a050}
+.ft-grid .ft-kv{text-align:center;font-weight:700;font-size:13px;color:#1c2b38}
+.ft-grid .ft-kv.z,.ft-grid .ft-tcol.z{color:#b3bdc7;font-weight:400}
+.ft-grid .ft-tcol{position:sticky;right:0;z-index:1;text-align:center;font-weight:700;background:#f1f4f7;border-left:1px solid #c9d3dc}
+.ft-grid tr.ft-rbg .ft-tcol{background:color-mix(in srgb,var(--row) 85%,#5b6b7a 15%)}
+.ft-grid thead .ft-tcol{z-index:3}
+.ft-grid tfoot th,.ft-grid tfoot td{height:26px;background:#f7f9fb;font-weight:700;text-align:center;font-size:12px;font-variant-numeric:tabular-nums}
+.ft-grid tfoot .ft-pcol{text-align:left}
+.ft-grid tfoot tr:first-child>*{border-top:2px solid #b9c4cf}
+.ft-grid tfoot .ft-fmeta>*{font-weight:500;color:#5f6f7e;font-size:11.5px}
+.ft-grid tfoot .ft-tcol{background:#e9eef3}
+.ft-grid .ft-empty{height:40px;text-align:center;color:#7a8896;font-size:12px}
+.ft-grid .ft-lw-up{color:#2f7d4f}.ft-grid .ft-lw-down{color:#b5532a}
+.ft-sub-kir+.ft-grid-wrap .ft-grid tbody th,.ft-sub-kir+.ft-grid-wrap .ft-grid td{height:24px}
+.ft-area{overflow:visible}
+.ft-area-head{border-radius:14px 14px 0 0}
+@media (min-width:1100px){.ft-area .ft-grid-wrap{overflow:visible}.ft-area .ft-grid thead th{top:54px}.ft-area .ft-grid .ft-tcol{position:static}}

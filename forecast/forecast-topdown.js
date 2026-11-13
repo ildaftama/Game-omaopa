@@ -301,45 +301,56 @@ window.ForecastTopdown=(()=>{
  const regOf=(id,r)=>r.kind==='core'?qtyOf(draft.cells[id][r.p]):qtyOf(draft.extra[id][r.nm]?.r);
  const ordOf=(id,r)=>r.kind==='core'?qtyOf(draft.orders[id][r.p]):qtyOf(draft.extra[id][r.nm]?.o);
  const valOf=(kind,id,r)=>kind==='reg'?regOf(id,r):kind==='ord'?ordOf(id,r):regOf(id,r)+ordOf(id,r);
- const zf=n=>n?nf(n):'<span class="ft-z">0</span>';
+ const rpShort=n=>n==null?'—':n>=1e6?(n/1e6).toLocaleString('id-ID',{maximumFractionDigits:2})+' jt':Math.round(n/1e3).toLocaleString('id-ID')+' rb';
+ const STATUS_DOT={saved:'Tersimpan',changed:'Berubah, belum disimpan',new:'Belum disimpan'};
  function areaCard(c,g,rows){
-  const ids=g.ids,A=esc(g.name),cats=PR().CATS;
-  const head=`<th class="ft-pcol">Produk</th>${ids.map(id=>{const o=c.outlets.get(id),[sk,sl]=statusOf(id),open=draft.open.includes(id);const adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'';
-   return `<th class="ft-ocol"><button type="button" class="ft-oname" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Catatan & detail outlet">${esc(name(id))}${draft.notes[id]?' ✎':''}</button><div class="ft-ochips">${adj}${rainChip(id)}</div><span class="ft-pill ${sk}" data-ft-status="${esc(id)}">${sl}</span></th>`;}).join('')}<th class="ft-tcol">Total</th>`;
-  const body=kind=>cats.map((cat,ci)=>{const rs=rows.filter(r=>r.cat===ci);if(!rs.length)return '';return `<tr class="ft-cat"><td colspan="${ids.length+2}">${esc(cat)}</td></tr>${rs.map(r=>{
-   const cells=ids.map(id=>{
-    if(kind==='kir')return `<td class="ft-kv" data-ft-k="${esc(id)}|${r.key}">${zf(valOf('kir',id,r))}</td>`;
+  const ids=g.ids,A=esc(g.name),cats=PR().CATS,n=ids.length;
+  const colgroup=`<colgroup><col class="ft-cw-p">${ids.map(()=>'<col class="ft-cw-o">').join('')}<col class="ft-cw-t"></colgroup>`;
+  const head=`<th class="ft-pcol" scope="col">Produk</th>${ids.map((id,ci)=>{const o=c.outlets.get(id),[sk,sl]=statusOf(id),open=draft.open.includes(id);const adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'';
+   return `<th class="ft-ocol" scope="col" data-ci="${ci+1}"><button type="button" class="ft-oname${open?' on':''}" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Catatan & detail ${esc(name(id))}"><span class="ft-sdot ${sk}" data-ft-status="${esc(id)}" title="${esc(sl)}"></span>${esc(name(id))}${draft.notes[id]?'<i class="ft-hasnote" title="Ada catatan">✎</i>':''}</button>${adj||rainChip(id)?`<div class="ft-ochips">${adj}${rainChip(id)}</div>`:''}</th>`;}).join('')}<th class="ft-tcol" scope="col">Total</th>`;
+  const anyOrd=r=>ids.some(id=>ordOf(id,r)>0);
+  const showAllOrd=!!draft.ordAll?.[g.name],hiddenOrd=rows.filter(r=>!anyOrd(r)).length;
+  const body=kind=>cats.map((cat,ci)=>{let rs=rows.filter(r=>r.cat===ci);if(kind==='ord'&&!showAllOrd)rs=rs.filter(anyOrd);if(!rs.length)return '';return `<tr class="ft-cat"><th colspan="${n+2}" scope="rowgroup">${esc(cat)}</th></tr>${rs.map(r=>{
+   const cells=ids.map((id,ci)=>{
+    if(kind==='kir'){const v=valOf('kir',id,r);return `<td class="ft-kv${v?'':' z'}" data-ci="${ci+1}" data-ft-k="${esc(id)}|${r.key}">${nf(v)}</td>`;}
     const reg=kind==='reg',v=reg?(r.kind==='core'?draft.cells[id][r.p]:draft.extra[id][r.nm].r):(r.kind==='core'?draft.orders[id][r.p]:draft.extra[id][r.nm].o);
     const attr=r.kind==='core'?(reg?`data-ft-cell="${esc(id)}:${r.p}"`:`data-ft-ord="${esc(id)}:${r.p}"`):(reg?`data-ft-xr="${esc(id)}:${r.i}"`:`data-ft-xo="${esc(id)}:${r.i}"`);
     let cls='ft-cell',title='';
-    if(reg&&r.kind==='core'){const o=c.outlets.get(id),auto=draft.auto?.[id]?.[r.p];if(auto!=null&&String(auto)!==String(v))cls+=' ft-edited';title=`Saran awal: ${auto??'—'}${o.recs[r.p]?.perf?` · porsi ${o.recs[r.p].perf.f<1?'diturunkan':'dinaikkan'} ${Math.abs(Math.round((o.recs[r.p].perf.f-1)*100))}% dari performa rencana ${o.recs[r.p].perf.n} hari (kirim ${o.recs[r.p].perf.out}, terjual ${o.recs[r.p].perf.sold})`:''}`;}
+    if(reg&&r.kind==='core'){const o=c.outlets.get(id),auto=draft.auto?.[id]?.[r.p];if(auto!=null&&String(auto)!==String(v))cls+=' ft-edited';title=`Saran awal ${auto??'—'}${o.recs[r.p]?.perf?` · porsi ${o.recs[r.p].perf.f<1?'diturunkan':'dinaikkan'} ${Math.abs(Math.round((o.recs[r.p].perf.f-1)*100))}% dari performa rencana ${o.recs[r.p].perf.n} hari (kirim ${o.recs[r.p].perf.out}, terjual ${o.recs[r.p].perf.sold})`:''}`;}
     else if(reg&&rotiIdx(r.nm)!=null){const o=c.outlets.get(id);title=`Saran median hari sama: ${o.roti[rotiIdx(r.nm)]??'data belum cukup'}`;}
     else if(!reg&&r.kind==='core'){const k=c.outlets.get(id).orders[r.p];if(k>0&&qtyOf(v)!==k){cls+=' ft-ordwarn';title=`Rekap pesanan mencatat ${k}`;}}
-    return `<td><input class="${cls}" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(v)}" ${attr} aria-label="${esc(name(id))} ${esc(r.label)}"${title?` title="${esc(title)}"`:''}></td>`;}).join('');
+    if(!qtyOf(v))cls+=' z';
+    return `<td data-ci="${ci+1}"><input class="${cls}" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(v)}" ${attr} aria-label="${esc(name(id))} ${esc(r.label)}"${title?` title="${esc(title)}"`:''}></td>`;}).join('');
    const tot=ids.reduce((s,id)=>s+valOf(kind,id,r),0);
-   return `<tr${r.bg?` class="ft-rbg" style="--row:${r.bg}"`:''}><td class="ft-pcol">${r.bg?'':`<span class="fs-dot" style="background:${r.dot}"></span>`}${esc(r.label)}</td>${cells}<td class="ft-tcol" data-ft-rt="${kind}|${r.key}|${A}">${zf(tot)}</td></tr>`;}).join('')}`;}).join('');
+   return `<tr class="ft-r${r.bg?' ft-rbg':''}"${r.bg?` style="--row:${r.bg}"`:''}><th class="ft-pcol" scope="row">${r.bg?'':`<span class="fs-dot" style="background:${r.dot}"></span>`}${esc(r.label)}</th>${cells}<td class="ft-tcol${tot?'':' z'}" data-ft-rt="${kind}|${r.key}|${A}">${nf(tot)}</td></tr>`;}).join('')}`;}).join('');
   const colSum=(kind,id)=>rows.reduce((s,r)=>s+valOf(kind,id,r),0);
-  const colTot=kind=>ids.map(id=>`<td class="ft-ctot" data-ft-ot="${kind}|${esc(id)}">${nf(colSum(kind,id))}</td>`).join('');
-  const gTot=kind=>nf(ids.reduce((s,id)=>s+colSum(kind,id),0));
-  const regFoot=`<tfoot><tr><td class="ft-pcol">Total pcs</td>${colTot('reg')}<td class="ft-tcol" data-ft-gt="reg|${A}">${gTot('reg')}</td></tr><tr><td class="ft-pcol">Omzet reguler</td>${ids.map(id=>`<td class="ft-ctot ft-muted" data-ft-val="${esc(id)}">${rp(outletTotals(c,id).val)}</td>`).join('')}<td></td></tr><tr><td class="ft-pcol" title="Reguler 12 produk inti dibanding terjual hari yang sama minggu lalu">vs minggu lalu</td>${ids.map(id=>{const l=lwCell(c.outlets.get(id),outletTotals(c,id).pcs);return `<td class="ft-ctot ${l.cls}" data-ft-lw="${esc(id)}" title="${esc(l.title)}">${l.txt}</td>`;}).join('')}<td></td></tr></tfoot>`;
-  const foot=kind=>`<tfoot><tr><td class="ft-pcol">Total pcs</td>${colTot(kind)}<td class="ft-tcol" data-ft-gt="${kind}|${A}">${gTot(kind)}</td></tr></tfoot>`;
-  const tbl=(kind,title,sub)=>`<div class="ft-sub-h ft-sub-${kind}"><b>${title}</b><span>${sub}</span></div><div class="ft-table-wrap ft-grid-wrap"><table class="ft-grid ft-grid-${kind}"><thead><tr>${head}</tr></thead><tbody>${body(kind)}</tbody>${kind==='reg'?regFoot:foot(kind)}</table></div>`;
-  const notes=ids.filter(id=>draft.open.includes(id)).map(id=>`<div class="ft-note-box"><b>${esc(name(id))}</b><textarea rows="2" maxlength="500" data-ft-note="${esc(id)}" placeholder="Catatan outlet, misalnya ada acara kampus">${esc(draft.notes[id])}</textarea><button type="button" class="button quiet" data-ft-open-outlet="${esc(id)}">Buka detail outlet ↗</button><button type="button" class="ft-note-x" data-ft-toggle="${esc(id)}" aria-label="Tutup catatan">×</button></div>`).join('');
-  return `<section class="ft-area" style="--acc:${g.color};--acc-soft:${PR().routeBg(g.name)||'#eef2f6'}"><header class="ft-area-head"><h3>${A}</h3><span>${ids.length} outlet · klik nama outlet untuk catatan</span></header>${notes?`<div class="ft-notes">${notes}</div>`:''}
-   ${tbl('reg','Stok outlet','reguler · diisi')}${tbl('ord','Pesanan','diisi · angka awal dari rekap pesanan')}${tbl('kir','Total kirim','stok + pesanan · otomatis, sama dengan Rincian kirim')}</section>`;
+  const colTot=kind=>ids.map((id,ci)=>`<td class="ft-ctot" data-ci="${ci+1}" data-ft-ot="${kind}|${esc(id)}">${nf(colSum(kind,id))}</td>`).join('');
+  const gSum=kind=>ids.reduce((s,id)=>s+colSum(kind,id),0);
+  const regFoot=`<tfoot><tr><th class="ft-pcol" scope="row">Total pcs</th>${colTot('reg')}<td class="ft-tcol" data-ft-gt="reg|${A}">${nf(gSum('reg'))}</td></tr><tr class="ft-fmeta"><th class="ft-pcol" scope="row">Omzet reguler</th>${ids.map((id,ci)=>`<td data-ci="${ci+1}" data-ft-val="${esc(id)}">${rpShort(outletTotals(c,id).val)}</td>`).join('')}<td class="ft-tcol" data-ft-gv="${A}">${rpShort(ids.reduce((s,id)=>s+outletTotals(c,id).val,0))}</td></tr><tr class="ft-fmeta"><th class="ft-pcol" scope="row" title="Reguler 12 produk inti dibanding terjual hari yang sama minggu lalu">vs minggu lalu</th>${ids.map((id,ci)=>{const l=lwCell(c.outlets.get(id),outletTotals(c,id).pcs);return `<td class="${l.cls}" data-ci="${ci+1}" data-ft-lw="${esc(id)}" title="${esc(l.title)}">${l.txt}</td>`;}).join('')}<td class="ft-tcol"></td></tr></tfoot>`;
+  const foot=kind=>`<tfoot><tr><th class="ft-pcol" scope="row">Total pcs</th>${colTot(kind)}<td class="ft-tcol" data-ft-gt="${kind}|${A}">${nf(gSum(kind))}</td></tr></tfoot>`;
+  const tbl=(kind,title,sub,extra='')=>`<div class="ft-sub-h ft-sub-${kind}"><b>${title}</b><span>${sub}</span>${extra}</div><div class="ft-table-wrap ft-grid-wrap"><table class="ft-grid ft-grid-${kind}" data-kind="${kind}">${colgroup}<thead><tr>${head}</tr></thead><tbody>${body(kind)||`<tr><td class="ft-empty" colspan="${n+2}">Belum ada pesanan di area ini. Klik <b>Tampilkan semua produk</b> untuk mengisi.</td></tr>`}</tbody>${kind==='reg'?regFoot:foot(kind)}</table></div>`;
+  const notes=ids.filter(id=>draft.open.includes(id)).map(id=>`<div class="ft-note-box"><b>${esc(name(id))}</b><textarea rows="2" maxlength="500" data-ft-note="${esc(id)}" placeholder="Catatan outlet, misalnya ada acara kampus">${esc(draft.notes[id])}</textarea><button type="button" class="button quiet" data-ft-open-outlet="${esc(id)}">Detail outlet ↗</button><button type="button" class="ft-note-x" data-ft-toggle="${esc(id)}" aria-label="Tutup catatan">×</button></div>`).join('');
+  const sum=k=>nf(gSum(k));
+  return `<section class="ft-area" style="--acc:${g.color};--acc-soft:${PR().routeBg(g.name)||'#eef2f6'}">
+   <header class="ft-area-head"><h3>${A}</h3><span class="ft-area-n">${n} outlet</span><div class="ft-area-kpi"><span>Stok <b data-ft-gt2="reg|${A}">${sum('reg')}</b></span><span>Pesanan <b data-ft-gt2="ord|${A}">${sum('ord')}</b></span><span>Kirim <b data-ft-gt2="kir|${A}">${sum('kir')}</b> pcs</span></div></header>
+   ${notes?`<div class="ft-notes">${notes}</div>`:''}
+   ${tbl('reg','Stok outlet','reguler · diisi forecaster')}
+   ${tbl('ord','Pesanan','diisi · angka awal dari rekap pesanan',hiddenOrd?`<button type="button" class="ft-linkbtn" data-ft-ordall="${A}">${showAllOrd?'Sembunyikan produk tanpa pesanan':`Tampilkan semua produk (+${hiddenOrd})`}</button>`:'')}
+   ${tbl('kir','Total kirim','stok + pesanan · otomatis, sama dengan Rincian kirim')}</section>`;
  }
  // Perbarui angka turunan satu outlet tanpa render ulang (mengetik tetap lancar).
  function paintOutlet(c,id){
   const g=c.groups.find(x=>x.ids.includes(id));if(!g)return;const rows=prodRows(),A=CSS.escape(g.name),E=CSS.escape(id);
-  const set=(sel,html)=>{const el=q(sel);if(el&&el.innerHTML!==html)el.innerHTML=html;};
+  const set=(sel,v,zero)=>{const el=q(sel);if(!el)return;const t=nf(v);if(el.textContent!==t)el.textContent=t;if(zero)el.classList.toggle('z',!v);};
   for(const r of rows){
-   set(`[data-ft-k="${E}|${r.key}"]`,zf(valOf('kir',id,r)));
-   for(const kind of ['reg','ord','kir'])set(`[data-ft-rt="${kind}|${r.key}|${A}"]`,zf(g.ids.reduce((s,x)=>s+valOf(kind,x,r),0)));
+   set(`[data-ft-k="${E}|${r.key}"]`,valOf('kir',id,r),true);
+   for(const kind of ['reg','ord','kir'])set(`[data-ft-rt="${kind}|${r.key}|${A}"]`,g.ids.reduce((s,x)=>s+valOf(kind,x,r),0),true);
   }
   for(const kind of ['reg','ord','kir']){
-   const f=x=>rows.reduce((s,r)=>s+valOf(kind,x,r),0);
-   set(`[data-ft-ot="${kind}|${E}"]`,nf(f(id)));set(`[data-ft-gt="${kind}|${A}"]`,nf(g.ids.reduce((s,x)=>s+f(x),0)));
+   const f=x=>rows.reduce((s,r)=>s+valOf(kind,x,r),0),G=g.ids.reduce((s,x)=>s+f(x),0);
+   set(`[data-ft-ot="${kind}|${E}"]`,f(id));set(`[data-ft-gt="${kind}|${A}"]`,G);set(`[data-ft-gt2="${kind}|${A}"]`,G);
   }
+  const gv=q(`[data-ft-gv="${A}"]`);if(gv)gv.textContent=rpShort(g.ids.reduce((s,x)=>s+outletTotals(c,x).val,0));
  }
  const AREA_ALL='__all__';
  function render(view){
@@ -351,26 +362,26 @@ window.ForecastTopdown=(()=>{
   const changedN=c.ids.filter(id=>statusOf(id)[0]!=='saved').length,existing=c.ids.filter(id=>record(id)).length;
   const fo=factoryOrders(),foN=fo?fo.qty.reduce((a,b)=>a+b,0):null,foV=factoryValue(c,fo);
   return `<div class="ft-wrap">
-   <div class="ft-top">
-    <label class="ft-date">Tanggal kiriman<input type="date" id="ft-date" value="${date}"></label>
-    <div class="ft-stat"><span>Prediksi sistem · omzet reguler</span><strong>${rp(pred)}</strong><small>${pred?'Dari mesin prediksi dashboard (tanpa pesanan)':'Prediksi belum tersedia untuk tanggal ini'}</small></div>
-    <div class="ft-target"><label for="ft-target">Target omzet reguler</label><div class="ft-target-input"><span>Rp</span><input id="ft-target" inputmode="numeric" value="${esc(nf(draft.target))}" autocomplete="off"></div>
-     ${pred?`<div class="ft-chips">${BUFFERS.map(b=>`<button type="button" class="ft-chip ${Math.abs((diff??-99)-b)<.05?'on':''} ${b===c.net.pct?'sug':''}" data-ft-buffer="${b}">${b?(b>0?'+':'−')+Math.abs(b)+'%':'Sesuai prediksi'}${b===c.net.pct?' · saran':''}</button>`).join('')}</div>${netWhy(c)}`:''}${rainSummary(c)}
-     <label class="ft-toggle"><input type="checkbox" id="ft-per-outlet" ${draft.perOutlet?'checked':''}> Sesuaikan porsi per outlet dari waste & habis stok <small>(${adjN} outlet digeser, total tetap sesuai target)</small></label>
-     <button type="button" class="button fp-primary" data-ft-allocate>Bagi otomatis ke outlet & produk</button>
+   <div class="ft-hero">
+    <div class="ft-ctrl">
+     <div class="ft-ctrl-row">
+      <label class="ft-date">Tanggal kiriman<input type="date" id="ft-date" value="${date}"><small>${esc(dateLabel(date))}</small></label>
+      <div class="ft-stat"><span>Prediksi sistem</span><strong>${rp(pred)}</strong><small>${pred?'omzet reguler, tanpa pesanan':'belum tersedia untuk tanggal ini'}</small></div>
+      <div class="ft-target"><label for="ft-target">Target omzet reguler</label><div class="ft-target-input"><span>Rp</span><input id="ft-target" inputmode="numeric" value="${esc(nf(draft.target))}" autocomplete="off"></div><small>${diff==null?'':Math.abs(diff)<.05?'sesuai prediksi':`${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi`}</small></div>
+     </div>
+     ${pred?`<div class="ft-chips"><span class="ft-chips-l">Buffer</span>${BUFFERS.map(b=>`<button type="button" class="ft-chip ${Math.abs((diff??-99)-b)<.05?'on':''} ${b===c.net.pct?'sug':''}" data-ft-buffer="${b}">${b?(b>0?'+':'−')+Math.abs(b)+'%':'0%'}${b===c.net.pct?' · saran':''}</button>`).join('')}</div>${netWhy(c)}`:''}${rainSummary(c)}
+     <div class="ft-ctrl-act"><label class="ft-toggle"><input type="checkbox" id="ft-per-outlet" ${draft.perOutlet?'checked':''}> Sesuaikan porsi outlet dari waste & habis stok <small>(${adjN} outlet digeser)</small></label><button type="button" class="button fp-primary" data-ft-allocate>Bagi otomatis ke outlet & produk</button></div>
+    </div>
+    <div class="ft-kpis">
+     <div><span>Omzet reguler · total outlet</span><strong data-ft-total-val>${rp(t.val)}</strong><small>12 produk inti, tanpa pesanan pabrik</small></div>
+     <div><span>Stok reguler</span><strong data-ft-total-pcs>${nf(t.pcs+t.extra)} pcs</strong><small data-ft-lw-total>${esc(lwTotal(c))}</small><small data-ft-total-extra>${t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi'}</small></div>
+     <div><span>Pesanan outlet</span><strong data-ft-total-ord>${nf(t.orders)} pcs</strong><small data-ft-total-ordval>${rp(t.ordVal)} · ditambahkan terpisah</small></div>
+     <div class="ft-kpi-fac" title="${fo?esc(fo.qty.map((q,p)=>q?`${model.names[p]} ${q}`:'').filter(Boolean).join(' · ')||'Tidak ada pesanan pabrik'):'Menunggu sinkron pesanan'}"><span>Pesanan pabrik</span><strong>${foN==null?'—':nf(foN)+' pcs'}</strong><small>${foN==null?'menunggu sinkron':`omzet ${rp(foV||0)} · tidak masuk total`}</small>${fo&&foN?`<small class="ft-fac-items">${fo.qty.map((q,p)=>q?`${esc(SHORT[p].join(' '))} <b>${q}</b>`:'').filter(Boolean).join(' · ')}</small>`:''}</div>
     </div>
    </div>
-   <div class="ft-extras"><div><b>Produk lain (diisi manual)</b><span>${draft.names.length?draft.names.map(esc).join(' · '):'Belum ada'}. Tampil sebagai baris di tabel tiap area, tidak ikut dibagi dari omzet. Tambah, ganti nama, atau hapus produk di <b>Pengaturan › Produk</b>.</span></div></div>
-   <p class="ft-sub">${esc(dateLabel(date))} · ${diff==null?'':Math.abs(diff)<.05?'Target sesuai prediksi · ':`Target ${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi · `}porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir${c.perfSum?.down||c.perfSum?.up?`, disesuaikan dengan performa rencana tim 28 hari terakhir (${c.perfSum.down} produk-outlet yang sering bersisa diturunkan${c.perfSum.up?`, ${c.perfSum.up} yang sering kurang dinaikkan`:''})`:''}. Kotak kuning = sudah diubah dari hasil bagi otomatis. Klik nama outlet untuk menulis catatan.</p>
-   <div class="ft-summary">
-    <div><span>Omzet hasil bagi · total outlet</span><strong data-ft-total-val>${rp(t.val)}</strong><small>12 produk inti, tanpa pesanan pabrik</small></div>
-    <div><span>Total reguler</span><strong data-ft-total-pcs>${nf(t.pcs+t.extra)} pcs</strong><small data-ft-lw-total>${esc(lwTotal(c))}</small><small data-ft-total-extra>${t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi'}</small></div>
-    <div><span>Pesanan outlet</span><strong data-ft-total-ord>${nf(t.orders)} pcs</strong><small data-ft-total-ordval>${rp(t.ordVal)} · ditambahkan terpisah</small></div>
-    <div><span>Pesanan pabrik</span><strong>${foN==null?'—':nf(foN)+' pcs'}</strong><small>${foN==null?'menunggu sinkron':`omzet ${rp(foV||0)} · terpisah, tidak masuk total`}</small></div>
-   </div>
-   ${factoryBlock(c)}
    ${locked()?'<p class="fp-lock-note">🔒 Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.</p>':date<=today()?'<p class="fs-ship-note">Hari H sudah dimulai. Anda Master, jadi masih bisa mengubah, tapi rencana yang disimpan sekarang tidak dihitung di akurasi.</p>':''}
-   <div class="ft-area-tabs" role="tablist" aria-label="Pilih area">${[{name:AREA_ALL},...c.groups].map(g=>`<button type="button" role="tab" data-ft-area="${esc(g.name)}" aria-selected="${(draft.area||AREA_ALL)===g.name}">${g.name===AREA_ALL?'Semua area':esc(g.name)}</button>`).join('')}</div>
+   <div class="ft-bar"><div class="ft-area-tabs" role="tablist" aria-label="Pilih area">${[{name:AREA_ALL},...c.groups].map(g=>`<button type="button" role="tab" data-ft-area="${esc(g.name)}" aria-selected="${(draft.area||AREA_ALL)===g.name}">${g.name===AREA_ALL?'Semua area':esc(g.name)}</button>`).join('')}</div><div class="ft-legend"><span><i class="ft-sdot saved"></i>tersimpan</span><span><i class="ft-sdot changed"></i>berubah</span><span><i class="ft-sdot new"></i>belum disimpan</span><span><i class="ft-lg-edit"></i>diubah dari saran</span><span class="ft-lg-key" title="Enter / ↓ ke bawah, Shift+Enter / ↑ ke atas, Ctrl+← → pindah outlet">⌨ Enter = baris berikutnya</span></div></div>
+   <p class="ft-sub">Porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir${c.perfSum?.down||c.perfSum?.up?`, disesuaikan performa rencana tim 28 hari (${c.perfSum.down} produk-outlet diturunkan${c.perfSum.up?`, ${c.perfSum.up} dinaikkan`:''})`:''}. Produk lain (${draft.names.length}) diisi manual, diatur di <b>Pengaturan › Produk</b>.</p>
    ${(()=>{const rows=prodRows();return c.groups.filter(g=>(draft.area||AREA_ALL)===AREA_ALL||draft.area===g.name).map(g=>areaCard(c,g,rows)).join('');})()}
    <div id="ft-prod">${productionBlock(c)}</div>
    <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
@@ -395,11 +406,11 @@ window.ForecastTopdown=(()=>{
  function saveLabel(){const c=compute(),i=pendingInfo(c),btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!i.n||locked();btn.textContent=saveText(i);btn.title=i.n?`Per area: ${i.areas}`:'';const any=c.ids.some(x=>record(x));btn.hidden=!i.n&&any;const nx=q('[data-ft-next]');if(nx)nx.hidden=!!i.n||!any;}const m=q('.ft-msg');if(m&&!message)m.textContent=pendingMsg(i);}
  function refreshTotals(id){
   const c=compute(),tt=outletTotals(c,id),t=totals(c),E=CSS.escape(id);
-  const v=q(`[data-ft-val="${E}"]`);if(v)v.textContent=rp(tt.val);
-  const lc=q(`[data-ft-lw="${E}"]`);if(lc){const l=lwCell(c.outlets.get(id),tt.pcs);lc.textContent=l.txt;lc.className='ft-ctot '+l.cls;lc.title=l.title;}
+  const v=q(`[data-ft-val="${E}"]`);if(v)v.textContent=rpShort(tt.val);
+  const lc=q(`[data-ft-lw="${E}"]`);if(lc){const l=lwCell(c.outlets.get(id),tt.pcs);lc.textContent=l.txt;lc.className=l.cls;lc.title=l.title;}
   const lt=q('[data-ft-lw-total]');if(lt)lt.textContent=lwTotal(c);
   paintOutlet(c,id);
-  const st=q(`[data-ft-status="${E}"]`);if(st){const [k,l]=statusOf(id);st.className='ft-pill '+k;st.textContent=l;}
+  const st=q(`[data-ft-status="${E}"]`);if(st){const [k,l]=statusOf(id);st.className='ft-sdot '+k;st.title=l;}
   const tv=q('[data-ft-total-val]');if(tv)tv.textContent=rp(t.val);
   const tp=q('[data-ft-total-pcs]');if(tp)tp.textContent=nf(t.pcs+t.extra)+' pcs';
   const tx=q('[data-ft-total-extra]');if(tx)tx.textContent=t.extra?`termasuk ${nf(t.extra)} pcs produk lain`:'produk lain belum diisi';
@@ -410,6 +421,7 @@ window.ForecastTopdown=(()=>{
  const split=s=>{const i=s.lastIndexOf(':');return [s.slice(0,i),+s.slice(i+1)];};
  function input(e){
   const t=e.target;if(!draft)return null;
+  if(t.classList?.contains('ft-cell'))t.classList.toggle('z',!qtyOf(t.value));
   if(t.dataset.ftCell){const [id,p]=split(t.dataset.ftCell);draft.cells[id][p]=t.value;persist();const auto=draft.auto?.[id]?.[p];t.classList.toggle('ft-edited',auto!=null&&String(auto)!==String(t.value));refreshTotals(id);return false;}
   if(t.dataset.ftXr){const [id,i]=split(t.dataset.ftXr);draft.extra[id][draft.names[i]].r=t.value;persist();refreshTotals(id);return false;}
   if(t.dataset.ftXo){const [id,i]=split(t.dataset.ftXo);draft.extra[id][draft.names[i]].o=t.value;persist();refreshTotals(id);return false;}
@@ -437,6 +449,7 @@ window.ForecastTopdown=(()=>{
   if(ru){undoRain(ru.dataset.ftRainUndo);persist();message='Penurunan karena hujan dibatalkan.';return true;}
   if(e.target.closest('[data-ft-rain-all]')){let n=0;for(const id of compute().ids){const d=rainOf(id),cut=d?rainCut(d.probability):0;if(cut&&!draft.rain?.[id]){applyRain(id,cut);n++;}}persist();message=`${n} outlet diturunkan 10–15% karena peluang hujan tinggi. Bisa dibatalkan per outlet.`;return true;}
   if(e.target.closest('[data-ft-rain-none]')){for(const id of Object.keys(draft.rain||{}))undoRain(id);persist();message='Semua penurunan karena hujan dibatalkan.';return true;}
+  const oa=e.target.closest('[data-ft-ordall]');if(oa){draft.ordAll=draft.ordAll||{};draft.ordAll[oa.dataset.ftOrdall]=!draft.ordAll[oa.dataset.ftOrdall];persist();return true;}
   const ar=e.target.closest('[data-ft-area]');if(ar){draft.area=ar.dataset.ftArea;persist();return true;}
   const tg=e.target.closest('[data-ft-toggle]');
   if(tg){const id=tg.dataset.ftToggle,i=draft.open.indexOf(id);if(i<0)draft.open.push(id);else draft.open.splice(i,1);persist();return true;}
@@ -463,7 +476,24 @@ window.ForecastTopdown=(()=>{
   if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.';return true;}saveAll();return true;}
   return false;
  }
- function keydown(){return false;}
+ // Navigasi ala spreadsheet di tabel area: Enter/↓ ke bawah, Shift+Enter/↑ ke atas (panah tidak
+ // lagi mengubah angka), ← → pindah outlet. Isi kotak terpilih saat fokus, jadi langsung ketik.
+ function keydown(e){
+  const t=e.target;if(!t.matches?.('.ft-grid input'))return false;
+  const k=e.key;let dr=0,dc=0;
+  if(k==='Enter')dr=e.shiftKey?-1:1;else if(k==='ArrowDown')dr=1;else if(k==='ArrowUp')dr=-1;else if(k==='ArrowRight'&&(e.ctrlKey||t.value===''||e.altKey))dc=1;else if(k==='ArrowLeft'&&(e.ctrlKey||t.value===''||e.altKey))dc=-1;else return false;
+  e.preventDefault();
+  const tbl=t.closest('table'),td=t.closest('td'),tr=td.parentElement,ci=[...tr.children].indexOf(td);
+  if(dc){let x=td;do{x=dc>0?x.nextElementSibling:x.previousElementSibling;}while(x&&!x.querySelector('input'));x?.querySelector('input')?.focus();return false;}
+  const rows=[...tbl.querySelectorAll('tbody tr.ft-r')];let ri=rows.indexOf(tr)+dr;
+  while(rows[ri]&&!rows[ri].children[ci]?.querySelector('input'))ri+=dr;
+  rows[ri]?.children[ci]?.querySelector('input')?.focus();
+  return false;
+ }
+ // Sorot baris & kolom outlet yang sedang diisi (lebih mudah membaca tabel lebar).
+ document.addEventListener('focusin',e=>{const t=e.target;if(!t.matches?.('.ft-grid input'))return;try{t.select();}catch{}
+  const tbl=t.closest('table'),ci=t.closest('td')?.dataset.ci;tbl.querySelectorAll('.ft-colhi').forEach(x=>x.classList.remove('ft-colhi'));if(ci)tbl.querySelectorAll(`[data-ci="${ci}"]`).forEach(x=>x.classList.add('ft-colhi'));});
+ document.addEventListener('focusout',e=>{const t=e.target;if(!t.matches?.('.ft-grid input'))return;t.closest('table')?.querySelectorAll('.ft-colhi').forEach(x=>x.classList.remove('ft-colhi'));});
  function hasEdits(){return compute().ids.some(id=>draft.cells[id].some((v,p)=>draft.auto?.[id]?.[p]!=null&&String(draft.auto[id][p])!==String(v)));}
  const rerender=()=>window.dispatchEvent(new Event('forecast-operations-changed'));
  // Selama menyimpan, layar TIDAK dirender ulang tiap outlet (dulu 28 outlet x snapshot Firestore
