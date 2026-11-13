@@ -460,6 +460,7 @@ window.ForecastDashboard=(()=>{
    cache.set(key,r);return r;
   };
  }
+ const FROZEN_ALL=new Map(),FROZEN_SIG=new Map();
  function buildEngine(series,planner){
   const valueByDate=new Map(series.map(r=>[r.date,r.value]));
   const lastDate=series.length?series[series.length-1].date:null;
@@ -652,7 +653,11 @@ window.ForecastDashboard=(()=>{
   // SEBELUM tanggal itu, dengan aturan pesanan yang sama seperti saat itu (pesanan tercatat
   // dipakai pasti). Hasilnya sama persis dengan yang tampil sehari sebelumnya dan tidak berubah
   // lagi -- tanpa perlu menyimpan apa pun. Tanggal yang belum lewat tetap diperbarui tiap hari.
-  const frozen=new Map();
+  // Cache lintas render (owner 2026-11-13): prediksi versi H-1 sebuah tanggal hanya bergantung
+  // pada data SEBELUM tanggal itu, jadi aman disimpan selama seri datanya sama.
+  const fsig=outletId+'|'+pureSeries.length+'|'+(pureSeries.at(-1)?.date||'')+'|'+pesananSeries.length+'|'+(pureSeries.at(-1)?.value||0)+'|'+(window.PcsPanels?.data?.()?.orders?.updatedAt||'');
+  if(FROZEN_SIG.get(outletId)!==fsig){FROZEN_SIG.set(outletId,fsig);FROZEN_ALL.set(outletId,new Map());}
+  const frozen=FROZEN_ALL.get(outletId);
   function frozenAt(date){
    if(!frozen.has(date)){
     const pe=buildEngine(pureSeries.filter(r=>r.date<date),planner),se=buildEngine(pesananSeries.filter(r=>r.date<date),planner);
