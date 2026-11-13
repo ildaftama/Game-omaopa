@@ -77,6 +77,36 @@
  function validCustomItems(a){return a===undefined||(Array.isArray(a)&&a.length<=20&&a.every(it=>it&&typeof it.name==='string'&&it.name.length>=1&&it.name.length<=60&&integer(it.regular)&&integer(it.orders)));}
  function validPlan(p){return p&&/^\d{4}-\d{2}-\d{2}$/.test(p.date)&&typeof p.outlet==='string'&&Array.isArray(p.active)&&p.active.length===12&&p.active.every(v=>typeof v==='boolean')&&['regular','orders'].every(k=>Array.isArray(p[k])&&p[k].length===12&&p[k].every(integer))&&Array.isArray(p.prices)&&p.prices.length===12&&p.prices.every(v=>v&&(v.value===null||(Number.isFinite(v.value)&&v.value>0)))&&typeof p.note==='string'&&validCustomItems(p.customItems);}
  function validShipped(a){return Array.isArray(a)&&a.length===12&&a.every(integer);}
- const api={names,integer,shift,quantile,recommend,prices,calculate,compare,validPlan,validShipped};
+ // ---- Saran dinamis dari PERFORMA RENCANA FORECASTER (owner 2026-11-13) ----
+ // Acuan kedua selain pola penjualan: rencana tim yang sudah dikirim vs yang benar2 terjual,
+ // per outlet x produk, 28 hari terakhir sebelum tanggal target. Kalau suatu produk di suatu
+ // outlet terus bersisa (lebih), saran berikutnya DITURUNKAN dan rentangnya digeser ke bawah
+ // (sisi minus lebih lebar, sisi plus menyempit). Kalau sering kurang (terjual > kirim, berarti
+ // dapat transfer/habis), saran dinaikkan sedikit -- dibatasi lebih kecil karena penjualan
+ // tertahan stok. Bobot naik dengan jumlah hari (n/(n+4)), minimal 3 hari data.
+ const PERF_DAYS=28,PERF_MIN=3,PERF_TARGET=.03,PERF_CUT=.30,PERF_ADD=.12;
+ const perfCache=new Map();
+ function cmpCached(r,sales,orders){const k=r.key+'|'+r.revision+'|'+(sales?.days?.length||0)+'|'+(orders?.days?.length||0);let c=perfCache.get(k);if(!c){c=compare(r,sales,orders);if(perfCache.size>5000)perfCache.clear();perfCache.set(k,c);}return c;}
+ function planPerformance(records,sales,orders,id,target){
+  const from=shift(target,-PERF_DAYS),acc=names.map(()=>({out:0,sold:0,over:0,under:0,n:0}));let days=0;
+  for(const r of records||[]){if(r.outlet!==id||r.date<from||r.date>=target)continue;const c=cmpCached(r,sales,orders);if(!c.est)continue;days++;
+   c.est.forEach((e,p)=>{if(!e.out&&!e.sold)return;const a=acc[p];a.out+=e.out;a.sold+=e.sold;a.over+=Math.max(0,e.out-e.sold);a.under+=Math.max(0,e.sold-e.out);a.n++;});}
+  return acc.map(a=>{
+   if(a.n<PERF_MIN||!(a.out>0))return {...a,f:1,skew:0,days};
+   const wasteRate=a.over/a.out,shortRate=a.under/Math.max(1,a.sold),net=wasteRate-PERF_TARGET-shortRate,k=a.n/(a.n+4);
+   const f=Math.max(1-PERF_CUT,Math.min(1+PERF_ADD,1-k*net*.8)),skew=Math.max(-.4,Math.min(.5,k*net*1.5));
+   return {...a,f,skew,wasteRate,shortRate,days};
+  });
+ }
+ // Terapkan ke hasil recommend(): titik tengah dikali f, rentang digeser (skew>0 = condong turun).
+ function applyPerformance(recs,perf){
+  if(!perf)return recs;
+  return recs.map((r,p)=>{const q=perf[p];if(!q||r.central==null||(q.f===1&&!q.skew))return r;
+   const c0=r.central,dl=Math.max(1,c0-r.low),dh=Math.max(1,r.high-c0),c=c0*q.f;
+   const central=Math.max(0,Math.round(c)),low=Math.max(0,Math.floor(c-dl*(1+q.skew))),high=Math.max(central,Math.ceil(c+dh*(1-q.skew)));
+   return {...r,central,low:Math.min(low,central),high,perf:{f:q.f,skew:q.skew,n:q.n,out:q.out,sold:q.sold,over:q.over,under:q.under,base:{central:c0,low:r.low,high:r.high}}};});
+ }
+ function recommendWithPerformance(sales,orders,id,target,records){return applyPerformance(recommend(sales,orders,id,target),planPerformance(records,sales,orders,id,target));}
+ const api={names,integer,shift,quantile,recommend,recommendWithPerformance,planPerformance,applyPerformance,prices,calculate,compare,validPlan,validShipped};
  if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.ForecastPlanner=api;
 })(typeof window!=='undefined'?window:this);
