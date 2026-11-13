@@ -1,6 +1,8 @@
 'use strict';
 (function(root){
  const math=typeof module!=='undefined'&&module.exports?require('./pcs-math.js'):root.PcsMath;
+ // HPP outlet per produk inti (Input Harga Jual Pabrik, owner 2026-11-13). Urutan = names.
+ const HPP=[20500,19800,8800,8500,3500,3500,3500,22576,23800,24000,13500,12000];
  const names=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju'];
  const integer=n=>Number.isSafeInteger(n)&&n>=0&&n<=10000;
  const day=s=>new Date(s+'T12:00:00Z');
@@ -64,8 +66,10 @@
   // di rencana. TANPA transfer antar outlet -- di lapangan kelebihan bisa dipindah ke outlet
   // yang kekurangan, jadi waste real biasanya lebih kecil. Persen = nominal / omzet terjual
   // (rumus sama dengan waste% tim).
-  const sent=Array.isArray(record.plan?.active)&&Array.isArray(record.plan?.regular)?record.plan:plan,est=complete?names.map((_,p)=>{const out=sent.active[p]?(sent.regular[p]||0)+(sent.orders[p]||0):0,sold=rows[p].totalActual||0,v=Number(sent.prices?.[p]?.value)||0;return {out,sold,v,w:Math.max(0,out-sold)};}):null;
-  const estWastePcs=est?total(est.map(e=>e.w)):null,estWasteValue=est?est.reduce((s,e)=>s+e.w*e.v,0):null,soldValue=est?est.reduce((s,e)=>s+e.sold*e.v,0):null;
+  // Nominal waste pakai HPP outlet (harga jual pabrik ke outlet, owner 2026-11-13), bukan harga jual
+  // ke pelanggan. Persen tetap dibagi omzet terjual (harga jual), sama dengan waste% tim.
+  const sent=Array.isArray(record.plan?.active)&&Array.isArray(record.plan?.regular)?record.plan:plan,est=complete?names.map((_,p)=>{const out=sent.active[p]?(sent.regular[p]||0)+(sent.orders[p]||0):0,sold=rows[p].totalActual||0,v=Number(sent.prices?.[p]?.value)||0;return {out,sold,v,h:HPP[p],w:Math.max(0,out-sold)};}):null;
+  const estWastePcs=est?total(est.map(e=>e.w)):null,estWasteValue=est?est.reduce((s,e)=>s+e.w*e.h,0):null,soldValue=est?est.reduce((s,e)=>s+e.sold*e.v,0):null;
   return {est,estWastePcs,estWasteValue,soldValue,estWastePercent:soldValue>0?estWasteValue/soldValue*100:null,rows,eligible,complete,actual,actualTotal,planned,absolute,wape:eligible&&complete&&actual>0?absolute/actual*100:null,hasShipped,shippedTotal,absoluteShipped,wapeShipped:hasShipped&&eligible&&complete&&actual>0?absoluteShipped/actual*100:null,wasteTotal,wastePercent:wasteTotal!=null&&shippedTotal>0?wasteTotal/shippedTotal*100:null};
  }
  function validCustomItems(a){return a===undefined||(Array.isArray(a)&&a.length<=20&&a.every(it=>it&&typeof it.name==='string'&&it.name.length>=1&&it.name.length<=60&&integer(it.regular)&&integer(it.orders)));}

@@ -1210,9 +1210,9 @@ window.ForecastDashboard=(()=>{
  // ditransfer (dijumlah per tanggal & produk dulu). Bukan waste tercatat tim.
  function estWasteNote(est){
   if(!est||!est.n||!(est.sv>0))return '';
-  let wt=0;for(const q of est.pool.values())wt+=Math.max(0,q.out-q.sold)*q.v;
+  let wt=0;for(const q of est.pool.values())wt+=Math.max(0,q.out-q.sold)*q.h;
   const p=est.w/est.sv*100,pt=wt/est.sv*100,bad=p>WASTE_THRESHOLD;
-  return `<p class="fd-est-waste ${bad?'bad':''}"><b>Estimasi waste dari rencana tim: ${pct1(p)}</b> (${Math.round(est.pcs).toLocaleString('id-ID')} pcs · ${moneyBig(est.w)}, ${est.n} rencana) — rencana terakhir dikurangi total terjual, <b>tanpa transfer</b> antar outlet. Kalau semua kelebihan bisa ditransfer: ±${pct1(pt)}. Ambang ${W_TH}. Waste real biasanya di antara kedua angka ini.</p>`;
+  return `<p class="fd-est-waste ${bad?'bad':''}"><b>Estimasi waste dari rencana tim: ${pct1(p)}</b> (${Math.round(est.pcs).toLocaleString('id-ID')} pcs · ${moneyBig(est.w)}, ${est.n} rencana) — rencana terakhir dikurangi total terjual, nominal pakai HPP outlet, <b>tanpa transfer</b> antar outlet. Kalau semua kelebihan bisa ditransfer: ±${pct1(pt)}. Ambang ${W_TH}. Waste real biasanya di antara kedua angka ini.</p>`;
  }
  function accuracyCard(trend,outletId){
   const days=trend.rows.filter(r=>r.date.startsWith(trend.ym)&&trend.lastActual&&r.date<=trend.lastActual&&r.actualTotal!=null&&r.forecastTotal!=null);
@@ -1232,7 +1232,7 @@ window.ForecastDashboard=(()=>{
     if(!r.date.startsWith(trend.ym)||r.date>trend.lastActual||(outletId!=='__all__'&&r.outlet!==outletId))continue;
     const fc=fulfillmentFor(r.key),shipped=!fc.loading&&fc.data?fc.data.shipped:null;
     const c=planner.compare(r,panels.sales,panels.orders,shipped);
-    if(c.est){est.w+=c.estWasteValue;est.sv+=c.soldValue;est.pcs+=c.estWastePcs;est.n++;c.est.forEach((e,p)=>{const k=r.date+'|'+p,q=est.pool.get(k)||{out:0,sold:0,v:0};q.out+=e.out;q.sold+=e.sold;q.v=q.v||e.v;est.pool.set(k,q);});}
+    if(c.est){est.w+=c.estWasteValue;est.sv+=c.soldValue;est.pcs+=c.estWastePcs;est.n++;c.est.forEach((e,p)=>{const k=r.date+'|'+p,q=est.pool.get(k)||{out:0,sold:0,h:0};q.out+=e.out;q.sold+=e.sold;q.h=e.h;est.pool.set(k,q);});}
     if(!c.eligible||!c.complete)continue;
     const price=p=>Number(r.baseline.prices?.[p]?.value)||0;
     let pf=0,pa=0,pe=0,sf=0,se=0;
