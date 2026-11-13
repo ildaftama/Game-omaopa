@@ -77,6 +77,7 @@ window.ForecastProduction=(()=>{
  // pesanan outlet di rute area itu) dibagi isi 1 angkatan, lalu dibulatkan sesuai pengaturan area:
  //   up = ke atas, down = ke bawah, thr = naik kalau pecahan >= ambang, rest = SISA dari total
  //   produksi (total angkatan produk itu dikurangi area lain; menampung pesanan pabrik & pengurangan).
+ //   Jumlah semua area selalu disamakan dengan total produksi produk itu.
  // Contoh tim: total 14, Semarang 6,6 -> 7, Solo 5,4 -> 6, Jogja = 14 - 13 = 1.
  const DEFAULT_AREAS=[
   {name:'Semarang',time:'03.30',round:'up',routes:['Semarang','Magelang – Salatiga']},
@@ -94,8 +95,13 @@ window.ForecastProduction=(()=>{
    const got=frac.map((f,i)=>{const m=A[i].round;if(m==='rest')return null;if(m==='down')return Math.floor(f+1e-9);if(m==='thr'){const fl=Math.floor(f+1e-9);return f-fl>=thr-1e-9?fl+1:fl;}return Math.ceil(f-1e-9);});
    const fixed=got.reduce((s,v)=>s+(v||0),0),ri=got.findIndex(v=>v===null);
    if(ri>=0){got[ri]=Math.max(0,r.batches-fixed);got.forEach((v,i)=>{if(v===null)got[i]=0;});}
-   const sum=got.reduce((a,b)=>a+b,0);
-   return {p:r.p,size:r.size,batches:r.batches,dem,frac,got,diff:sum-r.batches};
+   // Jumlah area harus = total produksi (pilihan naik/turun di atas). Kalau pembulatan area
+   // melebihi total (mis. Chiffon diproduksi turun), kurangi dari area yang paling banyak
+   // "dibulatkan naik"; kalau kurang, tambahkan ke area dengan pecahan terbesar.
+   let diff=got.reduce((a,b)=>a+b,0)-r.batches,adjusted=0;
+   while(diff>0){let bi=-1,bv=-1;got.forEach((g,i)=>{const v=g-frac[i];if(g>0&&v>bv){bv=v;bi=i;}});if(bi<0)break;got[bi]--;diff--;adjusted++;}
+   while(diff<0){let bi=0,bv=-Infinity;got.forEach((g,i)=>{const v=frac[i]-g;if(v>bv){bv=v;bi=i;}});got[bi]++;diff++;adjusted++;}
+   return {p:r.p,size:r.size,batches:r.batches,dem,frac,got,diff,adjusted};
   });
   return {areas:A,lines};
  }
