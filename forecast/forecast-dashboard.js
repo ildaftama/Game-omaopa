@@ -14,6 +14,16 @@ window.ForecastDashboard=(()=>{
  const pct=n=>n==null?'—':n.toLocaleString('id-ID',{maximumFractionDigits:1})+'%';
  const months=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
  const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
+ // Batas data "real final" (owner 2026-11-13): biasanya hari ini dikecualikan (lihat komentar di
+ // revenueTrend). Sejak tarikan final ~19.05 WIB, hari ini IKUT dihitung kalau jam sudah >= 19
+ // WIB DAN >= 90% outlet hari ini sudah lengkap & berisi penjualan -- supaya koreksi prediksi
+ // besok terjadi malam itu juga. Dini hari (hari baru) tidak pernah lolos syarat jam ini.
+ function actualCutoff(){
+  const t=today(),h=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jakarta',hour:'2-digit',hour12:false}).format(new Date()));
+  if(h<19)return t;const s=window.PcsPanels?.data?.()?.sales;if(!s)return t;
+  const ok=s.days.filter(r=>r.date===t&&r.complete&&Array.isArray(r.qty)&&r.qty.some(v=>v>0)).length;
+  return ok>=Math.max(1,Math.ceil((s.outletIds?.length||28)*.9))?window.ForecastPlanner.shift(t,1):t;
+ }
  const dayLabel=d=>Number(d.slice(8,10));
  const dateLabelShort=d=>Number(d.slice(8,10))+' '+months[Number(d.slice(5,7))-1].slice(0,3);
  const dateRange=(a,b)=>a.slice(0,7)===b.slice(0,7)?`${Number(a.slice(8,10))}–${dateLabelShort(b)}`:`${dateLabelShort(a)}–${dateLabelShort(b)}`;
@@ -154,9 +164,9 @@ window.ForecastDashboard=(()=>{
  function dailyOutletProductSeries(){
   const panels=window.PcsPanels.data();
   if(!panels.sales)return null;
-  const cacheKey=panels.sales.days.length+'|'+(panels.orders?.days?.length||0)+'|'+today();
+  const cacheKey=panels.sales.days.length+'|'+(panels.orders?.days?.length||0)+'|'+actualCutoff();
   if(dailySeriesCache?.key===cacheKey)return dailySeriesCache.value;
-  const todayStr=today(),ordersByKey=new Map((panels.orders?.days||[]).map(r=>[r.date+'|'+r.id,r]));
+  const todayStr=actualCutoff(),ordersByKey=new Map((panels.orders?.days||[]).map(r=>[r.date+'|'+r.id,r]));
   const byOutlet=new Map();
   for(const row of panels.sales.days){
    // "Hari ini" dikecualikan sama seperti di revenueTrend() -- lihat komentar di sana.
@@ -220,7 +230,7 @@ window.ForecastDashboard=(()=>{
   const recap=window.DAILY_RECAP_SUMMARY;if(!recap)return null;
   const cacheKey=(recap.updatedAt||'')+'|'+today();
   if(wasteLostTrendCache?.key===cacheKey)return wasteLostTrendCache.value;
-  const planner=window.ForecastPlanner,name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id,todayStr=today();
+  const planner=window.ForecastPlanner,name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id,todayStr=actualCutoff();
   function build(obj){
    const byOutlet=new Map();
    for(const [date,rows] of Object.entries(obj||{})){
@@ -356,7 +366,7 @@ window.ForecastDashboard=(()=>{
  const WASTE_CORE_LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco'];
  function outletWasteCoreRows(id){
   const recap=window.DAILY_RECAP_SUMMARY;if(!recap?.waste)return [];
-  const todayStr=today(),series=[];
+  const todayStr=actualCutoff(),series=[];
   for(const [date,rows] of Object.entries(recap.waste)){
    if(date>=todayStr)continue;
    const entry=rows[id];if(!entry)continue;
@@ -592,7 +602,7 @@ window.ForecastDashboard=(()=>{
   // ketipu oleh kejadian seperti itu, apapun penyebabnya. actualAt()/grafik di atas TIDAK
   // disaring di sini -- itu tetap menampilkan apa adanya data yang ada (akan otomatis benar
   // begitu sinkronisasi berikutnya menimpa angka yang salah).
-  const todayStr=today();
+  const todayStr=actualCutoff();
   const totalSeries=[...byDate.entries()].filter(([date,e])=>e.known>0&&date<todayStr).map(([date,e])=>({date,value:e.sum*(expected/e.known)})).sort((a,b)=>a.date.localeCompare(b.date));
   const lastActual=totalSeries.at(-1)?.date||null;
   // Tren badge pakai omzet TANPA pesanan (lihat dailyOutletProductSeries/aggregateOrganicSeries),
