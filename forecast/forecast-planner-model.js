@@ -59,7 +59,14 @@
   // forecast vs penjualan (itu akurasi). Dijepit ke 0: kirim < total laku berarti data
   // realisasi kirim yang diisi manual belum tepat, bukan "waste negatif".
   const wasteTotal=hasShipped&&complete?total(rows.map(r=>Math.max(0,r.shipped-r.totalActual))):null;
-  return {rows,eligible,complete,actual,actualTotal,planned,absolute,wape:eligible&&complete&&actual>0?absolute/actual*100:null,hasShipped,shippedTotal,absoluteShipped,wapeShipped:hasShipped&&eligible&&complete&&actual>0?absoluteShipped/actual*100:null,wasteTotal,wastePercent:wasteTotal!=null&&shippedTotal>0?wasteTotal/shippedTotal*100:null};
+  // ESTIMASI waste dari rencana (owner 2026-11-13): versi rencana TERAKHIR (yang benar2 dipakai
+  // Rincian kirim) reguler+pesanan vs total terjual (reguler+pesanan) per produk inti, x harga
+  // di rencana. TANPA transfer antar outlet -- di lapangan kelebihan bisa dipindah ke outlet
+  // yang kekurangan, jadi waste real biasanya lebih kecil. Persen = nominal / omzet terjual
+  // (rumus sama dengan waste% tim).
+  const sent=Array.isArray(record.plan?.active)&&Array.isArray(record.plan?.regular)?record.plan:plan,est=complete?names.map((_,p)=>{const out=sent.active[p]?(sent.regular[p]||0)+(sent.orders[p]||0):0,sold=rows[p].totalActual||0,v=Number(sent.prices?.[p]?.value)||0;return {out,sold,v,w:Math.max(0,out-sold)};}):null;
+  const estWastePcs=est?total(est.map(e=>e.w)):null,estWasteValue=est?est.reduce((s,e)=>s+e.w*e.v,0):null,soldValue=est?est.reduce((s,e)=>s+e.sold*e.v,0):null;
+  return {est,estWastePcs,estWasteValue,soldValue,estWastePercent:soldValue>0?estWasteValue/soldValue*100:null,rows,eligible,complete,actual,actualTotal,planned,absolute,wape:eligible&&complete&&actual>0?absolute/actual*100:null,hasShipped,shippedTotal,absoluteShipped,wapeShipped:hasShipped&&eligible&&complete&&actual>0?absoluteShipped/actual*100:null,wasteTotal,wastePercent:wasteTotal!=null&&shippedTotal>0?wasteTotal/shippedTotal*100:null};
  }
  function validCustomItems(a){return a===undefined||(Array.isArray(a)&&a.length<=20&&a.every(it=>it&&typeof it.name==='string'&&it.name.length>=1&&it.name.length<=60&&integer(it.regular)&&integer(it.orders)));}
  function validPlan(p){return p&&/^\d{4}-\d{2}-\d{2}$/.test(p.date)&&typeof p.outlet==='string'&&Array.isArray(p.active)&&p.active.length===12&&p.active.every(v=>typeof v==='boolean')&&['regular','orders'].every(k=>Array.isArray(p[k])&&p[k].length===12&&p[k].every(integer))&&Array.isArray(p.prices)&&p.prices.length===12&&p.prices.every(v=>v&&(v.value===null||(Number.isFinite(v.value)&&v.value>0)))&&typeof p.note==='string'&&validCustomItems(p.customItems);}

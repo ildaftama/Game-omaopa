@@ -1205,10 +1205,19 @@ window.ForecastDashboard=(()=>{
  // Akurasi bulan berjalan di puncak dashboard: prediksi sistem (versi H-1 yang dibekukan, jadi
  // ini akurasi yang jujur -- angka yang memang tampil sebelum harinya) vs omzet real, plus
  // akurasi rencana tim bulan yang sama (WAPE PCS, rumus sama dengan "Akurasi A" di bawah).
+ // Estimasi waste dari rencana tim (owner 2026-11-13): rencana terakhir (reguler+pesanan) vs total
+ // terjual per produk inti, TANPA transfer antar outlet. Batas bawah = kalau semua kelebihan bisa
+ // ditransfer (dijumlah per tanggal & produk dulu). Bukan waste tercatat tim.
+ function estWasteNote(est){
+  if(!est||!est.n||!(est.sv>0))return '';
+  let wt=0;for(const q of est.pool.values())wt+=Math.max(0,q.out-q.sold)*q.v;
+  const p=est.w/est.sv*100,pt=wt/est.sv*100,bad=p>WASTE_THRESHOLD;
+  return `<p class="fd-est-waste ${bad?'bad':''}"><b>Estimasi waste dari rencana tim: ${pct1(p)}</b> (${Math.round(est.pcs).toLocaleString('id-ID')} pcs · ${moneyBig(est.w)}, ${est.n} rencana) — rencana terakhir dikurangi total terjual, <b>tanpa transfer</b> antar outlet. Kalau semua kelebihan bisa ditransfer: ±${pct1(pt)}. Ambang ${W_TH}. Waste real biasanya di antara kedua angka ini.</p>`;
+ }
  function accuracyCard(trend,outletId){
   const days=trend.rows.filter(r=>r.date.startsWith(trend.ym)&&trend.lastActual&&r.date<=trend.lastActual&&r.actualTotal!=null&&r.forecastTotal!=null);
   if(!days.length)return '';
-  const rows=[];
+  const rows=[];let est=null;
   // 1) Prediksi sistem: versi H-1 yang dibekukan vs omzet real (semua produk, termasuk pesanan).
   {const A=days.reduce((s,r)=>s+r.actualTotal,0),F=days.reduce((s,r)=>s+r.forecastTotal,0),E=days.reduce((s,r)=>s+Math.abs(r.forecastTotal-r.actualTotal),0);
    rows.push({label:'Prediksi sistem',sub:`${days.length} hari`,acc:Math.max(0,100-E/A*100),bias:(F-A)/A*100,F,A,verb:'kiriman dari angka prediksi'});}
@@ -1218,11 +1227,13 @@ window.ForecastDashboard=(()=>{
   // jumlah yang benar2 dikirim setelah penyesuaian produksi (gagal/kelebihan produksi).
   const cloud=window.ForecastPlanCloud,panels=window.PcsPanels.data(),planner=window.ForecastPlanner;
   if(cloud?.state==='ready'&&panels.sales&&panels.orders){
-   const plan={F:0,A:0,E:0,n:0},ship={F:0,A:0,E:0,n:0};
+   const plan={F:0,A:0,E:0,n:0},ship={F:0,A:0,E:0,n:0};est={w:0,sv:0,pcs:0,n:0,pool:new Map()};
    for(const r of cloud.records||[]){
     if(!r.date.startsWith(trend.ym)||r.date>trend.lastActual||(outletId!=='__all__'&&r.outlet!==outletId))continue;
     const fc=fulfillmentFor(r.key),shipped=!fc.loading&&fc.data?fc.data.shipped:null;
-    const c=planner.compare(r,panels.sales,panels.orders,shipped);if(!c.eligible||!c.complete)continue;
+    const c=planner.compare(r,panels.sales,panels.orders,shipped);
+    if(c.est){est.w+=c.estWasteValue;est.sv+=c.soldValue;est.pcs+=c.estWastePcs;est.n++;c.est.forEach((e,p)=>{const k=r.date+'|'+p,q=est.pool.get(k)||{out:0,sold:0,v:0};q.out+=e.out;q.sold+=e.sold;q.v=q.v||e.v;est.pool.set(k,q);});}
+    if(!c.eligible||!c.complete)continue;
     const price=p=>Number(r.baseline.prices?.[p]?.value)||0;
     let pf=0,pa=0,pe=0,sf=0,se=0;
     for(const row of c.rows){const v=price(row.p);pf+=row.planned*v;pa+=row.actual*v;pe+=Math.abs(row.planned-row.actual)*v;if(c.hasShipped){sf+=row.shipped*v;se+=Math.abs(row.shipped-row.actual)*v;}}
@@ -1246,7 +1257,7 @@ window.ForecastDashboard=(()=>{
   });
   return `<article class="workspace-card fd-accuracy"><span class="micro-label">AKURASI ${month.toUpperCase()} · ${dateRange(days[0].date,days.at(-1).date).toUpperCase()} · DALAM RUPIAH</span>
    <div class="fd-outlet-table-wrap"><table class="fd-acc-table"><thead><tr><th></th><th>Akurasi</th><th>Selisih total</th><th>Prediksi/rencana vs real</th></tr></thead><tbody>${rows.map(line).join('')}</tbody></table></div>
-   ${warns.length?`<ul class="fd-acc-warn">${warns.join('')}</ul>`:`<p class="fd-accuracy-note">Semua masih dalam selisih ±3% dari real.</p>`}</article>`;
+   ${warns.length?`<ul class="fd-acc-warn">${warns.join('')}</ul>`:`<p class="fd-accuracy-note">Semua masih dalam selisih ±3% dari real.</p>`}${estWasteNote(est)}</article>`;
  }
  // Omzet real hari ini (SEMENTARA, owner 2026-11-12): tarikan ESB jam 18-20 WIB sebelum outlet
  // tutup (pcs-sales.json `intraday`). Hanya pantauan -- belum dipakai mesin prediksi, karena
