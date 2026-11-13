@@ -1269,7 +1269,7 @@ window.ForecastDashboard=(()=>{
   let sum=0;for(const r of rows)for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,r.id,p);if(v!=null)sum+=(r.qty?.[p]||0)*v;}
   const pred=trend.rows.find(x=>x.date===it.date)?.forecastTotal,jam=new Date(it.asOf).toLocaleTimeString('id-ID',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit'});
   const pct=pred>0?sum/pred*100:null;
-  return `<div class="fd-today"><div><span>Omzet real hari ini · sementara s.d. ${esc(jam)} WIB</span><strong>Rp${Math.round(sum).toLocaleString('id-ID')}</strong></div><div><span>Prediksi hari ini</span><strong>${pred?'Rp'+Math.round(pred).toLocaleString('id-ID'):'—'}</strong></div><div><span>Tercapai</span><strong>${pct==null?'—':pct.toLocaleString('id-ID',{maximumFractionDigits:0})+'%'}</strong></div><small>${rows.length}/${ids.length} outlet terbaca. Outlet tutup 21.00 — angka final masuk setelah itu.</small></div>`;
+  return `<div class="fd-today"><div><span>Omzet real hari ini · sementara s.d. ${esc(jam)} WIB</span><strong>Rp${Math.round(sum).toLocaleString('id-ID')}</strong></div><div><span>Prediksi hari ini</span><strong>${pred?'Rp'+Math.round(pred).toLocaleString('id-ID'):'—'}</strong></div><div><span>Tercapai</span><strong>${pct==null?'—':pct.toLocaleString('id-ID',{maximumFractionDigits:0})+'%'}</strong></div><small>${rows.length}/${ids.length} outlet terbaca. Outlet umumnya tutup 20.00 — angka final masuk setelah itu (diperbarui lagi s.d. 23.00 untuk outlet full shift).</small></div>`;
  }
  function render(outletId){
   applySettings();

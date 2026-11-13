@@ -10,7 +10,8 @@
 // 4. Pilih fungsi "pasang" -> Jalankan -> izinkan akses. Selesai; cek dengan fungsi "uji".
 //
 // Jadwal (WIB): 18, 19, 20 = omzet SEMENTARA hari ini (outlet masih buka);
-// 21, 22, 23 = omzet FINAL hari ini (outlet tutup 21.00; 22 & 23 = ulangan kalau ada yang gagal);
+// 21, 22, 23 = omzet FINAL hari ini (22 & 23 = ulangan kalau ada yang gagal). Sejak 2026-11-13
+// outlet dianggap tutup 20.00: pemicu jam 20 otomatis diperlakukan FINAL oleh workflow;
 // 07 = tarik ulang 7 hari terakhir (perbaiki laporan yang sempat gagal semalam).
 
 const REPO = 'ildaftama/Game-omaopa';
