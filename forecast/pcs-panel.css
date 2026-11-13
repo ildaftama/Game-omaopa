@@ -624,3 +624,14 @@
 /* Dashboard: estimasi waste dari rencana tim (tanpa transfer) */
 .fd-est-waste{margin:10px 0 0;padding:8px 12px;border-radius:10px;background:#f3f8f4;border:1px solid #d6e8da;font-size:12.5px;color:#2f4a36;line-height:1.5}
 .fd-est-waste.bad{background:#fdf4ee;border-color:#f0d6c4;color:#6a3a1c}
+
+/* Monitoring: rincian per produk per outlet & menu Performa bulanan */
+.fp-orow .fp-link{display:inline-flex;gap:6px;align-items:center;font-weight:600}
+.fp-orow.open td{background:#f7fafc}
+.fp-orow-detail>td{background:#f7fafc;padding:4px 10px 14px!important}
+.fop-detail{display:flex;flex-direction:column;gap:8px}
+.fop-detail-head{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;font-size:12.5px;color:#4d5d6c}
+.fop-detail-head .fp-link{margin-left:auto;font-size:12px}
+.fop-table td,.fop-table th{white-space:nowrap}
+.fop-table tfoot td{font-weight:600;border-top:2px solid #e3e8ee}
+.fop-under{color:#a0671a}
