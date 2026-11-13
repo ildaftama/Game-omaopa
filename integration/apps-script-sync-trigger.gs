@@ -44,7 +44,15 @@ function picu_(workflow, inputs) {
 function pasang() {
   ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('tiapJam').timeBased().everyHours(1).create();
-  console.log('Pemicu tiap jam terpasang.');
+  // Tarikan FINAL tepat setelah outlet tutup 20.00 (owner 2026-11-13) -- pemicu tiap jam Google
+  // jatuh di menit acak (mis. :56), jadi tanpa ini omzet final baru masuk hampir 21.00.
+  ScriptApp.newTrigger('finalMalam').timeBased().atHour(20).nearMinute(10).everyDays(1).inTimezone('Asia/Jakarta').create();
+  console.log('Pemicu tiap jam + final malam (~20.10 WIB) terpasang.');
+}
+
+// Tarikan omzet FINAL hari ini (~20.10 WIB), supaya prediksi besok sudah terkoreksi malam itu.
+function finalMalam() {
+  picu_('esb-forecast-refresh.yml', {});
 }
 
 // Uji koneksi token: memicu tarikan pesanan & 7 hari terakhir (aman dijalankan kapan saja).

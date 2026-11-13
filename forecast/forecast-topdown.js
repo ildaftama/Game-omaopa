@@ -369,7 +369,7 @@ window.ForecastTopdown=(()=>{
       <div class="ft-stat"><span>Prediksi sistem</span><strong>${rp(pred)}</strong><small>${pred?'omzet reguler, tanpa pesanan':'belum tersedia untuk tanggal ini'}</small></div>
       <div class="ft-target"><label for="ft-target">Target omzet reguler</label><div class="ft-target-input"><span>Rp</span><input id="ft-target" inputmode="numeric" value="${esc(nf(draft.target))}" autocomplete="off"></div><small>${diff==null?'':Math.abs(diff)<.05?'sesuai prediksi':`${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi`}</small></div>
      </div>
-     ${pred?`<div class="ft-chips"><span class="ft-chips-l">Buffer</span>${BUFFERS.map(b=>`<button type="button" class="ft-chip ${Math.abs((diff??-99)-b)<.05?'on':''} ${b===c.net.pct?'sug':''}" data-ft-buffer="${b}">${b?(b>0?'+':'−')+Math.abs(b)+'%':'0%'}${b===c.net.pct?' · saran':''}</button>`).join('')}</div>${netWhy(c)}`:''}${rainSummary(c)}
+     ${dayWarn()}${pred?`<div class="ft-chips"><span class="ft-chips-l">Buffer</span>${BUFFERS.map(b=>`<button type="button" class="ft-chip ${Math.abs((diff??-99)-b)<.05?'on':''} ${b===c.net.pct?'sug':''}" data-ft-buffer="${b}">${b?(b>0?'+':'−')+Math.abs(b)+'%':'0%'}${b===c.net.pct?' · saran':''}</button>`).join('')}</div>${netWhy(c)}`:''}${rainSummary(c)}
      <div class="ft-ctrl-act"><label class="ft-toggle"><input type="checkbox" id="ft-per-outlet" ${draft.perOutlet?'checked':''}> Sesuaikan porsi outlet dari waste & habis stok <small>(${adjN} outlet digeser)</small></label><button type="button" class="button fp-primary" data-ft-allocate>Bagi otomatis ke outlet & produk</button></div>
     </div>
     <div class="ft-kpis">
@@ -387,6 +387,16 @@ window.ForecastTopdown=(()=>{
    <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
    <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}. Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>
   </div>`;
+ }
+ // Peringatan pola hari (owner 2026-11-13): kalau 12 minggu terakhir prediksi untuk hari yang sama
+ // cenderung di atas / di bawah real, forecaster diingatkan sebelum menambah buffer.
+ const HARI=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+ function dayWarn(){
+  let b=null;try{b=window.ForecastDashboard?.insight?.(date);}catch{}
+  if(!b||b.n<4||Math.abs(b.biasPct)<3)return '';
+  const h=HARI[b.wd],up=b.biasPct>0,cal=Math.abs(b.calibPct)>=.5?` Prediksi di atas sudah ${b.calibPct<0?'diturunkan':'dinaikkan'} otomatis ${Math.abs(b.calibPct).toLocaleString('id-ID',{maximumFractionDigits:1})}%.`:'';
+  return up?`<div class="ft-daywarn over"><b>⚠️ Hati-hati hari ${h}</b><span>${b.over} dari ${b.n} hari ${h} terakhir omzet real <b>di bawah</b> prediksi (rata-rata ${Math.abs(b.biasPct).toLocaleString('id-ID',{maximumFractionDigits:1})}% lebih rendah).${cal} Hindari buffer plus dan jangan kirim berlebihan — risiko waste tinggi.</span></div>`
+   :`<div class="ft-daywarn under"><b>📈 Hari ${h} cenderung lebih ramai</b><span>${b.n-b.over} dari ${b.n} hari ${h} terakhir omzet real <b>di atas</b> prediksi (rata-rata ${Math.abs(b.biasPct).toLocaleString('id-ID',{maximumFractionDigits:1})}% lebih tinggi).${cal} Pastikan stok produk laris cukup.</span></div>`;
  }
  function netWhy(c){
   const n=c.net,d=describe(c.wl?.net,c.W),per=c.wl?.wasteFrom&&c.wl?.wasteTo?` (${c.wl.wasteFrom.slice(8)}/${c.wl.wasteFrom.slice(5,7)}–${c.wl.wasteTo.slice(8)}/${c.wl.wasteTo.slice(5,7)})`:'';

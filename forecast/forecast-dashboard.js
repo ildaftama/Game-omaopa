@@ -728,7 +728,14 @@ window.ForecastDashboard=(()=>{
   // Satu angka ringkas pengganti paragraf metodologi: berapa persen pesanan biasanya menambah
   // omzet murni, dipakai sebagai catatan singkat di bawah grafik.
   const pesananUpliftPct=pureEngine.baselineLevel>0&&pesananEngine.baselineLevel!=null?pesananEngine.baselineLevel/pureEngine.baselineLevel*100:null;
-  return {rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct,yoyGrowth:pureEngine.yoyGrowth,trendNow,trendDriver,trendContext};
+  // Insight hari yang sama (owner 2026-11-13): 12 minggu terakhir, prediksi versi H-1 vs real
+  // omzet reguler untuk hari (Senin..Minggu) tanggal target -- untuk peringatan di Buat forecast.
+  function weekdayBias(date){
+   const wd=new Date(date+'T12:00:00Z').getUTCDay(),end=lastActual&&date>lastActual?planner.shift(lastActual,1):date;let A=0,F=0,n=0,over=0;
+   for(let k=1;k<=84;k++){const d=planner.shift(end,-k);if(new Date(d+'T12:00:00Z').getUTCDay()!==wd)continue;const a=pureVal.get(d),f=frozenAt(d).pure;if(a==null||f==null||!(a>0))continue;A+=a;F+=f;n++;if(f>a)over++;}
+   return n?{wd,n,over,biasPct:(F/A-1)*100,calibPct:(calib(date)-1)*100}:null;
+  }
+  return {weekdayBias,rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct,yoyGrowth:pureEngine.yoyGrowth,trendNow,trendDriver,trendContext};
  }
 
  // actualTotal/forecastTotal/plan = garis utama (tebal, warna pekat, selalu tampil default).
@@ -1307,6 +1314,7 @@ window.ForecastDashboard=(()=>{
    <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast" data-fp-mode="topdown">Buat forecast →</button><span>Monitoring rencana tim ada di bawah kartu akurasi.</span></div>
    ${intradayCard(trend,outletId)}
    ${show.accuracy?accuracyCard(trend,outletId):''}
+   ${outletId==='__all__'?dayInsightCard(trend):''}
    ${window.ForecastWorkspace?.monitorSection?.()||''}
    ${show.trend&&outletId==='__all__'?trendWatchCard(trend.trendNow):''}
    ${show.wasteLost?wasteLostCard(outletId):''}
@@ -1348,6 +1356,15 @@ window.ForecastDashboard=(()=>{
  }
  // Dipakai "Forecast dari omzet": prediksi omzet reguler/pesanan jaringan untuk satu tanggal
  // (bulan ini & bulan depan), angka yang sama dengan garis prediksi di grafik dashboard.
+ // Kartu insight pola hari (owner 2026-11-13): hari yang prediksinya konsisten meleset.
+ function dayInsightCard(trend){
+  const H=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],start=trend.lastActual?window.ForecastPlanner.shift(trend.lastActual,1):today();
+  const xs=[];for(let i=0;i<7;i++){const d=window.ForecastPlanner.shift(start,i),b=trend.weekdayBias?.(d);if(b&&b.n>=4&&Math.abs(b.biasPct)>=3)xs.push({d,...b});}
+  if(!xs.length)return '';
+  xs.sort((a,b)=>Math.abs(b.biasPct)-Math.abs(a.biasPct));
+  return `<article class="workspace-card fd-dayins"><span class="micro-label">INSIGHT POLA HARI · 12 MINGGU TERAKHIR</span><ul>${xs.map(x=>`<li class="${x.biasPct>0?'over':'under'}"><b>${H[x.wd]}</b> ${x.biasPct>0?`omzet real <b>di bawah</b> prediksi ${x.over} dari ${x.n} kali (rata-rata ${pct1(Math.abs(x.biasPct))} lebih rendah) — jangan kirim berlebihan, hindari buffer plus.`:`omzet real <b>di atas</b> prediksi ${x.n-x.over} dari ${x.n} kali (rata-rata ${pct1(Math.abs(x.biasPct))} lebih tinggi) — pastikan stok produk laris cukup.`}${Math.abs(x.calibPct)>=.5?` <small>Prediksi sudah dikoreksi otomatis ${x.calibPct>0?'+':'−'}${pct1(Math.abs(x.calibPct))}.</small>`:''}</li>`).join('')}</ul></article>`;
+ }
+ function insight(date){try{return revenueTrend('__all__')?.weekdayBias?.(date)||null;}catch{return null;}}
  function predict(date){try{const r=revenueTrend('__all__')?.rows.find(x=>x.date===date);return r?{pure:r.forecastPure,total:r.forecastTotal}:null;}catch{return null;}}
  // Dipakai saran buffer "Forecast dari omzet": waste (sheet WASTE, nominal / omzet ESB) dan
  // menit habis stok (sheet rekap) untuk N TANGGAL TERAKHIR YANG SUDAH DIISI tim (bukan N hari
@@ -1367,5 +1384,5 @@ window.ForecastDashboard=(()=>{
   const net={wastePct:all.wd>=MIN_RECAP_DAYS&&all.wr>0?all.wn/all.wr*100:null,lostPct:all.ld>0&&lDates.length>=MIN_RECAP_DAYS?all.lm/all.ld/OPEN_MINUTES*100:null,lostPerDay:all.ld>0&&lDates.length>=MIN_RECAP_DAYS?all.lm/all.ld:null};
   return {net,byOutlet:new Map([...by].map(([id,r])=>[id,pctOf(r)])),wasteThreshold:WASTE_THRESHOLD,lostThreshold:LOST_SALES_THRESHOLD,wasteFrom:wDates[0]||null,wasteTo:wDates.at(-1)||null,lostFrom:lDates[0]||null,lostTo:lDates.at(-1)||null};
  }
- return {render,inspect,change,mount,click,predict,recentWasteLost};
+ return {render,inspect,change,mount,click,predict,insight,recentWasteLost};
 })();

@@ -847,3 +847,15 @@ main{max-width:1680px!important}
 .ft-area .ft-sub-h b{font-size:14.5px}
 .ft-area .ft-sub-h span{font-size:12.5px}
 .ft-grid tfoot th,.ft-grid tfoot td{font-size:12.5px}
+
+/* Peringatan pola hari (insight bias prediksi) */
+.ft-daywarn{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:10px;font-size:12.5px;line-height:1.45}
+.ft-daywarn b{font-size:13px}
+.ft-daywarn.over{background:#fff3e6;border:1px solid #f3cfa3;color:#6b3d0f}
+.ft-daywarn.under{background:#eaf6ef;border:1px solid #bfe2cc;color:#1f5a37}
+.fd-dayins{margin:0 0 18px}
+.fd-dayins ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.fd-dayins li{padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.45}
+.fd-dayins li.over{background:#fff3e6;color:#6b3d0f}
+.fd-dayins li.under{background:#eaf6ef;color:#1f5a37}
+.fd-dayins small{color:inherit;opacity:.8}
