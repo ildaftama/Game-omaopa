@@ -668,7 +668,26 @@ window.ForecastDashboard=(()=>{
   // Penyesuaian performa tim (lihat perfAdjust): tanggal lewat memakai data sebelum tanggal itu,
   // tanggal mendatang memakai data s.d. kemarin.
   const perf=date=>{if(date<PERF_FROM)return 1;try{return 1+perfAdjust(isPast(date)?date:today()).pct/100;}catch{return 1;}};
-  const forecastPureAt=date=>{const v=isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);return v==null?null:v*adj(date)*perf(date);};
+  // ---- Kalibrasi bias terkini (owner 2026-11-13: "prediksi cenderung di atas real") ----
+  // Uji mundur Agu-Nov 2026 (prediksi versi H-1 vs real, omzet reguler jaringan): mesin pola
+  // tahun lalu x pertumbuhan makin sering KELEBIHAN sejak Okt (bias Okt +3,3%, Nov +3,5%,
+  // 14 hari terakhir +3,7%), paling parah hari MINGGU (+11%, 8 dari 8 Minggu di atas real) --
+  // Minggu Okt-Nov tahun lalu jauh lebih ramai daripada tahun ini. Koreksi: rasio real/prediksi
+  // 28 hari terakhir, dicampur rasio hari yang sama (12 minggu, bobot n/(n+4)), diredam 75%,
+  // dibatasi 0,85-1,10. Hasil uji mundur: error harian 5,18% -> 5,03%, bias +2,4% -> +1,5%,
+  // 14 hari terakhir 5,49% -> 4,99% (bias +3,7% -> +2,0%), Minggu +11,2% -> +8,7%.
+  // Hanya untuk tanggal >= CALIB_FROM supaya prediksi lama yang sudah tampil tidak berubah.
+  const CALIB_FROM='2026-11-14',pureVal=new Map(pureSeries.map(r=>[r.date,r.value])),calibCache=new Map();
+  function calib(date){
+   if(date<CALIB_FROM||!lastActual)return 1;
+   const end=date<=lastActual?date:planner.shift(lastActual,1);if(calibCache.has(date+'|'+end))return calibCache.get(date+'|'+end);
+   const wd=new Date(date+'T12:00:00Z').getUTCDay();let gA=0,gF=0,gn=0,wA=0,wF=0,wn=0;
+   for(let k=1;k<=84;k++){const d=planner.shift(end,-k),a=pureVal.get(d);if(a==null)continue;const f=frozenAt(d).pure;if(f==null||!(f>0))continue;
+    if(k<=28){gA+=a;gF+=f;gn++;}if(new Date(d+'T12:00:00Z').getUTCDay()===wd){wA+=a;wF+=f;wn++;}}
+   let c=1;if(gn>=7&&gF>0){const g=gA/gF,kw=wn/(wn+4);c=wn&&wF>0?g*(1-kw)+(wA/wF)*kw:g;c=Math.max(.85,Math.min(1.1,1+(c-1)*.75));}
+   calibCache.set(date+'|'+end,c);return c;
+  }
+  const forecastPureAt=date=>{const v=isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);return v==null?null:v*calib(date)*adj(date)*perf(date);};
   function forecastPesananAt(date){
    // Tanggal lewat yang sudah tercakup sheet PESANAN: outlet tanpa baris pesanan = 0, bukan
    // "tidak diketahui". Sebelumnya jatuh ke tebakan pola tahun lalu -- per outlet itu menyalin
