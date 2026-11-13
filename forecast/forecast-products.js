@@ -25,6 +25,11 @@ window.ForecastProducts=(()=>{
  const hex=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)?v.toLowerCase():null;
  const bgOr=v=>v==='#ffffff'?null:v;
  const defaultCoreBg=p=>CORE_BG[p]||null,defaultExtraBg=name=>EXTRA_BG[low(name)]||null;
+ // HPP outlet per produk inti (harga jual pabrik ke outlet, owner 2026-11-13), dipakai nominal
+ // estimasi waste. Bisa diubah tim di Pengaturan › Produk (disimpan di core[p].hpp).
+ const DEFAULT_HPP=[20500,19800,8800,8500,3500,3500,3500,22576,23800,24000,13500,12000];
+ const hppOk=v=>Number.isFinite(Number(v))&&v!==''&&v!==null&&Number(v)>=0;
+ function hpp(){const c=prefs().core;return DEFAULT_HPP.map((d,p)=>hppOk(c[p]?.hpp)?Number(c[p].hpp):d);}
  const DEFAULTS={core:CORE.map(([label])=>({label,ship:true})),extra:DEFAULT_EXTRA.map(([name,cat])=>({name,cat,aliases:[]}))};
  function prefs(){const p=window.ForecastSettings?.get?.()?.products||{};return {core:Array.isArray(p.core)&&p.core.length===12?p.core:DEFAULTS.core,extra:Array.isArray(p.extra)?p.extra:DEFAULTS.extra};}
  function core(){const c=prefs().core;return CORE.map(([label,dot,cat],p)=>({p,label:String(c[p]?.label||label),ship:c[p]?.ship!==false,dot,cat,bg:bgOr(hex(c[p]?.color)??defaultCoreBg(p))}));}
@@ -36,5 +41,5 @@ window.ForecastProducts=(()=>{
  function itemFor(items,product){return (items||[]).find(it=>{const n=low(it.name);return n===low(product.name)||product.aliases.some(a=>low(a)===n);})||null;}
  // Warna header rute (nama rute -> warna latar lembut).
  function routeBg(name){const r=window.ForecastSettings?.get?.()?.products?.routes||{};return hex(r[name])||ROUTE_BG[name]||null;}
- return {CATS,CORE_ORDER,DEFAULTS,core,extra,names,match,itemFor,low,hex,routeBg,defaultCoreBg,defaultExtraBg,ROUTE_BG};
+ return {hpp,DEFAULT_HPP,CATS,CORE_ORDER,DEFAULTS,core,extra,names,match,itemFor,low,hex,routeBg,defaultCoreBg,defaultExtraBg,ROUTE_BG};
 })();

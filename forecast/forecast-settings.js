@@ -49,13 +49,14 @@ window.ForecastSettings=(()=>{
  // rincian kirim; tambah lewat form khusus; hapus = ditandai dulu (bisa dibatalkan) sampai
  // disimpan; ada penanda "belum disimpan". Draft disimpan di memori selama tab dibuka.
  let prodBase='',newCat=3;
- function prodDraft(){if(!prod){const c=P().core(),x=P().extra();const sp=get().products||{};prod={core:c.map((r,p)=>({label:r.label,ship:r.ship,color:P().hex(sp.core?.[p]?.color)||''})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false,color:P().hex((sp.extra||[]).find(e=>String(e?.name||'').trim()===r.name)?.color)||''})),routes:{...(sp.routes||{})},batch:{...(window.ForecastProduction?.sizes?.()||{})}};prodBase=JSON.stringify(prod);}return prod;}
+ function prodDraft(){if(!prod){const c=P().core(),x=P().extra();const sp=get().products||{};prod={core:c.map((r,p)=>({label:r.label,ship:r.ship,color:P().hex(sp.core?.[p]?.color)||'',hpp:String(P().hpp()[p])})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false,color:P().hex((sp.extra||[]).find(e=>String(e?.name||'').trim()===r.name)?.color)||''})),routes:{...(sp.routes||{})},batch:{...(window.ForecastProduction?.sizes?.()||{})}};prodBase=JSON.stringify(prod);}return prod;}
  const prodDirty=()=>!!prod&&JSON.stringify(prod)!==prodBase;
  function syncProd(form){if(!prod||!form)return;
   form.querySelectorAll('[data-prod-core-label]').forEach(el=>{prod.core[+el.dataset.prodCoreLabel].label=el.value;});
   form.querySelectorAll('[data-prod-core-ship]').forEach(el=>{prod.core[+el.dataset.prodCoreShip].ship=el.checked;});
   form.querySelectorAll('[data-prod-x-name]').forEach(el=>{prod.extra[+el.dataset.prodXName].name=el.value;});
   form.querySelectorAll('[data-prod-x-cat]').forEach(el=>{prod.extra[+el.dataset.prodXCat].cat=Number(el.value);});
+  form.querySelectorAll('[data-prod-hpp]').forEach(el=>{prod.core[+el.dataset.prodHpp].hpp=el.value;});
   form.querySelectorAll('[data-prod-batch]').forEach(el=>{prod.batch[el.dataset.prodBatch]=Number(el.value);});
   form.querySelectorAll('[data-color-core]').forEach(el=>{prod.core[+el.dataset.colorCore].color=el.value.toLowerCase();});
   form.querySelectorAll('[data-color-x]').forEach(el=>{prod.extra[+el.dataset.colorX].color=el.value.toLowerCase();});
@@ -88,6 +89,7 @@ window.ForecastSettings=(()=>{
     ${dis?'':`<div class="fsp-add"><div class="fsp-add-title">+ Tambah produk baru</div><div class="fsp-add-row"><input type="text" id="fs-prod-new-name" maxlength="60" placeholder="Nama produk, misalnya Roti Pisang Coklat" autocomplete="off">${catSel('id="fs-prod-new-cat"',newCat)}<button type="button" class="button fp-primary" data-prod-add>Tambah</button></div></div>`}
    </article>
    <article class="workspace-card"><h3 class="fs-h3">Isi 1 angkatan produksi <small>pcs per rasa</small></h3><p class="fs-use">Dipakai untuk menyusun <b>Rencana produksi (angkatan)</b> di Buat forecast. Semua rasa dalam satu varian memakai isi yang sama.</p><div class="fsp-batch">${(window.ForecastProduction?.families?.()||[]).map(f=>`<label><span>${esc(f.label)}</span><span class="fsp-batch-in"><input type="number" min="1" max="500" step="1" data-prod-batch="${f.key}" value="${esc(d.batch?.[f.key]??f.size)}" ${dis}><em>pcs</em></span>${f.unit?`<small>${esc(f.unit)}</small>`:''}</label>`).join('')}</div></article>
+   <article class="workspace-card"><h3 class="fs-h3">HPP outlet <small>Rp per pcs · harga jual pabrik ke outlet</small></h3><p class="fs-use">Dipakai menghitung nominal <b>estimasi waste</b> di Dashboard & Monitoring (kue sisa × HPP). Persen waste tetap dibagi omzet terjual. Produk lain (roti dll.) belum dihitung.</p><div class="fsp-batch">${P().CORE_ORDER.map(p=>`<label><span>${esc(window.ForecastPlanner?.names?.[p]||base[p].label)}</span><span class="fsp-batch-in"><em>Rp</em><input type="number" min="0" max="1000000" step="1" data-prod-hpp="${p}" value="${esc(d.core[p].hpp)}" ${dis}></span>${Number(d.core[p].hpp)!==P().DEFAULT_HPP[p]?`<small>Bawaan Rp${P().DEFAULT_HPP[p].toLocaleString('id-ID')}</small>`:''}</label>`).join('')}</div></article>
    ${colorsCard(dis)}
    <details class="workspace-card fsp-core"><summary><div><h3 class="fs-h3">12 produk inti <small>nama di rincian kirim & gambar WA</small></h3><p class="fs-use">Dipakai mesin rekomendasi, jadi tidak bisa dihapus atau dipindah kategori. Anda bisa mengganti nama tampilnya atau menyembunyikannya dari rincian kirim.</p></div><span class="fsp-chev">▾</span></summary>${coreGroups}</details>
   </div>`;
@@ -98,7 +100,8 @@ window.ForecastSettings=(()=>{
   if(extra.length>20)throw Error('Maksimal 20 produk lain.');
   const batch={};for(const [k,v] of Object.entries(d.batch||{})){if(!Number.isInteger(v)||v<1||v>500)throw Error('Isi 1 angkatan harus angka bulat 1–500 pcs.');batch[k]=v;}
   const routes={};for(const [k,v] of Object.entries(d.routes||{})){const h=P().hex(v);if(h)routes[k]=h;}
-  return {core:d.core.map((c,p)=>{const color=P().hex(c.color);return {label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship,...(color?{color}:{})};}),extra,batch,routes};}
+  const hpps=d.core.map((c,p)=>{const v=Number(c.hpp);if(String(c.hpp).trim()===''||!Number.isInteger(v)||v<0||v>1000000)throw Error(`HPP ${window.ForecastPlanner?.names?.[p]||P().DEFAULTS.core[p].label} harus angka bulat 0–1.000.000.`);return v;});
+  return {core:d.core.map((c,p)=>{const color=P().hex(c.color);return {label:String(c.label||'').trim()||P().DEFAULTS.core[p].label,ship:!!c.ship,hpp:hpps[p],...(color?{color}:{})};}),extra,batch,routes};}
  function addProduct(form){syncProd(form);const el=form?.querySelector('#fs-prod-new-name'),cs=form?.querySelector('#fs-prod-new-cat'),name=String(el?.value||'').trim().replace(/\s+/g,' ');newCat=Number(cs?.value??newCat);
   if(!name){status='Ketik nama produk baru dulu.';return;}
   if(prodDraft().extra.some(x=>!x.removed&&x.name.trim().toLowerCase()===name.toLowerCase())){status=`"${name}" sudah ada di daftar.`;return;}
@@ -180,6 +183,6 @@ window.ForecastSettings=(()=>{
   return false;
  }
  // Ganti kategori / tampil di rincian kirim -> render ulang supaya baris pindah kelompok.
- function change(e){const t=e.target;if(section==='experiment')return !!window.ForecastExperiment?.change(e);if(section!=='products'||!prod)return false;if(t.dataset.colorCore!==undefined||t.dataset.colorX!==undefined||t.dataset.colorRoute!==undefined){syncProd(t.closest('form'));return true;}if(t.dataset.prodXCat!==undefined||t.dataset.prodCoreShip!==undefined){syncProd(t.closest('form'));return true;}if(t.id==='fs-prod-new-cat'){newCat=Number(t.value);return false;}return false;}
+ function change(e){const t=e.target;if(section==='experiment')return !!window.ForecastExperiment?.change(e);if(section!=='products'||!prod)return false;if(t.dataset.colorCore!==undefined||t.dataset.colorX!==undefined||t.dataset.colorRoute!==undefined){syncProd(t.closest('form'));return true;}if(t.dataset.prodXCat!==undefined||t.dataset.prodCoreShip!==undefined||t.dataset.prodHpp!==undefined){syncProd(t.closest('form'));return true;}if(t.id==='fs-prod-new-cat'){newCat=Number(t.value);return false;}return false;}
  return {get,render,submit,click,change,DEFAULTS};
 })();
