@@ -641,3 +641,12 @@
 .fp-seg button{border:0;background:transparent;padding:7px 16px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;color:#5f6f7e;cursor:pointer}
 .fp-seg button[aria-selected="true"]{background:#fff;color:#1c2b38;box-shadow:0 1px 3px rgba(20,40,60,.12)}
 .fp-perf{display:block;margin-top:2px;font-size:11px;color:#8a5a1a}
+/* Monitoring di Dashboard & bilah kembali di Forecast (owner 2026-11-13) */
+.fp-embed .button{border:1px solid #d7e1e8;background:white;color:#172b42;border-radius:8px;padding:10px 16px;font:inherit;font-size:13px;cursor:pointer}
+.fp-embed .fp-primary{background:#205f70;color:white;border-color:#205f70;font-weight:600}
+.fp-monitor-card{margin:0 0 18px}
+.fp-monitor-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.fp-monitor-head h3{margin:2px 0 4px}
+.fp-backbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:8px 10px;border-radius:10px;background:#f2f6f9}
+.fp-backbar b{font-size:14px;color:#1c2b38}
+.fp-backbar .button:last-child{margin-left:auto}

@@ -1280,9 +1280,10 @@ window.ForecastDashboard=(()=>{
   if(show.weather)ensureWeather(outletId);
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
-   <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast">Buat forecast →</button><span>Histori rencana & akurasi tim (buat pembelajaran) ada di tab Forecast → Monitoring.</span></div>
+   <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast" data-fp-mode="topdown">Buat forecast →</button><span>Monitoring rencana tim ada di bawah kartu akurasi.</span></div>
    ${intradayCard(trend,outletId)}
    ${show.accuracy?accuracyCard(trend,outletId):''}
+   ${window.ForecastWorkspace?.monitorSection?.()||''}
    ${show.trend&&outletId==='__all__'?trendWatchCard(trend.trendNow):''}
    ${show.wasteLost?wasteLostCard(outletId):''}
    <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${monthSummaryHtml(trend)}</article>
