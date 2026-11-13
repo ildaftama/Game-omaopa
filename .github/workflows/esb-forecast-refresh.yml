@@ -86,7 +86,8 @@ jobs:
           # Owner 2026-11-13: outlet dianggap tutup 20.00 (21.00 hanya saat full shift, jarang).
           # Pemicu "sementara" yang datang jam >= 20 diperlakukan sebagai tarikan FINAL; tarikan
           # final jam 21-23 tetap jalan dan memperbarui outlet yang buka sampai 21.00.
-          if [ "${{ github.event.inputs.intraday }}" = "1" ] && [ "$WIB_HOUR" -lt 20 ]; then
+          # Sejak owner 2026-11-13 (pemicu final ~19.05): jam >= 19 sudah dianggap final.
+          if [ "${{ github.event.inputs.intraday }}" = "1" ] && [ "$WIB_HOUR" -lt 19 ]; then
             INTRADAY=1 node integration/pcs-sales.mjs || echo "::warning::Tarikan sementara hari ini belum lengkap."
             exit 0
           fi
@@ -101,7 +102,7 @@ jobs:
             # >= 21 (bukan 20): outlet tutup 21.00. Sejak 2026-11-12 jam 18-20 ditarik sebagai
             # data sementara (input intraday), jadi tarikan "final" tidak boleh sebelum tutup.
             # >= 20: outlet umumnya tutup 20.00 (owner 2026-11-13).
-            if [ "$WIB_HOUR" -ge 20 ]; then
+            if [ "$WIB_HOUR" -ge 19 ]; then
               FROM="$DAY"; TO="$DAY"
             else
               echo "::warning::Run ini jalan jam ${WIB_HOUR}:xx WIB, jauh dari jadwal 21.02 WIB (kemungkinan tertunda GitHub Actions sampai lewat tengah malam). Melewati tarikan hari berjalan supaya tidak salah menandai hari yang baru mulai sebagai 'selesai & kosong'. Hari ini akan tertarik lewat sinkronisasi tiap jam di siang hari atau sinkronisasi malam berikutnya."
