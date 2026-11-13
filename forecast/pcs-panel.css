@@ -828,4 +828,8 @@ main{max-width:1680px!important}
 .ft-sub-kir+.ft-grid-wrap .ft-grid tbody th,.ft-sub-kir+.ft-grid-wrap .ft-grid td{height:24px}
 .ft-area{overflow:visible}
 .ft-area-head{border-radius:14px 14px 0 0}
-@media (min-width:1100px){.ft-area .ft-grid-wrap{overflow:visible}.ft-area .ft-grid thead th{top:54px}.ft-area .ft-grid .ft-tcol{position:static}}
+@media (min-width:1100px){.ft-area .ft-grid-wrap{overflow:visible}}
+.ft-bar{height:52px;box-sizing:border-box;padding:6px 0;background:#fff;flex-wrap:nowrap}
+@media (min-width:1100px){.ft-area .ft-grid .ft-tcol{position:static}.ft-area .ft-grid thead th.ft-tcol,.ft-area .ft-grid thead th{position:sticky;top:52px}}
+@media (max-width:1099px){.ft-bar{height:auto;flex-wrap:wrap;position:static}}
+.fp-workspace{overflow:visible}
