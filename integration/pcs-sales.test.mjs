@@ -40,7 +40,7 @@ test('owner-excluded Kurma menus do not suppress all other product counts on a h
 
 test('legacy complete topped cake menus count their base once, without counting topping components',()=>{assert.equal(sku('Ogura Choco - Topping Halfmix Choco Greentea'),1);assert.equal(sku('Malmil Cheese - Topping Full Choco'),2);const r=summarize([row('Ogura Choco - Topping Halfmix Choco Greentea',6),row('Topping Full Greentea Ogura',6,{rowType:'PACKAGE_COMPONENT'})],job);assert.equal(r.qty[1],6);assert.equal(r.qty.reduce((a,b)=>a+b,0),6);});
 
-test('legacy Mini mix box is nine pieces, separated by flavor; complimentary boxes stay out of sales',()=>{const r=summarize([row('Mini Ogura Filling Mix',2),row('Mini Satuan - Cheese',4),row('Mini Ogura Filling Mix',1,{discountTotal:13000})],job);assert.deepEqual(r.qty.slice(4,7),[10,6,6]);assert.deepEqual(r.free.slice(4,7),[3,3,3]);assert.equal(r.mappingVersion,4);assert.throws(()=>summarize([row('Mini Ogura New Flavor')],job),/menu/);});
+test('legacy Mini mix box is nine pieces, separated by flavor; complimentary boxes stay out of sales',()=>{const r=summarize([row('Mini Ogura Filling Mix',2),row('Mini Satuan - Cheese',4),row('Mini Ogura Filling Mix',1,{discountTotal:13000})],job);assert.deepEqual(r.qty.slice(4,7),[10,6,6]);assert.deepEqual(r.free.slice(4,7),[3,3,3]);assert.equal(r.mappingVersion,5);assert.throws(()=>summarize([row('Mini Ogura New Flavor')],job),/menu/);});
 test('new menu mapping survives a history merge with an older complete snapshot',()=>{const r=mergeSales(null,[{...job,qty:[3],complete:true,mappingVersion:2},{...job,qty:[0],complete:true}]);assert.equal(r.days[0].qty[0],3);});
 
 test('roti manis maps 1:1 using the confirmed ESB menu names (plain + "Bundling Roti Manis - X"); unrecognised roti names fail loudly, "PE Roti Manis" stays silently excluded like "PE Malmil"',()=>{
@@ -73,3 +73,5 @@ test('an unmapped non-cake menu name contributes to netSales without tripping th
  const r=summarize([row('Minuman Es Teh',2,{total:12000,discountTotal:0})],job);
  assert.equal(r.netSales,12000);assert.equal(r.qty.reduce((a,b)=>a+b,0),0);
 });
+
+test('Malmil Less Sugar is its own product (18/19), never folded into regular Malmil',()=>{assert.equal(sku('Malmil Cheese Less Sugar'),18);assert.equal(sku('Malmil Chocolate Less Sugar'),19);assert.equal(sku('Malmil Cheese'),2);});

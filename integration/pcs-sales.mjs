@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {createEsbClient} from './esb-client.mjs';
 
-export const PRODUCTS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Mini Ogura - Cheese','Mini Ogura - Choco','Mini Ogura - Durian','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter','Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Pisang Coklat','Roti Coklat Keju','Roti Vanilla'];
-export const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Pisang Coklat','Roti Coklat Keju','Roti Vanilla'];
-export const MAPPING_VERSION=4;
+export const PRODUCTS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Mini Ogura - Cheese','Mini Ogura - Choco','Mini Ogura - Durian','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter','Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Pisang Coklat','Roti Coklat Keju','Roti Vanilla','Malmil Cheese Less Sugar','Malmil Chocolate Less Sugar'];
+export const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Pisang Coklat','Roti Coklat Keju','Roti Vanilla','Malmil Cheese Less Sugar','Malmil Choco Less Sugar'];
+export const MAPPING_VERSION=5;
 export function sku(name){
  let n=String(name).trim().toLowerCase().replace(/\s+/g,' ').replace(/\bcisfon\b/g,'chiffon');
  n=n.replace(/^(ogura (?:cheese|choco)) promo kartini$/,'$1').replace(/^(chiffon classic (?:keju|ekstra keju|buttermilk)) go gajah raya$/,'$1');
@@ -13,6 +13,9 @@ export function sku(name){
      .replace(/\bchiffon lite\s*-\s*/,'chiffon lite ').replace(/\bextra keju\b/g,'ekstra keju');
  n=n.replace(/\bchiffon (keju|ekstra keju|butter|buttermilk)$/,'chiffon classic $1')
      .replace(/\bchiffon classic butter$/,'chiffon classic buttermilk');
+ // Malmil Less Sugar (menu baru 5 outlet Jogja, 16 Nov 2026): produk TERSENDIRI (indeks 18/19),
+ // tidak dicampur Malmil biasa -- forecaster merencanakannya sebagai produk lain.
+ let ls=n.match(/^malmil (cheese|choco|chocolate) less sugar$/);if(ls)return ls[1]==='cheese'?18:19;
  let m=n.match(/^(?:paket oleh-oleh |paket cemal-cemil )?(ogura|malmil) (cheese|choco|chocolate)(?:\s*-\s*(?:topping|toping|polos)\b.*)?$/);
  if(m)return (m[1]==='ogura'?0:2)+(m[2]==='cheese'?0:1);
  m=n.match(/^mini satuan - (cheese|coklat|durian)$/);if(m)return 4+['cheese','coklat','durian'].indexOf(m[1]);

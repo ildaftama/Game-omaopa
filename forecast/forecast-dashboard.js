@@ -46,11 +46,13 @@ window.ForecastDashboard=(()=>{
  // box Mini (57000/9) yang juga sudah memakai satu harga acuan walau ada variasi per transaksi.
  const PRICE_REFS={4:57000/9,5:57000/9,6:57000/9,7:33000,8:34000,9:34000,10:19000,11:18000,12:6500,13:7000,14:6000,15:6000,16:6000,17:6000};
  const PRICE_KEYS=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate'];
- const PRODUCT_COUNT=18;
- const PRODUCT_NAMES=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Pisang Coklat','Roti Coklat Keju','Roti Vanilla'];
+ const PRODUCT_COUNT=20;
+ const PRODUCT_NAMES=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Cheese','Mini Choco','Mini Durian','Chiffon Classic Keju','Chiffon Classic Ekstra Keju','Chiffon Butter','Lite Ekstra Keju','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Pisang Coklat','Roti Coklat Keju','Roti Vanilla','Malmil Cheese Less Sugar','Malmil Choco Less Sugar'];
  const productLabel=p=>PRODUCT_NAMES[p]||('Produk '+p);
  function actualPrice(source,id,p){
   if(p<4){const v=source?.outlets?.[id]?.[PRICE_KEYS[p]]?.price;return v>0?v:null;}
+  // Malmil Less Sugar (18/19): harga acuan = harga Malmil biasa outlet itu (sampai ada harga resmi).
+  if(p===18||p===19)return actualPrice(source,id,p-16);
   return p in PRICE_REFS?PRICE_REFS[p]:null;
  }
  function shiftYearDate(date,deltaYears){const [y,m,d]=date.split('-').map(Number);return `${y+deltaYears}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}

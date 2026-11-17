@@ -27,7 +27,7 @@ window.ForecastTopdown=(()=>{
  // Produk lain = daftar di Pengaturan › Produk (forecast-products.js); tidak bisa ditambah/
  // dihapus dari halaman ini (owner 2026-11-10: supaya tidak terpencet saat menyusun forecast).
  // Roti punya penjualan ESB di indeks 12-14 -> diberi saran median hari sama (cocok nama/alias).
- const ROTI={'roti sosis':12,'roti abon':13,'roti coklat':14};
+ const ROTI={'roti sosis':12,'roti abon':13,'roti coklat':14,'malmil cheese less sugar':18,'malmil choco less sugar':19,'malmil chocolate less sugar':19};
  const low=s=>String(s||'').trim().toLowerCase();
  const PR=()=>window.ForecastProducts;
  const rotiIdx=nm=>{const x=PR().match(nm),keys=[nm,...(x?.aliases||[])].map(low);for(const k of keys)if(ROTI[k]!=null)return ROTI[k];return null;};
