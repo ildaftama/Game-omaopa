@@ -632,7 +632,31 @@
     font-size:1.1rem;padding:14px;border-radius:16px;background:#613925;color:#FACC1A;margin-top:22px;}
   #spinBk .sp-btn:disabled{background:rgba(97,57,37,.25);color:#FEFEFE;cursor:not-allowed;}
   #spinInfo{font-size:.82rem;color:#7A5640;font-weight:600;margin-top:12px;opacity:.85;}
-  #spinPesan{font-size:.84rem;color:#C0392B;font-weight:700;margin-top:10px;}
+  #spinPesan{font-size:.86rem;color:#613925;background:#FEF4CC;border-radius:12px;font-weight:700;margin-top:12px;padding:10px 12px;display:none;}
+  #spinPesan.ada{display:block;}
+  #spinBadge{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px auto 0;padding:8px 18px 8px 8px;border-radius:999px;background:#613925;width:fit-content;max-width:100%;}
+  #spinBadge .sp-bn{min-width:38px;height:38px;border-radius:50%;background:#FACC1A;color:#613925;font-family:'Fredoka';font-weight:600;font-size:1.35rem;display:flex;align-items:center;justify-content:center;}
+  #spinBadge .sp-bt{text-align:left;font-family:'Fredoka';font-weight:500;font-size:.98rem;color:#FEFEFE;line-height:1.2;}
+  #spinBadge .sp-bt small{display:block;font-family:'Nunito';font-weight:700;font-size:.74rem;color:#FDE28C;margin-top:2px;}
+  #spinBadge.kosong{background:rgba(97,57,37,.12);}
+  #spinBadge.kosong .sp-bn{background:#FEFEFE;color:#613925;}
+  #spinBadge.kosong .sp-bt{color:#613925;}
+  #spinBadge.kosong .sp-bt small{color:#7A5640;}
+  /* popup voucher dari blast */
+  #vchPop{position:fixed;inset:0;z-index:9050;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(74,42,25,.55);}
+  #vchPop.show{display:flex;}
+  #vchPop .vp-box{width:100%;max-width:360px;max-height:86vh;overflow-y:auto;background:#FFFBEE;border-radius:24px;padding:22px 18px 18px;text-align:center;box-shadow:0 14px 44px rgba(0,0,0,.32);}
+  #vchPop .vp-emo{font-size:2.4rem;line-height:1;}
+  #vchPop h3{font-family:'Fredoka';font-weight:600;font-size:1.35rem;color:#613925;margin:8px 0 2px;}
+  #vchPop .vp-sub{font-size:.86rem;color:#7A5640;font-weight:600;margin:0 0 12px;}
+  #vchPop .vp-item{background:#fff;border:2px solid #FACC1A;border-radius:16px;padding:12px 12px 11px;margin-top:10px;text-align:left;}
+  #vchPop .vp-t{font-family:'Fredoka';font-weight:600;font-size:1.05rem;color:#613925;}
+  #vchPop .vp-d{display:inline-block;margin-top:6px;background:#FEF4CC;border-radius:10px;padding:4px 10px;font-weight:800;font-size:.84rem;color:#613925;}
+  #vchPop .vp-n{font-size:.8rem;color:#7A5640;font-weight:600;margin-top:6px;}
+  #vchPop .vp-k{font-family:'Fredoka';font-size:.9rem;color:#613925;margin-top:6px;letter-spacing:1px;}
+  #vchPop .vp-go{display:block;width:100%;border:0;cursor:pointer;font-family:'Fredoka';font-weight:600;font-size:1rem;padding:11px;border-radius:13px;background:#613925;color:#FACC1A;margin-top:9px;}
+  #vchPop .vp-ok{display:block;width:100%;border:0;cursor:pointer;font-family:'Fredoka';font-weight:600;font-size:1.05rem;padding:13px;border-radius:15px;background:#FACC1A;color:#613925;margin-top:16px;}
+  #vchPop .vp-nanti{display:block;width:100%;border:0;background:none;cursor:pointer;font-weight:700;font-size:.85rem;color:#7A5640;margin-top:8px;padding:6px;}
   #spinHasil{display:none;background:#fff;border-radius:20px;padding:18px 16px;margin-top:20px;text-align:center;}
   #spinHasil .sp-ket{font-size:.78rem;letter-spacing:2px;text-transform:uppercase;color:#9a8b78;font-weight:800;}
   #spinHasil h3{font-family:'Fredoka';font-weight:600;font-size:1.3rem;color:#613925;margin:6px 0 2px;}
@@ -650,6 +674,7 @@
     </div>
     <h2>Putar rodanya!</h2>
     <p class="sp-sub">Satu tiket untuk satu putaran. Hadiahnya langsung jadi voucher di akunmu.</p>
+    <div id="spinBadge" class="kosong"><span class="sp-bn">0</span><span class="sp-bt">Tiket spin kamu</span></div>
 
     <div id="spinStage">
       <div id="spinWheel"><canvas id="spinCv" width="700" height="700"></canvas></div>
@@ -663,6 +688,7 @@
     <div id="spinHasil"></div>
   </div>
 </div>
+<div id="vchPop"><div class="vp-box" id="vchPopBox"></div></div>
 <canvas id="spinFx"></canvas>
 
 <script>
@@ -807,9 +833,31 @@
     if(!CFG||!CFG.active){ alert('Spin lagi tidak aktif.'); return; }
     var bk=el('spinBk'); if(!bk) return;
     bk.classList.add('show'); document.body.style.overflow='hidden';
-    el('spinHasil').style.display='none';
-    gambarRoda(hasilTerakhir!=null?hasilTerakhir:undefined);
-    perbaruiTombol();
+    if(!sedang) resetPutaran();
+    else perbaruiTombol();
+  }
+  function resetPutaran(){            // roda siap diputar lagi (kalau masih ada tiket)
+    hasilTerakhir=null;
+    var h=el('spinHasil'); if(h) h.style.display='none';
+    pesan('');
+    gambarRoda(); perbaruiTombol();
+  }
+  function pesan(t){ var p=el('spinPesan'); if(!p) return; p.textContent=t||''; p.classList.toggle('ada',!!t); }
+  function sisaTxt(ms){
+    if(!ms) return '';
+    var hari=Math.ceil((ms-Date.now())/86400000);
+    return hari<=1?'hangus hari ini':('hangus '+hari+' hari lagi');
+  }
+  function perbaruiBadge(){
+    var b=el('spinBadge'); if(!b) return;
+    var n=TIKET.length, kecil='';
+    if(n){
+      kecil=sisaTxt(TIKET[0].expiresMs);
+      if(n>1) kecil=(kecil?('Terdekat '+kecil):'')+' \u00b7 total '+n+' tiket';
+      kecil=kecil.replace(/^ \u00b7 /,'');
+    } else kecil='Belum ada tiket yang bisa dipakai';
+    b.className=n?'':'kosong';
+    b.innerHTML='<span class="sp-bn">'+n+'</span><span class="sp-bt">'+(n?'Tiket spin tersedia':'Tiket spin kamu')+(kecil?'<small>'+esc(kecil)+'</small>':'')+'</span>';
   }
   function tutup(){
     var bk=el('spinBk'); if(bk) bk.classList.remove('show');
@@ -819,30 +867,26 @@
     var b=el('spinGo'), info=el('spinInfo'), hub=el('spinHub');
     if(!b) return;
     var punya=TIKET.length>0;
+    perbaruiBadge();
     if(sedang){ b.disabled=true; b.textContent='Memutar…'; if(hub) hub.disabled=true; return; }
-    if(hasilTerakhir!=null){ b.style.display='none'; if(hub) hub.disabled=true; if(info) info.textContent=''; return; }
+    if(hasilTerakhir!=null){
+      if(info) info.textContent='';
+      if(punya){ b.style.display=''; b.disabled=false; b.textContent='Putar lagi ('+TIKET.length+' tiket)'; if(hub) hub.disabled=false; }
+      else { b.style.display='none'; if(hub) hub.disabled=true; }
+      return;
+    }
     b.style.display=''; b.disabled=!punya; if(hub) hub.disabled=!punya;
     b.textContent=punya?'Putar sekarang':'Belum punya tiket';
-    if(info){
-      if(punya){
-        var t=TIKET[0], sisa='';
-        if(t.expiresMs){
-          var hari=Math.ceil((t.expiresMs-Date.now())/86400000);
-          sisa=hari<=1?' · hangus hari ini':(' · hangus '+hari+' hari lagi');
-        }
-        info.textContent='Kamu punya '+TIKET.length+' tiket'+sisa;
-      } else {
-        info.textContent='Tiket spin dibagikan untuk member baru. Nantikan info berikutnya ya.';
-      }
-    }
+    if(info) info.textContent=punya?'':'Tiket spin dibagikan untuk member baru. Nantikan info berikutnya ya.';
   }
 
   /* ---- putar ---- */
   function putar(){
-    if(sedang||hasilTerakhir!=null) return;
+    if(sedang) return;
+    if(hasilTerakhir!=null){ resetPutaran(); if(TIKET.length) putar(); return; }   // tombol jadi "Putar lagi" setelah ada hasil
     if(!TIKET.length) return;
     sedang=true; perbaruiTombol();
-    el('spinPesan').textContent='';
+    pesan('');
     putarTerus();
     O().spinSekarang().then(function(h){
       cancelAnimationFrame(animId);
@@ -854,7 +898,7 @@
       });
     }).catch(function(e){
       cancelAnimationFrame(animId); sedang=false;
-      el('spinPesan').textContent=(e&&e.message)||'Gagal memutar. Coba lagi.';
+      pesan((e&&e.message)||'Gagal memutar. Coba lagi.');
       perbaruiTombol(); segarkan();
     });
   }
@@ -932,6 +976,93 @@
   setTimeout(mulai, 1800);
 })();
 
+</script>
+
+<script>
+/* ====== POPUP VOUCHER BARU (hasil blast admin) — muncul sekali per voucher ====== */
+(function(){
+  function O(){ return window.OmaOpa; }
+  function el(id){ return document.getElementById(id); }
+  function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function rp(n){ return 'Rp'+(Number(n)||0).toLocaleString('id-ID'); }
+  function ms(t){ if(!t) return null; var x=(t.seconds!=null)?t.seconds*1000:new Date(t).getTime(); return isNaN(x)?null:x; }
+  var MAKS_UMUR=7*86400000, sudahCek=false;
+
+  function detail(v){
+    if((v.jenis||'')==='spin') return '🎡 Tiket buat muter roda hadiah';
+    if(v.discType==='percent') return 'Diskon '+(Number(v.discValue)||0)+'%'+(Number(v.discMax)>0?(' (maks '+rp(v.discMax)+')'):'');
+    if(v.discType==='fixed') return 'Potongan '+rp(v.discValue);
+    if(v.discType==='freeitem') return 'Gratis: '+(v.freeItemName||v.title||'item');
+    return '';
+  }
+  function kunci(uid){ return 'omaopa_vch_seen_'+uid; }
+  function baca(uid){ try{ return JSON.parse(localStorage.getItem(kunci(uid))||'[]')||[]; }catch(e){ return []; } }
+  function simpan(uid,arr){ try{ localStorage.setItem(kunci(uid), JSON.stringify(arr.slice(-200))); }catch(e){} }
+
+  function tutup(){ var p=el('vchPop'); if(p) p.classList.remove('show'); document.body.style.overflow=''; }
+  function tampil(list){
+    var box=el('vchPopBox'), pop=el('vchPop'); if(!box||!pop) return;
+    var adaTiket=list.some(function(v){ return (v.jenis||'')==='spin'; });
+    var semuaTiket=list.every(function(v){ return (v.jenis||'')==='spin'; });
+    var h='<div class="vp-emo">🎁</div><h3>'+(semuaTiket?'Kamu dapat tiket spin!':(list.length>1?'Kamu dapat '+list.length+' hadiah!':'Kamu dapat hadiah!'))+'</h3>'
+      +'<p class="vp-sub">Dikirim khusus buat kamu dari Oma Opa Cakery.</p>';
+    list.slice(0,3).forEach(function(v){
+      var e=ms(v.expiresAt), tgl=e?new Date(e).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'';
+      var d=detail(v);
+      h+='<div class="vp-item"><div class="vp-t">'+esc(v.title||'Voucher')+'</div>'
+        +(d?'<div class="vp-d">'+esc(d)+'</div>':'')
+        +(v.note?'<div class="vp-n">'+esc(v.note)+'</div>':'')
+        +(tgl?'<div class="vp-n">Berlaku sampai '+tgl+'</div>':'')
+        +(((v.jenis||'')==='spin')?'<button class="vp-go" data-vp="spin">Putar sekarang</button>':'<div class="vp-k">'+esc(v.code||'')+'</div>')
+        +'</div>';
+    });
+    if(list.length>3) h+='<p class="vp-sub" style="margin-top:12px">+ '+(list.length-3)+' hadiah lainnya di Voucher Saya</p>';
+    h+=(semuaTiket?'':'<button class="vp-ok" data-vp="lihat">Lihat voucher saya</button>')+'<button class="vp-nanti" data-vp="tutup">'+(semuaTiket?'Nanti aja':'Tutup')+'</button>';
+    box.innerHTML=h; pop.classList.add('show'); document.body.style.overflow='hidden';
+  }
+
+  function cek(tries){
+    tries=tries||0;
+    var o=O(); if(!(o&&o.getUser&&o.listVouchers)) return;
+    var u=o.getUser(); if(!u) return;
+    var bukaSpin=el('spinBk');
+    // tunggu popup lain (spin otomatis, profil, dsb) selesai dulu
+    if((bukaSpin&&bukaSpin.classList.contains('show')||el('ooOutletAsk')||el('ooDobAsk')||el('ooBonusPop')) && tries<20){
+      setTimeout(function(){ cek(tries+1); },1500); return;
+    }
+    o.listVouchers().then(function(all){
+      var seen=baca(u.uid), now=Date.now(), baru=[];
+      (all||[]).forEach(function(v){
+        if(!v||!v.code) return;
+        if(v.status&&v.status!=='aktif') return;
+        if(v.fromSpin||v.autoGrant) return;                         // hadiah/tiket spin otomatis sudah punya popup sendiri
+        if(!(v.fromBroadcast||(Number(v.cost)||0)===0&&!v.rewardId)) return;
+        var e=ms(v.expiresAt); if(e&&e<now) return;                 // sudah hangus
+        var c=ms(v.createdAt); if(c&&now-c>MAKS_UMUR) return;       // voucher lama, jangan dimunculkan lagi
+        if(seen.indexOf(v.code)>=0) return;
+        baru.push(v);
+      });
+      if(!baru.length) return;
+      simpan(u.uid, seen.concat(baru.map(function(v){ return v.code; })));
+      tampil(baru);
+    }).catch(function(){});
+  }
+
+  document.addEventListener('click', function(e){
+    var t=e.target.closest&&e.target.closest('[data-vp]');
+    if(t){
+      var a=t.getAttribute('data-vp'); tutup();
+      if(a==='lihat'&&O()&&O().openVouchers) O().openVouchers();
+      if(a==='spin'&&typeof window.__bukaSpin==='function') window.__bukaSpin();
+      return;
+    }
+    if(e.target&&e.target.id==='vchPop') tutup();
+  });
+  function mulai(){ if(sudahCek) return; if(!(O()&&O().getUser&&O().getUser())) return; sudahCek=true; setTimeout(function(){ cek(0); },2600); }
+  window.addEventListener('omaopa:ready', mulai);
+  window.addEventListener('omaopa:change', mulai);
+  setTimeout(mulai, 2200);
+})();
 </script>
 </body>
 </html>
