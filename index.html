@@ -173,7 +173,14 @@
       <div class="gbtn play">Main</div>
     </a>
 
-    <div class="gcard soon">
+    <a class="gcard" href="#" id="spinCard" style="display:none">
+      <div class="gicon" style="background:#FFF1C9"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="19" r="12.5" fill="#FACC1A" stroke="#613925" stroke-width="1.6"/><path d="M18 6.5v25M5.5 19h25M9.2 10.2l17.6 17.6M26.8 10.2 9.2 27.8" stroke="#FEFEFE" stroke-width="1.5"/><circle cx="18" cy="19" r="4.2" fill="#FEFEFE" stroke="#613925" stroke-width="1.5"/><path d="M18 2.6 21 7.4h-6Z" fill="#613925"/></svg></div>
+      <div class="gname">Spin Hadiah</div>
+      <div class="gdesc" id="spinCardDesc">Putar roda, langsung dapat voucher.</div>
+      <div class="gbtn play" id="spinCardBtn">Putar</div>
+    </a>
+
+    <div class="gcard soon" id="spinSoon">
       <div class="blurwrap">
         <div class="gicon"><svg viewBox="0 0 36 36" aria-hidden="true"><path d="M7 26 25.5 9.5c1-.9 2.5-.2 2.5 1.1V25a2 2 0 0 1-2 2H8.4c-1.4 0-2.1-1.6-1.4-1Z" fill="#D9D4C7" stroke="#B7B2A4" stroke-width="1.5" stroke-linejoin="round"/><path d="M10.5 20.5 25 13.5" stroke="#B7B2A4" stroke-width="1.4"/><circle cx="24" cy="11.5" r="1.7" fill="#C9C3B4"/></svg></div>
       </div>
@@ -332,7 +339,7 @@
 
 <script src="menu-data.js?v=69"></script>
 <script src="outlets-data.js?v=69"></script>
-<script type="module" src="core-omaopa.js?v=177"></script>
+<script type="module" src="core-omaopa.js?v=178"></script>
 <script>
   try{ var _ci=document.getElementById('coin'); if(_ci) _ci.textContent = parseInt(localStorage.getItem('omaopa_points')||'0',10)||0; }catch(e){}
   function soon(){ alert('Fitur ini hadir sebentar lagi. Sekarang kumpulkan poin dulu lewat game ya!'); }
@@ -600,6 +607,331 @@
   function load(){ try{ if(window.OmaOpa&&window.OmaOpa.listBannersPublic){ window.OmaOpa.listBannersPublic().then(render).catch(function(){}); } }catch(e){} }
   window.addEventListener('omaopa:ready', load); setTimeout(load, 1000);
 })();
+</script>
+
+<style>
+  /* ====== Spin Wheel (member) ====== */
+  #spinBk{position:fixed;inset:0;z-index:9000;display:none;align-items:flex-start;justify-content:center;
+    background:#FFFBEE;overflow-y:auto;padding:0 0 40px;}
+  #spinBk.show{display:flex;}
+  #spinBk .sp-wrap{width:100%;max-width:460px;padding:14px 20px 0;text-align:center;}
+  #spinBk .sp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  #spinBk .sp-ttl{font-family:'Fredoka';font-weight:600;font-size:1.15rem;color:#613925;}
+  #spinBk .sp-x{border:0;background:#fff;width:34px;height:34px;border-radius:50%;font-size:1.1rem;color:#613925;cursor:pointer;line-height:1;}
+  #spinBk h2{font-family:'Fredoka';font-weight:600;font-size:1.5rem;color:#613925;margin:6px 0 4px;}
+  #spinBk .sp-sub{font-size:.88rem;line-height:1.5;color:#7A5640;font-weight:600;margin:0 auto;max-width:300px;}
+  #spinStage{position:relative;width:min(100%,310px);aspect-ratio:1;margin:22px auto 0;}
+  #spinWheel{position:absolute;inset:0;border-radius:50%;will-change:transform;}
+  #spinWheel canvas{width:100%;height:100%;display:block;border-radius:50%;}
+  #spinStage .sp-ptr{position:absolute;top:-9px;left:50%;width:26px;height:30px;margin-left:-13px;z-index:4;}
+  #spinHub{position:absolute;left:50%;top:50%;width:21%;aspect-ratio:1;margin:-10.5% 0 0 -10.5%;z-index:3;
+    border:0;border-radius:50%;background:#FEFEFE;color:#613925;font-family:'Fredoka';font-weight:600;
+    font-size:.9rem;cursor:pointer;box-shadow:0 2px 10px rgba(74,42,25,.18);padding:0;}
+  #spinHub:disabled{color:#B9A596;cursor:default;}
+  #spinBk .sp-btn{display:block;width:100%;border:0;cursor:pointer;font-family:'Fredoka';font-weight:600;
+    font-size:1.1rem;padding:14px;border-radius:16px;background:#613925;color:#FACC1A;margin-top:22px;}
+  #spinBk .sp-btn:disabled{background:rgba(97,57,37,.25);color:#FEFEFE;cursor:not-allowed;}
+  #spinInfo{font-size:.82rem;color:#7A5640;font-weight:600;margin-top:12px;opacity:.85;}
+  #spinPesan{font-size:.84rem;color:#C0392B;font-weight:700;margin-top:10px;}
+  #spinHasil{display:none;background:#fff;border-radius:20px;padding:18px 16px;margin-top:20px;text-align:center;}
+  #spinHasil .sp-ket{font-size:.78rem;letter-spacing:2px;text-transform:uppercase;color:#9a8b78;font-weight:800;}
+  #spinHasil h3{font-family:'Fredoka';font-weight:600;font-size:1.3rem;color:#613925;margin:6px 0 2px;}
+  #spinHasil .sp-vch{background:#FEF4CC;border-radius:14px;padding:12px;margin:12px 0 10px;text-align:left;}
+  #spinHasil .sp-vch b{font-family:'Fredoka';font-weight:600;color:#613925;}
+  #spinHasil .sp-vch small{display:block;color:#7A5640;font-weight:600;margin-top:3px;}
+  #spinFx{position:fixed;left:0;top:0;pointer-events:none;z-index:9100;}
+</style>
+
+<div id="spinBk">
+  <div class="sp-wrap">
+    <div class="sp-top">
+      <div class="sp-ttl">Spin Hadiah</div>
+      <button class="sp-x" id="spinTutup" aria-label="Tutup">&times;</button>
+    </div>
+    <h2>Putar rodanya!</h2>
+    <p class="sp-sub">Satu tiket untuk satu putaran. Hadiahnya langsung jadi voucher di akunmu.</p>
+
+    <div id="spinStage">
+      <div id="spinWheel"><canvas id="spinCv" width="700" height="700"></canvas></div>
+      <div class="sp-ptr"><svg viewBox="0 0 26 30"><path d="M13 29 3 10a11 11 0 1 1 20 0Z" fill="#613925"/></svg></div>
+      <button id="spinHub">PUTAR</button>
+    </div>
+
+    <button class="sp-btn" id="spinGo">Putar sekarang</button>
+    <div id="spinInfo"></div>
+    <div id="spinPesan"></div>
+    <div id="spinHasil"></div>
+  </div>
+</div>
+<canvas id="spinFx"></canvas>
+
+<script>
+/* ====== SPIN WHEEL (member) — roda hadiah khusus pemegang tiket spin ====== */
+(function(){
+  var CFG=null, TIKET=[], sedang=false, sudahAutoBuka=false, rot=0, animId=0, hasilTerakhir=null;
+  var KUNING='#FACC1A', KUNING_M='#FDE28C', PUTIH='#FEFEFE', COKLAT='#613925', MERAH='#E51A14';
+  var KURANG = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function O(){ return window.OmaOpa; }
+  function el(id){ return document.getElementById(id); }
+  function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function rp(n){ return 'Rp'+(Number(n)||0).toLocaleString('id-ID'); }
+
+  /* ---- ubah 1 hadiah jadi baris-baris yang digambar di roda ---- */
+  function barisHadiah(p){
+    if(p.discType==='freeitem'){
+      var nm=String(p.freeItemName||p.title||'Gratis').replace(/^Gratis\s*/i,'').replace(/^.*—\s*/,'');
+      var kata=nm.split(/\s+/), baris=[], cur='';
+      for(var i=0;i<kata.length;i++){
+        if((cur+' '+kata[i]).trim().length<=11){ cur=(cur+' '+kata[i]).trim(); }
+        else { if(cur) baris.push(cur); cur=kata[i]; }
+      }
+      if(cur) baris.push(cur);
+      baris=baris.slice(0,2);
+      return [{chip:'GRATIS',merah:1}].concat(baris.map(function(t){ return {t:t}; }));
+    }
+    if(p.discType==='percent') return [{t:'Diskon'},{chip:(Number(p.discValue)||0)+'%'}];
+    return [{t:'Diskon'},{chip:rp(p.discValue)}];
+  }
+
+  /* ---- gambar roda ---- */
+  function kotakBulat(c,x,y,w,h,r){
+    c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+    c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+  }
+  function gambarRoda(menang){
+    var cv=el('spinCv'); if(!cv||!CFG) return;
+    var c=cv.getContext('2d'), S=cv.width, R=S/2, RS=R-10, N=CFG.prizes.length;
+    if(!N) return;
+    var SUDUT=360/N;
+    c.clearRect(0,0,S,S);
+    for(var i=0;i<N;i++){
+      var p=CFG.prizes[i];
+      var a0=(-90+i*SUDUT)*Math.PI/180, a1=(-90+(i+1)*SUDUT)*Math.PI/180, am=(a0+a1)/2;
+      c.beginPath(); c.moveTo(R,R); c.arc(R,R,RS,a0,a1); c.closePath();
+      c.fillStyle=(i%2)?KUNING_M:KUNING; c.fill();
+      c.save(); c.translate(R,R); c.rotate(am); c.textBaseline='middle';
+      var bar=barisHadiah(p), LH=(bar.length>2?40:46), X=RS-30;
+      for(var k=0;k<bar.length;k++){
+        var b=bar[k], y=(k-(bar.length-1)/2)*LH;
+        if(b.chip){
+          c.font='500 32px Fredoka, sans-serif';
+          var w=c.measureText(b.chip).width+24, h=42;
+          kotakBulat(c,X-w,y-h/2,w,h,12);
+          c.fillStyle=b.merah?MERAH:COKLAT; c.fill();
+          c.fillStyle=PUTIH; c.textAlign='center'; c.fillText(b.chip,X-w/2,y+1);
+        } else {
+          c.font='500 34px Fredoka, sans-serif';
+          c.fillStyle=COKLAT; c.textAlign='right'; c.fillText(b.t,X,y);
+        }
+      }
+      c.restore();
+    }
+    for(var j=0;j<N;j++){
+      var a=(-90+j*SUDUT)*Math.PI/180;
+      c.beginPath(); c.moveTo(R,R); c.lineTo(R+Math.cos(a)*RS,R+Math.sin(a)*RS);
+      c.lineWidth=3; c.strokeStyle=PUTIH; c.stroke();
+    }
+    c.beginPath(); c.arc(R,R,RS+5,0,Math.PI*2); c.lineWidth=10; c.strokeStyle=PUTIH; c.stroke();
+    if(typeof menang==='number'&&menang>=0){
+      for(var m=0;m<N;m++){
+        if(m===menang) continue;
+        var b0=(-90+m*SUDUT)*Math.PI/180, b1=(-90+(m+1)*SUDUT)*Math.PI/180;
+        c.beginPath(); c.moveTo(R,R); c.arc(R,R,RS,b0,b1); c.closePath();
+        c.fillStyle='rgba(254,254,254,.62)'; c.fill();
+      }
+    }
+  }
+
+  /* ---- animasi ---- */
+  function setRot(v){ rot=v; var w=el('spinWheel'); if(w) w.style.transform='rotate('+v+'deg)'; }
+  function anim(dari,ke,dur,ease,selesai){
+    var t0=performance.now();
+    function f(now){
+      var p=dur<=0?1:Math.min(1,(now-t0)/dur);
+      setRot(dari+(ke-dari)*ease(p));
+      if(p<1) animId=requestAnimationFrame(f); else selesai&&selesai();
+    }
+    animId=requestAnimationFrame(f);
+  }
+  function putarTerus(){           // muter konstan selama nunggu jawaban server
+    var t0=performance.now(), awal=rot;
+    function f(now){
+      if(!sedang) return;
+      setRot(awal+(now-t0)*0.5);   // ~180 derajat per detik
+      animId=requestAnimationFrame(f);
+    }
+    animId=requestAnimationFrame(f);
+  }
+  function berhentiDi(idx, selesai){
+    var N=CFG.prizes.length, SUDUT=360/N;
+    var pusat=idx*SUDUT+SUDUT/2;
+    var jitter=(Math.random()-.5)*(SUDUT*.5);
+    var mulai=rot;
+    var ke=Math.ceil(mulai/360)*360+360*3+(360-pusat)+jitter;
+    anim(mulai,ke,3200,function(p){ return 1-Math.pow(1-p,4); }, selesai);
+  }
+
+  /* ---- konfeti kecil ---- */
+  function konfeti(){
+    if(KURANG) return;
+    var cv=el('spinFx'); if(!cv) return;
+    var c=cv.getContext('2d'), W=cv.width=window.innerWidth, H=cv.height=window.innerHeight;
+    var warna=['#FACC1A','#613925','#FEFEFE','#FDE28C'], P=[];
+    var st=el('spinStage').getBoundingClientRect(), cx=st.left+st.width/2, cy=st.top+st.height/2;
+    for(var i=0;i<34;i++){
+      var a=(-90+(Math.random()-.5)*130)*Math.PI/180, v=320+Math.random()*320;
+      P.push({x:cx,y:cy,vx:Math.cos(a)*v,vy:Math.sin(a)*v,w:6+Math.random()*5,h:4+Math.random()*4,
+              r:0,vr:(Math.random()-.5)*20,hidup:0,umur:1.8+Math.random()*.7,
+              warna:warna[Math.floor(Math.random()*warna.length)]});
+    }
+    var last=performance.now();
+    function f(now){
+      var dt=Math.min(.05,(now-last)/1000); last=now;
+      c.clearRect(0,0,W,H); var hidup=false;
+      for(var i=0;i<P.length;i++){
+        var p=P[i]; p.hidup+=dt; if(p.hidup>p.umur) continue; hidup=true;
+        p.vy+=1000*dt; p.vx*=(1-1.6*dt); p.x+=p.vx*dt; p.y+=p.vy*dt; p.r+=p.vr*dt;
+        var sisa=p.umur-p.hidup;
+        c.globalAlpha=sisa<.5?Math.max(0,sisa/.5):1;
+        c.save(); c.translate(p.x,p.y); c.rotate(p.r); c.fillStyle=p.warna;
+        c.fillRect(-p.w/2,-p.h/2,p.w,p.h); c.restore();
+      }
+      c.globalAlpha=1;
+      if(hidup) requestAnimationFrame(f); else c.clearRect(0,0,W,H);
+    }
+    requestAnimationFrame(f);
+  }
+
+  /* ---- buka / tutup ---- */
+  function buka(){
+    if(!CFG||!CFG.active){ alert('Spin lagi tidak aktif.'); return; }
+    var bk=el('spinBk'); if(!bk) return;
+    bk.classList.add('show'); document.body.style.overflow='hidden';
+    el('spinHasil').style.display='none';
+    gambarRoda(hasilTerakhir!=null?hasilTerakhir:undefined);
+    perbaruiTombol();
+  }
+  function tutup(){
+    var bk=el('spinBk'); if(bk) bk.classList.remove('show');
+    document.body.style.overflow='';
+  }
+  function perbaruiTombol(){
+    var b=el('spinGo'), info=el('spinInfo'), hub=el('spinHub');
+    if(!b) return;
+    var punya=TIKET.length>0;
+    if(sedang){ b.disabled=true; b.textContent='Memutar…'; if(hub) hub.disabled=true; return; }
+    if(hasilTerakhir!=null){ b.style.display='none'; if(hub) hub.disabled=true; if(info) info.textContent=''; return; }
+    b.style.display=''; b.disabled=!punya; if(hub) hub.disabled=!punya;
+    b.textContent=punya?'Putar sekarang':'Belum punya tiket';
+    if(info){
+      if(punya){
+        var t=TIKET[0], sisa='';
+        if(t.expiresMs){
+          var hari=Math.ceil((t.expiresMs-Date.now())/86400000);
+          sisa=hari<=1?' · hangus hari ini':(' · hangus '+hari+' hari lagi');
+        }
+        info.textContent='Kamu punya '+TIKET.length+' tiket'+sisa;
+      } else {
+        info.textContent='Tiket spin dibagikan untuk member baru. Nantikan info berikutnya ya.';
+      }
+    }
+  }
+
+  /* ---- putar ---- */
+  function putar(){
+    if(sedang||hasilTerakhir!=null) return;
+    if(!TIKET.length) return;
+    sedang=true; perbaruiTombol();
+    el('spinPesan').textContent='';
+    putarTerus();
+    O().spinSekarang().then(function(h){
+      cancelAnimationFrame(animId);
+      var idx=(typeof h.idx==='number' && h.idx>=0 && h.idx<CFG.prizes.length) ? h.idx : 0;
+      berhentiDi(idx, function(){
+        sedang=false; hasilTerakhir=idx;
+        gambarRoda(idx); konfeti(); tampilHasil(h);
+        perbaruiTombol(); segarkan();
+      });
+    }).catch(function(e){
+      cancelAnimationFrame(animId); sedang=false;
+      el('spinPesan').textContent=(e&&e.message)||'Gagal memutar. Coba lagi.';
+      perbaruiTombol(); segarkan();
+    });
+  }
+  function tampilHasil(h){
+    var box=el('spinHasil'); if(!box) return;
+    var isi='<div class="sp-ket">Selamat</div><h3>'+esc(h.title||'Hadiah')+'</h3>';
+    var det = (h.discType==='freeitem')
+      ? ('Item gratis: '+esc(h.freeItemName||h.title||''))
+      : (h.discType==='percent' ? ('Diskon '+(Number(h.discValue)||0)+'%') : ('Potongan harga '+rp(h.discValue)));
+    isi+='<div class="sp-vch"><b>'+det+'</b>'
+      +'<small>Kode: '+esc(h.kode||'')+'</small>'
+      +(h.expiresAt?('<small>Berlaku sampai '+new Date(h.expiresAt).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})+'</small>'):'')
+      +'</div>'
+      +'<p class="sp-sub">Vouchernya sudah masuk ke Voucher Saya. Tunjukkan ke kasir saat bayar.</p>'
+      +'<button class="sp-btn" id="spinLihat">Lihat voucher saya</button>';
+    box.innerHTML=isi; box.style.display='block';
+    var lv=el('spinLihat');
+    if(lv) lv.onclick=function(){ tutup(); if(O()&&O().openVouchers) O().openVouchers(); };
+  }
+
+  /* ---- data ---- */
+  function segarkan(){
+    if(!(O()&&O().listSpinTickets)) return Promise.resolve();
+    return O().listSpinTickets().then(function(l){ TIKET=l||[]; perbaruiKartu(); perbaruiTombol(); }).catch(function(){});
+  }
+  function perbaruiKartu(){
+    var kartu=el('spinCard'), soon=el('spinSoon');
+    if(!kartu) return;
+    var aktif=!!(CFG&&CFG.active);
+    kartu.style.display=aktif?'':'none';
+    if(soon) soon.style.display=aktif?'none':'';
+    var d=el('spinCardDesc'), b=el('spinCardBtn');
+    if(!aktif) return;
+    if(TIKET.length){ if(d) d.textContent='Kamu punya '+TIKET.length+' tiket. Putar sekarang!'; if(b) b.textContent='Putar'; }
+    else { if(d) d.textContent='Butuh tiket spin buat ikut muter rodanya.'; if(b) b.textContent='Lihat'; }
+  }
+
+  function mulai(){
+    if(!(O()&&O().getSpinConfig)) return;
+    O().getSpinConfig(true).then(function(c){
+      CFG=c; perbaruiKartu();
+      if(!c||!c.active) return;
+      var u=O().getUser&&O().getUser();
+      if(!u) return;
+      return segarkan().then(function(){
+        var kunci='omaopa_spin_minta_'+(u.uid||'x');
+        var sudahMinta=false;
+        try{ sudahMinta=localStorage.getItem(kunci)==='1'; }catch(e){}
+        if(sudahMinta){ autoBuka(); return; }
+        try{ localStorage.setItem(kunci,'1'); }catch(e){}
+        return O().pastikanTiketSpin().then(function(t){
+          return segarkan().then(function(){ if(t&&t.ok){ buka(); sudahAutoBuka=true; } else autoBuka(); });
+        }).catch(function(){ autoBuka(); });
+      });
+    }).catch(function(){});
+  }
+  function autoBuka(){
+    if(sudahAutoBuka||!TIKET.length) return;
+    var u=O().getUser&&O().getUser(); if(!u) return;
+    var k='omaopa_spin_buka_'+(u.uid||'x');
+    try{ if(localStorage.getItem(k)==='1') return; localStorage.setItem(k,'1'); }catch(e){}
+    sudahAutoBuka=true; buka();
+  }
+
+  window.__bukaSpin=function(){ segarkan(); buka(); };
+  document.addEventListener('click', function(e){
+    if(e.target.closest&&e.target.closest('#spinCard')){ e.preventDefault(); window.__bukaSpin(); }
+    if(e.target.closest&&e.target.closest('#spinTutup')){ tutup(); }
+  });
+  var go=el('spinGo'); if(go) go.onclick=putar;
+  var hub=el('spinHub'); if(hub) hub.onclick=putar;
+  window.addEventListener('omaopa:ready', mulai);
+  window.addEventListener('omaopa:change', function(){ if(CFG&&CFG.active) segarkan(); });
+  if(document.fonts&&document.fonts.load){ document.fonts.load('500 32px Fredoka').then(function(){ if(!sedang) gambarRoda(hasilTerakhir!=null?hasilTerakhir:undefined); },function(){}); }
+  setTimeout(mulai, 1800);
+})();
+
 </script>
 </body>
 </html>

@@ -1125,12 +1125,31 @@ function renderRewards(){
       if(!user){ body.innerHTML = `<div class="rw-empty">Masuk dulu untuk melihat voucher kamu.</div>`; return; }
       if(!list.length){ body.innerHTML = `<div class="rw-empty">Belum ada voucher.<br>Tukarkan poin di tab Katalog ya!</div>`; return; }
       body.innerHTML = list.map(v=>{
-        const st = (v.status==='terpakai')?'terpakai':'aktif';
+        let st = (v.status==='terpakai')?'terpakai':'aktif';
+        let expMs=null, expTxt='';
+        if(v.expiresAt){
+          expMs=(v.expiresAt.seconds)? v.expiresAt.seconds*1000 : new Date(v.expiresAt).getTime();
+          if(isNaN(expMs)) expMs=null;
+        }
+        const hangus = !!(expMs && Date.now()>expMs);
+        if(expMs) expTxt=(hangus?'Hangus ':'Berlaku sampai ')+new Date(expMs).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+        if((v.jenis||'')==='spin'){
+          const bisa = (st==='aktif' && !hangus);
+          return `<div class="rw-voucher" style="border-color:#FF6A3D">`
+            +`<div class="rw-vt">\u{1F3A1} ${v.title||'Tiket Spin'}</div>`
+            +`<div class="rw-n">Buat muter roda hadiah di beranda \u2014 bukan ditunjukkan ke kasir.</div>`
+            +(expTxt?`<div class="rw-n">${expTxt}</div>`:'')
+            +(bisa
+              ? `<button class="rw-btn" data-spin="1" style="margin-top:9px">Putar sekarang</button>`
+              : `<div style="margin-top:7px"><span class="rw-vs terpakai">${st==='terpakai'?'Sudah dipakai':'Hangus'}</span></div>`)
+            +`</div>`;
+        }
         return `<div class="rw-voucher"><div class="rw-vt">${v.title||'Voucher'}</div>`
           +`${v.note?`<div class="rw-n">${v.note}</div>`:''}`
           +`<div class="rw-vc">${v.code||'-'}</div>`
-          +`<span class="rw-vs ${st}">${st==='aktif'?'Aktif':'Sudah dipakai'}</span>`
-          +(st==='aktif'?`<div class="vqr" data-vq="${v.code}" style="width:122px;height:122px;margin:9px auto 0;background:#fff;border:1.5px solid #F1E4CC;border-radius:11px;display:flex;align-items:center;justify-content:center"></div>`:'')
+          +(expTxt?`<div class="rw-n">${expTxt}</div>`:'')
+          +`<span class="rw-vs ${hangus?'terpakai':st}">${hangus?'Hangus':(st==='aktif'?'Aktif':'Sudah dipakai')}</span>`
+          +((st==='aktif'&&!hangus)?`<div class="vqr" data-vq="${v.code}" style="width:122px;height:122px;margin:9px auto 0;background:#fff;border:1.5px solid #F1E4CC;border-radius:11px;display:flex;align-items:center;justify-content:center"></div>`:'')
           +`</div>`;
       }).join('');
       ensureQRLib().then(()=>{ body.querySelectorAll('.vqr').forEach(el=>{ if(el.dataset.done)return; el.dataset.done='1'; el.innerHTML=''; try{ new QRCode(el,{text:'OMAOPA:VOUCHER:'+el.dataset.vq, width:114, height:114, correctLevel:QRCode.CorrectLevel.H}); }catch(e){} }); }).catch(()=>{});
@@ -1138,6 +1157,8 @@ function renderRewards(){
   }
 }
 rwBk.querySelector('#rwBody').addEventListener('click', async (e)=>{
+  const sp=e.target.closest('[data-spin]');
+  if(sp){ closeRewards(); try{ if(typeof window.__bukaSpin==='function') window.__bukaSpin(); }catch(err){} return; }
   const b=e.target.closest('[data-rid]'); if(!b) return;
   if(!user){ closeRewards(); openLogin(); return; }
   const rid=b.dataset.rid; const rw=(rewardCatalog||defaultRewards()).find(x=>x.id===rid); if(!rw) return;
@@ -2012,6 +2033,19 @@ async function listSpinTickets(){
     return arr;
   }catch(e){ return []; }
 }
+// Minta tiket spin otomatis (buat member baru). Server yang memutuskan:
+// cuma dikasih kalau spin aktif, saklar "tiket otomatis" nyala, dan akun ini
+// belum pernah dapat tiket sama sekali. Aman dipanggil berkali-kali.
+async function pastikanTiketSpin(){
+  if(!user) return null;
+  let idToken='';
+  try{ idToken=await user.getIdToken(); }catch(e){ return null; }
+  try{
+    const res=await fetch(SHEET_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ type:'spinticket', idToken:idToken }) });
+    const j=await res.json();
+    return (j && j.ok) ? j : null;    // { kode, expiresAt } kalau dapat tiket baru
+  }catch(e){ return null; }
+}
 // Undiannya dijalankan DI SERVER (Apps Script). Hasil tidak bisa disetir dari HP member.
 // Server yang: cek tiket -> undi -> tandai tiket terpakai + bikin voucher hadiah (satu commit).
 async function spinSekarang(){
@@ -2180,7 +2214,7 @@ window.OmaOpa = {
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
-  getAnnouncement, setAnnouncement, getMessages, setMessages, getPromo, setPromo, getSpinConfig, setSpinConfig, spinOdds, listSpinTickets, spinSekarang, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
+  getAnnouncement, setAnnouncement, getMessages, setMessages, getPromo, setPromo, getSpinConfig, setSpinConfig, spinOdds, listSpinTickets, spinSekarang, pastikanTiketSpin, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel, adminResetPin, deleteMyAccount, adminDeleteMember,
   tierOf, TIERS, getMyTier,
   signOut: doSignOut,
