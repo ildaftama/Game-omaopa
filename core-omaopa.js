@@ -595,6 +595,7 @@ async function markVoucherUsed(code){
   const outlet=await getStaffOutlet();
   let data={};
   try{ const s=await getDoc(doc(db,'vouchers',code)); if(s.exists()) data=s.data(); }catch(e){}
+  if((data.jenis||'')==='spin') throw {message:'Ini TIKET SPIN, bukan voucher belanja. Tiket cuma dipakai member buat muter roda di aplikasi — jangan ditandai terpakai.'};
   if(data.expiresAt){ const expMs=(data.expiresAt.seconds)?data.expiresAt.seconds*1000:new Date(data.expiresAt).getTime(); if(!isNaN(expMs) && Date.now()>expMs) throw {message:'Voucher ini udah kadaluarsa, gak bisa dipakai lagi.'}; }
   await setDoc(doc(db,'vouchers',code), { status:'terpakai', usedAt: serverTimestamp(), usedOutlet:outlet, usedBy:(user?user.uid:'') }, {merge:true});
   pushToSheet({ type:'voucher', waktu:new Date().toISOString(), outlet:outlet, kode:code, title:data.title||'', nama:data.name||'', uid:data.uid||'' });
@@ -1734,6 +1735,7 @@ async function grantVouchersForBroadcast(targetType, targetParams, voucherConfig
         discType:voucherConfig.discType||'none', discValue:voucherConfig.discValue||0, discMax:voucherConfig.discMax||0,
         freeItemId:voucherConfig.freeItemId||'', freeItemName:voucherConfig.freeItemName||'', freeItemPrice:voucherConfig.freeItemPrice||0,
         expiresAt: voucherConfig.expiresAt || null,
+        jenis: voucherConfig.jenis || '',          // 'spin' = tiket muter roda, bukan voucher belanja
         fromBroadcast: broadcastId||'',
         createdAt: serverTimestamp()
       });
@@ -1911,6 +1913,88 @@ async function setMessages(m){ if(!(await isSuper())) throw {message:'Khusus adm
 async function getPromo(){ try{ const s=await getDoc(doc(db,'settings','promo')); const d=(s.exists()&&s.data())||{}; return { active:!!d.active, start:d.start||'', end:d.end||'', bonus:(typeof d.bonus==='number'?d.bonus:parseInt(d.bonus||0,10)||0) }; }catch(e){ return { active:false, start:'', end:'', bonus:0 }; } }
 async function setPromo(p){ if(!(await isSuper())) throw {message:'Khusus admin utama.'}; p=p||{}; await setDoc(doc(db,'settings','promo'), { active:!!p.active, start:String(p.start||''), end:String(p.end||''), bonus:Math.max(0,parseInt(p.bonus||0,10)||0), updatedAt:serverTimestamp() }, {merge:true});
   logAudit('pasang_promo', (p.active?('Aktifkan promo bonus pendaftaran: '+p.start+' s/d '+p.end+', +'+p.bonus+' poin.'):'Nonaktifkan promo bonus pendaftaran.')); }
+// ---- Spin Wheel (undian khusus member baru) ----
+// Tiket spin = dokumen di koleksi vouchers dengan jenis:'spin'. Hadiahnya voucher biasa.
+const SPIN_DEF = {
+  active:false,
+  autoGrant:true,                       // kasih tiket otomatis pas member daftar
+  ticketDays:3,                         // masa berlaku tiket spin (hari)
+  prizeDays:7,                          // masa berlaku voucher hadiah (hari; 0 = tanpa kadaluarsa)
+  ticketTitle:'Tiket Spin Member Baru',
+  prizes:[
+    { id:'d2000', title:'Diskon Rp2.000',           weight:41, discType:'fixed',    discValue:2000 },
+    { id:'d3000', title:'Diskon Rp3.000',           weight:30, discType:'fixed',    discValue:3000 },
+    { id:'d4000', title:'Diskon Rp4.000',           weight:15, discType:'fixed',    discValue:4000 },
+    { id:'d5000', title:'Diskon Rp5.000',           weight:3,  discType:'fixed',    discValue:5000 },
+    { id:'ogura', title:'Gratis Mini Ogura / Roti', weight:4,  discType:'freeitem' },
+    { id:'topmal',title:'Gratis Topping Malmil',    weight:4,  discType:'freeitem' },
+    { id:'malpol',title:'Gratis Malmil Polos',      weight:2,  discType:'freeitem' },
+    { id:'maltop',title:'Gratis Malmil + Topping',  weight:1,  discType:'freeitem' }
+  ]
+};
+function _spinNum(v, def){ const n=Number(v); return isFinite(n)?n:def; }
+function normSpinPrize(p, i){
+  p=p||{};
+  const t=String(p.discType||'fixed');
+  const out={
+    id:String(p.id||('h'+(i+1))).slice(0,24),
+    title:String(p.title||('Hadiah '+(i+1))).slice(0,60),
+    weight:Math.max(0, _spinNum(p.weight,0)),
+    discType:(t==='percent'||t==='freeitem')?t:'fixed',
+    discValue:Math.max(0, _spinNum(p.discValue,0)),
+    discMax:Math.max(0, _spinNum(p.discMax,0)),
+    freeItemId:String(p.freeItemId||''),
+    freeItemName:String(p.freeItemName||''),
+    freeItemPrice:Math.max(0, _spinNum(p.freeItemPrice,0))
+  };
+  if(out.discType==='freeitem'){ out.discValue=0; out.discMax=0; }
+  else { out.freeItemId=''; out.freeItemName=''; out.freeItemPrice=0; }
+  if(out.discType!=='percent') out.discMax=0;
+  return out;
+}
+function normSpinConfig(d){
+  d=d||{};
+  const src=(Array.isArray(d.prizes)&&d.prizes.length)? d.prizes.slice(0,12) : SPIN_DEF.prizes;
+  return {
+    active: d.active===true,
+    autoGrant: d.autoGrant!==false,
+    ticketDays: Math.min(90, Math.max(1, Math.round(_spinNum(d.ticketDays, SPIN_DEF.ticketDays)))),
+    prizeDays: Math.min(365, Math.max(0, Math.round(_spinNum(d.prizeDays, SPIN_DEF.prizeDays)))),
+    ticketTitle: String(d.ticketTitle||SPIN_DEF.ticketTitle).slice(0,60),
+    prizes: src.map(normSpinPrize)
+  };
+}
+// peluang jadi tiap hadiah dalam persen (bobot dinormalkan ke 100%)
+function spinOdds(prizes){
+  const arr=prizes||[]; const tot=arr.reduce((a,p)=>a+(Number(p.weight)||0),0);
+  return arr.map(p=> tot>0 ? (Number(p.weight)||0)/tot*100 : 0);
+}
+let _spinCache=null;
+async function getSpinConfig(force){
+  if(_spinCache && !force) return _spinCache;
+  try{ const s=await getDoc(doc(db,'settings','spin')); _spinCache=normSpinConfig(s.exists()?s.data():null); }
+  catch(e){ _spinCache=normSpinConfig(null); }
+  return _spinCache;
+}
+async function setSpinConfig(cfg){
+  const boleh = (await isSuper()) || (await isMaster());
+  if(!boleh) throw {message:'Khusus Admin Utama / Master.'};
+  const c=normSpinConfig(cfg);
+  if(c.prizes.length<2) throw {message:'Minimal 2 hadiah.'};
+  if(c.prizes.reduce((a,p)=>a+p.weight,0)<=0) throw {message:'Total bobot peluang masih 0 — isi minimal satu hadiah dengan bobot di atas 0.'};
+  if(c.active){
+    const kurangItem=c.prizes.filter(p=>p.discType==='freeitem' && !p.freeItemId);
+    if(kurangItem.length) throw {message:'Item gratisnya belum dipilih: '+kurangItem.map(p=>p.title).join(', ')};
+    const kurangNilai=c.prizes.filter(p=>p.discType!=='freeitem' && !(p.discValue>0));
+    if(kurangNilai.length) throw {message:'Nilai diskonnya belum diisi: '+kurangNilai.map(p=>p.title).join(', ')};
+  }
+  // merge:false biar hadiah yang dihapus beneran hilang, bukan nyangkut
+  await setDoc(doc(db,'settings','spin'), Object.assign({}, c, { updatedAt:serverTimestamp() }));
+  _spinCache=c;
+  logAudit('ubah_spin', 'Ubah pengaturan Spin Wheel: '+(c.active?'AKTIF':'nonaktif')+', '+c.prizes.length+' hadiah, tiket '+c.ticketDays+' hari, hadiah '+(c.prizeDays? c.prizeDays+' hari' : 'tanpa kadaluarsa')+'.');
+  return c;
+}
+
 let _regBonusChecked=false, _promoCache=null;
 async function maybeGrantRegBonus(){
   if(_regBonusChecked || !user || !profile) return;
@@ -2064,7 +2148,7 @@ window.OmaOpa = {
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
-  getAnnouncement, setAnnouncement, getMessages, setMessages, getPromo, setPromo, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
+  getAnnouncement, setAnnouncement, getMessages, setMessages, getPromo, setPromo, getSpinConfig, setSpinConfig, spinOdds, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel, adminResetPin, deleteMyAccount, adminDeleteMember,
   tierOf, TIERS, getMyTier,
   signOut: doSignOut,

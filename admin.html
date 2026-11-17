@@ -107,7 +107,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=175"></script>
+<script type="module" src="core-omaopa.js?v=176"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -291,7 +291,8 @@
         +'<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="bVoucherChk" style="width:auto"> 🎁 Sertakan Voucher Promo</label>'
         +'<div id="bVoucherBody" style="display:none;margin-top:8px">'
         +'<div class="muted" style="font-size:.74rem;margin-bottom:8px">Tiap member yang kena target blast ini bakal dapet 1 kode voucher masing-masing (kayak nuker poin, tapi gratis). Kalau target-nya "Semua member"/ribuan orang, proses ini bisa makan waktu beberapa menit — jangan tutup halaman pas lagi proses.</div>'
-        +'<label>Jenis Diskon</label><select id="bvType"><option value="percent">Persen (%)</option><option value="fixed">Potongan Rp</option><option value="freeitem">Gratis Item</option></select>'
+        +'<label>Jenis Voucher</label><select id="bvType"><option value="percent">Persen (%)</option><option value="fixed">Potongan Rp</option><option value="freeitem">Gratis Item</option><option value="spin">🎡 Tiket Spin (1x muter roda)</option></select>'
+        +'<div id="bvSpinNote" class="muted" style="display:none;font-size:.74rem;margin:6px 0 2px;background:#FFF6E6;border-radius:10px;padding:8px 10px">Tiket spin bukan voucher belanja: member pakai ini buat muter roda di aplikasi, hadiahnya nanti jadi voucher sendiri. Kasir tidak bisa menandai tiket ini terpakai. Atur hadiah &amp; peluangnya di tab <b>Pengaturan → Spin Wheel</b>.</div>'
         +'<div id="bvValueWrap"><label>Nilai Diskon</label><input type="number" id="bvValue" placeholder="misal 17"></div>'
         +'<div id="bvMaxWrap"><label>Maks Potongan (Rp, opsional)</label><input type="number" id="bvMax" placeholder="misal 20000"></div>'
         +'<div id="bvFreeItemWrap" style="display:none"><label>Pilih Item Gratis</label><select id="bvFreeItem"><option value="">— pilih item —</option></select></div>'
@@ -388,10 +389,19 @@
       var bvFI=document.getElementById('bvFreeItem');
       ensureMenuCache().then(function(mc){ bvFI.innerHTML='<option value="">— pilih item —</option>'+mc.map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>';}).join(''); });
       document.getElementById('bvType').onchange=function(){
-        var t=this.value;
-        document.getElementById('bvValueWrap').style.display = (t==='freeitem') ? 'none' : 'block';
+        var t=this.value, isSpin=(t==='spin');
+        document.getElementById('bvValueWrap').style.display = (t==='freeitem'||isSpin) ? 'none' : 'block';
         document.getElementById('bvMaxWrap').style.display = (t==='percent') ? 'block' : 'none';
         document.getElementById('bvFreeItemWrap').style.display = (t==='freeitem') ? 'block' : 'none';
+        var sn=document.getElementById('bvSpinNote'); if(sn) sn.style.display=isSpin?'block':'none';
+        if(isSpin){
+          var tiEl=document.getElementById('bvTitle'); if(tiEl && !tiEl.value.trim()) tiEl.value='Tiket Spin';
+          var toEl=document.getElementById('bvTo');
+          if(toEl && !toEl.value){ O.getSpinConfig().then(function(c){
+            if(toEl.value) return; var d=new Date(); d.setDate(d.getDate()+((c&&c.ticketDays)||3));
+            toEl.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+          }).catch(function(){}); }
+        }
       };
       document.getElementById('bvType').onchange();
 
@@ -443,7 +453,10 @@
           if(!vTitle){ msg.innerHTML='<div class="res bad">Isi judul voucher dulu.</div>'; return; }
           if(!vTo){ msg.innerHTML='<div class="res bad">Isi tanggal "Berlaku Sampai" buat voucher.</div>'; return; }
           voucherConfig={ title:vTitle, expiresAt:new Date(vTo+'T23:59:59') };
-          if(vType==='freeitem'){
+          if(vType==='spin'){
+            voucherConfig.jenis='spin'; voucherConfig.discType='none';
+            voucherDesc='🎡 Tiket Spin: '+vTitle+' (1x muter roda)';
+          } else if(vType==='freeitem'){
             var fid=document.getElementById('bvFreeItem').value;
             var mi=_menuCache.find(function(m){return m.id===fid;});
             if(!fid){ msg.innerHTML='<div class="res bad">Pilih item gratisnya dulu.</div>'; return; }
@@ -533,6 +546,117 @@
     }
   }
 
+  // ================= Spin Wheel (pengaturan) =================
+  var spinCfg=null;
+  async function mountSpin(){
+    var w=document.getElementById('spinWrap'); if(!w) return;
+    try{ spinCfg=await O.getSpinConfig(true); }
+    catch(e){ w.innerHTML='<div class="res bad">Gagal memuat pengaturan spin.</div>'; return; }
+    try{ await ensureMenuCache(); }catch(e){}
+    w.classList.remove('muted');
+    drawSpin();
+  }
+  function spinItemOpts(sel){
+    return '<option value="">— pilih item —</option>'+(_menuCache||[]).map(function(m){
+      return '<option value="'+esc(m.id)+'"'+(m.id===sel?' selected':'')+'>'+esc((m.cat?m.cat+' — ':'')+m.name)+'</option>'; }).join('');
+  }
+  function drawSpin(){
+    var w=document.getElementById('spinWrap'); if(!w||!spinCfg) return;
+    w.innerHTML='<div class="muted" style="font-size:.76rem;margin-bottom:10px">Roda hadiah buat member baru. Member perlu <b>tiket spin</b> buat muter: tiket dikasih otomatis pas daftar, atau dikirim manual lewat tab <b>Blast</b> (pilih jenis voucher “Tiket Spin”). Hadiahnya jadi voucher biasa yang ditunjukin ke kasir.</div>'
+      +'<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="spAktif" style="width:auto"'+(spinCfg.active?' checked':'')+'> <b>Aktifkan Spin Wheel</b></label>'
+      +'<label style="display:flex;align-items:center;gap:8px;margin-top:6px"><input type="checkbox" id="spAuto" style="width:auto"'+(spinCfg.autoGrant?' checked':'')+'> Member baru otomatis dapat 1 tiket pas daftar</label>'
+      +'<div style="display:flex;gap:8px;margin-top:10px">'
+      +'<div style="flex:1"><label>Tiket hangus (hari)</label><input type="number" min="1" max="90" id="spTday" value="'+spinCfg.ticketDays+'"></div>'
+      +'<div style="flex:1"><label>Hadiah hangus (hari)</label><input type="number" min="0" max="365" id="spPday" value="'+spinCfg.prizeDays+'"></div></div>'
+      +'<div class="muted" style="font-size:.72rem;margin-top:4px">Isi <b>0</b> di kolom hadiah kalau voucher hadiah mau tanpa kadaluarsa.</div>'
+      +'<label style="margin-top:10px">Judul tiket (tampil di member)</label><input id="spTitle" value="'+esc(spinCfg.ticketTitle)+'">'
+      +'<div style="border-top:1px dashed #E7D8BE;margin:14px 0 10px"></div>'
+      +'<div class="nm" style="font-size:.95rem">🎁 Daftar hadiah</div>'
+      +'<div class="muted" style="font-size:.72rem;margin:4px 0 10px">Bobot itu angka bebas, tidak harus jumlahnya 100. Peluangnya dihitung otomatis dari perbandingan antar hadiah.</div>'
+      +'<div id="spList"></div>'
+      +'<button class="btn sm sec" id="spAdd" style="width:auto;margin-top:6px">+ Tambah hadiah</button>'
+      +'<button class="btn" id="spSave" style="margin-top:12px">💾 Simpan pengaturan spin</button><div id="spMsg"></div>';
+    drawSpinList();
+    document.getElementById('spAdd').onclick=function(){
+      bacaSpin();
+      if(spinCfg.prizes.length>=12){ alert('Maksimal 12 hadiah.'); return; }
+      spinCfg.prizes.push({ id:'h'+Date.now().toString(36), title:'Hadiah baru', weight:1, discType:'fixed', discValue:0, discMax:0, freeItemId:'', freeItemName:'', freeItemPrice:0 });
+      drawSpinList();
+    };
+    document.getElementById('spSave').onclick=async function(){
+      if(busy) return; busy=true; var b=this; b.disabled=true;
+      var m=document.getElementById('spMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Menyimpan…</div>';
+      try{ bacaSpin(); spinCfg=await O.setSpinConfig(spinCfg); drawSpin();
+        document.getElementById('spMsg').innerHTML='<div class="res ok">✓ Pengaturan spin tersimpan.</div>'; }
+      catch(e){ m.innerHTML='<div class="res bad">Gagal: '+esc((e&&e.message)||'')+'</div>'; }
+      b.disabled=false; busy=false;
+    };
+  }
+  function drawSpinList(){
+    var box=document.getElementById('spList'); if(!box||!spinCfg) return;
+    var odds=O.spinOdds(spinCfg.prizes);
+    box.innerHTML=spinCfg.prizes.map(function(p,i){
+      var isFree=(p.discType==='freeitem'), isPct=(p.discType==='percent');
+      return '<div style="border:1px solid #F0E4CC;border-radius:12px;padding:10px;margin-bottom:8px">'
+        +'<div style="display:flex;gap:6px;align-items:center">'
+          +'<input id="spN'+i+'" value="'+esc(p.title)+'" placeholder="Nama hadiah" style="flex:1;margin:0">'
+          +'<button class="btn sm sec" data-sdel="'+i+'" style="width:auto;margin:0;padding:8px 10px">🗑</button></div>'
+        +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'
+          +'<select id="spT'+i+'" data-stype="'+i+'" style="flex:1;min-width:120px;margin:0">'
+            +'<option value="fixed"'+(p.discType==='fixed'?' selected':'')+'>Potongan Rp</option>'
+            +'<option value="percent"'+(isPct?' selected':'')+'>Persen (%)</option>'
+            +'<option value="freeitem"'+(isFree?' selected':'')+'>Gratis Item</option></select>'
+          +(isFree
+            ? '<select id="spF'+i+'" style="flex:2;min-width:150px;margin:0">'+spinItemOpts(p.freeItemId)+'</select>'
+            : '<input type="number" id="spV'+i+'" value="'+(p.discValue||'')+'" placeholder="'+(isPct?'nilai %':'potongan Rp')+'" style="flex:1;min-width:100px;margin:0">'
+              +(isPct?'<input type="number" id="spM'+i+'" value="'+(p.discMax||'')+'" placeholder="maks Rp" style="flex:1;min-width:100px;margin:0">':''))
+        +'</div>'
+        +'<div style="display:flex;gap:8px;align-items:center;margin-top:6px">'
+          +'<span class="muted" style="font-size:.76rem">Bobot</span>'
+          +'<input type="number" min="0" step="0.5" id="spW'+i+'" data-sw="'+i+'" value="'+p.weight+'" style="width:84px;margin:0">'
+          +'<span class="muted" style="font-size:.78rem">peluang jadi <b id="spO'+i+'">'+(Math.round(odds[i]*10)/10).toString().replace('.',',')+'%</b></span>'
+        +'</div></div>';
+    }).join('') || '<div class="muted">Belum ada hadiah.</div>';
+    box.querySelectorAll('[data-sdel]').forEach(function(b){ b.onclick=function(){
+      var i=parseInt(b.getAttribute('data-sdel'),10);
+      if(spinCfg.prizes.length<=2){ alert('Minimal 2 hadiah.'); return; }
+      if(!confirm('Hapus hadiah "'+(spinCfg.prizes[i].title||'')+'" dari roda?')) return;
+      bacaSpin(); spinCfg.prizes.splice(i,1); drawSpinList();
+    }; });
+    box.querySelectorAll('[data-stype]').forEach(function(sel){ sel.onchange=function(){ bacaSpin(); drawSpinList(); }; });
+    box.querySelectorAll('[data-sw]').forEach(function(inp){ inp.oninput=function(){ bacaSpin(); hitungOdds(); }; });
+  }
+  function hitungOdds(){
+    if(!spinCfg) return;
+    var odds=O.spinOdds(spinCfg.prizes);
+    spinCfg.prizes.forEach(function(p,i){ var el=document.getElementById('spO'+i); if(el) el.textContent=(Math.round(odds[i]*10)/10).toString().replace('.',',')+'%'; });
+  }
+  function bacaSpin(){
+    if(!spinCfg) return;
+    var g=function(id){ return document.getElementById(id); };
+    if(g('spAktif')) spinCfg.active=g('spAktif').checked;
+    if(g('spAuto')) spinCfg.autoGrant=g('spAuto').checked;
+    if(g('spTday')) spinCfg.ticketDays=Math.min(90,Math.max(1,parseInt(g('spTday').value,10)||3));
+    if(g('spPday')) spinCfg.prizeDays=Math.min(365,Math.max(0,parseInt(g('spPday').value,10)||0));
+    if(g('spTitle')) spinCfg.ticketTitle=(g('spTitle').value||'Tiket Spin Member Baru').trim();
+    spinCfg.prizes.forEach(function(p,i){
+      if(!g('spN'+i)) return;
+      p.title=(g('spN'+i).value||'').trim();
+      p.weight=Math.max(0, parseFloat(g('spW'+i).value)||0);
+      p.discType=g('spT'+i).value;
+      if(p.discType==='freeitem'){
+        var fid=(g('spF'+i)?g('spF'+i).value:p.freeItemId)||'';
+        var mi=(_menuCache||[]).find(function(m){ return m.id===fid; });
+        p.freeItemId=fid; p.freeItemName=mi?((mi.cat?mi.cat+' — ':'')+mi.name):''; p.freeItemPrice=mi?mi.price:0;
+        p.discValue=0; p.discMax=0;
+      } else {
+        p.discValue=Math.max(0, parseFloat(g('spV'+i)?g('spV'+i).value:0)||0);
+        p.discMax=(p.discType==='percent' && g('spM'+i)) ? Math.max(0, parseFloat(g('spM'+i).value)||0) : 0;
+        p.freeItemId=''; p.freeItemName=''; p.freeItemPrice=0;
+      }
+    });
+  }
+
   async function renderPengaturan(){
     if(!canEdit){ tabEl.innerHTML='<div class="card"><div class="res warn">👁️ Khusus Admin Utama.</div></div>'; return; }
     var mOutletOpts2='<option value="">— semua outlet —</option>'
@@ -542,7 +666,8 @@
       +'<option value="__area3">🗺️ Area 3</option>'
       +'<option value="__kronggahan">🏢 Kronggahan</option>'
       +(window.OMA_OUTLETS||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).map(function(o){ var n=(o.name||'').replace(/^Oma Opa Cakery\s*/i,''); return '<option>'+esc(n)+'</option>'; }).join('');
-    tabEl.innerHTML='<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
+    tabEl.innerHTML='<div class="card"><div class="nm">🎡 Spin Wheel (member baru)</div><div id="spinWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
+      +'<div class="card"><div class="nm">💬 Pesan otomatis WhatsApp</div><div id="msgWrap" class="muted" style="margin-top:6px">Memuat…</div></div>'
       +(masterEdit?('<div class="card"><div class="nm">🔄 Migrasi status "aktif" member</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: hitung tanggal transaksi terakhir tiap member dari riwayat lama, biar filter "Member aktif (30 hari)" di tab Member langsung akurat (bukan nunggu transaksi baru). Aman dijalankan berkali-kali.</div><button class="btn sec" id="bfBtn">Jalankan migrasi</button><div id="bfMsg"></div></div>'):'')
       +(masterEdit?('<div class="card"><div class="nm">🔎 Migrasi pencarian nama member</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: siapin index nama (huruf kecil) buat member lama, biar pencarian nama di Blast/fitur lain jadi akurat (sebelumnya cuma nemu kalau kebetulan ada di 30 data pertama). Member baru otomatis kesiapin sendiri pas daftar. Aman dijalankan berkali-kali.</div><button class="btn sec" id="nlBtn">Jalankan migrasi</button><div id="nlMsg"></div></div>'):'')
       +(masterEdit?('<div class="card"><div class="nm">🔧 Migrasi outlet riwayat adjust poin</div><div class="muted" style="font-size:.76rem;margin:5px 0 9px">Sekali jalan: benerin riwayat adjust poin LAMA yang field outlet-nya kesalahan kesisi teks alasan (bug versi sebelumnya). Alasan dipindah ke field yang benar, outlet diisi outlet member yang bersangkutan. Aman dijalankan berkali-kali.</div><button class="btn sec" id="aoBtn">Jalankan migrasi</button><div id="aoMsg"></div></div>'):'')
@@ -580,7 +705,7 @@
         +'<button class="btn sec" id="dvSearch">Cari voucher</button>'
         +'<div id="dvList" class="muted" style="margin-top:10px"></div></div>')
       :'<div class="card"><div class="muted" style="font-size:.82rem">🔒 Zona berbahaya (hapus data) khusus <b>Master</b>. Admin Utama tidak bisa menghapus data — biar rekap aman.</div></div>');
-    loadMessages();
+    loadMessages(); mountSpin();
     var bf=document.getElementById('bfBtn'); if(bf) bf.onclick=async function(){
       if(busy) return; if(!confirm('Jalankan migrasi status aktif? Ini membaca seluruh riwayat transaksi lama (sekali proses, aman).')) return;
       busy=true; this.disabled=true; var m=document.getElementById('bfMsg'); m.innerHTML='<div class="muted" style="margin-top:8px">Memproses… (jangan tutup halaman, bisa makan waktu)</div>';
