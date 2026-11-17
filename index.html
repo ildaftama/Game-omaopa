@@ -711,31 +711,26 @@
     if(p.discType==='percent') return [{t:'Diskon'},{chip:(Number(p.discValue)||0)+'%'}];
     return [{t:'Diskon'},{chip:rp(p.discValue)}];
   }
-  /* pecah nama item jadi 1-2 baris yang seimbang, kecilkan huruf kalau belum muat */
+  /* pecah nama item jadi 1-3 baris seimbang; SEMUA irisan pakai ukuran huruf yang sama (rapi & konsisten) */
+  var F_NAMA=28;
   function bagiNama(c,nm,maxW){
-    var kata=nm.split(' '), f, i, k;
-    for(f=34;f>=24;f-=2){
-      c.font='500 '+f+'px Fredoka, sans-serif';
-      if(c.measureText(nm).width<=maxW) return {f:f,baris:[nm]};
-      if(kata.length>1){
-        var terbaik=null, skor=1e9;
-        for(i=1;i<kata.length;i++){
-          var l1=kata.slice(0,i).join(' '), l2=kata.slice(i).join(' ');
-          var w=Math.max(c.measureText(l1).width,c.measureText(l2).width);
-          if(w<skor){ skor=w; terbaik=[l1,l2]; }
-        }
-        if(skor<=maxW) return {f:f,baris:terbaik};
-      }
+    var kata=nm.split(' '), n=kata.length;
+    function lebar(i,j){ return c.measureText(kata.slice(i,j).join(' ')).width; }
+    c.font='500 '+F_NAMA+'px Fredoka, sans-serif';
+    if(lebar(0,n)<=maxW) return {f:F_NAMA,baris:[nm]};
+    var terbaik=null, skor=1e9, i, j;
+    for(i=1;i<n;i++){                       // 2 baris
+      var w2=Math.max(lebar(0,i),lebar(i,n));
+      if(w2<skor){ skor=w2; terbaik=[kata.slice(0,i).join(' '),kata.slice(i).join(' ')]; }
     }
-    // masih kepanjangan: 3 baris dengan huruf kecil
-    c.font='500 24px Fredoka, sans-serif';
-    var out=[], cur='';
-    for(k=0;k<kata.length;k++){
-      var t=(cur+' '+kata[k]).trim();
-      if(c.measureText(t).width<=maxW||!cur) cur=t; else { out.push(cur); cur=kata[k]; }
+    if(skor<=maxW) return {f:F_NAMA,baris:terbaik};
+    skor=1e9; terbaik=null;
+    for(i=1;i<n-1;i++) for(j=i+1;j<n;j++){  // 3 baris
+      var w3=Math.max(lebar(0,i),lebar(i,j),lebar(j,n));
+      if(w3<skor){ skor=w3; terbaik=[kata.slice(0,i).join(' '),kata.slice(i,j).join(' '),kata.slice(j).join(' ')]; }
     }
-    if(cur) out.push(cur);
-    return {f:24,baris:out.slice(0,3)};
+    if(terbaik) return {f:F_NAMA,baris:terbaik};
+    return {f:F_NAMA,baris:[nm]};
   }
 
   /* ---- gambar roda ---- */
@@ -760,9 +755,9 @@
       var bar=barisHadiah(p), rows=[], tot=0, kk;
       for(kk=0;kk<bar.length;kk++){
         var b=bar[kk];
-        if(b.chip){ rows.push({chip:b.chip,merah:b.merah,h:42,f:32}); tot+=42; }
-        else if(b.nama!==undefined){ var bn=bagiNama(c,b.nama,L-6); for(var q=0;q<bn.baris.length;q++){ rows.push({t:bn.baris[q],f:bn.f,h:bn.f+8}); tot+=bn.f+8; } }
-        else { rows.push({t:b.t,f:34,h:44}); tot+=44; }
+        if(b.chip){ rows.push({chip:b.chip,merah:b.merah,h:40,f:30}); tot+=40; }
+        else if(b.nama!==undefined){ var bn=bagiNama(c,b.nama,L-6); for(var q=0;q<bn.baris.length;q++){ rows.push({t:bn.baris[q],f:bn.f,h:bn.f+6}); tot+=bn.f+6; } }
+        else { rows.push({t:b.t,f:30,h:40}); tot+=40; }
       }
       tot+=(rows.length-1)*4;
       var kecil=Math.min(1,chord/tot), yy=-tot*kecil/2;
