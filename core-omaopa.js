@@ -702,9 +702,19 @@ async function awardOrderPoints(id, d){
     if(uid) await maybePayReferral(uid);
   }catch(e){}
 }
-async function getStaffInfo(){
+// Dokumen staff dibaca SEKALI per akun (cache 60 detik). Sebelumnya isAdmin/isSuper/isMaster/isHRD
+// masing-masing baca ulang dokumen yang sama -> boros baca Firestore & bikin halaman admin lambat.
+let _staffInfoCache=null;
+async function getStaffInfo(force){
   if(!user) return null;
-  try{ const s=await getDoc(doc(db,'staff',user.uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true, super: d.super===true, master: d.master===true, hrd: d.hrd===true }; }catch(e){ return null; }
+  const uid=user.uid, now=Date.now();
+  if(!force && _staffInfoCache && _staffInfoCache.uid===uid && now-_staffInfoCache.t<60000) return _staffInfoCache.p;
+  const p=(async()=>{
+    try{ const s=await getDoc(doc(db,'staff',uid)); if(!s.exists()) return null; const d=s.data(); return { outlet:d.outlet||d.name||'', admin: d.admin===true, super: d.super===true, master: d.master===true, hrd: d.hrd===true }; }
+    catch(e){ if(_staffInfoCache && _staffInfoCache.p===p) _staffInfoCache=null; return null; }   // gagal baca: jangan di-cache
+  })();
+  _staffInfoCache={ uid:uid, t:now, p:p };
+  return p;
 }
 async function listTransactions(outlet){
   try{
