@@ -1995,6 +1995,38 @@ async function setSpinConfig(cfg){
   return c;
 }
 
+// Tiket spin milik member yang masih aktif & belum hangus
+async function listSpinTickets(){
+  if(!user) return [];
+  try{
+    const q=query(collection(db,'vouchers'), where('uid','==',user.uid), where('jenis','==','spin'), where('status','==','aktif'));
+    const snap=await getDocs(q); const now=Date.now(); const arr=[];
+    snap.forEach(d=>{
+      const x=d.data()||{};
+      let exp=null;
+      if(x.expiresAt) exp=(x.expiresAt.seconds)? x.expiresAt.seconds*1000 : new Date(x.expiresAt).getTime();
+      if(exp && !isNaN(exp) && now>exp) return;       // tiket sudah hangus
+      arr.push(Object.assign({ id:d.id, expiresMs:(exp&&!isNaN(exp))?exp:null }, x));
+    });
+    arr.sort((a,b)=>{ const ta=a.expiresMs||Infinity, tb=b.expiresMs||Infinity; return ta-tb; });  // yang paling cepat hangus duluan
+    return arr;
+  }catch(e){ return []; }
+}
+// Undiannya dijalankan DI SERVER (Apps Script). Hasil tidak bisa disetir dari HP member.
+// Server yang: cek tiket -> undi -> tandai tiket terpakai + bikin voucher hadiah (satu commit).
+async function spinSekarang(){
+  if(!user) throw {message:'Login dulu ya.'};
+  let idToken='';
+  try{ idToken=await user.getIdToken(); }catch(e){ throw {message:'Sesi kamu habis. Coba login ulang.'}; }
+  let j=null;
+  try{
+    const res=await fetch(SHEET_URL, { method:'POST', redirect:'follow', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ type:'spin', idToken:idToken }) });
+    j=await res.json();
+  }catch(e){ throw {message:'Gagal menghubungi server. Cek koneksi internetmu, lalu coba lagi.'}; }
+  if(!j || !j.ok) throw {message:(j&&j.error)||'Gagal muter roda.'};
+  return j;   // { idx, prizeId, title, discType, discValue, discMax, freeItemName, kode, expiresAt }
+}
+
 let _regBonusChecked=false, _promoCache=null;
 async function maybeGrantRegBonus(){
   if(_regBonusChecked || !user || !profile) return;
@@ -2148,7 +2180,7 @@ window.OmaOpa = {
   listStaff, addStaff, updateStaff, removeStaff,
   listRewardsAdmin, saveReward, setRewardActive, resetRewardClaimed, deleteReward,
   adminSetVoucherStatus, adminClearUsedVouchers, deleteVoucherRec, listVouchersByUid,
-  getAnnouncement, setAnnouncement, getMessages, setMessages, getPromo, setPromo, getSpinConfig, setSpinConfig, spinOdds, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
+  getAnnouncement, setAnnouncement, getMessages, setMessages, getPromo, setPromo, getSpinConfig, setSpinConfig, spinOdds, listSpinTickets, spinSekarang, saveBanner, listBanners, saveBannerItem, deleteBannerItem, listBannersPublic, logOrder, listOrders,
   setOrderStatus, updateOrder, deleteOrder, adminClearOrders, itemLabel, adminResetPin, deleteMyAccount, adminDeleteMember,
   tierOf, TIERS, getMyTier,
   signOut: doSignOut,
