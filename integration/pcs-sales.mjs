@@ -103,6 +103,7 @@ export async function collectJobs(jobs,client){
   }else results.push({date:job.date,id:job.id,...summarize(report.rows,job),complete:true});
  }catch(error){results.push({date:job.date,id:job.id,complete:false,reason:/menu kue baru/.test(error.message)?'unmapped-menu':/kosong/.test(error.message)?'empty-unverified':String(error.message).match(/HTTP \d{3}/)?.[0]||'unavailable',...(error.unmappedMenus?{unmappedMenus:error.unmappedMenus}:{})});}
  if(results.length%28===0)console.log('Laporan outlet diperiksa: '+results.length+'/'+jobs.length);
+ if(results.at(-1)?.unmappedMenus?.length)console.log('::warning::MENU_BELUM_DIPETAKAN '+job.date+' '+job.id+' '+JSON.stringify(results.at(-1).unmappedMenus));
  }}
  await Promise.all([worker(),worker()]);return results;
 }
@@ -110,7 +111,7 @@ export async function collect(branches,dates,client){return collectJobs(dates.fl
 export function mergeSales(previous,results){
  const map=new Map((previous?.days||[]).map(r=>[r.date+'|'+r.id,r]));
  for(const r of results)if(r.complete){const key=r.date+'|'+r.id,old=map.get(key);if(!old||(r.mappingVersion||1)>=(old.mappingVersion||1))map.set(key,r);}
- const failed=[...new Map([...(previous?.failed||[]),...results.filter(r=>!r.complete)].filter(r=>!map.has(r.date+'|'+r.id)).map(r=>[r.date+'|'+r.id,{date:r.date,id:r.id,...(r.reason?{reason:r.reason}:{})}])).values()];
+ const failed=[...new Map([...(previous?.failed||[]),...results.filter(r=>!r.complete)].filter(r=>!map.has(r.date+'|'+r.id)).map(r=>[r.date+'|'+r.id,{date:r.date,id:r.id,...(r.reason?{reason:r.reason}:{}),...(r.unmappedMenus?.length?{unmappedMenus:r.unmappedMenus}:{})}])).values()];
  return {schemaVersion:1,products:PRODUCTS,labels:LABELS,outletIds:[...new Set([...(previous?.outletIds||[]),...results.map(r=>r.id)])].sort(),updatedAt:new Date().toISOString(),days:[...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)),failed,...(previous?.history?{history:previous.history}:{}),...keepIntraday(previous,map)};
 }
 // Omzet hari berjalan (owner 2026-11-12): ditarik tiap jam 18-20 WIB sebagai data SEMENTARA,
