@@ -705,18 +705,37 @@
   /* ---- ubah 1 hadiah jadi baris-baris yang digambar di roda ---- */
   function barisHadiah(p){
     if(p.discType==='freeitem'){
-      var nm=String(p.freeItemName||p.title||'Gratis').replace(/^Gratis\s*/i,'').replace(/^.*—\s*/,'');
-      var kata=nm.split(/\s+/), baris=[], cur='';
-      for(var i=0;i<kata.length;i++){
-        if((cur+' '+kata[i]).trim().length<=11){ cur=(cur+' '+kata[i]).trim(); }
-        else { if(cur) baris.push(cur); cur=kata[i]; }
-      }
-      if(cur) baris.push(cur);
-      baris=baris.slice(0,2);
-      return [{chip:'GRATIS',merah:1}].concat(baris.map(function(t){ return {t:t}; }));
+      var nm=String(p.freeItemName||p.title||'Gratis').replace(/^Gratis\s*/i,'').replace(/^.*\u2014\s*/,'').replace(/\s*\/\s*$/,'').replace(/\s+/g,' ').trim();
+      return [{chip:'GRATIS',merah:1},{nama:nm}];
     }
     if(p.discType==='percent') return [{t:'Diskon'},{chip:(Number(p.discValue)||0)+'%'}];
     return [{t:'Diskon'},{chip:rp(p.discValue)}];
+  }
+  /* pecah nama item jadi 1-2 baris yang seimbang, kecilkan huruf kalau belum muat */
+  function bagiNama(c,nm,maxW){
+    var kata=nm.split(' '), f, i, k;
+    for(f=34;f>=24;f-=2){
+      c.font='500 '+f+'px Fredoka, sans-serif';
+      if(c.measureText(nm).width<=maxW) return {f:f,baris:[nm]};
+      if(kata.length>1){
+        var terbaik=null, skor=1e9;
+        for(i=1;i<kata.length;i++){
+          var l1=kata.slice(0,i).join(' '), l2=kata.slice(i).join(' ');
+          var w=Math.max(c.measureText(l1).width,c.measureText(l2).width);
+          if(w<skor){ skor=w; terbaik=[l1,l2]; }
+        }
+        if(skor<=maxW) return {f:f,baris:terbaik};
+      }
+    }
+    // masih kepanjangan: 3 baris dengan huruf kecil
+    c.font='500 24px Fredoka, sans-serif';
+    var out=[], cur='';
+    for(k=0;k<kata.length;k++){
+      var t=(cur+' '+kata[k]).trim();
+      if(c.measureText(t).width<=maxW||!cur) cur=t; else { out.push(cur); cur=kata[k]; }
+    }
+    if(cur) out.push(cur);
+    return {f:24,baris:out.slice(0,3)};
   }
 
   /* ---- gambar roda ---- */
@@ -736,19 +755,31 @@
       c.beginPath(); c.moveTo(R,R); c.arc(R,R,RS,a0,a1); c.closePath();
       c.fillStyle=(i%2)?KUNING_M:KUNING; c.fill();
       c.save(); c.translate(R,R); c.rotate(am); c.textBaseline='middle';
-      var bar=barisHadiah(p), LH=(bar.length>2?40:46), X=RS-30;
-      for(var k=0;k<bar.length;k++){
-        var b=bar[k], y=(k-(bar.length-1)/2)*LH;
-        if(b.chip){
-          c.font='500 32px Fredoka, sans-serif';
-          var w=c.measureText(b.chip).width+24, h=42;
-          kotakBulat(c,X-w,y-h/2,w,h,12);
-          c.fillStyle=b.merah?MERAH:COKLAT; c.fill();
-          c.fillStyle=PUTIH; c.textAlign='center'; c.fillText(b.chip,X-w/2,y+1);
+      var dalam=R*0.31, luar=RS-26, L=luar-dalam, XC=(dalam+luar)/2;
+      var chord=2*XC*Math.sin(SUDUT*Math.PI/360)-12;
+      var bar=barisHadiah(p), rows=[], tot=0, kk;
+      for(kk=0;kk<bar.length;kk++){
+        var b=bar[kk];
+        if(b.chip){ rows.push({chip:b.chip,merah:b.merah,h:42,f:32}); tot+=42; }
+        else if(b.nama!==undefined){ var bn=bagiNama(c,b.nama,L-6); for(var q=0;q<bn.baris.length;q++){ rows.push({t:bn.baris[q],f:bn.f,h:bn.f+8}); tot+=bn.f+8; } }
+        else { rows.push({t:b.t,f:34,h:44}); tot+=44; }
+      }
+      tot+=(rows.length-1)*4;
+      var kecil=Math.min(1,chord/tot), yy=-tot*kecil/2;
+      for(kk=0;kk<rows.length;kk++){
+        var r=rows[kk], hh=r.h*kecil, f=Math.round(r.f*kecil), ym=yy+hh/2;
+        c.textAlign='center';
+        if(r.chip){
+          c.font='500 '+f+'px Fredoka, sans-serif';
+          var w=c.measureText(r.chip).width+24*kecil, h=hh;
+          kotakBulat(c,XC-w/2,ym-h/2,w,h,12*kecil);
+          c.fillStyle=r.merah?MERAH:COKLAT; c.fill();
+          c.fillStyle=PUTIH; c.fillText(r.chip,XC,ym+1);
         } else {
-          c.font='500 34px Fredoka, sans-serif';
-          c.fillStyle=COKLAT; c.textAlign='right'; c.fillText(b.t,X,y);
+          c.font='500 '+f+'px Fredoka, sans-serif';
+          c.fillStyle=COKLAT; c.fillText(r.t,XC,ym);
         }
+        yy+=hh+4*kecil;
       }
       c.restore();
     }
