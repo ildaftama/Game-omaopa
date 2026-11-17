@@ -554,7 +554,12 @@ window.ForecastDashboard=(()=>{
  // forecast tetap tampil & dipakai seperti biasa, lapis ini sudah ada di dalam angka prediksi).
  // Hanya berlaku untuk tanggal >= PERF_FROM supaya prediksi hari-hari yang sudah lewat (dibekukan)
  // tidak berubah; tanggal lewat memakai data sebelum tanggal itu (sama seperti saat ditampilkan).
- const PERF_FROM='2026-11-13',PERF_MARGIN=0.3,PERF_MAX_CUT=6,PERF_MAX_ADD=4,PERF_LOST_GAIN=0.5;
+ // Revisi owner 2026-11-17 ("waste sudah sangat banyak, langsung koreksi turun"): koreksi waste
+ // lebih TEGAS & CEPAT -- waste acuan = yang lebih tinggi antara bulan berjalan dan 7 tanggal
+ // terakhir; potongan = 2,5 x kelebihan di atas target internal (maks 12%), karena memangkas
+ // kiriman x% hanya mengurangi sebagian dari waste (sebagian potongan memotong yang laku).
+ // Kalau lost sales juga di atas ambang, potongan diredam setengah supaya tidak sering habis.
+ const PERF_V2_FROM='2026-11-18',PERF_FROM='2026-11-13',PERF_MARGIN=0.3,PERF_MAX_CUT=12,PERF_CUT_GAIN=2.5,PERF_MAX_ADD=4,PERF_LOST_GAIN=0.5;
  const perfCache=new Map();
  function perfAdjust(asOf){
   const recap=window.DAILY_RECAP_SUMMARY;
@@ -568,13 +573,19 @@ window.ForecastDashboard=(()=>{
   let wn=0,wr=0;for(const d of wDates)for(const id of ids){const g=rev.get(d+'|'+id);if(!(g>0))continue;wn+=recap.waste[d][id]?.nominal||0;wr+=g;}
   const lDates=pick(Object.keys(recap?.lostSalesMinutes||{}).sort());
   let lm=0,ln=0;for(const d of lDates)for(const m of Object.values(recap.lostSalesMinutes[d]||{}))if(Number.isFinite(m)){lm+=m;ln++;}
-  const wastePct=wDates.length>=MIN_RECAP_DAYS&&wr>0?wn/wr*100:null,lostPct=lDates.length>=MIN_RECAP_DAYS&&ln>0?lm/ln/OPEN_MINUTES*100:null;
+  // 7 tanggal terakhir yang terisi (lebih cepat menangkap waste yang sedang naik).
+  const w7=Object.keys(recap?.waste||{}).filter(d=>d<asOf&&Object.keys(recap.waste[d]).length).sort().slice(-7);
+  let w7n=0,w7r=0;for(const d of w7)for(const id of ids){const g=rev.get(d+'|'+id);if(!(g>0))continue;w7n+=recap.waste[d][id]?.nominal||0;w7r+=g;}
+  const waste7=w7.length>=MIN_RECAP_DAYS&&w7r>0?w7n/w7r*100:null;
+  const wasteMtd=wDates.length>=MIN_RECAP_DAYS&&wr>0?wn/wr*100:null,wastePct=wasteMtd==null?waste7:waste7==null?wasteMtd:Math.max(wasteMtd,waste7),lostPct=lDates.length>=MIN_RECAP_DAYS&&ln>0?lm/ln/OPEN_MINUTES*100:null;
   const Wt=WASTE_THRESHOLD-PERF_MARGIN,L=LOST_SALES_THRESHOLD;
   let pct=0,kind='ok';
   if(wastePct==null&&lostPct==null)kind='nodata';
-  else if(wastePct!=null&&wastePct>Wt){pct=-Math.min(PERF_MAX_CUT,wastePct-Wt);kind='waste';}
+  let pctV1=0;if(wasteMtd!=null&&wasteMtd>Wt)pctV1=-Math.min(6,wasteMtd-Wt);
+  if(wastePct==null&&lostPct==null){}
+  else if(wastePct!=null&&wastePct>Wt){let cut=Math.min(PERF_MAX_CUT,(wastePct-Wt)*PERF_CUT_GAIN);if(lostPct!=null&&lostPct>L)cut/=2;pct=-cut;kind='waste';}
   else if(lostPct!=null&&lostPct>L){const room=wastePct==null?PERF_MAX_ADD:Math.max(0,Wt-wastePct);pct=Math.min(PERF_MAX_ADD,(lostPct-L)*PERF_LOST_GAIN,room);kind=pct>0?'lost':'ok';}
-  const v={pct:Math.round(pct*10)/10,kind,wastePct,lostPct,monthly:wDates[0]>=monthStart,from:wDates[0]||null,to:wDates.at(-1)||null};
+  const v={pct:Math.round(pct*10)/10,pctV1:Math.round(pctV1*10)/10,kind,wastePct,wasteMtd,waste7,lostPct,monthly:wDates[0]>=monthStart,from:wDates[0]||null,to:wDates.at(-1)||null};
   perfCache.set(key,v);return v;
  }
  function revenueTrend(outletId){
@@ -684,7 +695,9 @@ window.ForecastDashboard=(()=>{
   const adj=date=>outletAdjust&&lastActual?outletAdjust(date,isPast(date)?planner.shift(date,-1):lastActual):1;
   // Penyesuaian performa tim (lihat perfAdjust): tanggal lewat memakai data sebelum tanggal itu,
   // tanggal mendatang memakai data s.d. kemarin.
-  const perf=date=>{if(date<PERF_FROM)return 1;try{return 1+perfAdjust(isPast(date)?date:today()).pct/100;}catch{return 1;}};
+  // Aturan tegas berlaku untuk tanggal >= PERF_V2_FROM; tanggal sebelumnya tetap aturan lama supaya
+  // prediksi yang sudah tampil tidak berubah.
+  const perf=date=>{if(date<PERF_FROM)return 1;try{const a=perfAdjust(isPast(date)?date:today());return 1+(date<PERF_V2_FROM?a.pctV1:a.pct)/100;}catch{return 1;}};
   // ---- Kalibrasi bias terkini (owner 2026-11-13: "prediksi cenderung di atas real") ----
   // Uji mundur Agu-Nov 2026 (prediksi versi H-1 vs real, omzet reguler jaringan): mesin pola
   // tahun lalu x pertumbuhan makin sering KELEBIHAN sejak Okt (bias Okt +3,3%, Nov +3,5%,
