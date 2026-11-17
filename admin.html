@@ -107,7 +107,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=178"></script>
+<script type="module" src="core-omaopa.js?v=179"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -572,7 +572,7 @@
       +'<label style="margin-top:10px">Judul tiket (tampil di member)</label><input id="spTitle" value="'+esc(spinCfg.ticketTitle)+'">'
       +'<div style="border-top:1px dashed #E7D8BE;margin:14px 0 10px"></div>'
       +'<div class="nm" style="font-size:.95rem">🎁 Daftar hadiah</div>'
-      +'<div class="muted" style="font-size:.72rem;margin:4px 0 10px">Bobot itu angka bebas, tidak harus jumlahnya 100. Peluangnya dihitung otomatis dari perbandingan antar hadiah.</div>'
+      +'<div class="muted" style="font-size:.72rem;margin:4px 0 10px">Bobot itu angka bebas, tidak harus jumlahnya 100. Peluangnya dihitung otomatis dari perbandingan antar hadiah. Untuk hadiah gratis, item boleh ditulis bebas (tidak wajib pilih dari katalog).</div>'
       +'<div id="spList"></div>'
       +'<button class="btn sm sec" id="spAdd" style="width:auto;margin-top:6px">+ Tambah hadiah</button>'
       +'<button class="btn" id="spSave" style="margin-top:12px">💾 Simpan pengaturan spin</button><div id="spMsg"></div>';
@@ -607,10 +607,14 @@
             +'<option value="percent"'+(isPct?' selected':'')+'>Persen (%)</option>'
             +'<option value="freeitem"'+(isFree?' selected':'')+'>Gratis Item</option></select>'
           +(isFree
-            ? '<select id="spF'+i+'" style="flex:2;min-width:150px;margin:0">'+spinItemOpts(p.freeItemId)+'</select>'
+            ? '<select id="spF'+i+'" data-sfree="'+i+'" style="flex:2;min-width:150px;margin:0">'+spinItemOpts(p.freeItemId)+'</select>'
             : '<input type="number" id="spV'+i+'" value="'+(p.discValue||'')+'" placeholder="'+(isPct?'nilai %':'potongan Rp')+'" style="flex:1;min-width:100px;margin:0">'
               +(isPct?'<input type="number" id="spM'+i+'" value="'+(p.discMax||'')+'" placeholder="maks Rp" style="flex:1;min-width:100px;margin:0">':''))
         +'</div>'
+        +(isFree
+          ? '<input id="spFN'+i+'" value="'+esc(p.freeItemName||'')+'" placeholder="Nama item yang tampil ke member" style="width:100%;margin:6px 0 0">'
+            +'<div class="muted" style="font-size:.7rem;margin-top:3px">Boleh tanpa pilih katalog — tulis bebas, misal “1 pcs Mini Ogura / Roti (bebas pilih rasa)”. Pilih katalog cuma kalau item &amp; harganya mau dicatat persis.</div>'
+          : '')
         +'<div style="display:flex;gap:8px;align-items:center;margin-top:6px">'
           +'<span class="muted" style="font-size:.76rem">Bobot</span>'
           +'<input type="number" min="0" step="0.5" id="spW'+i+'" data-sw="'+i+'" value="'+p.weight+'" style="width:84px;margin:0">'
@@ -624,6 +628,12 @@
       bacaSpin(); spinCfg.prizes.splice(i,1); drawSpinList();
     }; });
     box.querySelectorAll('[data-stype]').forEach(function(sel){ sel.onchange=function(){ bacaSpin(); drawSpinList(); }; });
+    box.querySelectorAll('[data-sfree]').forEach(function(sel){ sel.onchange=function(){
+      var i=sel.getAttribute('data-sfree'), mi=(_menuCache||[]).find(function(m){ return m.id===sel.value; });
+      var nm=document.getElementById('spFN'+i);
+      if(nm && mi) nm.value=(mi.cat?mi.cat+' — ':'')+mi.name;
+      bacaSpin();
+    }; });
     box.querySelectorAll('[data-sw]').forEach(function(inp){ inp.oninput=function(){ bacaSpin(); hitungOdds(); }; });
   }
   function hitungOdds(){
@@ -647,7 +657,11 @@
       if(p.discType==='freeitem'){
         var fid=(g('spF'+i)?g('spF'+i).value:p.freeItemId)||'';
         var mi=(_menuCache||[]).find(function(m){ return m.id===fid; });
-        p.freeItemId=fid; p.freeItemName=mi?((mi.cat?mi.cat+' — ':'')+mi.name):''; p.freeItemPrice=mi?mi.price:0;
+        var nmEl=g('spFN'+i);
+        p.freeItemId=fid;
+        p.freeItemName=nmEl ? (nmEl.value||'').trim() : (mi?((mi.cat?mi.cat+' — ':'')+mi.name):'');
+        if(!p.freeItemName && mi) p.freeItemName=(mi.cat?mi.cat+' — ':'')+mi.name;
+        p.freeItemPrice=mi?mi.price:0;
         p.discValue=0; p.discMax=0;
       } else {
         p.discValue=Math.max(0, parseFloat(g('spV'+i)?g('spV'+i).value:0)||0);

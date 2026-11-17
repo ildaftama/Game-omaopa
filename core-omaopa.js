@@ -2004,8 +2004,8 @@ async function setSpinConfig(cfg){
   if(c.prizes.length<2) throw {message:'Minimal 2 hadiah.'};
   if(c.prizes.reduce((a,p)=>a+p.weight,0)<=0) throw {message:'Total bobot peluang masih 0 — isi minimal satu hadiah dengan bobot di atas 0.'};
   if(c.active){
-    const kurangItem=c.prizes.filter(p=>p.discType==='freeitem' && !p.freeItemId);
-    if(kurangItem.length) throw {message:'Item gratisnya belum dipilih: '+kurangItem.map(p=>p.title).join(', ')};
+    const kurangItem=c.prizes.filter(p=>p.discType==='freeitem' && !String(p.freeItemName||'').trim());
+    if(kurangItem.length) throw {message:'Nama item gratisnya belum diisi: '+kurangItem.map(p=>p.title).join(', ')};
     const kurangNilai=c.prizes.filter(p=>p.discType!=='freeitem' && !(p.discValue>0));
     if(kurangNilai.length) throw {message:'Nilai diskonnya belum diisi: '+kurangNilai.map(p=>p.title).join(', ')};
   }
