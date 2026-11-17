@@ -621,9 +621,9 @@
   #spinBk h2{font-family:'Fredoka';font-weight:600;font-size:1.5rem;color:#613925;margin:6px 0 4px;}
   #spinBk .sp-sub{font-size:.88rem;line-height:1.5;color:#7A5640;font-weight:600;margin:0 auto;max-width:300px;}
   #spinStage{position:relative;width:min(100%,310px);aspect-ratio:1;margin:22px auto 0;}
-  #spinWheel{position:absolute;inset:0;border-radius:50%;will-change:transform;}
+  #spinWheel{position:absolute;inset:0;border-radius:50%;will-change:transform;box-shadow:0 10px 28px rgba(97,57,37,.28);}
   #spinWheel canvas{width:100%;height:100%;display:block;border-radius:50%;}
-  #spinStage .sp-ptr{position:absolute;top:-9px;left:50%;width:26px;height:30px;margin-left:-13px;z-index:4;}
+  #spinStage .sp-ptr{position:absolute;top:-10px;left:50%;width:30px;height:37px;margin-left:-15px;z-index:4;filter:drop-shadow(0 2px 3px rgba(97,57,37,.35));}
   #spinHub{position:absolute;left:50%;top:50%;width:21%;aspect-ratio:1;margin:-10.5% 0 0 -10.5%;z-index:3;
     border:0;border-radius:50%;background:#FEFEFE;color:#613925;font-family:'Fredoka';font-weight:600;
     font-size:.9rem;cursor:pointer;box-shadow:0 2px 10px rgba(74,42,25,.18);padding:0;}
@@ -678,7 +678,7 @@
 
     <div id="spinStage">
       <div id="spinWheel"><canvas id="spinCv" width="700" height="700"></canvas></div>
-      <div class="sp-ptr"><svg viewBox="0 0 26 30"><path d="M13 29 3 10a11 11 0 1 1 20 0Z" fill="#613925"/></svg></div>
+      <div class="sp-ptr"><svg viewBox="0 0 26 32"><path d="M13 30 3.2 11.5a10.6 10.6 0 1 1 19.6 0Z" fill="#FACC1A" stroke="#613925" stroke-width="2.6" stroke-linejoin="round"/><circle cx="13" cy="10.5" r="3.2" fill="#613925"/></svg></div>
       <button id="spinHub">PUTAR</button>
     </div>
 
@@ -702,35 +702,34 @@
   function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function rp(n){ return 'Rp'+(Number(n)||0).toLocaleString('id-ID'); }
 
+  /* ---- label pendek buat di roda (nama lengkap tetap tampil di voucher & hasil) ---- */
+  function namaPendek(nm){
+    var t=String(nm||'').replace(/^Gratis\s*/i,'').replace(/^.*—\s*/,'').replace(/\(.*?\)/g,' ');
+    t=t.split(/\s\/\s/)[0];                                             // "A / B" -> "A"
+    t=t.replace(/^\s*\d+\s*(pcs|pc|x|buah|biji|porsi)\b\.?\s*/i,'');   // buang "1 Pcs"
+    t=t.replace(/\b(bebas\s+(pilih|rasa)|bebas|pilih\s+sendiri|pilih)\b/ig,'');
+    t=t.replace(/\s+/g,' ').replace(/[\/+\-,]\s*$/,'').trim();
+    return t||String(nm||'').trim();
+  }
   /* ---- ubah 1 hadiah jadi baris-baris yang digambar di roda ---- */
   function barisHadiah(p){
-    if(p.discType==='freeitem'){
-      var nm=String(p.freeItemName||p.title||'Gratis').replace(/^Gratis\s*/i,'').replace(/^.*\u2014\s*/,'').replace(/\s*\/\s*$/,'').replace(/\s+/g,' ').trim();
-      return [{chip:'GRATIS',merah:1},{nama:nm}];
-    }
-    if(p.discType==='percent') return [{t:'Diskon'},{chip:(Number(p.discValue)||0)+'%'}];
-    return [{t:'Diskon'},{chip:rp(p.discValue)}];
+    if(p.discType==='freeitem') return [{chip:'GRATIS',merah:1,kecil:1},{nama:namaPendek(p.freeItemName||p.title)}];
+    if(p.discType==='percent')  return [{cap:'DISKON'},{chip:(Number(p.discValue)||0)+'%'}];
+    return [{cap:'DISKON'},{chip:rp(p.discValue)}];
   }
-  /* pecah nama item jadi 1-3 baris seimbang; SEMUA irisan pakai ukuran huruf yang sama (rapi & konsisten) */
-  var F_NAMA=28;
+  /* pecah nama jadi 1-2 baris seimbang (3 kalau terpaksa), ukuran huruf sama di semua irisan */
+  var F_NAMA=31;
   function bagiNama(c,nm,maxW){
-    var kata=nm.split(' '), n=kata.length;
-    function lebar(i,j){ return c.measureText(kata.slice(i,j).join(' ')).width; }
-    c.font='500 '+F_NAMA+'px Fredoka, sans-serif';
-    if(lebar(0,n)<=maxW) return {f:F_NAMA,baris:[nm]};
-    var terbaik=null, skor=1e9, i, j;
-    for(i=1;i<n;i++){                       // 2 baris
-      var w2=Math.max(lebar(0,i),lebar(i,n));
-      if(w2<skor){ skor=w2; terbaik=[kata.slice(0,i).join(' '),kata.slice(i).join(' ')]; }
-    }
-    if(skor<=maxW) return {f:F_NAMA,baris:terbaik};
-    skor=1e9; terbaik=null;
-    for(i=1;i<n-1;i++) for(j=i+1;j<n;j++){  // 3 baris
-      var w3=Math.max(lebar(0,i),lebar(i,j),lebar(j,n));
-      if(w3<skor){ skor=w3; terbaik=[kata.slice(0,i).join(' '),kata.slice(i,j).join(' '),kata.slice(j).join(' ')]; }
-    }
-    if(terbaik) return {f:F_NAMA,baris:terbaik};
-    return {f:F_NAMA,baris:[nm]};
+    var kata=nm.split(' '), n=kata.length, i, j;
+    function lebar(a,z){ return c.measureText(kata.slice(a,z).join(' ')).width; }
+    c.font='600 '+F_NAMA+'px Fredoka, sans-serif';
+    if(lebar(0,n)<=maxW) return [nm];
+    var best=null, skor=1e9;
+    for(i=1;i<n;i++){ var w2=Math.max(lebar(0,i),lebar(i,n)); if(w2<skor){ skor=w2; best=[kata.slice(0,i).join(' '),kata.slice(i).join(' ')]; } }
+    if(best&&skor<=maxW) return best;
+    skor=1e9; best=null;
+    for(i=1;i<n-1;i++) for(j=i+1;j<n;j++){ var w3=Math.max(lebar(0,i),lebar(i,j),lebar(j,n)); if(w3<skor){ skor=w3; best=[kata.slice(0,i).join(' '),kata.slice(i,j).join(' '),kata.slice(j).join(' ')]; } }
+    return best||[nm];
   }
 
   /* ---- gambar roda ---- */
@@ -740,56 +739,87 @@
   }
   function gambarRoda(menang){
     var cv=el('spinCv'); if(!cv||!CFG) return;
-    var c=cv.getContext('2d'), S=cv.width, R=S/2, RS=R-10, N=CFG.prizes.length;
+    var c=cv.getContext('2d'), S=cv.width, R=S/2, RIM=30, RS=R-RIM, N=CFG.prizes.length;
     if(!N) return;
-    var SUDUT=360/N;
+    var SUDUT=360/N, PI=Math.PI, i;
     c.clearRect(0,0,S,S);
-    for(var i=0;i<N;i++){
-      var p=CFG.prizes[i];
-      var a0=(-90+i*SUDUT)*Math.PI/180, a1=(-90+(i+1)*SUDUT)*Math.PI/180, am=(a0+a1)/2;
+
+    /* 1) irisan: kuning & krem bergantian */
+    for(i=0;i<N;i++){
+      var a0=(-90+i*SUDUT)*PI/180, a1=(-90+(i+1)*SUDUT)*PI/180;
       c.beginPath(); c.moveTo(R,R); c.arc(R,R,RS,a0,a1); c.closePath();
       c.fillStyle=(i%2)?KUNING_M:KUNING; c.fill();
-      c.save(); c.translate(R,R); c.rotate(am); c.textBaseline='middle';
-      var dalam=R*0.31, luar=RS-26, L=luar-dalam, XC=(dalam+luar)/2;
-      var chord=2*XC*Math.sin(SUDUT*Math.PI/360)-12;
-      var bar=barisHadiah(p), rows=[], tot=0, kk;
-      for(kk=0;kk<bar.length;kk++){
-        var b=bar[kk];
-        if(b.chip){ rows.push({chip:b.chip,merah:b.merah,h:40,f:30}); tot+=40; }
-        else if(b.nama!==undefined){ var bn=bagiNama(c,b.nama,L-6); for(var q=0;q<bn.baris.length;q++){ rows.push({t:bn.baris[q],f:bn.f,h:bn.f+6}); tot+=bn.f+6; } }
-        else { rows.push({t:b.t,f:30,h:40}); tot+=40; }
+    }
+    /* 2) cahaya lembut dari tengah biar tidak flat */
+    var g=c.createRadialGradient(R,R,R*0.2,R,R,RS);
+    g.addColorStop(0,'rgba(254,254,254,.34)'); g.addColorStop(.55,'rgba(254,254,254,0)'); g.addColorStop(1,'rgba(97,57,37,.07)');
+    c.beginPath(); c.arc(R,R,RS,0,PI*2); c.fillStyle=g; c.fill();
+    /* 3) garis pemisah putih tipis */
+    for(i=0;i<N;i++){
+      var ap=(-90+i*SUDUT)*PI/180;
+      c.beginPath(); c.moveTo(R+Math.cos(ap)*R*0.3,R+Math.sin(ap)*R*0.3); c.lineTo(R+Math.cos(ap)*RS,R+Math.sin(ap)*RS);
+      c.lineWidth=3; c.strokeStyle='rgba(254,254,254,.9)'; c.stroke();
+    }
+
+    /* 4) teks tiap irisan */
+    var dalam=R*0.37, luar=RS-24, L=luar-dalam, XC=(dalam+luar)/2;
+    for(i=0;i<N;i++){
+      var p=CFG.prizes[i], am=(-90+(i+.5)*SUDUT)*PI/180;
+      c.save(); c.translate(R,R); c.rotate(am); c.textBaseline='middle'; c.textAlign='center';
+      var chord=2*XC*Math.sin(SUDUT*PI/360)-14;
+      var bar=barisHadiah(p), rows=[], tot=0, k, GAP=7;
+      for(k=0;k<bar.length;k++){
+        var b=bar[k];
+        if(b.cap)       { rows.push({cap:b.cap,h:26}); tot+=26; }
+        else if(b.chip) { var hh=b.kecil?38:46; rows.push({chip:b.chip,merah:b.merah,kecil:b.kecil,h:hh}); tot+=hh; }
+        else if(b.nama!==undefined){
+          var ls=bagiNama(c,b.nama,L-10);
+          for(var q=0;q<ls.length;q++){ rows.push({t:ls[q],h:38}); tot+=38; }
+        }
       }
-      tot+=(rows.length-1)*4;
-      var kecil=Math.min(1,chord/tot), yy=-tot*kecil/2;
-      for(kk=0;kk<rows.length;kk++){
-        var r=rows[kk], hh=r.h*kecil, f=Math.round(r.f*kecil), ym=yy+hh/2;
-        c.textAlign='center';
-        if(r.chip){
-          c.font='500 '+f+'px Fredoka, sans-serif';
-          var w=c.measureText(r.chip).width+24*kecil, h=hh;
-          kotakBulat(c,XC-w/2,ym-h/2,w,h,12*kecil);
-          c.fillStyle=r.merah?MERAH:COKLAT; c.fill();
+      tot+=(rows.length-1)*GAP;
+      var sk=Math.min(1,chord/tot), y=-tot*sk/2;
+      for(k=0;k<rows.length;k++){
+        var r=rows[k], h=r.h*sk, ym=y+h/2;
+        if(r.cap){
+          c.font='700 '+Math.round(22*sk)+'px Nunito, Fredoka, sans-serif';
+          try{ c.letterSpacing=(3*sk)+'px'; }catch(e){}
+          c.fillStyle=COKLAT; c.globalAlpha=.78; c.fillText(r.cap,XC+1.5,ym); c.globalAlpha=1;
+          try{ c.letterSpacing='0px'; }catch(e){}
+        } else if(r.chip){
+          var f=Math.round((r.kecil?24:32)*sk);
+          c.font='600 '+f+'px Fredoka, sans-serif';
+          var w=c.measureText(r.chip).width+(r.kecil?28:30)*sk;
+          kotakBulat(c,XC-w/2,ym-h/2,w,h,Math.min(h/2,16)); c.fillStyle=r.merah?MERAH:COKLAT; c.fill();
           c.fillStyle=PUTIH; c.fillText(r.chip,XC,ym+1);
         } else {
-          c.font='500 '+f+'px Fredoka, sans-serif';
-          c.fillStyle=COKLAT; c.fillText(r.t,XC,ym);
+          c.font='600 '+Math.round(F_NAMA*sk)+'px Fredoka, sans-serif';
+          c.fillStyle=COKLAT; c.fillText(r.t,XC,ym+1);
         }
-        yy+=hh+4*kecil;
+        y+=h+GAP*sk;
       }
       c.restore();
     }
-    for(var j=0;j<N;j++){
-      var a=(-90+j*SUDUT)*Math.PI/180;
-      c.beginPath(); c.moveTo(R,R); c.lineTo(R+Math.cos(a)*RS,R+Math.sin(a)*RS);
-      c.lineWidth=3; c.strokeStyle=PUTIH; c.stroke();
+
+    /* 5) pelek coklat + lampu kuning di tepi */
+    c.beginPath(); c.arc(R,R,RS+RIM/2,0,PI*2); c.lineWidth=RIM; c.strokeStyle=COKLAT; c.stroke();
+    c.beginPath(); c.arc(R,R,RS+1.5,0,PI*2); c.lineWidth=3; c.strokeStyle='rgba(254,254,254,.9)'; c.stroke();
+    var LAMPU=N*2;
+    for(i=0;i<LAMPU;i++){
+      var al=(-90+i*360/LAMPU)*PI/180, rx=R+Math.cos(al)*(RS+RIM/2), ry=R+Math.sin(al)*(RS+RIM/2);
+      c.beginPath(); c.arc(rx,ry,(i%2)?4.5:6.5,0,PI*2); c.fillStyle=(i%2)?'rgba(254,254,254,.85)':KUNING; c.fill();
     }
-    c.beginPath(); c.arc(R,R,RS+5,0,Math.PI*2); c.lineWidth=10; c.strokeStyle=PUTIH; c.stroke();
+    /* 6) cincin coklat di balik tombol tengah */
+    c.beginPath(); c.arc(R,R,R*0.285,0,PI*2); c.fillStyle=COKLAT; c.fill();
+    c.beginPath(); c.arc(R,R,R*0.285,0,PI*2); c.lineWidth=4; c.strokeStyle=KUNING; c.stroke();
+
+    /* 7) setelah ada hasil: redupkan irisan yang tidak menang */
     if(typeof menang==='number'&&menang>=0){
       for(var m=0;m<N;m++){
         if(m===menang) continue;
-        var b0=(-90+m*SUDUT)*Math.PI/180, b1=(-90+(m+1)*SUDUT)*Math.PI/180;
+        var b0=(-90+m*SUDUT)*PI/180, b1=(-90+(m+1)*SUDUT)*PI/180;
         c.beginPath(); c.moveTo(R,R); c.arc(R,R,RS,b0,b1); c.closePath();
-        c.fillStyle='rgba(254,254,254,.62)'; c.fill();
+        c.fillStyle='rgba(254,254,254,.66)'; c.fill();
       }
     }
   }
