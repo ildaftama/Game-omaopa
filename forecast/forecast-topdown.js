@@ -352,6 +352,17 @@ window.ForecastTopdown=(()=>{
   }
   const gv=q(`[data-ft-gv="${A}"]`);if(gv)gv.textContent=rpShort(g.ids.reduce((s,x)=>s+outletTotals(c,x).val,0));
  }
+ // Pesanan PABRIK (owner 2026-11-19): tampil sebagai tabel sendiri di tampilan Pesanan & Total
+ // kirim (pabrik tidak punya stok reguler). Angka dari sheet PESANAN (factoryDays), tidak diisi
+ // di sini; ikut dihitung di Rencana produksi dan tampil di Rincian kirim.
+ function factoryCard(c){
+  const f=factoryOrders();const core=PR().core();
+  const items=f?PR().CORE_ORDER.filter(p=>f.qty[p]>0).map(p=>({p,label:core[p].label,bg:core[p].bg,dot:core[p].dot,q:f.qty[p]})):[];
+  const tot=items.reduce((s,x)=>s+x.q,0);
+  const body=!f?'<tr><td class="ft-empty" colspan="2">Pesanan pabrik belum tersinkron.</td></tr>':!items.length?'<tr><td class="ft-empty" colspan="2">Tidak ada pesanan pabrik untuk tanggal ini.</td></tr>'
+   :items.map(x=>`<tr class="ft-r${x.bg?' ft-rbg':''}"${x.bg?` style="--row:${x.bg}"`:''}><th class="ft-pcol" scope="row">${x.bg?'':`<span class="fs-dot" style="background:${x.dot}"></span>`}${esc(x.label)}</th><td class="ft-kv">${nf(x.q)}</td></tr>`).join('');
+  return `<section class="ft-area ft-factory-area" style="--acc:#8a6a3b;--acc-soft:#f3eadb"><header class="ft-area-head"><h3>Pesanan pabrik</h3><span class="ft-area-n">diambil di pabrik · dari sheet PESANAN</span><div class="ft-area-kpi"><span>Total <b>${nf(tot)}</b> pcs</span>${f?.partial?'<span>sebagian varian belum pasti</span>':''}</div></header><div class="ft-sub-h"><b>Pabrik</b><span>tidak masuk outlet & omzet outlet · ikut Rencana produksi</span></div><div class="ft-table-wrap ft-grid-wrap"><table class="ft-grid ft-grid-fac"><colgroup><col class="ft-cw-p"><col class="ft-cw-t"></colgroup><thead><tr><th class="ft-pcol" scope="col">Produk</th><th class="ft-tcol" scope="col">Pabrik</th></tr></thead><tbody>${body}</tbody>${items.length?`<tfoot><tr><th class="ft-pcol" scope="row">Total pcs</th><td class="ft-tcol">${nf(tot)}</td></tr></tfoot>`:''}</table></div></section>`;
+ }
  const AREA_ALL='__all__';
  function render(view){
   if(!data().sales||!data().orders)return '<div class="fp-empty">Memuat riwayat penjualan dan pesanan…</div>';
@@ -386,7 +397,7 @@ window.ForecastTopdown=(()=>{
     <div class="ft-view" role="tablist" aria-label="Tabel yang ditampilkan">${[['reg','1 · Stok outlet',''],['ord','2 · Pesanan',t.orders?` <i>${nf(t.orders)}</i>`:''],['kir','3 · Total kirim','']].map(([k,l,n])=>`<button type="button" role="tab" data-ft-view="${k}" aria-selected="${(draft.view||'reg')===k}">${l}${n}</button>`).join('')}</div>
     <div class="ft-bar-r"><span class="ft-legend"><span title="Tersimpan"><i class="ft-sdot saved"></i></span><span title="Berubah, belum disimpan"><i class="ft-sdot changed"></i></span><span title="Belum disimpan"><i class="ft-sdot new"></i></span><span class="ft-lg-txt">status</span><span title="Diubah dari saran otomatis"><i class="ft-lg-edit"></i></span><span class="ft-lg-txt">diubah</span></span><span class="ft-help" tabindex="0" title="${esc(`Porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir${c.perfSum?.down||c.perfSum?.up?`, disesuaikan performa rencana tim 28 hari (${c.perfSum.down} produk-outlet diturunkan${c.perfSum.up?`, ${c.perfSum.up} dinaikkan`:''})`:''}. Produk lain diisi manual (atur di Pengaturan › Produk). Keyboard: Enter/↓ baris bawah, Shift+Enter/↑ baris atas, Ctrl+←/→ pindah outlet. Klik nama outlet untuk catatan.`)}">?</span><button type="button" class="button quiet ft-jump" data-ft-jump>Rencana produksi ↓</button></div>
    </div>
-   ${(()=>{const rows=prodRows();return c.groups.filter(g=>(draft.area||AREA_ALL)===AREA_ALL||draft.area===g.name).map(g=>areaCard(c,g,rows)).join('');})()}
+   ${(()=>{const rows=prodRows();return c.groups.filter(g=>(draft.area||AREA_ALL)===AREA_ALL||draft.area===g.name).map(g=>areaCard(c,g,rows)).join('')+((draft.area||AREA_ALL)===AREA_ALL&&(draft.view||'reg')!=='reg'?factoryCard(c):'');})()}
    <div id="ft-prod">${productionBlock(c)}</div>
    <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
    <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}. Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>

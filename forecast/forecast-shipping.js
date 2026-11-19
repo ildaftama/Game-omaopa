@@ -107,7 +107,7 @@ window.ForecastShipping=(()=>{
   const soft=headSoft||tint(accent,.88),ink=shade(accent,.35),totBg=tint(accent,.95);
   const text=(t,tx,ty,{size=13,weight=400,color='#1f2d3a',align='left'}={})=>{x.font=`${weight} ${size}px ${F}`;x.fillStyle=color;x.textAlign=align;x.textBaseline='middle';const ls=String(t).split('\n'),lh=size+3;ls.forEach((l,i)=>x.fillText(l,tx,ty-(ls.length-1)*lh/2+i*lh));};
   const rect=(rx,ry,w,h,c)=>{x.fillStyle=c;x.fillRect(rx,ry,w,h);};
-  const GRID='#aeb9c4';const hline=(ry,c=GRID,w=1)=>{x.strokeStyle=c;x.lineWidth=w;x.beginPath();x.moveTo(PAD,ry+.5);x.lineTo(PAD+TWD,ry+.5);x.stroke();};
+  const GRID='rgba(30,45,60,0.34)';const hline=(ry,c=GRID,w=1)=>{x.strokeStyle=c;x.lineWidth=w;x.beginPath();x.moveTo(PAD,ry+.5);x.lineTo(PAD+TWD,ry+.5);x.stroke();};
   rect(0,0,W,H,'#ffffff');rect(0,0,W,6,accent);
   text('OMA OPA CAKERY',PAD,PAD+6,{size:11,weight:700,color:'#8592a0'});
   text(title,PAD,PAD+32,{size:21,weight:700,color:'#1c2b38'});
@@ -133,7 +133,7 @@ window.ForecastShipping=(()=>{
     y+=RH;hline(y);
    }
   }
-  x.strokeStyle='#97a4b1';x.lineWidth=1;x.strokeRect(PAD+.5,PAD+HEAD+.5,TWD-1,y-PAD-HEAD-1);
+  x.strokeStyle='rgba(30,45,60,0.5)';x.lineWidth=1;x.strokeRect(PAD+.5,PAD+HEAD+.5,TWD-1,y-PAD-HEAD-1);
   x.strokeStyle=GRID;for(let i=0;i<=cols;i++){if(i===0||i===cols&&!showTotal)continue;const vx=PAD+LW+i*CW+.5;x.beginPath();x.moveTo(vx,PAD+HEAD);x.lineTo(vx,y);x.stroke();}
   x.strokeStyle='#dbe1e7';const vx0=PAD+LW+.5;x.beginPath();x.moveTo(vx0,PAD+HEAD);x.lineTo(vx0,y);x.stroke();
   const stamp=new Date().toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});

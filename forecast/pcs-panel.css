@@ -924,3 +924,13 @@ main{max-width:1680px!important}
 .fpd-table td{padding-top:5px;padding-bottom:5px}
 .fpd-opt{padding:5px 10px!important}
 .fpd-wa-prev>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:#1f5567;margin:2px 0 6px}
+
+/* Garis lebih tegas & tetap terlihat di baris berwarna (owner 2026-11-19) */
+.ft-grid{border-top:1px solid rgba(30,45,60,.45)!important;border-left:1px solid rgba(30,45,60,.45)!important}
+.ft-grid th,.ft-grid td{border-right:1px solid rgba(30,45,60,.32)!important;border-bottom:1px solid rgba(30,45,60,.32)!important}
+.ft-grid thead th{border-bottom:1px solid rgba(30,45,60,.55)!important}
+.ft-grid .ft-tcol{border-left:1px solid rgba(30,45,60,.5)!important}
+.fs-ship{border-top:1px solid rgba(30,45,60,.45)!important;border-left:1px solid rgba(30,45,60,.45)!important}
+.fs-ship th,.fs-ship td{border-right:1px solid rgba(30,45,60,.32)!important;border-bottom:1px solid rgba(30,45,60,.32)!important}
+.ft-grid-fac{width:auto;min-width:0}
+.ft-factory-area .ft-grid-wrap{display:inline-block;max-width:100%}
