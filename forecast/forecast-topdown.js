@@ -76,11 +76,11 @@ window.ForecastTopdown=(()=>{
  }
  function rainSummary(c){
   const t=today();if(date<t||date>model.shift(t,15))return '';
-  if(rain.date===date&&rain.loading)return '<p class="ft-why ft-why-ok">Memuat ramalan hujan per outlet…</p>';
+  if(rain.date===date&&rain.loading)return '';
   if(rain.date!==date||!rain.map)return '';
   const hi=c.ids.map(id=>({id,d:rainOf(id)})).filter(x=>x.d&&rainCut(x.d.probability)).sort((a,b)=>b.d.probability-a.d.probability);
   const pending=hi.filter(x=>!draft.rain?.[x.id]),applied=c.ids.filter(id=>draft.rain?.[id]).length;
-  if(!hi.length&&!applied)return '<p class="ft-why ft-why-ok">🌤️ Ramalan hujan: tidak ada outlet dengan peluang hujan tinggi untuk tanggal ini.</p>';
+  if(!hi.length&&!applied)return '';
   const names=hi.slice(0,4).map(x=>`<b>${esc(name(x.id))}</b> ${Math.round(x.d.probability)}%`).join(', ')+(hi.length>4?` dan ${hi.length-4} outlet lain`:'');
   return `<div class="ft-rain-sum"><p>🌧️ <b>${hi.length} outlet</b> berpeluang hujan tinggi: ${names}. Saran: turunkan kiriman outlet tersebut 10–15%. Keputusan di Anda — klik tombol % di samping nama outlet, atau sekaligus:</p><div>${pending.length?`<button type="button" class="button" data-ft-rain-all>Turunkan semua (${pending.length} outlet)</button>`:''}${applied?`<button type="button" class="button quiet" data-ft-rain-none>Batalkan semua penurunan hujan (${applied})</button>`:''}</div></div>`;
  }
@@ -334,9 +334,7 @@ window.ForecastTopdown=(()=>{
   return `<section class="ft-area" style="--acc:${g.color};--acc-soft:${PR().routeBg(g.name)||'#eef2f6'}">
    <header class="ft-area-head"><h3>${A}</h3><span class="ft-area-n">${n} outlet</span><div class="ft-area-kpi"><span>Stok <b data-ft-gt2="reg|${A}">${sum('reg')}</b></span><span>Pesanan <b data-ft-gt2="ord|${A}">${sum('ord')}</b></span><span>Kirim <b data-ft-gt2="kir|${A}">${sum('kir')}</b> pcs</span></div></header>
    ${notes?`<div class="ft-notes">${notes}</div>`:''}
-   ${tbl('reg','Stok outlet','reguler · diisi forecaster')}
-   ${tbl('ord','Pesanan','diisi · angka awal dari rekap pesanan',hiddenOrd?`<button type="button" class="ft-linkbtn" data-ft-ordall="${A}">${showAllOrd?'Sembunyikan produk tanpa pesanan':`Tampilkan semua produk (+${hiddenOrd})`}</button>`:'')}
-   ${tbl('kir','Total kirim','stok + pesanan · otomatis, sama dengan Rincian kirim')}</section>`;
+   ${(()=>{const v=draft.view||'reg';return v==='ord'?tbl('ord','Pesanan','diisi · angka awal dari rekap pesanan',hiddenOrd?`<button type="button" class="ft-linkbtn" data-ft-ordall="${A}">${showAllOrd?'Sembunyikan produk tanpa pesanan':`Tampilkan semua produk (+${hiddenOrd})`}</button>`:''):v==='kir'?tbl('kir','Total kirim','stok + pesanan · otomatis, sama dengan Rincian kirim'):tbl('reg','Stok outlet','reguler · diisi forecaster');})()}</section>`;
  }
  // Perbarui angka turunan satu outlet tanpa render ulang (mengetik tetap lancar).
  function paintOutlet(c,id){
@@ -369,7 +367,8 @@ window.ForecastTopdown=(()=>{
       <div class="ft-stat"><span>Prediksi sistem</span><strong>${rp(pred)}</strong><small>${pred?'omzet reguler, tanpa pesanan':'belum tersedia untuk tanggal ini'}</small></div>
       <div class="ft-target"><label for="ft-target">Target omzet reguler</label><div class="ft-target-input"><span>Rp</span><input id="ft-target" inputmode="numeric" value="${esc(nf(draft.target))}" autocomplete="off"></div><small>${diff==null?'':Math.abs(diff)<.05?'sesuai prediksi':`${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi`}</small></div>
      </div>
-     ${dayWarn()}${pred?`<div class="ft-chips"><span class="ft-chips-l">Buffer</span>${BUFFERS.map(b=>`<button type="button" class="ft-chip ${Math.abs((diff??-99)-b)<.05?'on':''} ${b===c.net.pct?'sug':''}" data-ft-buffer="${b}">${b?(b>0?'+':'−')+Math.abs(b)+'%':'0%'}${b===c.net.pct?' · saran':''}</button>`).join('')}</div>${netWhy(c)}`:''}${rainSummary(c)}
+     ${pred?`<div class="ft-chips"><span class="ft-chips-l">Buffer</span>${BUFFERS.map(b=>`<button type="button" class="ft-chip ${Math.abs((diff??-99)-b)<.05?'on':''} ${b===c.net.pct?'sug':''}" data-ft-buffer="${b}">${b?(b>0?'+':'−')+Math.abs(b)+'%':'0%'}${b===c.net.pct?' · saran':''}</button>`).join('')}</div>`:''}
+     ${(()=>{const a=[dayWarn(),pred?netWhy(c):'',rainSummary(c)].filter(Boolean).join('');return a?`<div class="ft-advice"><span class="ft-advice-h">Saran untuk tanggal ini</span>${a}</div>`:'';})()}
      <div class="ft-ctrl-act"><label class="ft-toggle"><input type="checkbox" id="ft-per-outlet" ${draft.perOutlet?'checked':''}> Sesuaikan porsi outlet dari waste & habis stok <small>(${adjN} outlet digeser)</small></label><button type="button" class="button fp-primary" data-ft-allocate>Bagi otomatis ke outlet & produk</button></div>
     </div>
     <div class="ft-kpis">
@@ -380,8 +379,11 @@ window.ForecastTopdown=(()=>{
     </div>
    </div>
    ${locked()?'<p class="fp-lock-note">🔒 Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.</p>':date<=today()?'<p class="fs-ship-note">Hari H sudah dimulai. Anda Master, jadi masih bisa mengubah, tapi rencana yang disimpan sekarang tidak dihitung di akurasi.</p>':''}
-   <div class="ft-bar"><div class="ft-area-tabs" role="tablist" aria-label="Pilih area">${[{name:AREA_ALL},...c.groups].map(g=>`<button type="button" role="tab" data-ft-area="${esc(g.name)}" aria-selected="${(draft.area||AREA_ALL)===g.name}">${g.name===AREA_ALL?'Semua area':esc(g.name)}</button>`).join('')}</div><div class="ft-legend"><span><i class="ft-sdot saved"></i>tersimpan</span><span><i class="ft-sdot changed"></i>berubah</span><span><i class="ft-sdot new"></i>belum disimpan</span><span><i class="ft-lg-edit"></i>diubah dari saran</span><span class="ft-lg-key" title="Enter / ↓ ke bawah, Shift+Enter / ↑ ke atas, Ctrl+← → pindah outlet">⌨ Enter = baris berikutnya</span></div></div>
-   <p class="ft-sub">Porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir${c.perfSum?.down||c.perfSum?.up?`, disesuaikan performa rencana tim 28 hari (${c.perfSum.down} produk-outlet diturunkan${c.perfSum.up?`, ${c.perfSum.up} dinaikkan`:''})`:''}. Produk lain (${draft.names.length}) diisi manual, diatur di <b>Pengaturan › Produk</b>.</p>
+   <div class="ft-bar">
+    <div class="ft-area-tabs" role="tablist" aria-label="Pilih area">${[{name:AREA_ALL},...c.groups].map(g=>`<button type="button" role="tab" data-ft-area="${esc(g.name)}" aria-selected="${(draft.area||AREA_ALL)===g.name}">${g.name===AREA_ALL?'Semua area':esc(g.name)}</button>`).join('')}</div>
+    <div class="ft-view" role="tablist" aria-label="Tabel yang ditampilkan">${[['reg','1 · Stok outlet',''],['ord','2 · Pesanan',t.orders?` <i>${nf(t.orders)}</i>`:''],['kir','3 · Total kirim','']].map(([k,l,n])=>`<button type="button" role="tab" data-ft-view="${k}" aria-selected="${(draft.view||'reg')===k}">${l}${n}</button>`).join('')}</div>
+    <div class="ft-bar-r"><span class="ft-legend"><span title="Tersimpan"><i class="ft-sdot saved"></i></span><span title="Berubah, belum disimpan"><i class="ft-sdot changed"></i></span><span title="Belum disimpan"><i class="ft-sdot new"></i></span><span class="ft-lg-txt">status</span><span title="Diubah dari saran otomatis"><i class="ft-lg-edit"></i></span><span class="ft-lg-txt">diubah</span></span><span class="ft-help" tabindex="0" title="${esc(`Porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir${c.perfSum?.down||c.perfSum?.up?`, disesuaikan performa rencana tim 28 hari (${c.perfSum.down} produk-outlet diturunkan${c.perfSum.up?`, ${c.perfSum.up} dinaikkan`:''})`:''}. Produk lain diisi manual (atur di Pengaturan › Produk). Keyboard: Enter/↓ baris bawah, Shift+Enter/↑ baris atas, Ctrl+←/→ pindah outlet. Klik nama outlet untuk catatan.`)}">?</span><button type="button" class="button quiet ft-jump" data-ft-jump>Rencana produksi ↓</button></div>
+   </div>
    ${(()=>{const rows=prodRows();return c.groups.filter(g=>(draft.area||AREA_ALL)===AREA_ALL||draft.area===g.name).map(g=>areaCard(c,g,rows)).join('');})()}
    <div id="ft-prod">${productionBlock(c)}</div>
    <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
@@ -460,6 +462,8 @@ window.ForecastTopdown=(()=>{
   if(e.target.closest('[data-ft-rain-all]')){let n=0;for(const id of compute().ids){const d=rainOf(id),cut=d?rainCut(d.probability):0;if(cut&&!draft.rain?.[id]){applyRain(id,cut);n++;}}persist();message=`${n} outlet diturunkan 10–15% karena peluang hujan tinggi. Bisa dibatalkan per outlet.`;return true;}
   if(e.target.closest('[data-ft-rain-none]')){for(const id of Object.keys(draft.rain||{}))undoRain(id);persist();message='Semua penurunan karena hujan dibatalkan.';return true;}
   const oa=e.target.closest('[data-ft-ordall]');if(oa){draft.ordAll=draft.ordAll||{};draft.ordAll[oa.dataset.ftOrdall]=!draft.ordAll[oa.dataset.ftOrdall];persist();return true;}
+  const vw=e.target.closest('[data-ft-view]');if(vw){draft.view=vw.dataset.ftView;persist();return true;}
+  if(e.target.closest('[data-ft-jump]')){q('#ft-prod')?.scrollIntoView({behavior:'smooth',block:'start'});return false;}
   const ar=e.target.closest('[data-ft-area]');if(ar){draft.area=ar.dataset.ftArea;persist();return true;}
   const tg=e.target.closest('[data-ft-toggle]');
   if(tg){const id=tg.dataset.ftToggle,i=draft.open.indexOf(id);if(i<0)draft.open.push(id);else draft.open.splice(i,1);persist();return true;}

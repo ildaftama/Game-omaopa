@@ -891,3 +891,31 @@ main{max-width:1680px!important}
 .fd-fold>summary:hover .fd-fold-t{color:#1f5567}
 .fd-fold-b{padding:0 12px 12px}
 .fd-fold-b>.workspace-card{margin:0;border:0;box-shadow:none}
+
+/* ===== Buat forecast v3 (owner 2026-11-19): garis lebih jelas, alur lebih ringkas ===== */
+.ft-grid{border-top-color:#a9b5c1;border-left-color:#a9b5c1}
+.ft-grid th,.ft-grid td{border-right-color:#b4bfca;border-bottom-color:#b4bfca}
+.ft-grid thead th{border-bottom:1px solid #8e9cab}
+.ft-grid .ft-tcol{border-left:1px solid #8e9cab}
+.ft-grid tr.ft-cat th{border-top:1px solid #a9b5c1}
+.fs-ship{border-top-color:#a9b5c1!important;border-left-color:#a9b5c1!important}
+.fs-ship th,.fs-ship td{border-right-color:#b4bfca!important;border-bottom-color:#b4bfca!important}
+.ft-advice{display:grid;gap:6px;padding:10px 12px;border-radius:10px;background:#f7f9fb;border:1px solid #e6ebf0}
+.ft-advice-h{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7a88}
+.ft-advice .ft-why,.ft-advice .ft-daywarn,.ft-advice .ft-rain-sum{margin:0;padding:6px 10px;border-radius:8px;font-size:12.5px}
+.ft-advice .ft-daywarn b{font-size:12.5px}
+.ft-bar{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:10px 14px;height:auto;min-height:52px}
+.ft-view{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:#e8eef4}
+.ft-view button{border:0;background:transparent;padding:7px 14px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;color:#4d5d6c;cursor:pointer;white-space:nowrap}
+.ft-view button i{font-style:normal;font-size:11px;padding:1px 6px;border-radius:9px;background:#d6e2ec;margin-left:3px}
+.ft-view button[aria-selected="true"]{background:#1f5567;color:#fff}
+.ft-view button[aria-selected="true"] i{background:rgba(255,255,255,.25)}
+.ft-bar-r{display:flex;align-items:center;gap:12px;justify-content:flex-end;min-width:0}
+.ft-legend{gap:6px}
+.ft-lg-txt{font-size:11.5px;color:#7a8896;margin-right:6px}
+.ft-help{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#eef2f6;color:#4d5d6c;font-size:12px;font-weight:700;cursor:help}
+.ft-jump{padding:7px 12px!important;font-size:12.5px!important;white-space:nowrap}
+@media (max-width:1300px){.ft-bar{grid-template-columns:1fr auto}.ft-bar-r{grid-column:1/-1;justify-content:space-between}}
+@media (min-width:1100px){.ft-area .ft-grid thead th{top:var(--ft-bar-h,60px)}}
+@media (min-width:1301px){.ft-bar{height:56px;box-sizing:border-box}.ft-area .ft-grid thead th{top:56px}}
+@media (min-width:1100px) and (max-width:1300px){.ft-bar{min-height:104px;box-sizing:border-box}.ft-area .ft-grid thead th{top:104px}}
