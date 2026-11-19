@@ -300,9 +300,9 @@ window.ForecastTopdown=(()=>{
  // disusun (draft halaman Buat forecast), tidak menunggu disimpan. Unduh/bagikan gambar untuk dapur
  // baru terbuka setelah semua outlet tersimpan -- itu langkah terakhir.
  function productionPage(){
-  const c=prepare(),i=pendingInfo(c),saved=c.ids.filter(id=>record(id)).length,done=!i.n&&saved>0,canShare=!!(navigator.canShare&&navigator.share);
-  const stat=done?`<div class="fpp-status done"><b>✓ Semua ${c.ids.length} outlet tersimpan</b><span>Rencana produksi final, siap diunduh untuk dapur.</span></div>`:`<div class="fpp-status draft"><b>Draft · ${i.n} outlet belum tersimpan</b><span>Angka di bawah sudah mengikuti forecast yang sedang disusun. Simpan semua outlet untuk membuka unduhan.${i.areas?` (${esc(i.areas)})`:''}</span></div>`;
-  const acts=done?`${canShare?'<button type="button" class="button fp-primary" data-ft-prod-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ft-prod-download>Unduh gambar</button>`:`<button type="button" class="button" data-fp-mode="topdown">← Kembali ke Buat forecast</button><button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!i.n||locked()?'disabled':''}>${saving?'Menyimpan…':saveText(i)}</button>`;
+  const c=prepare(),i=pendingInfo(c),saved=c.ids.filter(id=>record(id)).length,done=!i.any&&saved>0,canShare=!!(navigator.canShare&&navigator.share);
+  const stat=done?`<div class="fpp-status done"><b>✓ Semua ${c.ids.length} outlet tersimpan</b><span>Rencana produksi final, siap diunduh untuk dapur.</span></div>`:`<div class="fpp-status draft"><b>Draft · ${[i.n?`${i.n} outlet`:'',i.fac?'pesanan pabrik':''].filter(Boolean).join(' + ')} belum tersimpan</b><span>Angka di bawah sudah mengikuti forecast yang sedang disusun. Simpan semua outlet untuk membuka unduhan.${i.areas?` (${esc(i.areas)})`:''}</span></div>`;
+  const acts=done?`${canShare?'<button type="button" class="button fp-primary" data-ft-prod-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ft-prod-download>Unduh gambar</button>`:`<button type="button" class="button" data-fp-mode="topdown">← Kembali ke Buat forecast</button><button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!i.any||locked()?'disabled':''}>${saving?'Menyimpan…':saveText(i)}</button>`;
   return `<div class="ft-wrap"><div class="fpp-top"><label class="ft-date">Tanggal kiriman<input type="date" id="ft-date" value="${date}"></label>${stat}<div class="fpp-actions">${acts}</div></div>
    <p class="fs-ship-sub fs-ship-status ft-msg" role="status" ${message?'':'hidden'}>${esc(message)}</p>
    <div id="ft-prod">${productionBlock(c)}</div></div>`;
@@ -390,7 +390,7 @@ window.ForecastTopdown=(()=>{
   const c=prepare(),t=totals(c),pred=c.pred?.pure,diff=pred?((draft.target/pred-1)*100):null;
   loadRain(c.ids);
   const adjN=c.ids.filter(id=>c.outlets.get(id).adj.pct).length;
-  const changedN=c.ids.filter(id=>statusOf(id)[0]!=='saved').length,existing=c.ids.filter(id=>record(id)).length;
+  const changedN=pendingInfo(c).any?1:0,existing=c.ids.filter(id=>record(id)).length;
   const fo=factoryOrders(),foN=fo?fo.qty.reduce((a,b)=>a+b,0):null,foV=factoryValue(c,fo);
   return `<div class="ft-wrap">
    <div class="ft-hero">
@@ -445,10 +445,10 @@ window.ForecastTopdown=(()=>{
  const q=s=>document.querySelector(s);
  // Tombol simpan dihitung per OUTLET (bukan area). 0 = semua sudah tersimpan -> tulis jelas; kalau
  // ada yang belum, sebutkan sebarannya per area pengiriman supaya mudah dicek.
- function pendingInfo(c){const ids=c.ids.filter(x=>statusOf(x)[0]!=='saved'),areas=c.groups.map(g=>[g.name,g.ids.filter(id=>ids.includes(id)).length]).filter(([,n])=>n);const fac=!!draft?.fac&&facStatus()[0]!=='saved';if(fac)areas.push(['Pabrik',1]);return {n:ids.length+(fac?1:0),fac,areas:areas.map(([a,n])=>a==='Pabrik'?'Pabrik':`${a} ${n}`).join(', ')};}
- const saveText=i=>i.n?`Simpan ${i.n} outlet ke tim`:'Semua outlet tersimpan';
- const pendingMsg=i=>i.n?`${i.n} outlet belum tersimpan / berubah (${i.areas}). Teliti angkanya, lalu simpan.`:'Semua outlet sudah tersimpan sesuai angka di tabel.';
- function saveLabel(){const c=compute(),i=pendingInfo(c),btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!i.n||locked();btn.textContent=saveText(i);btn.title=i.n?`Per area: ${i.areas}`:'';const any=c.ids.some(x=>record(x));btn.hidden=!i.n&&any;const nx=q('[data-ft-next]');if(nx)nx.hidden=!!i.n||!any;}const m=q('.ft-msg');if(m&&!message)m.textContent=pendingMsg(i);}
+ function pendingInfo(c){const ids=c.ids.filter(x=>statusOf(x)[0]!=='saved'),areas=c.groups.map(g=>[g.name,g.ids.filter(id=>ids.includes(id)).length]).filter(([,n])=>n);const fac=!!draft?.fac&&facStatus()[0]!=='saved';return {n:ids.length,fac,any:ids.length>0||fac,areas:areas.map(([a,n])=>a==='Pabrik'?'Pabrik':`${a} ${n}`).join(', ')};}
+ const saveText=i=>i.any?`Simpan ${[i.n?`${i.n} outlet`:'',i.fac?'pesanan pabrik':''].filter(Boolean).join(' + ')} ke tim`:'Semua tersimpan';
+ const pendingMsg=i=>i.any?`${[i.n?`${i.n} outlet belum tersimpan / berubah (${i.areas})`:'',i.fac?'pesanan pabrik berubah':''].filter(Boolean).join(' · ')}. Teliti angkanya, lalu simpan.`:'Semua outlet & pesanan pabrik sudah tersimpan sesuai angka di tabel.';
+ function saveLabel(){const c=compute(),i=pendingInfo(c),btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!i.any||locked();btn.textContent=saveText(i);btn.title=i.n?`Per area: ${i.areas}`:'';const any=c.ids.some(x=>record(x));btn.hidden=!i.any&&any;const nx=q('[data-ft-next]');if(nx)nx.hidden=!!i.any||!any;}const m=q('.ft-msg');if(m&&!message)m.textContent=pendingMsg(i);}
  function refreshTotals(id){
   const c=compute(),tt=outletTotals(c,id),t=totals(c),E=CSS.escape(id);
   const v=q(`[data-ft-val="${E}"]`);if(v)v.textContent=rpShort(tt.val);
@@ -576,7 +576,7 @@ window.ForecastTopdown=(()=>{
    if(!plan.active.some(Boolean))plan.active[2]=true;
    try{await cloud().save(plan,r?.revision||0);ok++;}catch(err){fail.push('Pabrik'+(/permission|izin|insufficient/i.test(String(err.message))?' (aturan Firestore belum mengizinkan "pabrik")':''));failWhy=failWhy||String(err.message);}
   }
-  persist();saving=false;message=fail.length?`${ok} outlet tersimpan. Gagal ${fail.length}: ${fail.join(', ')}. Penyebab: ${failWhy}`:`${ok} outlet tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
+  persist();saving=false;const facOk=facTodo&&!fail.some(f=>f.startsWith('Pabrik')),outOk=ok-(facOk?1:0);message=fail.length?`${outOk} outlet${facOk?' + pesanan pabrik':''} tersimpan. Gagal ${fail.length}: ${fail.join(', ')}. Penyebab: ${failWhy}`:`${[outOk?`${outOk} outlet`:'',facOk?'pesanan pabrik':''].filter(Boolean).join(' + ')} tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
  }
  // Dipakai tab detail outlet: angka hasil bagi untuk outlet+tanggal ini (kalau belum ada rencana
  // tim), supaya detail outlet langsung berisi angka yang sama dengan halaman utama.
