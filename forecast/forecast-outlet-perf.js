@@ -54,7 +54,7 @@ window.ForecastOutletPerf=(()=>{
  function collect(){
   const cloud=window.ForecastPlanCloud,d=window.PcsPanels.data();if(!cloud||cloud.state!=='ready'||!d.sales||!d.orders)return null;
   const [from,to]=monthRange(ym);cloud.watch?.(from,to);
-  const out=[];for(const r of cloud.records||[]){if(r.date<from||r.date>to)continue;if(outlet!=='__all__'&&r.outlet!==outlet)continue;const c=model().compare(r,d.sales,d.orders);const ls=lines(r,c);out.push({r,ls});}
+  const out=[];for(const r of cloud.records||[]){if(r.outlet==='pabrik'||r.date<from||r.date>to)continue;if(outlet!=='__all__'&&r.outlet!==outlet)continue;const c=model().compare(r,d.sales,d.orders);const ls=lines(r,c);out.push({r,ls});}
   return out;
  }
  function render(){

@@ -61,7 +61,7 @@ window.ForecastShipping=(()=>{
    const totals=ROWS.map((_,ri)=>sumOf(cols.map(c=>c.values[ri])));return {...g,cols,totals,grand:sumOf(totals),filled:cols.filter(c=>c.record).length};});
  }
  // Pesanan untuk pabrik (bukan outlet), dari rekap sheet PESANAN (factoryDays, pcs_orders.py).
- function factory(){const f=window.PcsPanels?.data?.()?.orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===date);const qty=r?r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0):Array(12).fill(0);return {qty,orders:r?.orders||0,partial:!!r?.qty?.some(v=>v===null),total:qty.reduce((a,b)=>a+b,0)};}
+ function factory(){const rec=(window.ForecastPlanCloud?.records||[]).find(x=>x.date===date&&x.outlet==='pabrik');if(rec){const qty=rec.plan.orders.map(Number);return {qty,orders:1,partial:false,total:qty.reduce((a,b)=>a+b,0),manual:true};}const f=window.PcsPanels?.data?.()?.orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===date);const qty=r?r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0):Array(12).fill(0);return {qty,orders:r?.orders||0,partial:!!r?.qty?.some(v=>v===null),total:qty.reduce((a,b)=>a+b,0)};}
  // Rencana produksi dari rencana tersimpan (+ pesanan pabrik), dalam angkatan dapur.
  // Rencana produksi dari rencana TERSIMPAN (+ pesanan pabrik), dalam angkatan dapur. Pilihan
  // naik/turun, stok Mini per rasa & pengurangan Chiffon diambil dari draft Buat forecast di

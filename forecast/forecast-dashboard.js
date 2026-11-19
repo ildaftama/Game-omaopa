@@ -741,7 +741,7 @@ window.ForecastDashboard=(()=>{
    cloud.watch?.(planner.shift(today(),-56),planner.shift(today(),62));
    const byPlanDate=new Map();
    for(const r of cloud.records||[]){
-    if(outletId!=='__all__'&&r.outlet!==outletId)continue;
+    if(r.outlet==='pabrik'||(outletId!=='__all__'&&r.outlet!==outletId))continue;
     const prices=r.baseline.prices;let sum=0;
     for(let p=0;p<12;p++)if(r.baseline.active[p]&&Number.isFinite(prices[p]?.value))sum+=(r.baseline.regular[p]+r.baseline.orders[p])*prices[p].value;
     byPlanDate.set(r.date,(byPlanDate.get(r.date)||0)+sum);

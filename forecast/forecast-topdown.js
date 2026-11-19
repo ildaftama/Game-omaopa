@@ -97,7 +97,27 @@ window.ForecastTopdown=(()=>{
  }
  function orderQty(id){const pre=data().orders.days.find(r=>r.date===date&&r.id===id);return pre?.qty?.map((v,p)=>Number.isInteger(v)?v:pre.knownQty?.[p]||0)||Array(12).fill(0);}
  // Pesanan untuk pabrik (bukan outlet) -- direkap terpisah oleh pcs_orders.py (factoryDays).
- function factoryOrders(d=date){const f=data().orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===d);return r?{...r,qty:r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0),partial:r.qty.some(v=>v===null)}:{date:d,qty:Array(12).fill(0),orders:0,partial:false};}
+ function sheetFactory(d=date){const f=data().orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===d);return r?{...r,qty:r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0),partial:r.qty.some(v=>v===null)}:{date:d,qty:Array(12).fill(0),orders:0,partial:false};}
+ // Pesanan PABRIK bisa diisi forecaster (owner 2026-11-19): pesanan yang diambil di pabrik atau
+ // dari manajemen sebelah. Angka awal dari sheet PESANAN; perubahan disimpan sebagai rencana
+ // "outlet" khusus FAC_ID (pabrik) -- tidak masuk outlet/omzet outlet, ikut Rencana produksi &
+ // Rincian kirim. Yang dipakai: draft halaman ini > rencana tim tersimpan > sheet.
+ const FAC_ID='pabrik';
+ function factoryOrders(d=date){
+  if(d===date&&draft?.fac&&draft.date===date){const qty=draft.fac.cells.map(v=>Math.round(qtyOf(v)));return {date:d,qty,orders:0,partial:false,manual:true};}
+  const r=cloud().records.find(x=>x.date===d&&x.outlet===FAC_ID);if(r)return {date:d,qty:r.plan.orders.map(Number),orders:0,partial:false,manual:true};
+  return sheetFactory(d);
+ }
+ function ensureFac(){
+  const r=record(FAC_ID);
+  if(!draft.fac||(r&&(draft.fac.seen||0)<r.revision)){const sh=sheetFactory();draft.fac={cells:(r?r.plan.orders:(sh?.qty||Array(12).fill(0))).map(String),seen:r?.revision||0};return true;}
+  return false;
+ }
+ function facStatus(){
+  const r=record(FAC_ID),cur=draft.fac.cells.map(v=>Math.round(qtyOf(v)));
+  if(r)return r.plan.orders.every((v,p)=>v===cur[p])?['saved',`Tersimpan v${r.revision}`]:['changed',`Berubah · v${r.revision}`];
+  const sh=sheetFactory()?.qty||Array(12).fill(0);return sh.every((v,p)=>v===cur[p])?['saved','Sesuai sheet PESANAN']:['changed','Diubah, belum disimpan'];
+ }
  // Dihitung sekali per tanggal (recommend 28 outlet cukup berat).
  function compute(){
   const d=data(),recsAll=cloud().records||[];cloud().watch?.(model.shift(date,-28),date);
@@ -182,6 +202,7 @@ window.ForecastTopdown=(()=>{
   // dari tab detail outlet, atau oleh rekan) selalu menang -- tabel ikut angka tim terbaru.
   let synced=false;for(const id of c.ids){const r=record(id);if(r&&(draft.seen[id]||0)<r.revision){seed(id,r);synced=true;}}
   if(synced){ensureShape(c);persist();}
+  if(ensureFac())persist();
   return c;
  }
  // Pembanding: reguler terjual hari yang sama minggu lalu (ESB 12 produk inti dikurangi pesanan
@@ -356,12 +377,11 @@ window.ForecastTopdown=(()=>{
  // kirim (pabrik tidak punya stok reguler). Angka dari sheet PESANAN (factoryDays), tidak diisi
  // di sini; ikut dihitung di Rencana produksi dan tampil di Rincian kirim.
  function factoryCard(c){
-  const f=factoryOrders();const core=PR().core();
-  const items=f?PR().CORE_ORDER.filter(p=>f.qty[p]>0).map(p=>({p,label:core[p].label,bg:core[p].bg,dot:core[p].dot,q:f.qty[p]})):[];
-  const tot=items.reduce((s,x)=>s+x.q,0);
-  const body=!f?'<tr><td class="ft-empty" colspan="2">Pesanan pabrik belum tersinkron.</td></tr>':!items.length?'<tr><td class="ft-empty" colspan="2">Tidak ada pesanan pabrik untuk tanggal ini.</td></tr>'
-   :items.map(x=>`<tr class="ft-r${x.bg?' ft-rbg':''}"${x.bg?` style="--row:${x.bg}"`:''}><th class="ft-pcol" scope="row">${x.bg?'':`<span class="fs-dot" style="background:${x.dot}"></span>`}${esc(x.label)}</th><td class="ft-kv">${nf(x.q)}</td></tr>`).join('');
-  return `<section class="ft-area ft-factory-area" style="--acc:#8a6a3b;--acc-soft:#f3eadb"><header class="ft-area-head"><h3>Pesanan pabrik</h3><span class="ft-area-n">diambil di pabrik · dari sheet PESANAN</span><div class="ft-area-kpi"><span>Total <b>${nf(tot)}</b> pcs</span>${f?.partial?'<span>sebagian varian belum pasti</span>':''}</div></header><div class="ft-sub-h"><b>Pabrik</b><span>tidak masuk outlet & omzet outlet · ikut Rencana produksi</span></div><div class="ft-table-wrap ft-grid-wrap"><table class="ft-grid ft-grid-fac"><colgroup><col class="ft-cw-p"><col class="ft-cw-t"></colgroup><thead><tr><th class="ft-pcol" scope="col">Produk</th><th class="ft-tcol" scope="col">Pabrik</th></tr></thead><tbody>${body}</tbody>${items.length?`<tfoot><tr><th class="ft-pcol" scope="row">Total pcs</th><td class="ft-tcol">${nf(tot)}</td></tr></tfoot>`:''}</table></div></section>`;
+  const core=PR().core(),sh=sheetFactory()?.qty||Array(12).fill(0),all=!!draft.facAll,[sk,sl]=facStatus();
+  const rows=PR().CORE_ORDER.filter(p=>all||qtyOf(draft.fac.cells[p])>0||sh[p]>0).map(p=>{const v=draft.fac.cells[p],ed=Math.round(qtyOf(v))!==sh[p];
+   return `<tr class="ft-r${core[p].bg?' ft-rbg':''}"${core[p].bg?` style="--row:${core[p].bg}"`:''}><th class="ft-pcol" scope="row">${core[p].bg?'':`<span class="fs-dot" style="background:${core[p].dot}"></span>`}${esc(core[p].label)}</th><td><input class="ft-cell${ed?' ft-edited':''}${qtyOf(v)?'':' z'}" type="number" inputmode="numeric" min="0" max="10000" step="1" value="${esc(v)}" data-ft-fac="${p}" aria-label="Pabrik ${esc(core[p].label)}" title="Sheet PESANAN: ${sh[p]}"></td></tr>`;}).join('');
+  const tot=draft.fac.cells.reduce((a,v)=>a+Math.round(qtyOf(v)),0),hidden=PR().CORE_ORDER.length-PR().CORE_ORDER.filter(p=>qtyOf(draft.fac.cells[p])>0||sh[p]>0).length;
+  return `<section class="ft-area ft-factory-area" style="--acc:#8a6a3b;--acc-soft:#f3eadb"><header class="ft-area-head"><h3>Pesanan pabrik</h3><span class="ft-area-n">diambil di pabrik / manajemen sebelah · angka awal dari sheet PESANAN</span><div class="ft-area-kpi"><span class="ft-sdot ${sk}" title="${esc(sl)}"></span><span>${esc(sl)}</span><span>Total <b data-ft-fac-total>${nf(tot)}</b> pcs</span></div></header><div class="ft-sub-h"><b>Pabrik</b><span>bisa diubah · tidak masuk outlet & omzet outlet · ikut Rencana produksi & Rincian kirim</span>${hidden?`<button type="button" class="ft-linkbtn" data-ft-facall>${all?'Sembunyikan produk kosong':`Tambah produk lain (+${hidden})`}</button>`:''}</div><div class="ft-table-wrap ft-grid-wrap"><table class="ft-grid ft-grid-fac"><colgroup><col class="ft-cw-p"><col class="ft-cw-o"></colgroup><thead><tr><th class="ft-pcol" scope="col">Produk</th><th class="ft-ocol" scope="col">Pabrik</th></tr></thead><tbody class="ft-r-body">${rows||`<tr><td class="ft-empty" colspan="2">Tidak ada pesanan pabrik. Klik <b>Tambah produk lain</b> untuk mengisi.</td></tr>`}</tbody><tfoot><tr><th class="ft-pcol" scope="row">Total pcs</th><td class="ft-ctot" data-ft-fac-total2>${nf(tot)}</td></tr></tfoot></table></div></section>`;
  }
  const AREA_ALL='__all__';
  function render(view){
@@ -425,7 +445,7 @@ window.ForecastTopdown=(()=>{
  const q=s=>document.querySelector(s);
  // Tombol simpan dihitung per OUTLET (bukan area). 0 = semua sudah tersimpan -> tulis jelas; kalau
  // ada yang belum, sebutkan sebarannya per area pengiriman supaya mudah dicek.
- function pendingInfo(c){const ids=c.ids.filter(x=>statusOf(x)[0]!=='saved'),areas=c.groups.map(g=>[g.name,g.ids.filter(id=>ids.includes(id)).length]).filter(([,n])=>n);return {n:ids.length,areas:areas.map(([a,n])=>`${a} ${n}`).join(', ')};}
+ function pendingInfo(c){const ids=c.ids.filter(x=>statusOf(x)[0]!=='saved'),areas=c.groups.map(g=>[g.name,g.ids.filter(id=>ids.includes(id)).length]).filter(([,n])=>n);const fac=!!draft?.fac&&facStatus()[0]!=='saved';if(fac)areas.push(['Pabrik',1]);return {n:ids.length+(fac?1:0),fac,areas:areas.map(([a,n])=>a==='Pabrik'?'Pabrik':`${a} ${n}`).join(', ')};}
  const saveText=i=>i.n?`Simpan ${i.n} outlet ke tim`:'Semua outlet tersimpan';
  const pendingMsg=i=>i.n?`${i.n} outlet belum tersimpan / berubah (${i.areas}). Teliti angkanya, lalu simpan.`:'Semua outlet sudah tersimpan sesuai angka di tabel.';
  function saveLabel(){const c=compute(),i=pendingInfo(c),btn=q('[data-ft-save]');if(btn&&!saving){btn.disabled=cloud().state!=='ready'||!i.n||locked();btn.textContent=saveText(i);btn.title=i.n?`Per area: ${i.areas}`:'';const any=c.ids.some(x=>record(x));btn.hidden=!i.n&&any;const nx=q('[data-ft-next]');if(nx)nx.hidden=!!i.n||!any;}const m=q('.ft-msg');if(m&&!message)m.textContent=pendingMsg(i);}
@@ -452,6 +472,7 @@ window.ForecastTopdown=(()=>{
   if(t.dataset.ftXo){const [id,i]=split(t.dataset.ftXo);draft.extra[id][draft.names[i]].o=t.value;persist();refreshTotals(id);return false;}
   if(t.dataset.ftOrd){const [id,p]=split(t.dataset.ftOrd);draft.orders[id][p]=t.value;persist();refreshTotals(id);return false;}
   if(t.dataset.ftNote!==undefined){draft.notes[t.dataset.ftNote]=t.value;persist();refreshTotals(t.dataset.ftNote);return false;}
+  if(t.dataset.ftFac!==undefined){draft.fac.cells[+t.dataset.ftFac]=t.value;persist();const tot=draft.fac.cells.reduce((a,v)=>a+Math.round(qtyOf(v)),0);for(const el of document.querySelectorAll('[data-ft-fac-total],[data-ft-fac-total2]'))el.textContent=nf(tot);const sh=sheetFactory()?.qty||[];t.classList.toggle('ft-edited',Math.round(qtyOf(t.value))!==(sh[+t.dataset.ftFac]||0));saveLabel();scheduleProd();return false;}
   if(t.dataset.ftMiniStock!==undefined){if(!draft.miniStock||typeof draft.miniStock!=='object')draft.miniStock={};draft.miniStock[t.dataset.ftMiniStock]=t.value;persist();scheduleProd();return false;}
   if(t.dataset.ftProdExtra!==undefined){draft.prodExtra=draft.prodExtra||{};draft.prodExtra[t.dataset.ftProdExtra]=t.value;persist();proposal=null;scheduleProd();return false;}
   if(t.id==='ft-target'){const n=Number(String(t.value).replace(/\D/g,''));draft.target=n;persist();return false;}
@@ -475,6 +496,7 @@ window.ForecastTopdown=(()=>{
   if(e.target.closest('[data-ft-rain-all]')){let n=0;for(const id of compute().ids){const d=rainOf(id),cut=d?rainCut(d.probability):0;if(cut&&!draft.rain?.[id]){applyRain(id,cut);n++;}}persist();message=`${n} outlet diturunkan 10–15% karena peluang hujan tinggi. Bisa dibatalkan per outlet.`;return true;}
   if(e.target.closest('[data-ft-rain-none]')){for(const id of Object.keys(draft.rain||{}))undoRain(id);persist();message='Semua penurunan karena hujan dibatalkan.';return true;}
   const ra2=e.target.closest('[data-ft-regall]');if(ra2){draft.regAll=draft.regAll||{};draft.regAll[ra2.dataset.ftRegall]=!draft.regAll[ra2.dataset.ftRegall];persist();return true;}
+  if(e.target.closest('[data-ft-facall]')){draft.facAll=!draft.facAll;persist();return true;}
   const oa=e.target.closest('[data-ft-ordall]');if(oa){draft.ordAll=draft.ordAll||{};draft.ordAll[oa.dataset.ftOrdall]=!draft.ordAll[oa.dataset.ftOrdall];persist();return true;}
   const vw=e.target.closest('[data-ft-view]');if(vw){draft.view=vw.dataset.ftView;persist();return true;}
   if(e.target.closest('[data-ft-jump]')){q('#ft-prod')?.scrollIntoView({behavior:'smooth',block:'start'});return false;}
@@ -529,7 +551,8 @@ window.ForecastTopdown=(()=>{
  // tempat; render penuh sekali di akhir.
  const say=t=>{message=t;const m=q('.ft-msg');if(m){m.textContent=t;m.hidden=false;}};
  async function saveAll(){
-  const c=compute(),todo=c.ids.filter(id=>statusOf(id)[0]!=='saved'),bad=v=>v===''||!model.integer(Number(v));
+  const c=compute(),todo=c.ids.filter(id=>statusOf(id)[0]!=='saved'),bad=v=>v===''||!model.integer(Number(v)),facTodo=!!draft.fac&&facStatus()[0]!=='saved';
+  if(facTodo&&draft.fac.cells.some(bad)){message='Angka pesanan pabrik belum valid (harus bilangan bulat 0–10000).';rerender();return;}
   for(const id of todo){
    if(draft.cells[id].some(bad)||draft.orders[id].some(bad)){message=`Angka ${name(id)} belum valid (harus bilangan bulat 0–10000).`;rerender();return;}
    for(const nm of draft.names){const x=draft.extra[id][nm];if(!model.integer(qtyOf(x.r))||!model.integer(qtyOf(x.o))){message=`Angka ${nm} di ${name(id)} belum valid.`;rerender();return;}}
@@ -547,6 +570,12 @@ window.ForecastTopdown=(()=>{
   };
   // 5 outlet sekaligus; tiap outlet tetap satu transaksi sendiri (cek konflik versi per outlet).
   for(let i=0;i<todo.length;i+=5)await Promise.all(todo.slice(i,i+5).map(saveOne));
+  if(facTodo){
+   const orders=draft.fac.cells.map(v=>Math.round(qtyOf(v))),r=record(FAC_ID);
+   const plan={date,outlet:FAC_ID,active:orders.map(v=>v>0),regular:Array(12).fill(0),orders,note:'Pesanan pabrik (diambil di pabrik / manajemen sebelah).',prices:Array(12).fill(null).map(()=>({value:null})),recommendations:[],method:'factory-manual',cutoff:null};
+   if(!plan.active.some(Boolean))plan.active[2]=true;
+   try{await cloud().save(plan,r?.revision||0);ok++;}catch(err){fail.push('Pabrik'+(/permission|izin|insufficient/i.test(String(err.message))?' (aturan Firestore belum mengizinkan "pabrik")':''));failWhy=failWhy||String(err.message);}
+  }
   persist();saving=false;message=fail.length?`${ok} outlet tersimpan. Gagal ${fail.length}: ${fail.join(', ')}. Penyebab: ${failWhy}`:`${ok} outlet tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
  }
  // Dipakai tab detail outlet: angka hasil bagi untuk outlet+tanggal ini (kalau belum ada rencana
