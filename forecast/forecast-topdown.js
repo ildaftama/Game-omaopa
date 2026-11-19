@@ -151,12 +151,38 @@ window.ForecastTopdown=(()=>{
  // dari harga 1 PCS) -- pembulatan biasa bisa meleset ratusan ribu rupiah di 28 outlet x 12 produk.
  // perOutlet: porsi outlet digeser sesuai saran buffer outletnya (waste tinggi dikurangi, sering
  // habis ditambah), lalu dinormalkan lagi supaya TOTAL jaringan tetap = target.
+ // ---- Center & Stand Alone (owner 2026-11-19) ----
+ // Transfer hanya terjadi antar outlet yang berdekatan. CENTER = outlet ramai yang dikelilingi
+ // banyak outlet, dijadikan cadangan stok: outlet lain di kelompoknya dikirim lebih sedikit dan
+ // selisihnya ditaruh di Center; kalau outlet lain kehabisan, Center yang menutup lewat transfer.
+ // STAND ALONE = outlet yang jauh dari outlet lain (tidak bisa transfer) -- ditandai supaya
+ // forecaster lebih hati-hati; penyesuaian prediksinya menyusul bertahap per area.
+ // Uji mundur Semarang kota 21 Okt-18 Nov (pcs, 12 produk, transfer hanya dari Center):
+ //   saran tanpa Center: waste 9,5% / kurang 12,3% (mesin cadangan: 12,5% / 10,8%)
+ //   Center UNDIP+UNNES, outlet lain 85% (min 1 pcs bila ada saran): waste 7,1% / kurang 9,9%
+ //   (mesin cadangan: 9,9% / 8,1%) -- waste & kekurangan turun bersamaan.
+ const CLUSTERS=[
+  {name:'Semarang kota',ids:['unnes','undip','sampangan','udinus','gajah-raya','unimus','ngaliyan'],centers:['undip','unnes'],share:.85},
+ ];
+ const STAND_ALONE=['ambarawa','uksw','boyolali','sragen','karanganyar','sukoharjo','temanggung'];
+ const roleOf=id=>CLUSTERS.some(c=>c.centers.includes(id))?'center':STAND_ALONE.includes(id)?'stand':null;
+ function applyCenters(cells){
+  for(const cl of CLUSTERS){
+   const ids=cl.ids.filter(id=>cells[id]),cs=cl.centers.filter(id=>cells[id]);if(!cs.length)continue;
+   for(let p=0;p<12;p++){
+    let moved=0;for(const id of ids){if(cs.includes(id))continue;const q=cells[id][p]||0,n=Math.max(q>0?1:0,Math.floor(q*cl.share+1e-9));moved+=q-n;cells[id][p]=n;}
+    if(!moved)continue;const w=cs.map(id=>(cells[id][p]||0)+1),W=w.reduce((a,b)=>a+b,0);let left=moved;
+    cs.forEach((id,i)=>{const add=i===cs.length-1?left:Math.round(moved*w[i]/W);cells[id][p]=(cells[id][p]||0)+add;left-=add;});
+   }
+  }
+ }
  function allocate(target,perOutlet=true){
   const c=compute(),cells={},frac=[];let val=0;
   const wOf=o=>perOutlet?1+o.adj.pct/100:1,den=[...c.outlets.values()].reduce((s,o)=>s+o.value*wOf(o),0);
   for(const [id,o] of c.outlets){const k=den>0?target*wOf(o)/den:0;cells[id]=o.base.map((q,p)=>{const raw=Math.max(0,q*k),fl=Math.floor(raw),pr=o.prices[p].value||0;val+=fl*pr;if(pr>0&&raw-fl>0)frac.push({id,p,f:raw-fl,pr});return fl;});}
   frac.sort((a,b)=>b.f-a.f);
   for(const x of frac){if(val+x.pr/2>target)continue;cells[x.id][x.p]++;val+=x.pr;}
+  applyCenters(cells);
   for(const id in cells)cells[id]=cells[id].map(String);
   return cells;
  }
@@ -329,7 +355,8 @@ window.ForecastTopdown=(()=>{
   const ids=g.ids,A=esc(g.name),cats=PR().CATS,n=ids.length;
   const colgroup=`<colgroup><col class="ft-cw-p">${ids.map(()=>'<col class="ft-cw-o">').join('')}<col class="ft-cw-t"></colgroup>`;
   const head=`<th class="ft-pcol" scope="col">Produk</th>${ids.map((id,ci)=>{const o=c.outlets.get(id),[sk,sl]=statusOf(id),open=draft.open.includes(id);const adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'';
-   return `<th class="ft-ocol" scope="col" data-ci="${ci+1}"><button type="button" class="ft-oname${open?' on':''}" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Catatan & detail ${esc(name(id))}"><span class="ft-sdot ${sk}" data-ft-status="${esc(id)}" title="${esc(sl)}"></span>${esc(name(id))}${draft.notes[id]?'<i class="ft-hasnote" title="Ada catatan">✎</i>':''}</button>${adj||rainChip(id)?`<div class="ft-ochips">${adj}${rainChip(id)}</div>`:''}</th>`;}).join('')}<th class="ft-tcol" scope="col">Total</th>`;
+   const role=roleOf(id),roleTag=role==='center'?'<span class="ft-role center" title="Center: dikirim lebih banyak sebagai cadangan stok outlet sekitar">Center</span>':role==='stand'?'<span class="ft-role stand" title="Stand Alone: jauh dari outlet lain, tidak bisa transfer — kirim hati-hati">Stand Alone</span>':'';
+   return `<th class="ft-ocol" scope="col" data-ci="${ci+1}"><button type="button" class="ft-oname${open?' on':''}" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Catatan & detail ${esc(name(id))}"><span class="ft-sdot ${sk}" data-ft-status="${esc(id)}" title="${esc(sl)}"></span>${esc(name(id))}${draft.notes[id]?'<i class="ft-hasnote" title="Ada catatan">✎</i>':''}</button>${roleTag||adj||rainChip(id)?`<div class="ft-ochips">${roleTag}${adj}${rainChip(id)}</div>`:''}</th>`;}).join('')}<th class="ft-tcol" scope="col">Total</th>`;
   const anyOrd=r=>ids.some(id=>ordOf(id,r)>0);
   const showAllOrd=!!draft.ordAll?.[g.name],hiddenOrd=rows.filter(r=>!anyOrd(r)).length;
   // Produk lain yang kosong di semua outlet area ini disembunyikan (owner 2026-11-19: tabel lebih ringkas).

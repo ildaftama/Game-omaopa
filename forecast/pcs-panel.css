@@ -944,3 +944,8 @@ main{max-width:1680px!important}
 .ft-sub-ordv b{color:#7a4b12}
 .ft-grid-ordv thead th{background:#fbf3e4}
 .ft-grid-ordv .ft-kv{color:#5a3d00}
+
+/* Label Center & Stand Alone (owner 2026-11-19) */
+.ft-role{display:inline-block;padding:0 6px;border-radius:9px;font-size:10px;font-weight:800;letter-spacing:.03em;line-height:16px;white-space:nowrap}
+.ft-role.center{background:#1f5567;color:#fff}
+.ft-role.stand{background:#fff;color:#8a4b12;border:1px solid #e0b27a}
