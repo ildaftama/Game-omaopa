@@ -934,3 +934,8 @@ main{max-width:1680px!important}
 .fs-ship th,.fs-ship td{border-right:1px solid rgba(30,45,60,.32)!important;border-bottom:1px solid rgba(30,45,60,.32)!important}
 .ft-grid-fac{width:auto;min-width:0}
 .ft-factory-area .ft-grid-wrap{display:inline-block;max-width:100%}
+
+/* Kaki tabel Stok: pesanan & total kirim per outlet (owner 2026-11-19) */
+.ft-grid tfoot .ft-fsum>*{font-weight:600;color:#4d5d6c}
+.ft-grid tfoot .ft-fkirim>*{font-weight:800;color:#1c2b38;background:#eef4f8}
+.ft-grid tfoot .ft-fkirim .ft-tcol{background:#e1ebf2}
