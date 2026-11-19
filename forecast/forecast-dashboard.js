@@ -1055,11 +1055,28 @@ window.ForecastDashboard=(()=>{
   return `<option value="__all__" ${weatherAreaFilter==='__all__'?'selected':''}>Semua area (${rows.length})</option>`+
    areas.map(a=>`<option value="${esc(a)}" ${weatherAreaFilter===a?'selected':''}>${esc(AREA_LABEL[a]||a)} (${counts.get(a)})</option>`).join('');
  }
+ // Rangkuman cuaca di dalam peta (owner 2026-11-19): rata-rata peluang hujan area terpilih,
+ // artinya, dan saran kiriman. Aturan saran SAMA dengan Buat forecast (rainCut): >= ambang
+ // "hujan tinggi" (Pengaturan > Cuaca) -> turunkan 10%, >= ambang+20 -> 15%. Riset 2025-26: hujan
+ // rata-rata hanya ~-2% omzet jaringan, jadi penurunan cukup untuk outlet berisiko saja.
+ function weatherSummaryHtml(rows){
+  const hi=RAIN_RISK,top=Math.min(95,hi+20);
+  const day=(key,label)=>{const v=rows.map(r=>r[key]).filter(x=>x!=null);if(!v.length)return null;
+   const avg=v.reduce((a,b)=>a+b,0)/v.length,risk=rows.filter(r=>r[key]!=null&&r[key]>=hi).sort((a,b)=>b[key]-a[key]),heavy=risk.filter(r=>r[key]>=top);
+   const lvl=avg>=top?['sangat tinggi','vh']:avg>=hi?['tinggi','h']:avg>=hi-20?['cukup tinggi','m']:avg>=20?['rendah','l']:['sangat rendah','l'];
+   return {label,avg:Math.round(avg),lvl,risk,heavy,n:v.length};};
+  const t=day('today','Hari ini'),b=day('tomorrow','Besok');if(!t&&!b)return '';
+  const line=d=>d?`<div class="weather-sum-row ${d.lvl[1]}"><span>${d.label}</span><b>${d.avg}%</b><div class="weather-sum-bar"><i style="width:${d.avg}%"></i></div><em>${d.lvl[0]}</em></div>`:'';
+  const f=b||t,names=f.risk.slice(0,3).map(r=>`${esc(r.name)} ${r[b?'tomorrow':'today']}%`).join(', ')+(f.risk.length>3?` +${f.risk.length-3} lainnya`:'');
+  const meaning=f.lvl[1]==='l'?'Kemungkinan hujan kecil, penjualan diperkirakan normal.':f.lvl[1]==='m'?'Ada kemungkinan hujan di sebagian outlet, tapi belum cukup kuat untuk menurunkan kiriman.':'Kemungkinan hujan besar, pembeli yang datang ke outlet bisa berkurang.';
+  const advice=f.risk.length?`Turunkan kiriman <b>${f.risk.length} outlet</b> berisiko${f.heavy.length?` (−10%; <b>−15%</b> untuk ${f.heavy.length} outlet ≥${top}%)`:' sekitar <b>−10%</b>'}: ${names}. Outlet lain kirim normal.`:'Kirim <b>normal</b>, tidak perlu penurunan karena cuaca.';
+  return `<div class="weather-sum-h"><b>Rangkuman cuaca</b><small>${f.n} outlet${weatherAreaFilter==='__all__'?'':' · '+esc(AREA_LABEL[weatherAreaFilter]||weatherAreaFilter)}</small><button type="button" class="weather-sum-x" data-weather-sum-toggle title="Kecilkan / besarkan">–</button></div><div class="weather-sum-b">${line(t)}${line(b)}<p>${meaning}</p><p class="weather-sum-adv"><span>Saran kiriman ${b?'besok':'hari ini'}</span>${advice}</p><small class="weather-sum-note">Ambang hujan tinggi ${hi}% (Pengaturan › Cuaca). Hujan rata-rata hanya ±2% omzet jaringan, jadi cukup outlet berisiko yang diturunkan — keputusan tetap di forecaster (tombol % di Buat forecast).</small></div>`;
+ }
  function weatherMapSection(rows){
   if(!rows.length)return '';
-  return `<div class="weather-map-toolbar"><label for="weather-area-select">Fokus area</label><select id="weather-area-select" class="weather-area-select">${weatherAreaOptions(rows)}</select></div><div class="weather-map-layout"><div class="weather-leaflet-wrap"><div id="weather-leaflet-map" class="weather-leaflet" role="img" aria-label="Peta interaktif cuaca outlet"></div><button type="button" class="weather-reset-btn" id="weather-reset-view" title="Lihat semua outlet">⟲ Semua outlet</button></div><div class="weather-outlet-list">${weatherOutletListHtml(weatherRowsInArea(rows))}</div></div>`;
+  return `<div class="weather-map-toolbar"><label for="weather-area-select">Fokus area</label><select id="weather-area-select" class="weather-area-select">${weatherAreaOptions(rows)}</select></div><div class="weather-map-layout"><div class="weather-leaflet-wrap"><div id="weather-leaflet-map" class="weather-leaflet" role="img" aria-label="Peta interaktif cuaca outlet"></div><button type="button" class="weather-reset-btn" id="weather-reset-view" title="Lihat semua outlet">⟲ Semua outlet</button><div class="weather-sum${weatherSumMin?' min':''}" id="weather-sum">${weatherSummaryHtml(weatherRowsInArea(rows))}</div></div><div class="weather-outlet-list">${weatherOutletListHtml(weatherRowsInArea(rows))}</div></div>`;
  }
- let leafletMap=null,leafletMarkers=new Map(),leafletContainerEl=null,leafletFitted=false;
+ let leafletMap=null,leafletMarkers=new Map(),leafletContainerEl=null,leafletFitted=false,weatherSumMin=false;
  // Akurasi forecast (WAPE) untuk SATU outlet, 56 hari terakhir -- pola yang sama dengan
  // operationalSummary() di bawah, cuma tidak di-cache (popup per-klik, bukan tiap render).
  function outletAccuracy(id){
@@ -1123,6 +1140,9 @@ window.ForecastDashboard=(()=>{
    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'}).addTo(leafletMap);
   }
   const rows=weatherRowsInArea(lastWeatherRows),seen=new Set();
+  const sumEl=document.getElementById('weather-sum');
+  if(sumEl){const h=weatherSummaryHtml(rows);if(sumEl.dataset.sig!==h){sumEl.dataset.sig=h;sumEl.innerHTML=h;}sumEl.classList.toggle('min',weatherSumMin);
+   if(!sumEl.dataset.wired){sumEl.dataset.wired='1';L.DomEvent.disableClickPropagation(sumEl);L.DomEvent.disableScrollPropagation(sumEl);sumEl.addEventListener('click',e=>{if(e.target.closest('[data-weather-sum-toggle]')){weatherSumMin=!weatherSumMin;sumEl.classList.toggle('min',weatherSumMin);}});}}
   for(const r of rows){
    const o=window.OUTLET_DATA?.outlets?.find(x=>x.id===r.id);if(!o)continue;
    seen.add(r.id);
