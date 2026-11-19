@@ -574,7 +574,7 @@ window.ForecastTopdown=(()=>{
   for(let i=0;i<todo.length;i+=5)await Promise.all(todo.slice(i,i+5).map(saveOne));
   if(facTodo){
    const orders=draft.fac.cells.map(v=>Math.round(qtyOf(v))),r=record(FAC_ID);
-   const plan={date,outlet:FAC_ID,active:orders.map(v=>v>0),regular:Array(12).fill(0),orders,note:'Pesanan pabrik (diambil di pabrik / manajemen sebelah).',prices:Array(12).fill(null).map(()=>({value:null})),recommendations:[],method:'factory-manual',cutoff:null};
+   const plan={date,outlet:FAC_ID,active:orders.map(v=>v>0),regular:Array(12).fill(0),orders,note:'Pesanan pabrik (diambil di pabrik / manajemen sebelah).',prices:Array(12).fill(null).map(()=>({value:null})),recommendations:model.names.map(name=>({name,central:null,low:null,high:null,samples:0})),method:'weekday-median-trend-v1',cutoff:null}; // rules: 12 rekomendasi & metode yang dikenal; pabrik tidak punya saran (semua null)
    if(!plan.active.some(Boolean))plan.active[2]=true;
    try{await cloud().save(plan,r?.revision||0);ok++;}catch(err){fail.push('Pabrik'+(/permission|insufficient/i.test(String(err.message))?' (aturan Firestore belum mengizinkan "pabrik")':''));failWhy=failWhy||String(err.message);}
   }
