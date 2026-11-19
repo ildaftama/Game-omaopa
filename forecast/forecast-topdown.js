@@ -214,8 +214,8 @@ window.ForecastTopdown=(()=>{
   return `<section class="fpd"><div class="fpd-head"><div><h3>Rencana produksi (angkatan)</h3><p>Total semua outlet + pesanan pabrik, dibulatkan ke angkatan dapur. Ikut berubah setiap angka outlet diubah. Gambar untuk dapur bisa diunduh di menu <b>3 · Rencana produksi</b> setelah semua outlet tersimpan.</p></div><div class="fpd-mode fpd-${m.kind}"><b>${esc(m.title)}</b><span>${esc(m.text)}</span></div></div>
    <div class="fpd-sum"><div><span>Total angkatan</span><strong>${batches}</strong></div><div><span>Kelebihan (dibulatkan naik)</span><strong class="${plus?'fpd-plus':''}">${plus?'+'+plus:0} pcs</strong></div><div><span>Kekurangan (dibulatkan turun)</span><strong class="${minus?'fpd-minus':''}">${minus?'−'+minus:0} pcs</strong></div></div>
    <div class="ft-table-wrap fpd-wrap"><table class="ft-table fpd-table"><thead><tr><th class="fpd-l">Produk</th><th class="ft-num">Total rencana</th><th class="fpd-l">Pilih produksi <span class="fpd-muted">(klik untuk mengganti)</span></th></tr></thead><tbody>${fam}</tbody></table></div>
-   ${areaBlock(c,pl)}
    ${plus||minus?(proposal&&!stale?prop:`<div class="fpd-cta">${stale?'<span class="fpd-muted">Angka berubah sejak usulan dibuat, hitung ulang.</span>':`<span>Selisih ${plus?`+${plus} pcs`:''}${plus&&minus?' dan ':''}${minus?`−${minus} pcs`:''} perlu dibagi ke outlet supaya kiriman pas dengan produksi.</span>`}<button type="button" class="button fp-primary" data-ft-prod-propose>Bagi otomatis ke outlet</button></div>`):'<p class="fpd-done">Semua rasa sudah pas dengan angkatan. Tidak ada sisa atau kekurangan.</p>'}
+   ${areaBlock(c,pl)}
   </section>`;
  }
  // Pembagian angkatan per area + teks WA "Request Malam" (feedback forecaster 2026-11-13).
