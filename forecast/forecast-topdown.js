@@ -166,10 +166,14 @@ window.ForecastTopdown=(()=>{
   // Diperluas 2026-11-19 (uji mundur 21 Okt-18 Nov, waste/kurang tanpa -> dengan Center):
   //   Solo kota 15,3/15,4 -> 8,8/8,9 · Klaten 12,3/12,5 -> 9,9/10,1 · Jogja utara 19,3/19,4 ->
   //   14,0/14,2 · Jogja barat 11,7/20,2 -> 9,3/17,8 · Magelang 16,9/17,5 -> 13,0/13,6.
-  //   Center dipilih dari hasil uji (Nusa Indah di tengah Tajem & Jakal UII lebih baik dari Jakal UII).
-  {name:'Solo kota',ids:['uns','ums','makamhaji','nusukan','laweyan'],centers:['uns','ums'],share:.85,bt:[[15.3,15.4],[8.8,8.9]]},
-  {name:'Klaten',ids:['merbabu','rajawali'],centers:['rajawali'],share:.85,bt:[[12.3,12.5],[9.9,10.1]]},
-  {name:'Jogja utara',ids:['nusa-indah','tajem','jakal-uii'],centers:['nusa-indah'],share:.85,bt:[[19.3,19.4],[14.0,14.2]]},
+  //   Klaten & Jogja utara diubah owner di bawah (Klaten tanpa Center -> UMS; Jogja utara -> Jakal UII).
+  {name:'Solo kota',ids:['uns','ums','makamhaji','nusukan','laweyan'],centers:['uns','ums'],share:.85,bt:[[15.3,15.4],[9.7,8.2]]},
+  // Owner 2026-11-19: Klaten TANPA Center -- Merbabu & Rajawali jadi anggota (85%), selisihnya ke UMS
+  // (Center terdekat, di luar kelompok) dan kalau terpaksa transfer dari UMS. Uji mundur: Klaten
+  // 12,3/12,5 -> 5,9/13,7; Solo kota (UMS menampung selisih Klaten) 15,3/15,4 -> 9,7/8,2.
+  // Jogja utara: Center = Jakal UII (pilihan owner; uji 19,3/19,4 -> 14,8/14,9).
+  {name:'Klaten',ids:['merbabu','rajawali'],centers:['ums'],share:.85,bt:[[12.3,12.5],[5.9,13.7]]},
+  {name:'Jogja utara',ids:['nusa-indah','tajem','jakal-uii'],centers:['jakal-uii'],share:.85,bt:[[19.3,19.4],[14.8,14.9]]},
   {name:'Jogja barat',ids:['godean','umy'],centers:['umy'],share:.85,bt:[[11.7,20.2],[9.3,17.8]]},
   {name:'Magelang',ids:['pemuda-magelang','muntilann','temanggung'],centers:['pemuda-magelang'],share:.85,bt:[[16.9,17.5],[13.0,13.6]]},
  ];
