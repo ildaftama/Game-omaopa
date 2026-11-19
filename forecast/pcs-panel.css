@@ -1185,3 +1185,38 @@ input,select,textarea{transition:border-color .2s,box-shadow .2s}
 @media(max-width:700px){.weather-sum{position:static;width:auto;max-width:none;margin-top:8px;box-shadow:none;border:1px solid #e3e8ee}}
 .fa-item .fa-up-bar b{animation:none}
 .fa-item .fa-up-bar i{width:2px!important;left:var(--a)!important;background:#14303c;opacity:.75;mix-blend-mode:normal;border-radius:0}
+
+/* ---- Update Metode Forecast: notif wajib baca (s/d 24 Nov 2026 06.00 WIB) ---- */
+.tab-new.done{background:#2f9e6a;animation:none}
+.method-notice{display:flex;align-items:center;gap:12px;margin:10px 0 0;padding:10px 14px;border-radius:12px;background:linear-gradient(90deg,#fff1e8,#fff8f2);border:1px solid #f3c5a8;box-shadow:0 4px 14px rgba(224,96,47,.12);animation:mnIn .45s ease both}
+.method-notice[hidden]{display:none}
+.method-notice p{margin:0;flex:1;font-size:13px;line-height:1.45;color:#5a3a22}
+.method-notice b{color:#7a3a14}
+.method-notice .button{white-space:nowrap}
+.mn-ic{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#e0602f;color:#fff;font-size:16px;animation:mnRing 2.4s ease-in-out infinite}
+.method-notice.done{background:#f1f8f4;border-color:#cfe6d8;box-shadow:none}
+.method-notice.done p,.method-notice.done b{color:#24563c}
+.method-notice.done .mn-ic{background:#2f9e6a;animation:none;font-weight:800}
+.method-gate{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:16px;background:rgba(15,30,42,.45);backdrop-filter:blur(4px);animation:mnFade .25s ease both}
+.method-gate-card{max-width:520px;width:100%;padding:26px 26px 22px;border-radius:18px;background:#fff;box-shadow:0 24px 60px rgba(10,25,40,.35);text-align:left;animation:mnPop .35s cubic-bezier(.2,.9,.3,1.2) both}
+.method-gate-card h3{margin:4px 0 8px;font-size:21px;color:#14303c}
+.method-gate-card p{margin:0 0 18px;font-size:14px;line-height:1.6;color:#3d4d5b}
+.method-gate-card .micro-label{color:#c04f22}
+.mn-big{display:grid;place-items:center;width:52px;height:52px;margin-bottom:10px;border-radius:50%;background:#fff1e8;font-size:26px;animation:mnRing 2.4s ease-in-out infinite}
+.method-gate-b{display:flex;gap:10px;flex-wrap:wrap}
+.fa-new{margin:0;padding:0;list-style:none;counter-reset:fn;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px}
+.fa-new li{counter-increment:fn;position:relative;padding:10px 12px 10px 44px;border-radius:12px;background:#fff;border:1px solid #e3e8ee;font-size:13px;line-height:1.5;color:#3d4d5b;animation:faIn .45s ease both}
+.fa-new li::before{content:counter(fn);position:absolute;left:12px;top:10px;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#14303c;color:#fff;font-size:11.5px;font-weight:800}
+.fa-new li b{color:#14303c}
+.fa-new li:nth-child(2){animation-delay:.05s}.fa-new li:nth-child(3){animation-delay:.1s}.fa-new li:nth-child(4){animation-delay:.15s}.fa-new li:nth-child(5){animation-delay:.2s}.fa-new li:nth-child(6){animation-delay:.25s}
+.fa-read{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:16px 18px;border-radius:14px;background:linear-gradient(90deg,#14303c,#1f4a5c);color:#fff;box-shadow:0 8px 24px rgba(20,48,60,.18)}
+.fa-read b{display:block;font-size:15px}
+.fa-read span{font-size:12.5px;opacity:.85}
+.fa-read .button{background:#fff!important;color:#14303c!important;border-color:#fff!important;font-weight:800}
+.fa-read.done{background:linear-gradient(90deg,#1f6b45,#2f9e6a)}
+@keyframes mnIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes mnFade{from{opacity:0}to{opacity:1}}
+@keyframes mnPop{from{opacity:0;transform:scale(.92) translateY(10px)}to{opacity:1;transform:none}}
+@keyframes mnRing{0%,100%{transform:rotate(0)}6%{transform:rotate(-14deg)}12%{transform:rotate(12deg)}18%{transform:rotate(-8deg)}24%{transform:rotate(0)}}
+@media (max-width:640px){.method-notice{flex-wrap:wrap}.method-notice .button{width:100%}}
+@media (prefers-reduced-motion:reduce){.method-notice,.mn-ic,.mn-big,.method-gate,.method-gate-card{animation:none!important}}

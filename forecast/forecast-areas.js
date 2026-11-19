@@ -34,12 +34,21 @@ window.ForecastAreas=(()=>{
   const stand=A.STAND_ALONE.map(id=>{const o=P.get(id);const near=[...P.values()].filter(x=>x.id!==id&&!['pasar-kliwon','banyumanik'].includes(x.id)).map(x=>[x,dist(o,x)]).sort((p,q)=>p[1]-q[1])[0];return `<li data-fa-outlet="${esc(id)}"><span>${esc(nm(id))}</span>${near?`<small>terdekat ${esc(nm(near[0].id))} · ${km(near[1])}</small>`:''}</li>`;}).join('');
   const role=(k,t,d)=>`<button type="button" class="fa-rolebtn${roleFocus===k?' on':''}" data-fa-role="${k}" title="Klik untuk menyorot semua ${t} di peta"><span class="fa-ic ${k}">${ICON[k]}</span><span><b>${t}</b><small>${d}</small></span></button>`;
   return `<div class="fa fa-page">
-   <header class="fa-hero"><span class="micro-label">PANDUAN FORECASTER · WAJIB DIBACA</span><h2>Area, Center & Stand Alone</h2><p>Kue hanya bisa <b>ditransfer antar outlet yang berdekatan</b>. Secara data, kelebihan satu outlet bisa "menutupi" kekurangan outlet lain yang jauh — padahal di lapangan kuenya tidak bisa berpindah, jadi tetap waste. Karena itu Buat forecast membagi kiriman per <b>kelompok transfer</b>, dengan <b>Center</b> sebagai cadangan stok tiap kelompok.</p></header>
+   <header class="fa-hero"><span class="micro-label">UPDATE METODE FORECAST · WAJIB DIBACA</span><h2>Area, Center & Stand Alone</h2><p>Kue hanya bisa <b>ditransfer antar outlet yang berdekatan</b>. Secara data, kelebihan satu outlet bisa "menutupi" kekurangan outlet lain yang jauh — padahal di lapangan kuenya tidak bisa berpindah, jadi tetap waste. Karena itu Buat forecast membagi kiriman per <b>kelompok transfer</b>, dengan <b>Center</b> sebagai cadangan stok tiap kelompok.</p></header>
+   <ol class="fa-new">
+    <li><b>Dibagi per area.</b> Kue hanya bisa ditransfer ke outlet yang berdekatan, jadi kiriman dihitung per kelompok area.</li>
+    <li><b>Center dikirim lebih banyak.</b> Outlet ramai di tengah kelompok jadi cadangan stok kelompoknya.</li>
+    <li><b>Anggota dikirim 85% dari saran.</b> Kalau kehabisan, ambil (transfer) dari Center.</li>
+    <li><b>Stand Alone dikirim hati-hati.</b> Tidak ada outlet dekat, kelebihan pasti jadi waste.</li>
+    <li><b>Jogja kini satu area</b> dengan Center <b>Jakal UII</b>. <b>Klaten</b> tanpa Center, cadangannya di <b>UMS</b>.</li>
+    <li><b>Sudah otomatis.</b> Angka saran di Buat forecast sudah memakai aturan ini; forecaster cukup cek & sesuaikan.</li>
+   </ol>
    <div class="fa-stage">
     <div id="fa-leaflet" class="fa-leaflet" aria-label="Peta area outlet"></div>
     <aside class="fa-panel" aria-label="Kelompok area"><div class="fa-panel-h"><b>Kelompok area</b><button type="button" class="fa-reset" data-fa-all>Lihat semua</button></div><div class="fa-panel-list">${items}<div class="fa-item fa-item-stand${focus==='__stand'?' on':''}" style="--fa:${STAND_COL}" data-fa-cluster="__stand" role="button" tabindex="0"><div class="fa-item-h"><span class="fa-dot"></span><b>Stand Alone</b><small>${A.STAND_ALONE.length} outlet</small></div><div class="fa-item-b"><ul>${stand}</ul><p>Tidak ada outlet dekat untuk transfer. Kirim mendekati pola penjualannya, hindari buffer plus, perhatikan waste hariannya.</p></div></div></div></aside>
     <div class="fa-roles2" aria-label="Arti ikon">${role('center','Center','toko utama · dikirim lebih banyak, cadangan stok kelompok')}${role('member','Anggota','dikirim 85% dari saran · ambil dari Center kalau habis')}${role('stand','Stand Alone','jauh dari outlet lain · tidak bisa transfer, kirim hati-hati')}</div>
    </div>
+   ${(()=>{const N=window.ForecastMethodNotice,read=N?.read?.();return `<div class="fa-read${read?' done':''}"><div><b>${read?'✓ Anda sudah membaca update ini':'Sudah paham semuanya?'}</b><span>${read?'Silakan lanjut membuat forecast.':'Klik tombol di samping untuk konfirmasi, lalu lanjut membuat forecast.'}</span></div><button type="button" class="button" data-fa-read>${read?'Lanjut ke Forecast →':'Saya sudah membaca & paham →'}</button></div>`;})()}
   </div>`;
  }
  // ---- Peta (Leaflet) ----
@@ -53,6 +62,7 @@ window.ForecastAreas=(()=>{
    // Hanya KLIK yang memilih (terkunci); arahan kursor tidak memindahkan peta.
    host.addEventListener('click',e=>{
     const o=e.target.closest('[data-fa-outlet]');if(o){openOutlet(o.dataset.faOutlet);return;}
+    if(e.target.closest('[data-fa-read]')){window.ForecastMethodNotice?.markRead?.();document.querySelector('[data-focus="forecast"]')?.click();window.scrollTo({top:0,behavior:'smooth'});return;}
     if(e.target.closest('[data-fa-all]')){roleFocus=null;syncRoles();flyTo(null);return;}
     const r=e.target.closest('[data-fa-role]');if(r){roleFocus=roleFocus===r.dataset.faRole?null:r.dataset.faRole;syncRoles();return;}
     const c=e.target.closest('[data-fa-cluster]');if(c&&c.dataset.faCluster!==focus)flyTo(c.dataset.faCluster);
