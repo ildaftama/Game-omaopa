@@ -163,8 +163,17 @@ window.ForecastTopdown=(()=>{
  //   (mesin cadangan: 9,9% / 8,1%) -- waste & kekurangan turun bersamaan.
  const CLUSTERS=[
   {name:'Semarang kota',ids:['unnes','undip','sampangan','udinus','gajah-raya','unimus','ngaliyan'],centers:['undip','unnes'],share:.85},
+  // Diperluas 2026-11-19 (uji mundur 21 Okt-18 Nov, waste/kurang tanpa -> dengan Center):
+  //   Solo kota 15,3/15,4 -> 8,8/8,9 · Klaten 12,3/12,5 -> 9,9/10,1 · Jogja utara 19,3/19,4 ->
+  //   14,0/14,2 · Jogja barat 11,7/20,2 -> 9,3/17,8 · Magelang 16,9/17,5 -> 13,0/13,6.
+  //   Center dipilih dari hasil uji (Nusa Indah di tengah Tajem & Jakal UII lebih baik dari Jakal UII).
+  {name:'Solo kota',ids:['uns','ums','makamhaji','nusukan','laweyan'],centers:['uns','ums'],share:.85},
+  {name:'Klaten',ids:['merbabu','rajawali'],centers:['rajawali'],share:.85},
+  {name:'Jogja utara',ids:['nusa-indah','tajem','jakal-uii'],centers:['nusa-indah'],share:.85},
+  {name:'Jogja barat',ids:['godean','umy'],centers:['umy'],share:.85},
+  {name:'Magelang',ids:['pemuda-magelang','muntilann','temanggung'],centers:['pemuda-magelang'],share:.85},
  ];
- const STAND_ALONE=['ambarawa','uksw','boyolali','sragen','karanganyar','sukoharjo','temanggung'];
+ const STAND_ALONE=['ambarawa','uksw','boyolali','sragen','karanganyar','sukoharjo'];
  const roleOf=id=>CLUSTERS.some(c=>c.centers.includes(id))?'center':STAND_ALONE.includes(id)?'stand':null;
  function applyCenters(cells){
   for(const cl of CLUSTERS){
