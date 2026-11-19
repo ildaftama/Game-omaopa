@@ -83,7 +83,7 @@ function forecastRecord(d, key) {
   return d.keys().hasOnly(['schemaVersion','date','outlet','revision','plan','baseline','firstSavedAt','savedAt','savedBy'])
     && d.schemaVersion == 1 && d.revision is int && d.revision >= 1
     && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-    && d.outlet in ['ambarawa','boyolali','gajah-raya','godean','jakal-uii','karanganyar','laweyan','makamhaji','merbabu','muntilann','ngaliyan','nusa-indah','nusukan','pemuda-magelang','rajawali','sampangan','sragen','sukoharjo','tajem','temanggung','udinus','uksw','ums','umy','undip','unimus','unnes','uns']
+    && d.outlet in ['ambarawa','boyolali','gajah-raya','godean','jakal-uii','karanganyar','laweyan','makamhaji','merbabu','muntilann','ngaliyan','nusa-indah','nusukan','pemuda-magelang','rajawali','sampangan','sragen','sukoharjo','tajem','temanggung','udinus','uksw','ums','umy','undip','unimus','unnes','uns','pabrik']
     && key == d.date + '_' + d.outlet
     && d.savedBy == request.auth.uid && d.savedAt == request.time
     && d.firstSavedAt is timestamp && forecastPlan(d.plan,d);
