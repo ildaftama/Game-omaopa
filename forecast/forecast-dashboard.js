@@ -1345,7 +1345,6 @@ window.ForecastDashboard=(()=>{
    ${fold('mon','Monitoring rencana tim','rencana vs penjualan per tanggal, outlet & produk · performa bulanan',window.ForecastWorkspace?.monitorSection?.()||'')}
    ${show.trend&&outletId==='__all__'?fold('trend','Kondisi outlet','omzet, waste & lost sales naik/turun 3 hari terakhir',trendWatchCard(trend.trendNow)):''}
    ${show.wasteLost?fold('wl','Waste & lost sales per outlet','bulan berjalan · outlet di atas batas',wasteLostCard(outletId)):''}
-   ${outletId==='__all__'?fold('area','Panduan area & outlet','kelompok transfer, Center & Stand Alone · bahan edukasi forecaster',window.ForecastAreas?.render?.()||''):''}
    <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${monthSummaryHtml(trend)}</article>
    ${show.weather?`<article class="workspace-card weather-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>`:''}
    ${show.events?`<div class="product-comparison"><article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article></div>`:''}
@@ -1365,7 +1364,7 @@ window.ForecastDashboard=(()=>{
   if(!dlg.dataset.wired){dlg.dataset.wired='1';dlg.addEventListener('close',()=>{outletDetailId=null;});}
   if(!dlg.open)dlg.showModal();
  }
- function mount(){mountWeatherMap();window.ForecastAreas?.mount?.();if(outletDetailId)mountOutletDialog();if(pendingFold){const id=pendingFold;pendingFold=null;setTimeout(()=>document.querySelector(`[data-fold="${id}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),120);}}
+ function mount(){mountWeatherMap();if(outletDetailId)mountOutletDialog();if(pendingFold){const id=pendingFold;pendingFold=null;setTimeout(()=>document.querySelector(`[data-fold="${id}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),120);}}
  // Tooltip melayang DI TITIK yang disentuh/di-hover, bukan cuma teks tetap di bawah grafik --
  // posisinya dari koordinat layar event (clientX/clientY, bukan koordinat SVG internal yang
  // perlu konversi skala) relatif terhadap pembungkus .fd-chart-wrap. Readout di bawah grafik

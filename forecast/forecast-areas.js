@@ -15,6 +15,8 @@ window.ForecastAreas=(()=>{
  // Akurasi pengiriman = 100 - (sisa + kurang) dari uji mundur 21 Okt-18 Nov (pcs, 12 produk).
  const acc=bt=>bt?[100-bt[0][0]-bt[0][1],100-bt[1][0]-bt[1][1]]:null;
  let focus=null;
+ const CITIES=[['Semarang',-6.966,110.42],['Ungaran',-7.139,110.405],['Salatiga',-7.331,110.508],['Magelang',-7.47,110.217],['Temanggung',-7.316,110.175],['Boyolali',-7.533,110.596],['Klaten',-7.706,110.606],['Surakarta',-7.575,110.825],['Sukoharjo',-7.682,110.841],['Karanganyar',-7.597,110.953],['Sragen',-7.43,111.03],['Yogyakarta',-7.797,110.37],['Sleman',-7.716,110.356],['Muntilan',-7.58,110.29]];
+ const LOGO='logo-omaopa.webp?v=20261105-desktop-1';
  function render(){
   const A=window.ForecastTopdown?.areas?.();if(!A)return '<div class="fp-empty">Memuat data area…</div>';
   const P=pos();
@@ -24,7 +26,7 @@ window.ForecastAreas=(()=>{
    const up=a?`<div class="fa-up"><span>Akurasi pengiriman</span><div class="fa-up-bar"><i style="--a:${a[0]}%"></i><b style="--a:${a[1]}%"></b></div><div class="fa-up-n"><small>${pt(a[0])}%</small><strong>+${pt(a[1]-a[0])} poin</strong><small>${pt(a[1])}%</small></div></div>`:'';
    return `<article class="fa-card${focus===c.name?' on':''}" style="--fa:${col};--d:${i*70}ms" data-fa-cluster="${esc(c.name)}" tabindex="0"><header><h4>${esc(c.name)}</h4><span>${c.ids.length} outlet</span></header><ul>${rows}</ul>${up}</article>`;}).join('');
   const stand=A.STAND_ALONE.map(id=>{const o=P.get(id);const near=[...P.values()].filter(x=>x.id!==id&&!['pasar-kliwon','banyumanik'].includes(x.id)).map(x=>[x,dist(o,x)]).sort((p,q)=>p[1]-q[1])[0];return `<li data-fa-outlet="${esc(id)}"><span>${esc(nm(id))}</span>${near?`<small>terdekat ${esc(nm(near[0].id))} · ${km(near[1])}</small>`:''}</li>`;}).join('');
-  return `<div class="fa">
+  return `<div class="fa fa-page"><header class="fa-hero"><span class="micro-label">PANDUAN FORECASTER · WAJIB DIBACA</span><h2>Area, Center & Stand Alone</h2><p>Cara Buat forecast membagi kiriman ke outlet supaya waste tidak menumpuk di outlet yang tidak bisa transfer.</p></header>
    <div class="fa-intro"><h3>Kenapa forecast dibagi per area?</h3><p>Kue hanya bisa <b>ditransfer antar outlet yang berdekatan</b>. Secara data, kelebihan di satu outlet bisa "menutupi" kekurangan outlet lain yang jauh — akurasi jaringan terlihat bagus — padahal di lapangan kuenya tidak bisa berpindah, jadi tetap waste. Karena itu pembagian otomatis di Buat forecast memakai <b>kelompok transfer</b>: di tiap kelompok ada <b>Center</b> sebagai cadangan stok.</p>${roles}</div>
    <div class="fa-mapwrap"><div id="fa-leaflet" class="fa-leaflet" aria-label="Peta area outlet"></div><div class="fa-map-ctl"><button type="button" class="button quiet" data-fa-all>Lihat semua area</button><span>Klik kartu kelompok atau nama outlet untuk melihat di peta</span></div></div>
    <div class="fa-grid">${cards}<article class="fa-card fa-stand" style="--fa:#c0762a;--d:${A.CLUSTERS.length*70}ms" data-fa-cluster="__stand" tabindex="0"><header><h4>Stand Alone</h4><span>${A.STAND_ALONE.length} outlet</span></header><ul>${stand}</ul><p class="fa-note">Tidak ada outlet dekat untuk transfer. Kirim mendekati pola penjualannya, hindari buffer plus, dan perhatikan waste hariannya.</p></article></div>
@@ -45,16 +47,18 @@ window.ForecastAreas=(()=>{
   if(!el.offsetWidth)return; // masih terlipat; dipasang saat dibuka
   if(map){try{map.remove();}catch{}}
   mapEl=el;map=L.map(el,{scrollWheelZoom:false,zoomControl:true,attributionControl:true});
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',className:'fa-tiles'}).addTo(map);
+  // Peta ringan (owner 2026-11-19: "terlalu realistis"): dasar CARTO light tanpa label + label kota sendiri.
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:16,subdomains:'abcd',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',className:'fa-tiles'}).addTo(map);
+  for(const [nmCity,lat,lon] of CITIES)L.marker([lat,lon],{interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<div class="fa-city">${nmCity}</div>`,iconSize:[0,0]})}).addTo(map);
   const A=window.ForecastTopdown.areas(),P=pos();layers=new Map();const all=[];
   A.CLUSTERS.forEach((c,i)=>{const col=PALETTE[i%PALETTE.length],g=L.layerGroup().addTo(map),pts=c.ids.map(id=>P.get(id)).filter(Boolean);
    if(pts.length>1)L.polygon(hull(pts.map(o=>[o.lat,o.lon])),{color:col,weight:1.5,fillColor:col,fillOpacity:.08,dashArray:'5 5',className:'fa-zone'}).addTo(g);
    for(const id of c.ids){const o=P.get(id);if(!o||c.centers.includes(id))continue;const cen=c.centers.map(x=>P.get(x)).filter(Boolean).sort((a,b)=>dist(o,a)-dist(o,b))[0];if(cen)L.polyline([[o.lat,o.lon],[cen.lat,cen.lon]],{color:col,weight:2.5,opacity:.85,dashArray:'6 6',className:'fa-flow'}).addTo(g);}
    for(const id of c.ids){const o=P.get(id);if(!o)continue;const ctr=c.centers.includes(id);all.push([o.lat,o.lon]);
-    const m=L.marker([o.lat,o.lon],{icon:L.divIcon({className:'',html:`<div class="fa-pin ${ctr?'c':'m'}" style="--fa:${col}"><i></i><span>${esc(nm(id))}</span></div>`,iconSize:[0,0]})}).bindPopup(`<b>${esc(nm(id))}</b><br>${esc(c.name)} · ${ctr?'Center':'Anggota (85%)'}`).addTo(g);m.__id=id;}
+    const m=L.marker([o.lat,o.lon],{icon:L.divIcon({className:'',html:`<div class="fa-pin ${ctr?'c':'m'}" style="--fa:${col}"><i><img src="${LOGO}" alt=""></i><span>${esc(nm(id))}${ctr?' · Center':''}</span></div>`,iconSize:[0,0]})}).bindPopup(`<b>${esc(nm(id))}</b><br>${esc(c.name)} · ${ctr?'Center':'Anggota (85%)'}`).addTo(g);m.__id=id;}
    layers.set(c.name,{g,b:L.latLngBounds(pts.map(o=>[o.lat,o.lon]))});});
   const sg=L.layerGroup().addTo(map),sp=[];
-  for(const id of A.STAND_ALONE){const o=P.get(id);if(!o)continue;sp.push([o.lat,o.lon]);all.push([o.lat,o.lon]);const m=L.marker([o.lat,o.lon],{icon:L.divIcon({className:'',html:`<div class="fa-pin s"><i></i><span>${esc(nm(id))}</span></div>`,iconSize:[0,0]})}).bindPopup(`<b>${esc(nm(id))}</b><br>Stand Alone · tidak bisa transfer`).addTo(sg);m.__id=id;}
+  for(const id of A.STAND_ALONE){const o=P.get(id);if(!o)continue;sp.push([o.lat,o.lon]);all.push([o.lat,o.lon]);const m=L.marker([o.lat,o.lon],{icon:L.divIcon({className:'',html:`<div class="fa-pin s"><i><img src="${LOGO}" alt=""></i><span>${esc(nm(id))}</span></div>`,iconSize:[0,0]})}).bindPopup(`<b>${esc(nm(id))}</b><br>Stand Alone · tidak bisa transfer`).addTo(sg);m.__id=id;}
   layers.set('__stand',{g:sg,b:L.latLngBounds(sp)});
   bounds=L.latLngBounds(all);map.fitBounds(bounds,{padding:[30,30]});
   if(focus)setTimeout(()=>flyTo(focus,true),50);

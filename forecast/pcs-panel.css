@@ -1045,3 +1045,54 @@ main{max-width:1680px!important}
 .fa-up-n strong{font-size:15px;color:#1f6b45}
 .fa-stand .fa-note{font-size:12.5px;color:#6a4a1c;margin:10px 0 0;line-height:1.5}
 @media (prefers-reduced-motion:reduce){.fa *,.fa{animation:none!important;transition:none!important}}
+
+/* ===== Panduan v3: peta ringan + pin logo (owner 2026-11-19) ===== */
+.fa-page{max-width:1500px}
+.fa-hero{padding:6px 2px 2px;animation:faIn .45s ease both}
+.fa-hero h2{margin:4px 0 4px;font-size:24px;color:#14303c}
+.fa-hero p{margin:0;color:#5f6f7e;font-size:14px}
+.fa-tiles{filter:saturate(.6) brightness(1.03)!important}
+.fa-leaflet{height:520px!important;background:#f3f6f8}
+.fa-city{transform:translate(-50%,-50%);font:700 10.5px/1 'DM Sans',system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9aa8b5;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff}
+.fa-pin i{display:grid!important;place-items:center;width:26px!important;height:26px!important;border-radius:50%;background:#fff!important;border:2.5px solid var(--fa)!important;box-shadow:0 2px 6px rgba(20,40,60,.18);overflow:hidden}
+.fa-pin i img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.fa-pin.c i{width:36px!important;height:36px!important;border:3px solid var(--fa)!important;animation:faPulse 2s infinite}
+.fa-pin.s i{width:26px!important;height:26px!important;border:2.5px dashed #c0762a!important;transform:none!important;border-radius:50%!important}
+.fa-pin{transition:transform .2s}
+.fa-pin:hover{transform:translate(-50%,-50%) scale(1.12)}
+.fa-pin span{font-size:11px;padding:3px 6px}
+.fa-pin.c span{background:var(--fa);color:#fff}
+/* tab Panduan: lencana Baru */
+.tab-new{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:9px;background:#e0602f;color:#fff;font-size:10px;font-weight:800;letter-spacing:.03em;animation:tabPulse 1.6s ease-in-out infinite}
+@keyframes tabPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+
+/* ===== Interaksi seluruh web (owner 2026-11-19) ===== */
+@keyframes wsIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes foldIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes fxRipple{from{transform:scale(0);opacity:.35}to{transform:scale(2.4);opacity:0}}
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+#workspace-content.ws-enter>*{animation:wsIn .45s cubic-bezier(.2,.7,.2,1) both}
+#workspace-content.ws-enter>*:nth-child(2){animation-delay:.05s}
+#workspace-content.ws-enter>*:nth-child(3){animation-delay:.1s}
+#workspace-content.ws-enter>*:nth-child(4){animation-delay:.15s}
+#workspace-content.ws-enter>*:nth-child(n+5){animation-delay:.2s}
+.focus-tabs button{transition:background .25s,color .25s,box-shadow .25s,transform .15s}
+.focus-tabs button:hover{transform:translateY(-1px)}
+.focus-tabs button.active{box-shadow:0 4px 14px rgba(23,43,66,.25)}
+.workspace-card,.fd-kpi,.ft-kpis>div,.fp-metrics article,.fd-fold,.ft-area,.fa-role-card{transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.fd-kpi:hover,.ft-kpis>div:hover,.fp-metrics article:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(20,40,60,.08)}
+.fd-fold:hover{box-shadow:0 6px 16px rgba(20,40,60,.06)}
+.fd-fold[open]>.fd-fold-b{animation:foldIn .3s ease both}
+.fd-att-more[open]>ul{animation:foldIn .25s ease both}
+.button{transition:transform .12s ease,box-shadow .2s ease,background-color .2s ease,filter .2s ease}
+.button:active{transform:scale(.97)}
+.fp-primary:hover{filter:brightness(1.08);box-shadow:0 6px 16px rgba(32,95,112,.28)}
+.fx-ripple{position:absolute;border-radius:50%;background:currentColor;pointer-events:none;animation:fxRipple .55s ease-out forwards}
+.ft-chip,.ft-view button,.ft-area-tabs button,.fp-seg button{transition:background .2s,color .2s,box-shadow .2s,transform .12s}
+.ft-chip:hover{transform:translateY(-1px)}
+.fp-table tbody tr,.ft-grid tbody tr{transition:background-color .15s}
+.fd-kpi strong,.ft-kpis strong{font-variant-numeric:tabular-nums}
+.workspace-empty,.fp-empty{position:relative}
+.workspace-empty::after{content:'';display:block;height:6px;margin-top:12px;border-radius:4px;background:linear-gradient(90deg,#eef2f6 0,#dfe7ee 40%,#eef2f6 80%);background-size:800px 6px;animation:shimmer 1.2s linear infinite}
+input,select,textarea{transition:border-color .2s,box-shadow .2s}
+@media (prefers-reduced-motion:reduce){#workspace-content.ws-enter>*,.fd-fold[open]>.fd-fold-b,.fx-ripple,.tab-new{animation:none!important}.button,.workspace-card,.fd-kpi{transition:none!important}}
