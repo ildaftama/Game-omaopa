@@ -35,6 +35,7 @@ window.ForecastAreas=(()=>{
  // ---- Peta (Leaflet) ----
  let map=null,mapEl=null,layers=null,bounds=null;
  function mount(){
+  const pk=document.querySelector('.outlet-picker');if(pk&&document.querySelector('.fa-page'))pk.hidden=true;
   const el=document.getElementById('fa-leaflet');
   if(!el||typeof L==='undefined')return;
   const host=el.closest('.fa');
@@ -47,8 +48,8 @@ window.ForecastAreas=(()=>{
   if(!el.offsetWidth)return; // masih terlipat; dipasang saat dibuka
   if(map){try{map.remove();}catch{}}
   mapEl=el;map=L.map(el,{scrollWheelZoom:false,zoomControl:true,attributionControl:true});
-  // Peta ringan (owner 2026-11-19: "terlalu realistis"): dasar CARTO light tanpa label + label kota sendiri.
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:16,subdomains:'abcd',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',className:'fa-tiles'}).addTo(map);
+  // Peta ringan (owner 2026-11-19: "terlalu realistis"): dasar Esri Light Gray (tanpa kunci API) + label kota sendiri.
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Peta dasar &copy; Esri',className:'fa-tiles'}).addTo(map);
   for(const [nmCity,lat,lon] of CITIES)L.marker([lat,lon],{interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<div class="fa-city">${nmCity}</div>`,iconSize:[0,0]})}).addTo(map);
   const A=window.ForecastTopdown.areas(),P=pos();layers=new Map();const all=[];
   A.CLUSTERS.forEach((c,i)=>{const col=PALETTE[i%PALETTE.length],g=L.layerGroup().addTo(map),pts=c.ids.map(id=>P.get(id)).filter(Boolean);
