@@ -1159,7 +1159,7 @@ window.ForecastDashboard=(()=>{
    if(!leafletMarkers.size)return;
    leafletMap.closePopup();
    if(leafletMarkers.size===1){const only=[...leafletMarkers.values()][0];leafletMap.setView(only.getLatLng(),14);}
-   else leafletMap.fitBounds(L.latLngBounds([...leafletMarkers.values()].map(m=>m.getLatLng())),{padding:[28,28]});
+   else{const sm=document.getElementById('weather-sum'),side=sm&&!weatherSumMin&&getComputedStyle(sm).position==='absolute'?sm.offsetWidth+30:28;leafletMap.fitBounds(L.latLngBounds([...leafletMarkers.values()].map(m=>m.getLatLng())),{paddingTopLeft:[side,40],paddingBottomRight:[28,28]});}
   }
   if(!leafletFitted&&leafletMarkers.size){leafletFitted=true;resetMapView();}
   setTimeout(()=>leafletMap?.invalidateSize(),60);
