@@ -162,16 +162,16 @@ window.ForecastTopdown=(()=>{
  //   Center UNDIP+UNNES, outlet lain 85% (min 1 pcs bila ada saran): waste 7,1% / kurang 9,9%
  //   (mesin cadangan: 9,9% / 8,1%) -- waste & kekurangan turun bersamaan.
  const CLUSTERS=[
-  {name:'Semarang kota',ids:['unnes','undip','sampangan','udinus','gajah-raya','unimus','ngaliyan'],centers:['undip','unnes'],share:.85},
+  {name:'Semarang kota',ids:['unnes','undip','sampangan','udinus','gajah-raya','unimus','ngaliyan'],centers:['undip','unnes'],share:.85,bt:[[9.5,12.3],[7.1,9.9]]},
   // Diperluas 2026-11-19 (uji mundur 21 Okt-18 Nov, waste/kurang tanpa -> dengan Center):
   //   Solo kota 15,3/15,4 -> 8,8/8,9 · Klaten 12,3/12,5 -> 9,9/10,1 · Jogja utara 19,3/19,4 ->
   //   14,0/14,2 · Jogja barat 11,7/20,2 -> 9,3/17,8 · Magelang 16,9/17,5 -> 13,0/13,6.
   //   Center dipilih dari hasil uji (Nusa Indah di tengah Tajem & Jakal UII lebih baik dari Jakal UII).
-  {name:'Solo kota',ids:['uns','ums','makamhaji','nusukan','laweyan'],centers:['uns','ums'],share:.85},
-  {name:'Klaten',ids:['merbabu','rajawali'],centers:['rajawali'],share:.85},
-  {name:'Jogja utara',ids:['nusa-indah','tajem','jakal-uii'],centers:['nusa-indah'],share:.85},
-  {name:'Jogja barat',ids:['godean','umy'],centers:['umy'],share:.85},
-  {name:'Magelang',ids:['pemuda-magelang','muntilann','temanggung'],centers:['pemuda-magelang'],share:.85},
+  {name:'Solo kota',ids:['uns','ums','makamhaji','nusukan','laweyan'],centers:['uns','ums'],share:.85,bt:[[15.3,15.4],[8.8,8.9]]},
+  {name:'Klaten',ids:['merbabu','rajawali'],centers:['rajawali'],share:.85,bt:[[12.3,12.5],[9.9,10.1]]},
+  {name:'Jogja utara',ids:['nusa-indah','tajem','jakal-uii'],centers:['nusa-indah'],share:.85,bt:[[19.3,19.4],[14.0,14.2]]},
+  {name:'Jogja barat',ids:['godean','umy'],centers:['umy'],share:.85,bt:[[11.7,20.2],[9.3,17.8]]},
+  {name:'Magelang',ids:['pemuda-magelang','muntilann','temanggung'],centers:['pemuda-magelang'],share:.85,bt:[[16.9,17.5],[13.0,13.6]]},
  ];
  const STAND_ALONE=['ambarawa','uksw','boyolali','sragen','karanganyar','sukoharjo'];
  const roleOf=id=>CLUSTERS.some(c=>c.centers.includes(id))?'center':STAND_ALONE.includes(id)?'stand':null;
@@ -365,7 +365,10 @@ window.ForecastTopdown=(()=>{
   const colgroup=`<colgroup><col class="ft-cw-p">${ids.map(()=>'<col class="ft-cw-o">').join('')}<col class="ft-cw-t"></colgroup>`;
   const head=`<th class="ft-pcol" scope="col">Produk</th>${ids.map((id,ci)=>{const o=c.outlets.get(id),[sk,sl]=statusOf(id),open=draft.open.includes(id);const adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'';
    const role=roleOf(id),roleTag=role==='center'?'<span class="ft-role center" title="Center: dikirim lebih banyak sebagai cadangan stok outlet sekitar">Center</span>':role==='stand'?'<span class="ft-role stand" title="Stand Alone: jauh dari outlet lain, tidak bisa transfer — kirim hati-hati">Stand Alone</span>':'';
-   return `<th class="ft-ocol" scope="col" data-ci="${ci+1}"><button type="button" class="ft-oname${open?' on':''}" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Catatan & detail ${esc(name(id))}"><span class="ft-sdot ${sk}" data-ft-status="${esc(id)}" title="${esc(sl)}"></span>${esc(name(id))}${draft.notes[id]?'<i class="ft-hasnote" title="Ada catatan">✎</i>':''}</button>${roleTag||adj||rainChip(id)?`<div class="ft-ochips">${roleTag}${adj}${rainChip(id)}</div>`:''}</th>`;}).join('')}<th class="ft-tcol" scope="col">Total</th>`;
+   // Header rapi (owner 2026-11-19): baris 1 hanya nama + status + label peran; saran otomatis
+   // (penyesuaian waste/habis stok, hujan) pindah ke baris kedua supaya tidak bertumpuk.
+   return `<th class="ft-ocol" scope="col" data-ci="${ci+1}"><button type="button" class="ft-oname${open?' on':''}" data-ft-toggle="${esc(id)}" aria-expanded="${open}" title="Catatan & detail ${esc(name(id))}"><span class="ft-sdot ${sk}" data-ft-status="${esc(id)}" title="${esc(sl)}"></span><span class="ft-oname-t">${esc(name(id))}</span>${draft.notes[id]?'<i class="ft-hasnote" title="Ada catatan">✎</i>':''}</button>${roleTag}</th>`;}).join('')}<th class="ft-tcol" scope="col">Total</th>`;
+  const headSub=`<th class="ft-pcol ft-hsub-l" scope="row">Saran otomatis</th>${ids.map((id,ci)=>{const o=c.outlets.get(id),adj=draft.perOutlet&&o.adj.pct?`<span class="ft-adj ${o.adj.pct<0?'minus':'plus'}" title="${esc(describe(o.wl,c.W)+' → '+(o.adj.pct<0?'dikurangi ':'ditambah ')+Math.abs(o.adj.pct)+'%')}">${o.adj.pct>0?'+':'−'}${Math.abs(o.adj.pct)}%</span>`:'',rc=rainChip(id);return `<th class="ft-hsub-c" data-ci="${ci+1}">${adj||rc?`<div class="ft-ochips">${adj}${rc}</div>`:'<span class="ft-z">·</span>'}</th>`;}).join('')}<th class="ft-tcol"></th>`;
   const anyOrd=r=>ids.some(id=>ordOf(id,r)>0);
   const showAllOrd=!!draft.ordAll?.[g.name],hiddenOrd=rows.filter(r=>!anyOrd(r)).length;
   // Produk lain yang kosong di semua outlet area ini disembunyikan (owner 2026-11-19: tabel lebih ringkas).
@@ -389,7 +392,7 @@ window.ForecastTopdown=(()=>{
   const gSum=kind=>ids.reduce((s,id)=>s+colSum(kind,id),0);
   const regFoot=`<tfoot><tr><th class="ft-pcol" scope="row">Total pcs</th>${colTot('reg')}<td class="ft-tcol" data-ft-gt="reg|${A}">${nf(gSum('reg'))}</td></tr><tr class="ft-fmeta"><th class="ft-pcol" scope="row">Omzet reguler</th>${ids.map((id,ci)=>`<td data-ci="${ci+1}" data-ft-val="${esc(id)}">${rpShort(outletTotals(c,id).val)}</td>`).join('')}<td class="ft-tcol" data-ft-gv="${A}">${rpShort(ids.reduce((s,id)=>s+outletTotals(c,id).val,0))}</td></tr><tr class="ft-fmeta"><th class="ft-pcol" scope="row" title="Reguler 12 produk inti dibanding terjual hari yang sama minggu lalu">vs minggu lalu</th>${ids.map((id,ci)=>{const l=lwCell(c.outlets.get(id),outletTotals(c,id).pcs);return `<td class="${l.cls}" data-ci="${ci+1}" data-ft-lw="${esc(id)}" title="${esc(l.title)}">${l.txt}</td>`;}).join('')}<td class="ft-tcol"></td></tr></tfoot>`;
   const foot=kind=>`<tfoot><tr><th class="ft-pcol" scope="row">Total pcs</th>${colTot(kind)}<td class="ft-tcol" data-ft-gt="${kind}|${A}">${nf(gSum(kind))}</td></tr></tfoot>`;
-  const tbl=(kind,title,sub,extra='')=>`<div class="ft-sub-h ft-sub-${kind}"><b>${title}</b><span>${sub}</span>${extra}</div><div class="ft-table-wrap ft-grid-wrap"><table class="ft-grid ft-grid-${kind}" data-kind="${kind}">${colgroup}<thead><tr>${head}</tr></thead><tbody>${body(kind)||`<tr><td class="ft-empty" colspan="${n+2}">Belum ada pesanan di area ini. Klik <b>Tampilkan semua produk</b> untuk mengisi.</td></tr>`}</tbody>${kind==='reg'?regFoot:foot(kind)}</table></div>`;
+  const tbl=(kind,title,sub,extra='')=>`<div class="ft-sub-h ft-sub-${kind}"><b>${title}</b><span>${sub}</span>${extra}</div><div class="ft-table-wrap ft-grid-wrap"><table class="ft-grid ft-grid-${kind}" data-kind="${kind}">${colgroup}<thead><tr>${head}</tr><tr class="ft-hsub">${headSub}</tr></thead><tbody>${body(kind)||`<tr><td class="ft-empty" colspan="${n+2}">Belum ada pesanan di area ini. Klik <b>Tampilkan semua produk</b> untuk mengisi.</td></tr>`}</tbody>${kind==='reg'?regFoot:foot(kind)}</table></div>`;
   const notes=ids.filter(id=>draft.open.includes(id)).map(id=>`<div class="ft-note-box"><b>${esc(name(id))}</b><textarea rows="2" maxlength="500" data-ft-note="${esc(id)}" placeholder="Catatan outlet, misalnya ada acara kampus">${esc(draft.notes[id])}</textarea><button type="button" class="button quiet" data-ft-open-outlet="${esc(id)}">Detail outlet ↗</button><button type="button" class="ft-note-x" data-ft-toggle="${esc(id)}" aria-label="Tutup catatan">×</button></div>`).join('');
   const sum=k=>nf(gSum(k));
   return `<section class="ft-area" style="--acc:${g.color};--acc-soft:${PR().routeBg(g.name)||'#eef2f6'}">
@@ -453,7 +456,7 @@ window.ForecastTopdown=(()=>{
    <div class="ft-bar">
     <div class="ft-area-tabs" role="tablist" aria-label="Pilih area">${[{name:AREA_ALL},...c.groups].map(g=>`<button type="button" role="tab" data-ft-area="${esc(g.name)}" aria-selected="${(draft.area||AREA_ALL)===g.name}">${g.name===AREA_ALL?'Semua area':esc(g.name)}</button>`).join('')}</div>
     <div class="ft-view" role="tablist" aria-label="Tabel yang ditampilkan">${[['reg','1 · Stok outlet',''],['ord','2 · Pesanan',t.orders?` <i>${nf(t.orders)}</i>`:''],['kir','3 · Total kirim','']].map(([k,l,n])=>`<button type="button" role="tab" data-ft-view="${k}" aria-selected="${(draft.view||'reg')===k}">${l}${n}</button>`).join('')}</div>
-    <div class="ft-bar-r"><span class="ft-legend"><span title="Tersimpan"><i class="ft-sdot saved"></i></span><span title="Berubah, belum disimpan"><i class="ft-sdot changed"></i></span><span title="Belum disimpan"><i class="ft-sdot new"></i></span><span class="ft-lg-txt">status</span><span title="Diubah dari saran otomatis"><i class="ft-lg-edit"></i></span><span class="ft-lg-txt">diubah</span></span><span class="ft-help" tabindex="0" title="${esc(`Porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir${c.perfSum?.down||c.perfSum?.up?`, disesuaikan performa rencana tim 28 hari (${c.perfSum.down} produk-outlet diturunkan${c.perfSum.up?`, ${c.perfSum.up} dinaikkan`:''})`:''}. Produk lain diisi manual (atur di Pengaturan › Produk). Keyboard: Enter/↓ baris bawah, Shift+Enter/↑ baris atas, Ctrl+←/→ pindah outlet. Klik nama outlet untuk catatan.`)}">?</span><button type="button" class="button quiet ft-jump" data-ft-jump>Rencana produksi ↓</button></div>
+    <div class="ft-bar-r"><span class="ft-legend"><span title="Tersimpan"><i class="ft-sdot saved"></i></span><span title="Berubah, belum disimpan"><i class="ft-sdot changed"></i></span><span title="Belum disimpan"><i class="ft-sdot new"></i></span><span class="ft-lg-txt">status</span><span title="Diubah dari saran otomatis"><i class="ft-lg-edit"></i></span><span class="ft-lg-txt">diubah</span></span><span class="ft-help" tabindex="0" title="${esc(`Porsi outlet & komposisi produk mengikuti pola hari yang sama 8 minggu terakhir${c.perfSum?.down||c.perfSum?.up?`, disesuaikan performa rencana tim 28 hari (${c.perfSum.down} produk-outlet diturunkan${c.perfSum.up?`, ${c.perfSum.up} dinaikkan`:''})`:''}. Produk lain diisi manual (atur di Pengaturan › Produk). Keyboard: Enter/↓ baris bawah, Shift+Enter/↑ baris atas, Ctrl+←/→ pindah outlet. Klik nama outlet untuk catatan.`)}">?</span><button type="button" class="button quiet ft-jump" data-fp-mode="areas" title="Penjelasan area, Center & Stand Alone">Area & outlet</button><button type="button" class="button quiet ft-jump" data-ft-jump>Rencana produksi ↓</button></div>
    </div>
    ${(()=>{const rows=prodRows();return c.groups.filter(g=>(draft.area||AREA_ALL)===AREA_ALL||draft.area===g.name).map(g=>areaCard(c,g,rows)).join('')+((draft.view||'reg')!=='reg'?factoryCard(c):'');})()}
    <div id="ft-prod">${productionBlock(c)}</div>
@@ -623,5 +626,5 @@ window.ForecastTopdown=(()=>{
   try{if(!data().sales||!data().orders)return null;if(date!==d){date=d;draft=null;}const c=prepare();if(!c.outlets.has(id))return null;
    return {regular:[...draft.cells[id]],orders:[...draft.orders[id]],note:draft.notes[id]||'',customItems:draft.names.map(nm=>({name:nm,regular:draft.extra[id][nm].r,orders:draft.extra[id][nm].o}))};}catch{return null;}
  }
- return {render,input,change,click,keydown,cellsFor,factoryOrders,busy:()=>saving,setMessage:t=>{message=t;}};
+ return {areas:()=>({CLUSTERS,STAND_ALONE,roleOf}),render,input,change,click,keydown,cellsFor,factoryOrders,busy:()=>saving,setMessage:t=>{message=t;}};
 })();
