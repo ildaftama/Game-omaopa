@@ -78,7 +78,7 @@ window.ForecastAreas=(()=>{
    for(const id of c.ids){const o=P.get(id);if(!o)continue;const ctr=c.centers.includes(id);all.push([o.lat,o.lon]);
     const m=L.marker([o.lat,o.lon],{icon:pin(ctr?'c':'m',col,nm(id)),riseOnHover:true,zIndexOffset:ctr?500:0}).bindPopup(`<b>${esc(nm(id))}</b><br>${esc(c.name)} · ${ctr?'Center':'Anggota (85%)'}`).addTo(g);m.__id=id;}
    // Center di luar kelompok (Klaten -> UMS) ikut masuk bingkai saat kelompok dipilih.
-   layers.set(c.name,{g,b:L.latLngBounds([...pts,...c.centers.map(x=>P.get(x)).filter(Boolean)].map(o=>[o.lat,o.lon]))});});
+   layers.set(c.name,{g,centers:c.centers,b:L.latLngBounds([...pts,...c.centers.map(x=>P.get(x)).filter(Boolean)].map(o=>[o.lat,o.lon]))});});
   const sg=L.layerGroup().addTo(map),sp=[];
   for(const id of A.STAND_ALONE){const o=P.get(id);if(!o)continue;sp.push([o.lat,o.lon]);all.push([o.lat,o.lon]);const m=L.marker([o.lat,o.lon],{icon:pin('s',STAND_COL,nm(id)),riseOnHover:true}).bindPopup(`<b>${esc(nm(id))}</b><br>Stand Alone · tidak bisa transfer`).addTo(sg);m.__id=id;}
   layers.set('__stand',{g:sg,b:L.latLngBounds(sp)});
@@ -98,7 +98,8 @@ window.ForecastAreas=(()=>{
  function flyTo(name,instant){
   focus=name;document.querySelectorAll('.fa-item').forEach(c=>c.classList.toggle('on',c.dataset.faCluster===name));
   if(!map||!layers)return;
-  for(const [k,v] of layers)v.g.eachLayer(l=>{const e=l.getElement?.()||l._path;if(e)e.classList.toggle('fa-dim',!!name&&k!==name);});
+  const keep=new Set(name&&layers.get(name)?.centers||[]); // Center di luar kelompok (UMS untuk Klaten) tetap terang
+  for(const [k,v] of layers)v.g.eachLayer(l=>{const e=l.getElement?.()||l._path;if(e)e.classList.toggle('fa-dim',!!name&&k!==name&&!keep.has(l.__id));});
   const L1=name&&layers.get(name);fit(L1?L1.b:bounds,instant);
  }
  function syncRoles(){
