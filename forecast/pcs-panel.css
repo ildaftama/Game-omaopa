@@ -939,3 +939,8 @@ main{max-width:1680px!important}
 .ft-grid tfoot .ft-fsum>*{font-weight:600;color:#4d5d6c}
 .ft-grid tfoot .ft-fkirim>*{font-weight:800;color:#1c2b38;background:#eef4f8}
 .ft-grid tfoot .ft-fkirim .ft-tcol{background:#e1ebf2}
+
+/* Rincian pesanan (read-only) di tampilan Total kirim */
+.ft-sub-ordv b{color:#7a4b12}
+.ft-grid-ordv thead th{background:#fbf3e4}
+.ft-grid-ordv .ft-kv{color:#5a3d00}
