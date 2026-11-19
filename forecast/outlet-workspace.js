@@ -43,7 +43,7 @@ function render(){const o=outlet(),primary=focus==='forecast'||focus==='dashboar
 // sekejap = satu render saja, bukan beberapa render berturut-turut yang terlihat berkedip.
 let lastHTML='',lastFocus='',queued=0;
 // Update Metode Forecast (owner 2026-11-19): WAJIB dibaca sebelum forecast malam ini. Pengingat
-// (lencana tab + pita di bawah menu) tampil terus sampai Senin 24 Nov 2026 pukul 06.00 WIB, lalu hilang
+// (lencana tab + pita di bawah menu) tampil terus sampai Selasa 24 Nov 2026 pukul 06.00 WIB, lalu hilang
 // sendiri. Selama belum dikonfirmasi "sudah membaca" (per perangkat), membuka Forecast memunculkan
 // jendela wajib baca dulu.
 const METHOD_UNTIL=Date.parse('2026-11-24T06:00:00+07:00'),METHOD_KEY='omaopa-method-read-20261119';let methodReadMem=false;
@@ -58,13 +58,13 @@ function guideBadge(){
  if(!on||focus==='guide'){if(n)n.hidden=true;}
  else{
   if(!n){n=document.createElement('div');n.id='method-notice';n.className='method-notice';n.setAttribute('role','status');document.querySelector('.focus-tabs')?.insertAdjacentElement('afterend',n);n.addEventListener('click',e=>{if(e.target.closest('[data-method-open]'))goGuide();});}
-  const h=read?`<span class="mn-ic">✓</span><p><b>Anda sudah membaca Update Metode Forecast.</b> Pengingat ini tampil sampai Senin, 24 November pagi.</p><button type="button" class="button quiet" data-method-open>Baca lagi</button>`:`<span class="mn-ic">📣</span><p><b>Metode forecast diperbarui — wajib dibaca sebelum membuat forecast malam ini.</b> Kiriman kini dibagi per area dengan outlet Center, Anggota & Stand Alone.</p><button type="button" class="button" data-method-open>Baca sekarang →</button>`;
+  const h=read?`<span class="mn-ic">✓</span><p><b>Anda sudah membaca Update Metode Forecast.</b> Pengingat ini tampil sampai Selasa, 24 November pagi.</p><button type="button" class="button quiet" data-method-open>Baca lagi</button>`:`<span class="mn-ic">📣</span><p><b>Metode forecast diperbarui — wajib dibaca sebelum membuat forecast malam ini.</b> Kiriman kini dibagi per area dengan outlet Center, Anggota & Stand Alone.</p><button type="button" class="button primary" data-method-open>Baca sekarang →</button>`;
   n.hidden=false;n.classList.toggle('done',read);if(n.dataset.sig!==h){n.dataset.sig=h;n.innerHTML=h;}
  }
  // Gerbang: Forecast dibuka sebelum membaca -> jendela wajib baca (tidak bisa dilewati).
  let g=document.getElementById('method-gate');
  if(focus==='forecast'&&on&&!read){
-  if(!g){g=document.createElement('div');g.id='method-gate';g.className='method-gate';g.innerHTML=`<div class="method-gate-card" role="dialog" aria-modal="true" aria-labelledby="mg-t"><span class="mn-big">📣</span><span class="micro-label">WAJIB DIBACA</span><h3 id="mg-t">Ada update metode forecast</h3><p>Mulai forecast malam ini, kiriman dibagi per <b>area</b>: outlet <b>Center</b> dikirim lebih banyak sebagai cadangan stok, <b>Anggota</b> dikirim 85% dari saran, dan outlet <b>Stand Alone</b> dikirim hati-hati. Baca dulu penjelasannya (± 3 menit) sebelum membuat forecast.</p><div class="method-gate-b"><button type="button" class="button" data-mg-read>Baca Update Metode Forecast</button><button type="button" class="button quiet" data-mg-back>Kembali ke Dashboard</button></div></div>`;
+  if(!g){g=document.createElement('div');g.id='method-gate';g.className='method-gate';g.innerHTML=`<div class="method-gate-card" role="dialog" aria-modal="true" aria-labelledby="mg-t"><span class="mn-big">📣</span><span class="micro-label">WAJIB DIBACA</span><h3 id="mg-t">Ada update metode forecast</h3><p>Mulai forecast malam ini, kiriman dibagi per <b>area</b>: outlet <b>Center</b> dikirim lebih banyak sebagai cadangan stok, <b>Anggota</b> dikirim 85% dari saran, dan outlet <b>Stand Alone</b> dikirim hati-hati. Baca dulu penjelasannya (± 3 menit) sebelum membuat forecast.</p><div class="method-gate-b"><button type="button" class="button primary" data-mg-read>Baca Update Metode Forecast</button><button type="button" class="button quiet" data-mg-back>Kembali ke Dashboard</button></div></div>`;
    document.body.appendChild(g);
    g.addEventListener('click',e=>{if(e.target.closest('[data-mg-read]'))goGuide();else if(e.target.closest('[data-mg-back]')){focus='dashboard';g.remove();render();}});
    setTimeout(()=>g.querySelector('[data-mg-read]')?.focus(),50);}

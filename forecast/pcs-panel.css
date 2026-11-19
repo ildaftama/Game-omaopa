@@ -1220,3 +1220,5 @@ input,select,textarea{transition:border-color .2s,box-shadow .2s}
 @keyframes mnRing{0%,100%{transform:rotate(0)}6%{transform:rotate(-14deg)}12%{transform:rotate(12deg)}18%{transform:rotate(-8deg)}24%{transform:rotate(0)}}
 @media (max-width:640px){.method-notice{flex-wrap:wrap}.method-notice .button{width:100%}}
 @media (prefers-reduced-motion:reduce){.method-notice,.mn-ic,.mn-big,.method-gate,.method-gate-card{animation:none!important}}
+.fa-new{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:900px){.fa-new{grid-template-columns:1fr}}
