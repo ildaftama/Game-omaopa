@@ -1264,6 +1264,7 @@ window.ForecastDashboard=(()=>{
  // Estimasi waste dari rencana tim (owner 2026-11-13): rencana terakhir (reguler+pesanan) vs total
  // terjual per produk inti, TANPA transfer antar outlet. Batas bawah = kalau semua kelebihan bisa
  // ditransfer (dijumlah per tanggal & produk dulu). Bukan waste tercatat tim.
+ let briefAcc=null;
  function estWasteNote(est){
   if(!est||!est.n||!(est.sv>0))return '';
   let wt=0;for(const q of est.pool.values())wt+=Math.max(0,q.out-q.sold)*q.h;
@@ -1306,14 +1307,16 @@ window.ForecastDashboard=(()=>{
   const sign=v=>(v>=0?'+':'')+pct1(v);
   const line=r=>r.empty?`<tr class="fd-acc-empty"><td><b>${esc(r.label)}</b></td><td colspan="3">${esc(r.empty)}</td></tr>`
    :`<tr><td><b>${esc(r.label)}</b><small>${esc(r.sub)}</small></td><td><span class="fd-acc-pill ${tone(r.acc)}">${pct1(r.acc)}</span></td><td class="${Math.abs(r.bias)>=3?'fd-acc-warnc':''}">${sign(r.bias)}</td><td>${moneyBig(r.F)} <span class="fd-acc-vs">vs</span> ${moneyBig(r.A)}</td></tr>`;
-  // Peringatan arah (owner): selisih total >=3% -> sarankan koreksi sebesar selisihnya.
+  // Peringatan & estimasi waste tidak lagi ditulis di kartu ini (owner 2026-11-19: halaman depan
+  // terlalu ramai) -- datanya dikirim ke kartu Ringkasan (briefCard) sebagai "Perlu perhatian".
+  briefAcc={rows:rows.filter(r=>!r.empty),est:est&&est.n&&est.sv>0?{pct:est.w/est.sv*100,pcs:est.pcs,w:est.w,n:est.n}:null};
   const warns=rows.filter(r=>!r.empty&&Math.abs(r.bias)>=3).map(r=>{
    const up=r.bias>0,k=Math.round(Math.abs(r.bias));
    return `<li class="${up?'over':'under'}"><b>${esc(r.label)}</b> cenderung ${pct1(Math.abs(r.bias))} ${up?'di atas':'di bawah'} real (${moneyBig(r.F)} vs ${moneyBig(r.A)}). ${up?'Kurangi':'Tambah'} ${esc(r.verb)} sekitar ${k}% ${up?'agar waste tidak menumpuk':'agar tidak kehabisan stok'}.</li>`;
   });
   return `<article class="workspace-card fd-accuracy"><span class="micro-label">AKURASI ${month.toUpperCase()} · ${dateRange(days[0].date,days.at(-1).date).toUpperCase()} · DALAM RUPIAH</span>
    <div class="fd-outlet-table-wrap"><table class="fd-acc-table"><thead><tr><th></th><th>Akurasi</th><th>Selisih total</th><th>Prediksi/rencana vs real</th></tr></thead><tbody>${rows.map(line).join('')}</tbody></table></div>
-   ${warns.length?`<ul class="fd-acc-warn">${warns.join('')}</ul>`:`<p class="fd-accuracy-note">Semua masih dalam selisih ±3% dari real.</p>`}${estWasteNote(est)}</article>`;
+   </article>`;
  }
  // Omzet real hari ini (SEMENTARA, owner 2026-11-12): tarikan ESB jam 18-20 WIB sebelum outlet
  // tutup (pcs-sales.json `intraday`). Hanya pantauan -- belum dipakai mesin prediksi, karena
@@ -1336,13 +1339,12 @@ window.ForecastDashboard=(()=>{
   if(show.weather)ensureWeather(outletId);
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
-   <div class="fd-shortcut"><button type="button" class="button fp-primary" data-go="forecast" data-fp-mode="topdown">Buat forecast →</button><span>Monitoring rencana tim ada di bawah kartu akurasi.</span></div>
+   ${(()=>{const accHtml=show.accuracy?accuracyCard(trend,outletId):'';return `${briefCard(trend,outletId)}
    ${intradayCard(trend,outletId)}
-   ${show.accuracy?accuracyCard(trend,outletId):''}
-   ${outletId==='__all__'?dayInsightCard(trend):''}
-   ${window.ForecastWorkspace?.monitorSection?.()||''}
-   ${show.trend&&outletId==='__all__'?trendWatchCard(trend.trendNow):''}
-   ${show.wasteLost?wasteLostCard(outletId):''}
+   ${accHtml}`;})()}
+   ${fold('mon','Monitoring rencana tim','rencana vs penjualan per tanggal, outlet & produk · performa bulanan',window.ForecastWorkspace?.monitorSection?.()||'')}
+   ${show.trend&&outletId==='__all__'?fold('trend','Kondisi outlet','omzet, waste & lost sales naik/turun 3 hari terakhir',trendWatchCard(trend.trendNow)):''}
+   ${show.wasteLost?fold('wl','Waste & lost sales per outlet','bulan berjalan · outlet di atas batas',wasteLostCard(outletId)):''}
    <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${monthSummaryHtml(trend)}</article>
    ${show.weather?`<article class="workspace-card weather-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>`:''}
    ${show.events?`<div class="product-comparison"><article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article></div>`:''}
@@ -1388,6 +1390,38 @@ window.ForecastDashboard=(()=>{
   if(!xs.length)return '';
   xs.sort((a,b)=>Math.abs(b.biasPct)-Math.abs(a.biasPct));
   return `<article class="workspace-card fd-dayins"><span class="micro-label">INSIGHT POLA HARI · 12 MINGGU TERAKHIR</span><ul>${xs.map(x=>`<li class="${x.biasPct>0?'over':'under'}"><b>${H[x.wd]}</b> ${x.biasPct>0?`omzet real <b>di bawah</b> prediksi ${x.over} dari ${x.n} kali (rata-rata ${pct1(Math.abs(x.biasPct))} lebih rendah) — jangan kirim berlebihan, hindari buffer plus.`:`omzet real <b>di atas</b> prediksi ${x.n-x.over} dari ${x.n} kali (rata-rata ${pct1(Math.abs(x.biasPct))} lebih tinggi) — pastikan stok produk laris cukup.`}${Math.abs(x.calibPct)>=.5?` <small>Prediksi sudah dikoreksi otomatis ${x.calibPct>0?'+':'−'}${pct1(Math.abs(x.calibPct))}.</small>`:''}</li>`).join('')}</ul></article>`;
+ }
+ // ---- Halaman depan ringkas (owner 2026-11-19: "terlalu banyak notif") ----
+ // Satu kartu Ringkasan: angka kunci + maksimal 3 hal "Perlu perhatian" (diurutkan dari yang
+ // paling parah); sisanya dilipat. Bagian detail (Monitoring, kondisi outlet, waste per outlet)
+ // dilipat dan status buka/tutupnya diingat selama halaman terbuka.
+ const foldOpen=new Set();
+ document.addEventListener('toggle',e=>{const d=e.target;if(d?.dataset?.fold){d.open?foldOpen.add(d.dataset.fold):foldOpen.delete(d.dataset.fold);}},true);
+ const fold=(id,title,sub,body)=>body?`<details class="fd-fold" data-fold="${id}" ${foldOpen.has(id)?'open':''}><summary><span class="fd-fold-t">${title}</span>${sub?`<span class="fd-fold-s">${sub}</span>`:''}<span class="fd-fold-c" aria-hidden="true">⌄</span></summary><div class="fd-fold-b">${body}</div></details>`:'';
+ function briefCard(trend,outletId){
+  const H=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],P=window.ForecastPlanner,t1=P.shift(today(),1);
+  const nx=trend.rows.find(r=>r.date===t1),acc=briefAcc?.rows?.find(r=>r.label==='Prediksi sistem');
+  let wl=null;try{wl=wasteLostStats();}catch{}
+  const net=wl?.net||{},wOver=(wl?.list||[]).filter(r=>r.wasteOver).sort((a,b)=>b.wastePct-a.wastePct),lOver=(wl?.list||[]).filter(r=>r.lostOver).sort((a,b)=>b.lostPct-a.lostPct);
+  const kpi=(label,val,sub,tone)=>`<div class="fd-kpi ${tone||''}"><span>${label}</span><strong>${val}</strong>${sub?`<small>${sub}</small>`:''}</div>`;
+  const kpis=[
+   kpi(`Prediksi besok · ${H[new Date(t1+'T12:00:00Z').getUTCDay()]}`,nx?.forecastTotal!=null?moneyBig(nx.forecastTotal):'—',nx?.forecastPure!=null?`reguler ${moneyBig(nx.forecastPure)}`:''),
+   acc?kpi('Akurasi prediksi bulan ini',pct1(acc.acc),`${acc.bias>=0?'+':''}${pct1(acc.bias)} dari real`,acc.acc>=90?'ok':'warn'):'',
+   net.wastePct!=null?kpi('Waste bulan ini',pct1(net.wastePct),`batas ${W_TH}`,net.wastePct>WASTE_THRESHOLD?'bad':'ok'):'',
+   net.lostPerDay!=null?kpi('Habis stok',Math.round(net.lostPerDay)+' mnt',`per outlet per hari · batas ${L_TH}`,net.lostPct>LOST_SALES_THRESHOLD?'bad':'ok'):'',
+   briefAcc?.est?kpi('Est. sisa kiriman rencana tim',pct1(briefAcc.est.pct),'tanpa transfer, nominal HPP',briefAcc.est.pct>WASTE_THRESHOLD?'warn':'ok'):'',
+  ].join('');
+  const items=[];
+  if(net.wastePct!=null&&net.wastePct>WASTE_THRESHOLD)items.push({sev:3+net.wastePct/WASTE_THRESHOLD,tone:'bad',html:`<b>Waste ${pct1(net.wastePct)}</b>, di atas batas ${W_TH}${wOver.length?` — ${wOver.length} outlet di atas batas, tertinggi ${nameList(wOver.slice(0,3).map(r=>r.name))}`:''}. Kiriman sebaiknya dikurangi.`});
+  for(const r of briefAcc?.rows||[])if(r.label!=='Prediksi sistem'&&Math.abs(r.bias)>=3){const up=r.bias>0;items.push({sev:2+Math.abs(r.bias)/10,tone:up?'warn':'info',html:`<b>${esc(r.label)}</b> ${pct1(Math.abs(r.bias))} ${up?'di atas':'di bawah'} real bulan ini — ${up?'kurangi':'tambah'} ${esc(r.verb)} sekitar ${Math.round(Math.abs(r.bias))}%.`});}
+  if(briefAcc?.est&&briefAcc.est.pct>WASTE_THRESHOLD)items.push({sev:1.5+briefAcc.est.pct/10,tone:'warn',html:`Rencana tim menyisakan <b>±${pct1(briefAcc.est.pct)}</b> kiriman (${Math.round(briefAcc.est.pcs).toLocaleString('id-ID')} pcs) sebelum transfer — cek outlet yang selalu bersisa di Monitoring.`});
+  for(let i=0;i<7;i++){const d=P.shift(t1,i),b=trend.weekdayBias?.(d);if(!b||b.n<4||Math.abs(b.biasPct)<3)continue;const near=i<2,when=i===0?'Besok':i===1?'Lusa':'';
+   items.push({sev:(near?2.5:0.5)+Math.abs(b.biasPct)/20,tone:b.biasPct>0?'warn':'info',html:`${when?`<b>${when} (${H[b.wd]})</b>`:`<b>${H[b.wd]}</b>`}: omzet real ${b.biasPct>0?'di bawah':'di atas'} prediksi ${b.biasPct>0?b.over:b.n-b.over} dari ${b.n} kali terakhir (${pct1(Math.abs(b.biasPct))}) — ${b.biasPct>0?'hindari buffer plus':'pastikan stok produk laris cukup'}.`});}
+  if(lOver.length)items.push({sev:1+lOver.length/10,tone:'info',html:`<b>${lOver.length} outlet sering kehabisan stok</b>, terutama ${nameList(lOver.slice(0,2).map(r=>r.name))}.`});
+  items.sort((a,b)=>b.sev-a.sev);
+  const li=x=>`<li class="${x.tone}">${x.html}</li>`,top=items.slice(0,3),rest=items.slice(3);
+  const att=items.length?`<div class="fd-att"><span class="fd-att-h">Perlu perhatian</span><ul>${top.map(li).join('')}</ul>${rest.length?`<details class="fd-att-more" data-fold="att" ${foldOpen.has('att')?'open':''}><summary>Lihat ${rest.length} catatan lainnya</summary><ul>${rest.map(li).join('')}</ul></details>`:''}</div>`:`<p class="fd-att-ok">✓ Tidak ada yang perlu perhatian khusus hari ini.</p>`;
+  return `<article class="workspace-card fd-brief"><div class="fd-brief-head"><span class="micro-label">RINGKASAN${outletId==='__all__'?' · SEMUA OUTLET':''}</span><button type="button" class="button fp-primary" data-go="forecast" data-fp-mode="topdown">Buat forecast →</button></div><div class="fd-kpis">${kpis}</div>${outletId==='__all__'?att:''}</article>`;
  }
  function insight(date){try{return revenueTrend('__all__')?.weekdayBias?.(date)||null;}catch{return null;}}
  function predict(date){try{const r=revenueTrend('__all__')?.rows.find(x=>x.date===date);return r?{pure:r.forecastPure,total:r.forecastTotal}:null;}catch{return null;}}

@@ -859,3 +859,35 @@ main{max-width:1680px!important}
 .fd-dayins li.over{background:#fff3e6;color:#6b3d0f}
 .fd-dayins li.under{background:#eaf6ef;color:#1f5a37}
 .fd-dayins small{color:inherit;opacity:.8}
+
+/* ===== Dashboard ringkas (owner 2026-11-19) ===== */
+.fd-brief{margin:0 0 16px}
+.fd-brief-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.fd-brief-head .button{padding:9px 16px}
+.fd-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.fd-kpi{display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;background:#f6f8fa;border:1px solid #e6ebf0}
+.fd-kpi span{font-size:11.5px;font-weight:600;color:#6b7a88}
+.fd-kpi strong{font-size:20px;color:#1c2b38;font-variant-numeric:tabular-nums}
+.fd-kpi small{font-size:11px;color:#8592a0}
+.fd-kpi.bad strong{color:#b4442a}.fd-kpi.warn strong{color:#a0671a}.fd-kpi.ok strong{color:#1f6b45}
+.fd-att{margin-top:14px;padding-top:12px;border-top:1px solid #eef1f4}
+.fd-att-h{display:block;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7a88;margin-bottom:6px}
+.fd-att ul{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+.fd-att li{position:relative;padding:6px 10px 6px 22px;border-radius:8px;font-size:13px;line-height:1.45;color:#2b3a47}
+.fd-att li::before{content:'';position:absolute;left:9px;top:12px;width:7px;height:7px;border-radius:50%;background:#9aa8b5}
+.fd-att li.bad::before{background:#c8553a}.fd-att li.warn::before{background:#e0a030}.fd-att li.info::before{background:#3d8bb5}
+.fd-att li:hover{background:#f7f9fb}
+.fd-att-more{margin-top:4px}
+.fd-att-more>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:#1f5567;padding:4px 10px;list-style:none}
+.fd-att-more>summary::-webkit-details-marker{display:none}
+.fd-att-ok{margin:12px 0 0;font-size:13px;color:#1f6b45}
+.fd-fold{margin:0 0 12px;border:1px solid #e3e8ee;border-radius:14px;background:#fff}
+.fd-fold>summary{display:flex;align-items:baseline;gap:12px;padding:14px 18px;cursor:pointer;list-style:none}
+.fd-fold>summary::-webkit-details-marker{display:none}
+.fd-fold-t{font-size:15px;font-weight:700;color:#1c2b38}
+.fd-fold-s{font-size:12.5px;color:#7a8896}
+.fd-fold-c{margin-left:auto;font-size:16px;color:#7a8896;transition:transform .15s}
+.fd-fold[open]>summary .fd-fold-c{transform:rotate(180deg)}
+.fd-fold>summary:hover .fd-fold-t{color:#1f5567}
+.fd-fold-b{padding:0 12px 12px}
+.fd-fold-b>.workspace-card{margin:0;border:0;box-shadow:none}
