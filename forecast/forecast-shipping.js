@@ -61,7 +61,8 @@ window.ForecastShipping=(()=>{
    const totals=ROWS.map((_,ri)=>sumOf(cols.map(c=>c.values[ri])));return {...g,cols,totals,grand:sumOf(totals),filled:cols.filter(c=>c.record).length};});
  }
  // Pesanan untuk pabrik (bukan outlet), dari rekap sheet PESANAN (factoryDays, pcs_orders.py).
- function factory(){const rec=(window.ForecastPlanCloud?.records||[]).find(x=>x.date===date&&x.outlet==='pabrik');if(rec){const qty=rec.plan.orders.map(Number);return {qty,orders:1,partial:false,total:qty.reduce((a,b)=>a+b,0),manual:true};}const f=window.PcsPanels?.data?.()?.orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===date);const qty=r?r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0):Array(12).fill(0);return {qty,orders:r?.orders||0,partial:!!r?.qty?.some(v=>v===null),total:qty.reduce((a,b)=>a+b,0)};}
+ // Pesanan pabrik: angka yang diisi di Buat forecast (draft perangkat ini) > sheet PESANAN.
+ function factory(){let d=null;try{d=JSON.parse(localStorage.getItem('omaopa-topdown-v2:'+date)||'null');}catch{}if(d?.fac?.cells){const qty=d.fac.cells.map(v=>Math.max(0,Math.round(Number(v)||0)));return {qty,orders:1,partial:false,total:qty.reduce((a,b)=>a+b,0),manual:true};}const f=window.PcsPanels?.data?.()?.orders?.factoryDays;if(!Array.isArray(f))return null;const r=f.find(x=>x.date===date);const qty=r?r.qty.map((v,p)=>Number.isInteger(v)?v:r.knownQty?.[p]||0):Array(12).fill(0);return {qty,orders:r?.orders||0,partial:!!r?.qty?.some(v=>v===null),total:qty.reduce((a,b)=>a+b,0)};}
  // Rencana produksi dari rencana tersimpan (+ pesanan pabrik), dalam angkatan dapur.
  // Rencana produksi dari rencana TERSIMPAN (+ pesanan pabrik), dalam angkatan dapur. Pilihan
  // naik/turun, stok Mini per rasa & pengurangan Chiffon diambil dari draft Buat forecast di
@@ -206,5 +207,11 @@ window.ForecastShipping=(()=>{
  }
  // Dipakai menu Rencana produksi (forecast-topdown.js) untuk tanggal yang sedang disusun.
  function exportProduction(d,viaShare){date=d;return viaShare?share('production'):download('production');}
- return {render,click,input,change,groups:GROUPS,exportProduction};
+ // Gambar pesanan pabrik saja (tombol di tabel Pesanan pabrik, Buat forecast).
+ async function exportFactory(d,viaShare){date=d;ROWS=buildRows();const f=factory();if(!f||!f.total)return;
+  const rows=PR().CORE_ORDER.map(p=>PR().core()[p]).filter(c=>f.qty[c.p]>0).map(c=>({label:c.label,dot:c.dot,bg:c.bg,values:[f.qty[c.p]],total:null}));
+  const cv=drawTable({title:'Pesanan Pabrik',accent:FACTORY_ACCENT,showTotal:false,colLabels:['Pabrik'],sections:[{rows:[...rows,{label:'Total',values:[f.total],total:null}]}]}),name=`Pesanan Pabrik ${d}.png`,blob=await toBlob(cv);
+  if(viaShare){try{await navigator.share({files:[new File([blob],name,{type:'image/png'})],title:name});return;}catch(e){if(e.name==='AbortError')return;}}
+  const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);}
+ return {render,click,input,change,groups:GROUPS,exportProduction,exportFactory};
 })();
