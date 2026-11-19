@@ -66,7 +66,10 @@ window.ForecastAreas=(()=>{
   map.zoomControl.setPosition('topright');
   // Peta ringan: dasar Esri Light Gray (tanpa kunci API) + label kota sendiri.
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Peta dasar &copy; Esri',className:'fa-tiles'}).addTo(map);
-  for(const [c,lat,lon] of CITIES)L.marker([lat,lon],{interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<div class="fa-city">${c}</div>`,iconSize:[0,0]})}).addTo(map);
+  // Label kota di lapisan sendiri DI BAWAH pin; kota yang namanya sama dengan outlet tidak diberi label (dobel).
+  map.createPane('faCity').style.zIndex=450;
+  const outletNames=new Set((window.OUTLET_DATA?.outlets||[]).map(o=>nm(o.id).toLowerCase()));
+  for(const [c,lat,lon] of CITIES)if(!outletNames.has(c.toLowerCase()))L.marker([lat,lon],{pane:'faCity',interactive:false,keyboard:false,icon:L.divIcon({className:'',html:`<div class="fa-city">${c}</div>`,iconSize:[0,0]})}).addTo(map);
   const A=window.ForecastTopdown.areas(),P=pos();layers=new Map();const all=[];
   const pin=(kind,col,label)=>L.divIcon({className:'',html:`<div class="fa-pin ${kind}" style="--fa:${col}">${ICON[kind==='c'?'center':kind==='s'?'stand':'member']}<span>${esc(label)}</span></div>`,iconSize:[0,0]});
   A.CLUSTERS.forEach((c,i)=>{const col=PALETTE[i%PALETTE.length],g=L.layerGroup().addTo(map),pts=c.ids.map(id=>P.get(id)).filter(Boolean);
@@ -83,7 +86,7 @@ window.ForecastAreas=(()=>{
   syncRoles();
  }
  // Peta digeser supaya tidak tertutup panel kelompok di kiri & tombol peran di bawah.
- const PAD=()=>{const w=document.querySelector('.fa-panel'),wide=w&&getComputedStyle(w).position==='absolute';return {paddingTopLeft:[wide?w.offsetWidth+40:30,40],paddingBottomRight:[40,wide?100:30],maxZoom:13};};
+ const PAD=()=>{const w=document.querySelector('.fa-panel'),wide=w&&getComputedStyle(w).position==='absolute';return {paddingTopLeft:[wide?w.offsetWidth+50:30,70],paddingBottomRight:[40,wide?100:30],maxZoom:13};};
  function fit(b,instant){if(!map||!b)return;instant?map.fitBounds(b,PAD()):map.flyToBounds(b,{...PAD(),duration:.8});}
  // Cangkang cembung sederhana untuk menggambar area kelompok.
  function hull(pts){if(pts.length<3){const [a,b]=pts,d=.006;return b?[[a[0]+d,a[1]],[b[0]+d,b[1]],[b[0]-d,b[1]],[a[0]-d,a[1]]]:pts;}

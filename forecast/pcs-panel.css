@@ -1183,3 +1183,5 @@ input,select,textarea{transition:border-color .2s,box-shadow .2s}
 .weather-sum-adv span{display:block;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6b7a88;margin-bottom:2px}
 .weather-sum-note{font-size:10.5px;line-height:1.4;color:#8a96a3}
 @media(max-width:700px){.weather-sum{position:static;width:auto;max-width:none;margin-top:8px;box-shadow:none;border:1px solid #e3e8ee}}
+.fa-item .fa-up-bar b{animation:none}
+.fa-item .fa-up-bar i{width:2px!important;left:var(--a)!important;background:#14303c;opacity:.75;mix-blend-mode:normal;border-radius:0}
