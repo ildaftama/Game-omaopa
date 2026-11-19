@@ -1,52 +1,77 @@
 'use strict';
-// Halaman "Area & outlet" (owner 2026-11-19): menjelaskan kelompok transfer, outlet CENTER
-// (cadangan stok) dan STAND ALONE (terisolasi) yang dipakai pembagian otomatis di Buat forecast.
-// Data kelompok diambil dari ForecastTopdown.areas() -- satu sumber dengan aturan pembagian.
+// Panduan "Area & outlet" (owner 2026-11-19): halaman EDUKASI untuk forecaster di Dashboard.
+// Menjelaskan kelompok transfer, outlet CENTER (cadangan stok) dan STAND ALONE (terisolasi) yang
+// dipakai pembagian otomatis di Buat forecast. Data kelompok dari ForecastTopdown.areas() -- satu
+// sumber dengan aturan pembagian. Peta: Leaflet + OpenStreetMap yang dilembutkan (bukan peta cuaca),
+// interaktif: arahkan/klik kartu kelompok -> peta meluncur ke kelompok itu.
 window.ForecastAreas=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const pct=n=>n.toLocaleString('id-ID',{maximumFractionDigits:1})+'%';
  const km=n=>n.toLocaleString('id-ID',{maximumFractionDigits:1})+' km';
- const PALETTE=['#1f6f8b','#4e8a5e','#8a5fa8','#c0762a','#2a8f99','#a8504f'];
+ const pt=n=>n.toLocaleString('id-ID',{maximumFractionDigits:1});
+ const PALETTE=['#1f6f8b','#3f8a4f','#8a5fa8','#c0762a','#2a8f99','#b5534f'];
  const pos=()=>{const m=new Map();for(const o of window.OUTLET_DATA?.outlets||[])m.set(o.id,o);return m;};
  const nm=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||pos().get(id)?.name||id;
  function dist(a,b){if(!a||!b)return null;const R=6371,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lon-a.lon),h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
- const STAND_BT=[['100% saran (sekarang)',16.0,17.3],['95%',10.9,23.9],['90%',9.7,26.5],['85%',8.5,29.6]];
- // Peta ringkas: tiap kelompok satu lingkaran (ukuran = jumlah outlet), Stand Alone berupa
- // belah ketupat. Rincian outlet per kelompok ada di peta kecil tiap kartu (tidak bertumpuk).
- function proj(pts,W,H,pad){const lats=pts.map(o=>o.lat),lons=pts.map(o=>o.lon);let x0=Math.min(...lons),x1=Math.max(...lons),y0=Math.min(...lats),y1=Math.max(...lats);const mx=Math.max(.004,(x1-x0)*.15),my=Math.max(.004,(y1-y0)*.15);x0-=mx;x1+=mx;y0-=my;y1+=my;const sc=Math.min((W-2*pad)/(x1-x0),(H-2*pad)/(y1-y0)),ox=(W-(x1-x0)*sc)/2,oy=(H-(y1-y0)*sc)/2;return {X:o=>ox+(o.lon-x0)*sc,Y:o=>oy+(y1-o.lat)*sc};}
- function map(A,P){
-  const groups=A.CLUSTERS.map((c,i)=>{const ps=c.ids.map(id=>P.get(id)).filter(Boolean);return ps.length?{c,col:PALETTE[i%PALETTE.length],lat:ps.reduce((s,o)=>s+o.lat,0)/ps.length,lon:ps.reduce((s,o)=>s+o.lon,0)/ps.length,n:ps.length}:null;}).filter(Boolean);
-  const st=A.STAND_ALONE.map(id=>P.get(id)).filter(Boolean);if(!groups.length)return '';
-  const W=760,H=640,{X,Y}=proj([...groups,...st],W,H,48);
-  const g=groups.map(x=>{const r=12+x.n*4;return `<g><circle cx="${X(x)}" cy="${Y(x)}" r="${r}" fill="${x.col}" opacity=".16"/><circle cx="${X(x)}" cy="${Y(x)}" r="${r}" fill="none" stroke="${x.col}" stroke-width="2"/><text x="${X(x)}" y="${Y(x)+4}" text-anchor="middle" class="fa-gl" fill="${x.col}">${x.n}</text><text x="${X(x)}" y="${Y(x)+r+15}" text-anchor="middle" class="fa-lbl c">${esc(x.c.name)}</text></g>`;}).join('');
-  const s=st.map(o=>`<g><rect x="${X(o)-7}" y="${Y(o)-7}" width="14" height="14" rx="2" fill="#fff" stroke="#c0762a" stroke-width="2.4" transform="rotate(45 ${X(o)} ${Y(o)})"/><text x="${X(o)+13}" y="${Y(o)+4}" class="fa-lbl s">${esc(nm(o.id))}</text></g>`).join('');
-  return `<svg class="fa-map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peta ringkas kelompok outlet dan Stand Alone">${g}${s}</svg>`;
- }
- function miniMap(c,col,P){
-  const ps=c.ids.map(id=>[id,P.get(id)]).filter(([,o])=>o);if(ps.length<2)return '';
-  const W=360,H=210,{X,Y}=proj(ps.map(([,o])=>o),W,H,26);let l='',d='',t='';
-  for(const [id,o] of ps){if(c.centers.includes(id))continue;const cen=c.centers.map(x=>P.get(x)).filter(Boolean).sort((a,b)=>dist(o,a)-dist(o,b))[0];if(cen)l+=`<line x1="${X(o)}" y1="${Y(o)}" x2="${X(cen)}" y2="${Y(cen)}" stroke="${col}" stroke-width="1.6" stroke-dasharray="4 3"/>`;}
-  for(const [id,o] of ps){const ctr=c.centers.includes(id);d+=ctr?`<circle cx="${X(o)}" cy="${Y(o)}" r="7" fill="${col}" stroke="#fff" stroke-width="2"/>`:`<circle cx="${X(o)}" cy="${Y(o)}" r="4.5" fill="#fff" stroke="${col}" stroke-width="2.2"/>`;const right=X(o)<W*.62;t+=`<text x="${X(o)+(right?9:-9)}" y="${Y(o)+4}" text-anchor="${right?'start':'end'}" class="fa-lbl${ctr?' c':''}">${esc(nm(id))}</text>`;}
-  return `<svg class="fa-mini" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peta ${esc(c.name)}">${l}${d}${t}</svg>`;
- }
+ // Akurasi pengiriman = 100 - (sisa + kurang) dari uji mundur 21 Okt-18 Nov (pcs, 12 produk).
+ const acc=bt=>bt?[100-bt[0][0]-bt[0][1],100-bt[1][0]-bt[1][1]]:null;
+ let focus=null;
  function render(){
   const A=window.ForecastTopdown?.areas?.();if(!A)return '<div class="fp-empty">Memuat data area…</div>';
   const P=pos();
-  const legend=`<div class="fa-legend"><span><i class="fa-k center"></i><b>Center</b> — outlet ramai yang dikelilingi outlet lain. Dikirim <b>lebih banyak</b> sebagai cadangan stok; kalau outlet sekitar kehabisan, ambil dari Center.</span><span><i class="fa-k member"></i><b>Anggota</b> — outlet di kelompok yang sama. Dikirim <b>85%</b> dari saran (minimal 1 pcs); selisihnya ditaruh di Center.</span><span><i class="fa-k stand"></i><b>Stand Alone</b> — jauh dari outlet lain (&gt;10 km), tidak bisa transfer. Kelebihan pasti jadi waste, jadi kirim <b>hati-hati</b>.</span></div>`;
-  const cards=A.CLUSTERS.map((c,i)=>{const col=PALETTE[i%PALETTE.length];
-   const rows=c.ids.slice().sort((a,b)=>(c.centers.includes(b)?1:0)-(c.centers.includes(a)?1:0)).map(id=>{const o=P.get(id),ctr=c.centers.includes(id),near=ctr?null:c.centers.map(x=>[x,dist(o,P.get(x))]).filter(x=>x[1]!=null).sort((a,b)=>a[1]-b[1])[0];return `<li class="${ctr?'c':''}"><span>${esc(nm(id))}</span>${ctr?'<em class="ft-role center">Center</em>':near?`<small>${km(near[1])} ke ${esc(nm(near[0]))}</small>`:''}</li>`;}).join('');
-   const bt=c.bt?`<div class="fa-bt"><span>Uji mundur 21 Okt–18 Nov (pcs)</span><div><b>Waste</b> ${pct(c.bt[0][0])} → <strong>${pct(c.bt[1][0])}</strong></div><div><b>Kurang</b> ${pct(c.bt[0][1])} → <strong>${pct(c.bt[1][1])}</strong></div></div>`:'';
-   return `<article class="fa-card" style="--fa:${col}"><header><h4>${esc(c.name)}</h4><span>${c.ids.length} outlet · anggota ${Math.round(c.share*100)}%</span></header>${miniMap(c,col,P)}<ul>${rows}</ul>${bt}</article>`;}).join('');
-  const stand=A.STAND_ALONE.map(id=>{const o=P.get(id);const near=[...P.values()].filter(x=>x.id!==id&&!['pasar-kliwon','banyumanik'].includes(x.id)).map(x=>[x,dist(o,x)]).sort((a,b)=>a[1]-b[1])[0];return `<li><span>${esc(nm(id))}</span>${near?`<small>terdekat ${esc(nm(near[0].id))} ${km(near[1])}</small>`:''}</li>`;}).join('');
+  const roles=`<div class="fa-roles"><div class="fa-role-card c"><i class="fa-k center"></i><b>Center</b><p>Outlet ramai yang dikelilingi outlet lain. Dikirim <b>lebih banyak</b> sebagai cadangan stok. Kalau outlet sekitar kehabisan, ambil dari Center.</p></div><div class="fa-role-card m"><i class="fa-k member"></i><b>Anggota</b><p>Outlet di kelompok yang sama dengan Center. Dikirim <b>85%</b> dari saran (minimal 1 pcs), selisihnya ditaruh di Center.</p></div><div class="fa-role-card s"><i class="fa-k stand"></i><b>Stand Alone</b><p>Jauh dari outlet lain (lebih dari 10 km), tidak bisa transfer. Kelebihan pasti jadi waste, jadi kirim <b>hati-hati</b>.</p></div></div>`;
+  const cards=A.CLUSTERS.map((c,i)=>{const col=PALETTE[i%PALETTE.length],a=acc(c.bt);
+   const rows=c.ids.slice().sort((x,y)=>(c.centers.includes(y)?1:0)-(c.centers.includes(x)?1:0)).map(id=>{const o=P.get(id),ctr=c.centers.includes(id),near=ctr?null:c.centers.map(x=>[x,dist(o,P.get(x))]).filter(x=>x[1]!=null).sort((p,q)=>p[1]-q[1])[0];return `<li class="${ctr?'c':''}" data-fa-outlet="${esc(id)}"><span>${esc(nm(id))}</span>${ctr?'<em class="ft-role center">Center</em>':near?`<small>${km(near[1])} ke ${esc(nm(near[0]))}</small>`:''}</li>`;}).join('');
+   const up=a?`<div class="fa-up"><span>Akurasi pengiriman</span><div class="fa-up-bar"><i style="--a:${a[0]}%"></i><b style="--a:${a[1]}%"></b></div><div class="fa-up-n"><small>${pt(a[0])}%</small><strong>+${pt(a[1]-a[0])} poin</strong><small>${pt(a[1])}%</small></div></div>`:'';
+   return `<article class="fa-card${focus===c.name?' on':''}" style="--fa:${col};--d:${i*70}ms" data-fa-cluster="${esc(c.name)}" tabindex="0"><header><h4>${esc(c.name)}</h4><span>${c.ids.length} outlet</span></header><ul>${rows}</ul>${up}</article>`;}).join('');
+  const stand=A.STAND_ALONE.map(id=>{const o=P.get(id);const near=[...P.values()].filter(x=>x.id!==id&&!['pasar-kliwon','banyumanik'].includes(x.id)).map(x=>[x,dist(o,x)]).sort((p,q)=>p[1]-q[1])[0];return `<li data-fa-outlet="${esc(id)}"><span>${esc(nm(id))}</span>${near?`<small>terdekat ${esc(nm(near[0].id))} · ${km(near[1])}</small>`:''}</li>`;}).join('');
   return `<div class="fa">
-   <article class="workspace-card fa-intro"><h3>Kenapa dibagi per area?</h3><p>Kue hanya bisa ditransfer antar outlet yang <b>berdekatan</b>. Akurasi seluruh jaringan bisa terlihat bagus (88,6% pcs) karena kelebihan di satu outlet "tertutup" kekurangan di outlet lain secara data — padahal di lapangan kuenya tidak bisa berpindah jauh, jadi tetap jadi waste. Karena itu pembagian otomatis di Buat forecast memakai kelompok transfer di bawah ini.</p>${legend}</article>
-   <article class="workspace-card fa-mapcard"><span class="micro-label">PETA RINGKAS · LINGKARAN = KELOMPOK TRANSFER (ANGKA = JUMLAH OUTLET) · ◇ = STAND ALONE</span>${map(A,P)}</article>
-   <div class="fa-grid">${cards}</div>
-   <article class="workspace-card fa-stand"><header><h4>Stand Alone</h4><span>${A.STAND_ALONE.length} outlet · belum dikurangi otomatis</span></header><ul>${stand}</ul>
-    <p class="fa-note">Mengurangi kiriman Stand Alone adalah tukar-menukar: waste turun tapi lebih sering habis (tidak ada outlet untuk transfer). Uji mundur gabungan 6 outlet:</p>
-    <table class="fa-tbl"><thead><tr><th>Kiriman</th><th>Waste</th><th>Kurang</th></tr></thead><tbody>${STAND_BT.map(r=>`<tr><td>${r[0]}</td><td>${pct(r[1])}</td><td>${pct(r[2])}</td></tr>`).join('')}</tbody></table></article>
-   <p class="fp-caption">Angka uji mundur: saran per outlet × produk vs penjualan reguler, 12 produk inti, dengan asumsi transfer hanya dari Center ke outlet di kelompoknya. Ini untuk membandingkan strategi, bukan perkiraan waste tercatat (waste tim dihitung dalam rupiah HPP).</p>
+   <div class="fa-intro"><h3>Kenapa forecast dibagi per area?</h3><p>Kue hanya bisa <b>ditransfer antar outlet yang berdekatan</b>. Secara data, kelebihan di satu outlet bisa "menutupi" kekurangan outlet lain yang jauh — akurasi jaringan terlihat bagus — padahal di lapangan kuenya tidak bisa berpindah, jadi tetap waste. Karena itu pembagian otomatis di Buat forecast memakai <b>kelompok transfer</b>: di tiap kelompok ada <b>Center</b> sebagai cadangan stok.</p>${roles}</div>
+   <div class="fa-mapwrap"><div id="fa-leaflet" class="fa-leaflet" aria-label="Peta area outlet"></div><div class="fa-map-ctl"><button type="button" class="button quiet" data-fa-all>Lihat semua area</button><span>Klik kartu kelompok atau nama outlet untuk melihat di peta</span></div></div>
+   <div class="fa-grid">${cards}<article class="fa-card fa-stand" style="--fa:#c0762a;--d:${A.CLUSTERS.length*70}ms" data-fa-cluster="__stand" tabindex="0"><header><h4>Stand Alone</h4><span>${A.STAND_ALONE.length} outlet</span></header><ul>${stand}</ul><p class="fa-note">Tidak ada outlet dekat untuk transfer. Kirim mendekati pola penjualannya, hindari buffer plus, dan perhatikan waste hariannya.</p></article></div>
   </div>`;
  }
- return {render};
+ // ---- Peta (Leaflet) ----
+ let map=null,mapEl=null,layers=null,bounds=null;
+ function mount(){
+  const el=document.getElementById('fa-leaflet');
+  if(!el||typeof L==='undefined')return;
+  const host=el.closest('.fa');
+  if(host&&!host.dataset.wired){host.dataset.wired='1';
+   host.addEventListener('mouseover',e=>{const c=e.target.closest('[data-fa-cluster]');if(c&&c.dataset.faCluster!==focus)flyTo(c.dataset.faCluster);});
+   host.addEventListener('click',e=>{const o=e.target.closest('[data-fa-outlet]');if(o){openOutlet(o.dataset.faOutlet);return;}const c=e.target.closest('[data-fa-cluster]');if(c)flyTo(c.dataset.faCluster);if(e.target.closest('[data-fa-all]'))flyTo(null);});
+   host.addEventListener('focusin',e=>{const c=e.target.closest('[data-fa-cluster]');if(c)flyTo(c.dataset.faCluster);});
+  }
+  if(mapEl===el&&map){if(el.offsetWidth)map.invalidateSize();return;}
+  if(!el.offsetWidth)return; // masih terlipat; dipasang saat dibuka
+  if(map){try{map.remove();}catch{}}
+  mapEl=el;map=L.map(el,{scrollWheelZoom:false,zoomControl:true,attributionControl:true});
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',className:'fa-tiles'}).addTo(map);
+  const A=window.ForecastTopdown.areas(),P=pos();layers=new Map();const all=[];
+  A.CLUSTERS.forEach((c,i)=>{const col=PALETTE[i%PALETTE.length],g=L.layerGroup().addTo(map),pts=c.ids.map(id=>P.get(id)).filter(Boolean);
+   if(pts.length>1)L.polygon(hull(pts.map(o=>[o.lat,o.lon])),{color:col,weight:1.5,fillColor:col,fillOpacity:.08,dashArray:'5 5',className:'fa-zone'}).addTo(g);
+   for(const id of c.ids){const o=P.get(id);if(!o||c.centers.includes(id))continue;const cen=c.centers.map(x=>P.get(x)).filter(Boolean).sort((a,b)=>dist(o,a)-dist(o,b))[0];if(cen)L.polyline([[o.lat,o.lon],[cen.lat,cen.lon]],{color:col,weight:2.5,opacity:.85,dashArray:'6 6',className:'fa-flow'}).addTo(g);}
+   for(const id of c.ids){const o=P.get(id);if(!o)continue;const ctr=c.centers.includes(id);all.push([o.lat,o.lon]);
+    const m=L.marker([o.lat,o.lon],{icon:L.divIcon({className:'',html:`<div class="fa-pin ${ctr?'c':'m'}" style="--fa:${col}"><i></i><span>${esc(nm(id))}</span></div>`,iconSize:[0,0]})}).bindPopup(`<b>${esc(nm(id))}</b><br>${esc(c.name)} · ${ctr?'Center':'Anggota (85%)'}`).addTo(g);m.__id=id;}
+   layers.set(c.name,{g,b:L.latLngBounds(pts.map(o=>[o.lat,o.lon]))});});
+  const sg=L.layerGroup().addTo(map),sp=[];
+  for(const id of A.STAND_ALONE){const o=P.get(id);if(!o)continue;sp.push([o.lat,o.lon]);all.push([o.lat,o.lon]);const m=L.marker([o.lat,o.lon],{icon:L.divIcon({className:'',html:`<div class="fa-pin s"><i></i><span>${esc(nm(id))}</span></div>`,iconSize:[0,0]})}).bindPopup(`<b>${esc(nm(id))}</b><br>Stand Alone · tidak bisa transfer`).addTo(sg);m.__id=id;}
+  layers.set('__stand',{g:sg,b:L.latLngBounds(sp)});
+  bounds=L.latLngBounds(all);map.fitBounds(bounds,{padding:[30,30]});
+  if(focus)setTimeout(()=>flyTo(focus,true),50);
+ }
+ // Cangkang cembung sederhana untuk menggambar area kelompok.
+ function hull(pts){if(pts.length<3){const [a,b]=pts,d=.006;return b?[[a[0]+d,a[1]],[b[0]+d,b[1]],[b[0]-d,b[1]],[a[0]-d,a[1]]]:pts;}
+  const p=[...pts].sort((a,b)=>a[1]-b[1]||a[0]-b[0]),cr=(o,a,b)=>(a[1]-o[1])*(b[0]-o[0])-(a[0]-o[0])*(b[1]-o[1]),lo=[],up=[];
+  for(const x of p){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],x)<=0)lo.pop();lo.push(x);}
+  for(const x of p.reverse()){while(up.length>=2&&cr(up[up.length-2],up[up.length-1],x)<=0)up.pop();up.push(x);}
+  return lo.slice(0,-1).concat(up.slice(0,-1));}
+ function flyTo(name,instant){
+  focus=name;document.querySelectorAll('.fa-card').forEach(c=>c.classList.toggle('on',c.dataset.faCluster===name));
+  if(!map||!layers)return;const L1=name&&layers.get(name);
+  for(const [k,v] of layers)v.g.eachLayer(l=>{const e=l.getElement?.()||l._path;if(e)e.classList.toggle('fa-dim',!!name&&k!==name);});
+  const b=L1?L1.b:bounds;if(!b)return;
+  if(instant)map.fitBounds(b,{padding:[40,40],maxZoom:13});else map.flyToBounds(b,{padding:[40,40],maxZoom:13,duration:.8});
+ }
+ function openOutlet(id){if(!layers)return;for(const v of layers.values())v.g.eachLayer(l=>{if(l.__id===id){map.flyTo(l.getLatLng(),13,{duration:.8});setTimeout(()=>l.openPopup(),850);}});}
+ return {render,mount};
 })();

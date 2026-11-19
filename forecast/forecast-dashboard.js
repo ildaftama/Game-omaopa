@@ -1345,6 +1345,7 @@ window.ForecastDashboard=(()=>{
    ${fold('mon','Monitoring rencana tim','rencana vs penjualan per tanggal, outlet & produk · performa bulanan',window.ForecastWorkspace?.monitorSection?.()||'')}
    ${show.trend&&outletId==='__all__'?fold('trend','Kondisi outlet','omzet, waste & lost sales naik/turun 3 hari terakhir',trendWatchCard(trend.trendNow)):''}
    ${show.wasteLost?fold('wl','Waste & lost sales per outlet','bulan berjalan · outlet di atas batas',wasteLostCard(outletId)):''}
+   ${outletId==='__all__'?fold('area','Panduan area & outlet','kelompok transfer, Center & Stand Alone · bahan edukasi forecaster',window.ForecastAreas?.render?.()||''):''}
    <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${monthSummaryHtml(trend)}</article>
    ${show.weather?`<article class="workspace-card weather-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>`:''}
    ${show.events?`<div class="product-comparison"><article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article></div>`:''}
@@ -1352,6 +1353,7 @@ window.ForecastDashboard=(()=>{
    ${outletDetailId?outletDetailHtml(outletDetailId):''}`;
  }
  function click(e){
+  const fo=e.target.closest('[data-fold-open]');if(fo){foldOpen.add(fo.dataset.foldOpen);pendingFold=fo.dataset.foldOpen;}
   const open=e.target.closest('[data-outlet-detail]');
   if(open){outletDetailId=open.dataset.outletDetail;return true;}
   if(e.target.closest('[data-outlet-detail-close]')){outletDetailId=null;return true;}
@@ -1363,7 +1365,7 @@ window.ForecastDashboard=(()=>{
   if(!dlg.dataset.wired){dlg.dataset.wired='1';dlg.addEventListener('close',()=>{outletDetailId=null;});}
   if(!dlg.open)dlg.showModal();
  }
- function mount(){mountWeatherMap();if(outletDetailId)mountOutletDialog();}
+ function mount(){mountWeatherMap();window.ForecastAreas?.mount?.();if(outletDetailId)mountOutletDialog();if(pendingFold){const id=pendingFold;pendingFold=null;setTimeout(()=>document.querySelector(`[data-fold="${id}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}),120);}}
  // Tooltip melayang DI TITIK yang disentuh/di-hover, bukan cuma teks tetap di bawah grafik --
  // posisinya dari koordinat layar event (clientX/clientY, bukan koordinat SVG internal yang
  // perlu konversi skala) relatif terhadap pembungkus .fd-chart-wrap. Readout di bawah grafik
@@ -1396,7 +1398,8 @@ window.ForecastDashboard=(()=>{
  // paling parah); sisanya dilipat. Bagian detail (Monitoring, kondisi outlet, waste per outlet)
  // dilipat dan status buka/tutupnya diingat selama halaman terbuka.
  const foldOpen=new Set();
- document.addEventListener('toggle',e=>{const d=e.target;if(d?.dataset?.fold){d.open?foldOpen.add(d.dataset.fold):foldOpen.delete(d.dataset.fold);}},true);
+ let pendingFold=null;
+ document.addEventListener('toggle',e=>{const d=e.target;if(d?.dataset?.fold){d.open?foldOpen.add(d.dataset.fold):foldOpen.delete(d.dataset.fold);if(d.open&&d.dataset.fold==='area')setTimeout(()=>window.ForecastAreas?.mount?.(),60);}},true);
  const fold=(id,title,sub,body)=>body?`<details class="fd-fold" data-fold="${id}" ${foldOpen.has(id)?'open':''}><summary><span class="fd-fold-t">${title}</span>${sub?`<span class="fd-fold-s">${sub}</span>`:''}<span class="fd-fold-c" aria-hidden="true">⌄</span></summary><div class="fd-fold-b">${body}</div></details>`:'';
  function briefCard(trend,outletId){
   const H=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],P=window.ForecastPlanner,t1=P.shift(today(),1);

@@ -998,3 +998,50 @@ main{max-width:1680px!important}
 .fa-map{max-height:480px}
 .fa-grid{grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
 .fa-map{max-height:640px;max-width:760px;margin:8px auto 0}
+
+/* ===== Panduan area (Dashboard) v2: peta nyata, kartu interaktif, transisi ===== */
+@keyframes faIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes faPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--fa) 55%,transparent)}70%{box-shadow:0 0 0 12px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@keyframes faDash{to{stroke-dashoffset:-24}}
+.fa{gap:16px}
+.fa-intro{animation:faIn .5s ease both}
+.fa-intro h3{margin:0 0 6px;font-size:17px}
+.fa-intro p{margin:0 0 12px;font-size:13.5px;line-height:1.6;color:#33424f;max-width:980px}
+.fa-roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.fa-role-card{position:relative;padding:12px 14px 12px 40px;border-radius:12px;background:#f6f8fa;border:1px solid #e6ebf0;transition:transform .2s,box-shadow .2s;animation:faIn .5s ease both}
+.fa-role-card:nth-child(2){animation-delay:.08s}.fa-role-card:nth-child(3){animation-delay:.16s}
+.fa-role-card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(20,40,60,.08)}
+.fa-role-card .fa-k{position:absolute;left:14px;top:15px;margin:0}
+.fa-role-card b{font-size:14px}
+.fa-role-card p{margin:4px 0 0;font-size:12.5px;line-height:1.5;color:#4d5d6c}
+.fa-mapwrap{position:relative;border-radius:14px;overflow:hidden;border:1px solid #dfe5eb;animation:faIn .6s ease both .1s}
+.fa-leaflet{height:460px;background:#eef3f6}
+.fa-tiles{filter:grayscale(.55) saturate(.8) brightness(1.05) contrast(.92)}
+.fa-map-ctl{position:absolute;left:12px;bottom:12px;z-index:500;display:flex;gap:10px;align-items:center;padding:6px 8px;border-radius:10px;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(20,40,60,.12);font-size:12px;color:#4d5d6c}
+.fa-map-ctl .button{padding:6px 10px!important}
+.fa-pin{position:relative;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;white-space:nowrap;transition:opacity .3s}
+.fa-pin i{display:block;width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--fa);box-sizing:border-box;flex:none}
+.fa-pin.c i{width:18px;height:18px;background:var(--fa);border:3px solid #fff;box-shadow:0 0 0 2px var(--fa);animation:faPulse 2s infinite}
+.fa-pin.s i{width:13px;height:13px;border-radius:2px;border-color:#c0762a;transform:rotate(45deg)}
+.fa-pin span{font:700 11px/1 'DM Sans',system-ui,sans-serif;color:#1c2b38;background:rgba(255,255,255,.85);padding:2px 5px;border-radius:5px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.fa-pin.s span{color:#8a4b12}
+.leaflet-marker-icon.fa-dim,.fa-dim{opacity:.18!important}
+.fa-flow{animation:faDash 1.2s linear infinite}
+.fa-zone{transition:opacity .3s}
+.fa-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))!important}
+.fa-card{cursor:pointer;transition:transform .22s,box-shadow .22s,border-color .22s;animation:faIn .5s ease both;animation-delay:var(--d,0ms)}
+.fa-card:hover,.fa-card.on{transform:translateY(-3px);box-shadow:0 10px 24px rgba(20,40,60,.1)}
+.fa-card.on{outline:2px solid var(--fa);outline-offset:-1px}
+.fa-card li{cursor:pointer;border-radius:6px;padding:4px 6px!important;transition:background .15s}
+.fa-card li:hover{background:color-mix(in srgb,var(--fa) 10%,#fff)}
+.fa-up{margin-top:10px;padding:10px 12px;border-radius:10px;background:#f4f8f6}
+.fa-up>span{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#6b7a88}
+.fa-up-bar{position:relative;height:8px;margin:8px 0 6px;border-radius:5px;background:#e3e9ee;overflow:hidden}
+.fa-up-bar i,.fa-up-bar b{position:absolute;left:0;top:0;bottom:0;border-radius:5px}
+.fa-up-bar b{width:var(--a);background:linear-gradient(90deg,#7fc49a,#2f9e6a);animation:faGrow 1s ease both .3s}
+.fa-up-bar i{width:var(--a);background:#b9c4ce;z-index:1;mix-blend-mode:multiply;opacity:.6}
+@keyframes faGrow{from{width:0}}
+.fa-up-n{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:#6b7a88}
+.fa-up-n strong{font-size:15px;color:#1f6b45}
+.fa-stand .fa-note{font-size:12.5px;color:#6a4a1c;margin:10px 0 0;line-height:1.5}
+@media (prefers-reduced-motion:reduce){.fa *,.fa{animation:none!important;transition:none!important}}
