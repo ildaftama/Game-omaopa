@@ -747,7 +747,7 @@ async function listMemberTransactionsPaged(uid, opts){
     constraints.push(limit(10));
     const snap=await getDocs(query(collection(db,'transactions'), ...constraints));
     const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, nominal:x.nominal||0, points:x.points||0, outlet:x.outlet||'', kind:x.kind||'', reason:x.reason||'', staffUid:x.staffUid||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, nominal:x.nominal||0, points:x.points||0, outlet:x.outlet||'', kind:x.kind||'', reason:x.reason||'', staffUid:x.staffUid||'', byRole:x.byRole||'', byName:x.byName||'', byOutlet:x.byOutlet||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
     const lastDoc=snap.docs.length?snap.docs[snap.docs.length-1]:null;
     return { items:arr, hasMore:snap.docs.length===10, cursor:lastDoc };
   }catch(e){ console.error('listMemberTransactionsPaged gagal:', e); return { items:[], hasMore:false, cursor:null, error:(e&&e.message)||String(e) }; }
@@ -764,7 +764,7 @@ async function listAdjustHistory(opts){
     constraints.push(limit(10));
     const snap=await getDocs(query(collection(db,'transactions'), ...constraints));
     const arr=[];
-    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, uid:x.uid||'', name:x.name||'', points:x.points||0, outlet:x.outlet||'', reason:x.reason||'', staffUid:x.staffUid||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
+    snap.forEach(d=>{ const x=d.data(); arr.push({ id:d.id, uid:x.uid||'', name:x.name||'', points:x.points||0, outlet:x.outlet||'', reason:x.reason||'', staffUid:x.staffUid||'', byRole:x.byRole||'', byName:x.byName||'', byOutlet:x.byOutlet||'', createdAt:(x.createdAt&&x.createdAt.seconds)?x.createdAt.seconds*1000:0 }); });
     const lastDoc=snap.docs.length?snap.docs[snap.docs.length-1]:null;
     return { items:arr, hasMore:snap.docs.length===10, cursor:lastDoc };
   }catch(e){ console.error('listAdjustHistory gagal:', e); return { items:[], hasMore:false, cursor:null, error:(e&&e.message)||String(e) }; }
@@ -1481,7 +1481,14 @@ async function listAudit(opts){
 }
 async function adminAdjustPoints(uid, delta, reason){
   uid=(uid||'').trim(); delta=Math.floor(Number(delta)||0);
-  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
+  const _sup=await isSuper(); let byRole='', byName='', byOutlet='';
+  if(!_sup){
+    if(!user) throw {message:'Belum masuk.'};
+    let sd=null; try{ const ss=await getDoc(doc(db,'staff',user.uid)); if(ss.exists()) sd=ss.data(); }catch(e){}
+    if(!sd) throw {message:'Khusus admin utama atau kasir.'};
+    if(!String(reason||'').trim()) throw {message:'Alasan wajib diisi.'};
+    byRole='kasir'; byName=sd.name||sd.outlet||''; byOutlet=sd.outlet||sd.name||'';
+  }
   if(!uid) throw {message:'Member belum dipilih.'};
   if(!delta) throw {message:'Jumlah poin tidak boleh 0.'};
   const uref=doc(db,'users',uid); let newTotal=0, mname='', applied=0, mOutlet='';
@@ -1492,12 +1499,13 @@ async function adminAdjustPoints(uid, delta, reason){
     tx.set(uref,{ points:newTotal, updatedAt:serverTimestamp() },{merge:true});
     tx.set(doc(db,'leaderboard',uid), { name:mname, points:newTotal, updatedAt:serverTimestamp() },{merge:true});
     const tref=doc(collection(db,'transactions'));
-    tx.set(tref,{ uid:uid, name:mname, nominal:0, points:applied, outlet:mOutlet, reason:(reason||'Penyesuaian admin'), kind:'adjust', staffUid:(user?user.uid:''), createdAt:serverTimestamp() });
+    tx.set(tref,{ uid:uid, name:mname, nominal:0, points:applied, outlet:mOutlet, reason:(reason||'Penyesuaian admin'), kind:'adjust', staffUid:(user?user.uid:''), byRole:byRole, byName:byName, byOutlet:byOutlet, createdAt:serverTimestamp() });
   });
-  logAudit('adjust_poin', 'Member '+(mname||uid)+' '+(applied>=0?'+':'')+applied+' poin (jadi '+newTotal+'). Alasan: '+(reason||'-'));
+  logAudit('adjust_poin', (byRole?'[KASIR '+(byName||byOutlet||'-')+'] ':'')+'Member '+(mname||uid)+' '+(applied>=0?'+':'')+applied+' poin (jadi '+newTotal+'). Alasan: '+(reason||'-'));
   return { newTotal:newTotal, applied:applied, name:mname };
 }
 async function adminSetPoints(uid, value, reason){
+  if(!(await isSuper())) throw {message:'Khusus admin utama.'};
   value=Math.max(0, Math.floor(Number(value)||0));
   const m=await getMemberByUid(uid); if(!m) throw {message:'Member tidak ditemukan.'};
   return adminAdjustPoints(uid, value-m.points, reason||'Set poin admin');

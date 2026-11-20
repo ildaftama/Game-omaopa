@@ -58,7 +58,7 @@
   <div style="text-align:center"><a class="link" href="index.html">‹ Ke beranda</a></div>
 </div>
 
-<script type="module" src="core-omaopa.js?v=180"></script>
+<script type="module" src="core-omaopa.js?v=181"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
 (function(){
@@ -164,10 +164,47 @@
       +'<input id="nom" inputmode="numeric" placeholder="cth: 50000" style="text-transform:none;font-family:inherit;letter-spacing:0">'
       +'<div class="muted" style="margin-top:6px">'+rp(EARN_PER_POINT)+' = 1 poin</div>'
       +'<button class="btn" id="giveBtn">＋ Beri Poin</button>'
+      +'<button class="btn sec" id="adjOpen" style="margin-top:8px">⚖️ Adjust poin</button>'
+      +'<div id="adjBox" style="display:none;margin-top:10px;padding:12px;border:2px dashed #E0B100;border-radius:14px;background:#FFF8EC">'
+      +'<div style="font-weight:900;color:#613925;margin-bottom:8px">Adjust poin manual</div>'
+      +'<div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn sec" id="adjPlus" style="flex:1;margin:0;background:#FACC1A">＋ Tambah</button><button class="btn sec" id="adjMin" style="flex:1;margin:0">－ Kurangi</button></div>'
+      +'<label>Jumlah poin</label><input id="adjAmt" inputmode="numeric" placeholder="cth: 5" style="text-transform:none;font-family:inherit;letter-spacing:0">'
+      +'<label style="margin-top:8px">Alasan (wajib)</label><input id="adjWhy" placeholder="cth: poin transaksi belum masuk" autocomplete="off" style="text-transform:none;font-family:inherit;letter-spacing:0">'
+      +'<div class="muted" style="margin-top:6px">Tercatat di riwayat adjust admin atas nama kamu.</div>'
+      +'<button class="btn" id="adjSave" style="margin-top:8px">Simpan adjust</button>'
+      +'</div>'
       +'<button class="btn sec" id="cancelM" style="margin-top:8px">Batal</button>';
     var nom=document.getElementById('nom'); nom.focus();
     nom.addEventListener('input',function(){ var n=parseInt((nom.value||'').replace(/\D/g,''),10)||0; var p=Math.floor(n/EARN_PER_POINT); document.getElementById('giveBtn').textContent = p>0 ? ('＋ Beri '+p+' poin ('+rp(n)+')') : '＋ Beri Poin'; });
     document.getElementById('cancelM').onclick=function(){ refresh(); };
+    var adjSign=1;
+    function setSign(x){ adjSign=x; document.getElementById('adjPlus').style.background=x>0?'#FACC1A':''; document.getElementById('adjMin').style.background=x<0?'#FACC1A':''; }
+    document.getElementById('adjOpen').onclick=function(){ var bx=document.getElementById('adjBox'); bx.style.display=bx.style.display==='none'?'block':'none'; if(bx.style.display==='block') document.getElementById('adjAmt').focus(); };
+    document.getElementById('adjPlus').onclick=function(){ setSign(1); };
+    document.getElementById('adjMin').onclick=function(){ setSign(-1); };
+    document.getElementById('adjSave').onclick=async function(ev){
+      if(busy) return;
+      var amt=parseInt((document.getElementById('adjAmt').value||'').replace(/\D/g,''),10)||0;
+      var why=(document.getElementById('adjWhy').value||'').trim();
+      if(amt<=0){ document.getElementById('adjAmt').focus(); return; }
+      if(!why){ document.getElementById('adjWhy').focus(); return; }
+      busy=true; var b=ev.target; b.disabled=true; b.textContent='Memproses…';
+      try{
+        var r=await window.OmaOpa.adminAdjustPoints(uid, adjSign*amt, why);
+        out.innerHTML='<div class="res ok"><div class="t">✓ Adjust poin tersimpan</div>'
+          +'<div class="row">'+esc(m.name||'Member')+': '+(r.applied>=0?'+':'')+r.applied+' poin</div>'
+          +'<div class="row">Total poin sekarang: <b>'+r.newTotal+'</b></div>'
+          +'<div class="row">Alasan: '+esc(why)+'</div></div>'
+          +'<button class="btn sec" id="again">Selesai</button>';
+        document.getElementById('again').onclick=function(){ refresh(); };
+      }catch(e){
+        b.disabled=false; b.textContent='Simpan adjust';
+        var msg=(e&&e.message)||'coba lagi'; if(/permission/i.test(msg)) msg='Izin ditolak server. Kabari admin utama.';
+        var bx=document.getElementById('adjBox'); var old=document.getElementById('adjErr'); if(old) old.remove();
+        bx.insertAdjacentHTML('beforeend','<div class="res bad" id="adjErr" style="margin-top:8px">Gagal: '+esc(msg)+'</div>');
+      }
+      busy=false;
+    };
     document.getElementById('giveBtn').onclick=async function(ev){
       if(busy) return; var n=parseInt((nom.value||'').replace(/\D/g,''),10)||0;
       if(n<=0){ nom.focus(); return; }

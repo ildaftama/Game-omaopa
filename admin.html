@@ -114,7 +114,7 @@
 
 <script src="outlets-data.js?v=62"></script>
 <script src="menu-data.js?v=62"></script>
-<script type="module" src="core-omaopa.js?v=180"></script>
+<script type="module" src="core-omaopa.js?v=181"></script>
 <script>
 (function(){
   var O=null, gate=document.getElementById('gate'), app=document.getElementById('app'), tabEl=document.getElementById('tab');
@@ -962,9 +962,9 @@
         var staffNm=staffNames[a.staffUid]||a.staffUid||'-';
         var sign=a.points>=0?'+':''; var color=a.points>=0?'#2E7D32':'#C0392B';
         return '<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:150px">'
-          +'<div class="nm" style="font-size:.86rem">'+esc(a.name||'(tanpa nama)')+' <b style="color:'+color+'">'+sign+a.points+' poin</b></div>'
+          +'<div class="nm" style="font-size:.86rem">'+esc(a.name||'(tanpa nama)')+' <b style="color:'+color+'">'+sign+a.points+' poin</b>'+(a.byRole==='kasir'?' <span style="background:#FACC1A;color:#613925;border-radius:8px;padding:2px 7px;font-size:.68rem;font-weight:900;white-space:nowrap">🧾 KASIR</span>':'')+'</div>'
           +'<div class="sub">'+esc(a.reason||'-')+'</div>'
-          +'<div class="sub">'+esc(a.outlet||'-')+' · oleh '+esc(staffNm)+' · '+tgl+'</div>'
+          +'<div class="sub">'+esc(a.outlet||'-')+' · oleh '+(a.byRole==='kasir'?'kasir '+esc(a.byName||staffNm)+(a.byOutlet?' ('+esc(a.byOutlet)+')':''):esc(staffNm))+' · '+tgl+'</div>'
           +'</div></div>';
       }).join('');
     }
