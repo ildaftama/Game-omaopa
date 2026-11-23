@@ -175,9 +175,9 @@ window.ForecastTopdown=(()=>{
   // UMY 16 km). Uji: 16,2/19,7 -> 10,3/13,8 (lebih baik dari 2 kelompok utara+barat terpisah).
   {name:'Klaten',ids:['merbabu','rajawali'],centers:['ums'],share:.85,bt:[[12.3,12.5],[5.9,13.7]]},
   {name:'Jogja',ids:['jakal-uii','nusa-indah','tajem','godean','umy'],centers:['jakal-uii'],share:.85,bt:[[16.2,19.7],[10.3,13.8]]},
-  {name:'Magelang',ids:['pemuda-magelang','muntilann','temanggung'],centers:['pemuda-magelang'],share:.85,bt:[[16.9,17.5],[13.0,13.6]]},
+  {name:'Magelang',ids:['pemuda-magelang','muntilann'],centers:['pemuda-magelang'],share:.85,bt:[[16.9,17.5],[13.0,13.6]]},
  ];
- const STAND_ALONE=['ambarawa','uksw','boyolali','sragen','karanganyar','sukoharjo'];
+ const STAND_ALONE=['ambarawa','uksw','boyolali','sragen','karanganyar','sukoharjo','temanggung']; // Temanggung: keputusan owner 2026-11-23
  const roleOf=id=>CLUSTERS.some(c=>c.centers.includes(id))?'center':STAND_ALONE.includes(id)?'stand':null;
  // Owner 2026-11-23: potongan 15% anggota -> Center DIMATIKAN. Uji 4-19 Nov (transfer sesuai kebutuhan):
  // aturan ini menambah waste DAN lost. Data kelompok tetap dipakai untuk peta/label. Aktifkan lagi hanya setelah diuji.

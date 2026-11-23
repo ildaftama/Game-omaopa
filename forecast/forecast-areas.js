@@ -14,7 +14,7 @@ window.ForecastAreas=(()=>{
  const nm=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||pos().get(id)?.name||id;
  function dist(a,b){if(!a||!b)return null;const R=6371,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lon-a.lon),h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
  // Akurasi pengiriman = 100 - (sisa + kurang) dari uji mundur 21 Okt-18 Nov (pcs, 12 produk).
- const acc=bt=>bt?[100-bt[0][0]-bt[0][1],100-bt[1][0]-bt[1][1]]:null;
+ const acc=()=>null; // Owner 2026-11-23: klaim kenaikan akurasi Center tidak ditampilkan (uji ulang tidak mendukung).
  const CITIES=[['Semarang',-6.966,110.42],['Ungaran',-7.139,110.405],['Salatiga',-7.331,110.508],['Magelang',-7.47,110.217],['Temanggung',-7.316,110.175],['Boyolali',-7.533,110.596],['Klaten',-7.706,110.606],['Surakarta',-7.575,110.825],['Sukoharjo',-7.682,110.841],['Karanganyar',-7.597,110.953],['Sragen',-7.43,111.03],['Yogyakarta',-7.797,110.37],['Sleman',-7.716,110.356],['Muntilan',-7.58,110.29]];
  // Ikon toko (SVG): Center = toko besar & mewah (2 lantai, bintang); Anggota = toko biasa;
  // Anggota = stan kecil beratap garis; Stand Alone = gerobak berpayung. Warna mengikuti kelompok (currentColor).
@@ -30,23 +30,23 @@ window.ForecastAreas=(()=>{
   const items=A.CLUSTERS.map((c,i)=>{const col=PALETTE[i%PALETTE.length],a=acc(c.bt),ext=c.centers.filter(x=>!c.ids.includes(x));
    const rows=c.ids.slice().sort((x,y)=>(c.centers.includes(y)?1:0)-(c.centers.includes(x)?1:0)).map(id=>{const o=P.get(id),ctr=c.centers.includes(id),near=ctr?null:c.centers.map(x=>[x,dist(o,P.get(x))]).filter(x=>x[1]!=null).sort((p,q)=>p[1]-q[1])[0];return `<li class="${ctr?'c':''}" data-fa-outlet="${esc(id)}"><span>${esc(nm(id))}</span>${ctr?'<em class="ft-role center">Center</em>':near?`<small>${km(near[1])} ke ${esc(nm(near[0]))}</small>`:''}</li>`;}).join('');
    const up=a?`<div class="fa-up"><div class="fa-up-bar"><b style="--a:${a[1]}%"></b><i style="--a:${a[0]}%"></i></div><div class="fa-up-n"><small>Akurasi ${pt(a[0])}% → ${pt(a[1])}%</small><strong>+${pt(a[1]-a[0])} poin</strong></div></div>`:'';
-   return `<div class="fa-item${focus===c.name?' on':''}" style="--fa:${col}" data-fa-cluster="${esc(c.name)}" role="button" tabindex="0"><div class="fa-item-h"><span class="fa-dot"></span><b>${esc(c.name)}</b><small>${c.ids.length} outlet</small>${a?`<em>+${pt(a[1]-a[0])}</em>`:''}</div><div class="fa-item-b"><ul>${rows}</ul>${up}<p>${ext.length?`Tidak ada Center di kelompok ini. Semua outlet anggota (dikirim ${Math.round(c.share*100)}% dari saran); selisihnya ditaruh di <b>${ext.map(id=>esc(nm(id))).join(', ')}</b>, Center terdekat. Kalau kehabisan, terpaksa transfer dari sana.`:`Anggota dikirim ${Math.round(c.share*100)}% dari saran; selisihnya di Center.`}</p></div></div>`;}).join('');
+   return `<div class="fa-item${focus===c.name?' on':''}" style="--fa:${col}" data-fa-cluster="${esc(c.name)}" role="button" tabindex="0"><div class="fa-item-h"><span class="fa-dot"></span><b>${esc(c.name)}</b><small>${c.ids.length} outlet</small>${a?`<em>+${pt(a[1]-a[0])}</em>`:''}</div><div class="fa-item-b"><ul>${rows}</ul>${up}<p>${ext.length?`Tidak ada Center di kelompok ini. Semua outlet anggota. Kalau kehabisan dan outlet sekitar tidak punya sisa, rujukannya <b>${ext.map(id=>esc(nm(id))).join(', ')}</b>.`:`Anggota dikirim sesuai saran. Kalau kehabisan, ambil dari outlet terdekat yang punya sisa.`}</p></div></div>`;}).join('');
   const stand=A.STAND_ALONE.map(id=>{const o=P.get(id);const near=[...P.values()].filter(x=>x.id!==id&&!['pasar-kliwon','banyumanik'].includes(x.id)).map(x=>[x,dist(o,x)]).sort((p,q)=>p[1]-q[1])[0];return `<li data-fa-outlet="${esc(id)}"><span>${esc(nm(id))}</span>${near?`<small>terdekat ${esc(nm(near[0].id))} · ${km(near[1])}</small>`:''}</li>`;}).join('');
   const role=(k,t,d)=>`<button type="button" class="fa-rolebtn${roleFocus===k?' on':''}" data-fa-role="${k}" title="Klik untuk menyorot semua ${t} di peta"><span class="fa-ic ${k}">${ICON[k]}</span><span><b>${t}</b><small>${d}</small></span></button>`;
   return `<div class="fa fa-page">
-   <header class="fa-hero"><span class="micro-label">UPDATE METODE FORECAST · WAJIB DIBACA</span><h2>Area, Center & Stand Alone</h2><p>Kue hanya bisa <b>ditransfer antar outlet yang berdekatan</b>. Secara data, kelebihan satu outlet bisa "menutupi" kekurangan outlet lain yang jauh — padahal di lapangan kuenya tidak bisa berpindah, jadi tetap waste. Karena itu Buat forecast membagi kiriman per <b>kelompok transfer</b>, dengan <b>Center</b> sebagai cadangan stok tiap kelompok.</p></header>
+   <header class="fa-hero"><span class="micro-label">UPDATE METODE FORECAST · WAJIB DIBACA</span><h2>Area, Center & Stand Alone</h2><p>Kue hanya bisa <b>ditransfer antar outlet yang berdekatan</b>. Secara data, kelebihan satu outlet bisa "menutupi" kekurangan outlet lain yang jauh — padahal di lapangan kuenya tidak bisa berpindah, jadi tetap waste. Karena itu outlet dikelompokkan per <b>area transfer</b>, dengan <b>Center</b> sebagai rujukan utama saat outlet sekitarnya butuh stok.</p></header>
    <ol class="fa-new">
-    <li><b>Dibagi per area.</b> Kue hanya bisa ditransfer ke outlet yang berdekatan, jadi kiriman dihitung per kelompok area.</li>
-    <li><b>Center dikirim lebih banyak.</b> Outlet ramai di tengah kelompok jadi cadangan stok kelompoknya.</li>
-    <li><b>Anggota dikirim 85% dari saran.</b> Kalau kehabisan, ambil (transfer) dari Center.</li>
-    <li><b>Stand Alone dikirim hati-hati.</b> Tidak ada outlet dekat, kelebihan pasti jadi waste.</li>
-    <li><b>Jogja kini satu area</b> dengan Center <b>Jakal UII</b>. <b>Klaten</b> tanpa Center, cadangannya di <b>UMS</b>.</li>
-    <li><b>Sudah otomatis.</b> Angka saran di Buat forecast sudah memakai aturan ini; forecaster cukup cek & sesuaikan.</li>
+    <li><b>Potongan 85% dihentikan.</b> Sejak 23 November, Anggota kembali dikirim sesuai saran.</li>
+    <li><b>Area dipakai untuk transfer.</b> Kalau kehabisan, ambil dari outlet terdekat yang punya sisa.</li>
+    <li><b>Center jadi rujukan transfer.</b> Outlet ramai di tengah area. Stoknya tidak lagi ditambah otomatis.</li>
+    <li><b>Stand Alone dikirim hati-hati.</b> Tidak ada outlet dekat untuk transfer, termasuk <b>Temanggung</b>.</li>
+    <li><b>Jogja satu area</b> dengan Center <b>Jakal UII</b>. <b>Klaten</b> tanpa Center, rujukannya <b>UMS</b>.</li>
+    <li><b>Prioritas sekarang: tekan waste.</b> Angka saran tetap dicek forecaster sebelum disimpan.</li>
    </ol>
    <div class="fa-stage">
     <div id="fa-leaflet" class="fa-leaflet" aria-label="Peta area outlet"></div>
     <aside class="fa-panel" aria-label="Kelompok area"><div class="fa-panel-h"><b>Kelompok area</b><button type="button" class="fa-reset" data-fa-all>Lihat semua</button></div><div class="fa-panel-list">${items}<div class="fa-item fa-item-stand${focus==='__stand'?' on':''}" style="--fa:${STAND_COL}" data-fa-cluster="__stand" role="button" tabindex="0"><div class="fa-item-h"><span class="fa-dot"></span><b>Stand Alone</b><small>${A.STAND_ALONE.length} outlet</small></div><div class="fa-item-b"><ul>${stand}</ul><p>Tidak ada outlet dekat untuk transfer. Kirim mendekati pola penjualannya, hindari buffer plus, perhatikan waste hariannya.</p></div></div></div></aside>
-    <div class="fa-roles2" aria-label="Arti ikon">${role('center','Center','toko utama · dikirim lebih banyak, cadangan stok kelompok')}${role('member','Anggota','dikirim 85% dari saran · ambil dari Center kalau habis')}${role('stand','Stand Alone','jauh dari outlet lain · tidak bisa transfer, kirim hati-hati')}</div>
+    <div class="fa-roles2" aria-label="Arti ikon">${role('center','Center','outlet ramai · rujukan utama saat anggota butuh transfer')}${role('member','Anggota','dikirim sesuai saran · transfer dari outlet terdekat kalau habis')}${role('stand','Stand Alone','jauh dari outlet lain · tidak bisa transfer, kirim hati-hati')}</div>
    </div>
    ${(()=>{const N=window.ForecastMethodNotice,read=N?.read?.();return `<div class="fa-read${read?' done':''}"><div><b>${read?'✓ Anda sudah membaca update ini':'Sudah paham semuanya?'}</b><span>${read?'Silakan lanjut membuat forecast.':'Klik tombol di samping untuk konfirmasi, lalu lanjut membuat forecast.'}</span></div><button type="button" class="button" data-fa-read>${read?'Lanjut ke Forecast →':'Saya sudah membaca & paham →'}</button></div>`;})()}
   </div>`;
@@ -86,7 +86,7 @@ window.ForecastAreas=(()=>{
    if(pts.length>1)L.polygon(hull(pts.map(o=>[o.lat,o.lon])),{color:col,weight:1.5,fillColor:col,fillOpacity:.1,dashArray:'5 5',className:'fa-zone'}).addTo(g);
    for(const id of c.ids){const o=P.get(id);if(!o||c.centers.includes(id))continue;const cen=c.centers.map(x=>P.get(x)).filter(Boolean).sort((a,b)=>dist(o,a)-dist(o,b))[0];if(cen)L.polyline([[o.lat,o.lon],[cen.lat,cen.lon]],{color:col,weight:2.5,opacity:.85,dashArray:'6 6',className:'fa-flow'}).addTo(g);}
    for(const id of c.ids){const o=P.get(id);if(!o)continue;const ctr=c.centers.includes(id);all.push([o.lat,o.lon]);
-    const m=L.marker([o.lat,o.lon],{icon:pin(ctr?'c':'m',col,nm(id)),riseOnHover:true,zIndexOffset:ctr?500:0}).bindPopup(`<b>${esc(nm(id))}</b><br>${esc(c.name)} · ${ctr?'Center':'Anggota (85%)'}`).addTo(g);m.__id=id;}
+    const m=L.marker([o.lat,o.lon],{icon:pin(ctr?'c':'m',col,nm(id)),riseOnHover:true,zIndexOffset:ctr?500:0}).bindPopup(`<b>${esc(nm(id))}</b><br>${esc(c.name)} · ${ctr?'Center':'Anggota'}`).addTo(g);m.__id=id;}
    // Center di luar kelompok (Klaten -> UMS) ikut masuk bingkai saat kelompok dipilih.
    layers.set(c.name,{g,centers:c.centers,b:L.latLngBounds([...pts,...c.centers.map(x=>P.get(x)).filter(Boolean)].map(o=>[o.lat,o.lon]))});});
   const sg=L.layerGroup().addTo(map),sp=[];
