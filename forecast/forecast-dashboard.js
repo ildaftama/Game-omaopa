@@ -559,6 +559,7 @@ window.ForecastDashboard=(()=>{
  // terakhir; potongan = 2,5 x kelebihan di atas target internal (maks 12%), karena memangkas
  // kiriman x% hanya mengurangi sebagian dari waste (sebagian potongan memotong yang laku).
  // Kalau lost sales juga di atas ambang, potongan diredam setengah supaya tidak sering habis.
+ // Owner 2026-11-23: banyak outlet habis dan tren naik, potongan otomatis karena waste dihentikan untuk tanggal kirim mulai 24 Nov.
  const PERF_NO_CUT_FROM='2026-11-24',PERF_V2_FROM='2026-11-18',PERF_FROM='2026-11-13',PERF_MARGIN=0.3,PERF_MAX_CUT=12,PERF_CUT_GAIN=2.5,PERF_MAX_ADD=4,PERF_LOST_GAIN=0.5;
  const perfCache=new Map();
  function perfAdjust(asOf){
@@ -585,8 +586,6 @@ window.ForecastDashboard=(()=>{
   if(wastePct==null&&lostPct==null){}
   else if(wastePct!=null&&wastePct>Wt){let cut=Math.min(PERF_MAX_CUT,(wastePct-Wt)*PERF_CUT_GAIN);if(lostPct!=null&&lostPct>L)cut/=2;pct=-cut;kind='waste';}
   else if(lostPct!=null&&lostPct>L){const room=wastePct==null?PERF_MAX_ADD:Math.max(0,Wt-wastePct);pct=Math.min(PERF_MAX_ADD,(lostPct-L)*PERF_LOST_GAIN,room);kind=pct>0?'lost':'ok';}
-  // Owner 2026-11-23: banyak outlet habis dan tren naik, potongan otomatis karena waste dihentikan dulu.
-  if(asOf>=PERF_NO_CUT_FROM&&pct<0){pct=0;kind='ok';}
   const v={pct:Math.round(pct*10)/10,pctV1:Math.round(pctV1*10)/10,kind,wastePct,wasteMtd,waste7,lostPct,monthly:wDates[0]>=monthStart,from:wDates[0]||null,to:wDates.at(-1)||null};
   perfCache.set(key,v);return v;
  }
@@ -699,7 +698,7 @@ window.ForecastDashboard=(()=>{
   // tanggal mendatang memakai data s.d. kemarin.
   // Aturan tegas berlaku untuk tanggal >= PERF_V2_FROM; tanggal sebelumnya tetap aturan lama supaya
   // prediksi yang sudah tampil tidak berubah.
-  const perf=date=>{if(date<PERF_FROM)return 1;try{const a=perfAdjust(isPast(date)?date:today());return 1+(date<PERF_V2_FROM?a.pctV1:a.pct)/100;}catch{return 1;}};
+  const perf=date=>{if(date<PERF_FROM)return 1;try{const a=perfAdjust(isPast(date)?date:today());return 1+(date<PERF_V2_FROM?a.pctV1:date>=PERF_NO_CUT_FROM?Math.max(0,a.pct):a.pct)/100;}catch{return 1;}};
   // ---- Kalibrasi bias terkini (owner 2026-11-13: "prediksi cenderung di atas real") ----
   // Uji mundur Agu-Nov 2026 (prediksi versi H-1 vs real, omzet reguler jaringan): mesin pola
   // tahun lalu x pertumbuhan makin sering KELEBIHAN sejak Okt (bias Okt +3,3%, Nov +3,5%,
