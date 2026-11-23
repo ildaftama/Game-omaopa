@@ -7,7 +7,10 @@
 //   sebagai customItems memakai NAMA; ganti nama menyimpan nama lama sebagai alias supaya rencana
 //   lama tetap terbaca di rincian kirim & akurasi roti.
 window.ForecastProducts=(()=>{
- const CATS=['Ogura & Malmil','Mini','Chiffon','Roti & lainnya'];
+ // Kategori (owner 2026-11-23): bisa ditambah di Pengaturan › Produk. Nomor kategori = posisi di daftar;
+ // 4 kategori pertama bawaan (dipakai 12 produk inti) boleh diganti nama tapi tidak bisa dihapus.
+ const BASE_CATS=['Ogura & Malmil','Mini','Chiffon','Roti & lainnya'],MAX_CATS=12;
+ function cats(){const s=window.ForecastSettings?.get?.()?.products?.categories,a=Array.isArray(s)?s:[],n=Math.min(MAX_CATS,Math.max(BASE_CATS.length,a.length));return Array.from({length:n},(_,i)=>String(a[i]||'').trim().slice(0,30)||BASE_CATS[i]||`Kategori ${i+1}`);}
  const CORE=[['Ogura Cheese','#e2c15a',0],['Ogura Chocolate','#8b5e3c',0],['Malmil Cheese','#e2c15a',0],['Malmil Choco','#8b5e3c',0],['Mini Cheese (pcs)','#e2c15a',1],['Mini Choco (pcs)','#8b5e3c',1],['Mini Durian (pcs)','#7fae6b',1],['Chiffon Classic Keju','#e6b39b',2],['Chiffon Classic Ekstra Keju','#d99a7e',2],['Chiffon Butter','#e0b25e',2],['Chiffon Lite Ekstra Keju','#7d9cc6',2],['Chiffon Lite Keju','#9db7d8',2]];
  // Urutan tampil di rincian kirim (sama seperti format logistik sebelumnya).
  const CORE_ORDER=[0,1,2,3,4,5,6,7,8,11,10,9];
@@ -33,7 +36,7 @@ window.ForecastProducts=(()=>{
  const DEFAULTS={core:CORE.map(([label])=>({label,ship:true})),extra:DEFAULT_EXTRA.map(([name,cat])=>({name,cat,aliases:[]}))};
  function prefs(){const p=window.ForecastSettings?.get?.()?.products||{};return {core:Array.isArray(p.core)&&p.core.length===12?p.core:DEFAULTS.core,extra:Array.isArray(p.extra)?p.extra:DEFAULTS.extra};}
  function core(){const c=prefs().core;return CORE.map(([label,dot,cat],p)=>({p,label:String(c[p]?.label||label),ship:c[p]?.ship!==false,dot,cat,bg:bgOr(hex(c[p]?.color)??defaultCoreBg(p))}));}
- function extra(){return prefs().extra.filter(x=>String(x?.name||'').trim()).map((x,i)=>({name:String(x.name).trim(),cat:Number.isInteger(x.cat)&&x.cat>=0&&x.cat<CATS.length?x.cat:3,aliases:Array.isArray(x.aliases)?x.aliases.map(String):[],dot:DOTS[i%DOTS.length],bg:bgOr(hex(x.color)??defaultExtraBg(x.name))}));}
+ function extra(){const nCat=cats().length;return prefs().extra.filter(x=>String(x?.name||'').trim()).map((x,i)=>({name:String(x.name).trim(),cat:Number.isInteger(x.cat)&&x.cat>=0&&x.cat<nCat?x.cat:3,aliases:Array.isArray(x.aliases)?x.aliases.map(String):[],dot:DOTS[i%DOTS.length],bg:bgOr(hex(x.color)??defaultExtraBg(x.name))}));}
  const names=()=>extra().map(x=>x.name);
  // Produk lain yang cocok dengan nama item rencana (nama sekarang atau nama lama).
  function match(itemName){const n=low(itemName);return extra().find(x=>low(x.name)===n||x.aliases.some(a=>low(a)===n))||null;}
@@ -41,5 +44,5 @@ window.ForecastProducts=(()=>{
  function itemFor(items,product){return (items||[]).find(it=>{const n=low(it.name);return n===low(product.name)||product.aliases.some(a=>low(a)===n);})||null;}
  // Warna header rute (nama rute -> warna latar lembut).
  function routeBg(name){const r=window.ForecastSettings?.get?.()?.products?.routes||{};return hex(r[name])||ROUTE_BG[name]||null;}
- return {hpp,DEFAULT_HPP,CATS,CORE_ORDER,DEFAULTS,core,extra,names,match,itemFor,low,hex,routeBg,defaultCoreBg,defaultExtraBg,ROUTE_BG};
+ return {hpp,DEFAULT_HPP,get CATS(){return cats();},BASE_CATS,MAX_CATS,CORE_ORDER,DEFAULTS,core,extra,names,match,itemFor,low,hex,routeBg,defaultCoreBg,defaultExtraBg,ROUTE_BG};
 })();
