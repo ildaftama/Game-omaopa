@@ -718,7 +718,9 @@ window.ForecastDashboard=(()=>{
    let c=1;if(gn>=7&&gF>0){const g=gA/gF,kw=wn/(wn+4);c=wn&&wF>0?g*(1-kw)+(wA/wF)*kw:g;c=Math.max(.85,Math.min(1.1,1+(c-1)*.75));}
    calibCache.set(date+'|'+end,c);return c;
   }
-  const forecastPureAt=date=>{const v=isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);return v==null?null:v*calib(date)*adj(date)*perf(date);};
+  // Mode optimis (owner 2026-11-23): penjualan yang habis stok tidak boleh menurunkan prediksi berikutnya.
+  const OPT_FROM='2026-11-25',calibUsed=date=>{const k=calib(date);return date>=OPT_FROM&&window.ForecastSettings?.get?.().display?.optimistic!==false?Math.max(1,k):k;};
+  const forecastPureAt=date=>{const v=isPast(date)?frozenAt(date).pure:pureEngine.forecastAt(date);return v==null?null:v*calibUsed(date)*adj(date)*perf(date);};
   function forecastPesananAt(date){
    // Tanggal lewat yang sudah tercakup sheet PESANAN: outlet tanpa baris pesanan = 0, bukan
    // "tidak diketahui". Sebelumnya jatuh ke tebakan pola tahun lalu -- per outlet itu menyalin

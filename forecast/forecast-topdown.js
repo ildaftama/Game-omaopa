@@ -120,9 +120,12 @@ window.ForecastTopdown=(()=>{
   return cur.some(v=>v>0)?['new','Belum terekam']:['saved','Tidak ada pesanan'];
  }
  // Dihitung sekali per tanggal (recommend 28 outlet cukup berat).
+ // Mode optimis (owner 2026-11-23): saran tidak dikurangi, dan porsi lebih besar ke produk yang paling sering habis.
+ const OPT_FROM='2026-11-25',OPT_TILT={2:1.05,3:1.05,7:1.12,8:1.12,9:1.12,10:1.12,11:1.12};
+ const optimistic=()=>!!date&&date>=OPT_FROM&&window.ForecastSettings?.get?.().display?.optimistic!==false;
  function compute(){
   const d=data(),recsAll=cloud().records||[];cloud().watch?.(model.shift(date,-28),date);
-  const key=date+'|'+d.sales.days.length+'|'+(d.orders?.days?.length||0)+'|'+recsAll.filter(r=>r.date<date).length;
+  const key=date+'|'+d.sales.days.length+'|'+(d.orders?.days?.length||0)+'|'+recsAll.filter(r=>r.date<date).length+'|'+optimistic();
   if(cache?.key===key)return cache;
   const ids=[...d.sales.outletIds],from=model.shift(date,-56),byOutlet=new Map();
   for(const r of d.sales.days){if(r.date<from||r.date>=date||!r.complete||!Array.isArray(r.qty)||wd(r.date)!==wd(date))continue;if(!byOutlet.has(r.id))byOutlet.set(r.id,[]);byOutlet.get(r.id).push(r);}
@@ -141,7 +144,7 @@ window.ForecastTopdown=(()=>{
   let wl=null;try{wl=window.ForecastDashboard?.recentWasteLost?.(7)||null;}catch{}
   const W=wl?.wasteThreshold??3.5,L=wl?.lostThreshold??4.5;
   for(const [id,o] of outlets){const r=wl?.byOutlet.get(id);o.wl=r;o.adj=bufferFor(r,W,L);}
-  const net=bufferFor(wl?.net,W,L);
+  const rawNet=bufferFor(wl?.net,W,L),net=optimistic()&&rawNet.pct<0?{pct:0,kind:'opt'}:rawNet;
   let pDown=0,pUp=0,pOut=new Set();for(const [id,o] of outlets)o.recs.forEach(r=>{if(!r.perf)return;if(r.perf.f<1){pDown++;pOut.add(id);}else if(r.perf.f>1)pUp++;});
   cache={key,ids,outlets,B,pred,wl,net,W,L,groups:groups(ids),perfSum:{down:pDown,up:pUp,outlets:pOut.size}};return cache;
  }
@@ -209,8 +212,8 @@ window.ForecastTopdown=(()=>{
  function boostHtml(){const b=boostLeft();if(!b)return '';if(!b.pcs)return '<div class="ft-boost done">Tambahan dari list habis sudah masuk ke rencana ini.</div>';const parts=[['Malmil',b.by[1]],['Chiffon',b.by[3]],['Ogura',b.by[0]],['Mini',b.by[2]]].filter(x=>x[1]).map(x=>`${x[0]} ${x[1]}`).join(', ');return `<div class="ft-boost"><span><b>Banyak outlet habis hari ini.</b> Saran tambah <b>${nf(b.pcs)} pcs</b> di ${b.outlets} outlet (${parts}).</span><button type="button" class="button fp-primary" data-ft-boost ${locked()?'disabled':''}>Tambahkan ke rencana</button></div>`;}
  function allocate(target,perOutlet=true){
   const c=compute(),cells={},frac=[];let val=0;
-  const wOf=o=>perOutlet?1+o.adj.pct/100:1,den=[...c.outlets.values()].reduce((s,o)=>s+o.value*wOf(o),0);
-  for(const [id,o] of c.outlets){const k=den>0?target*wOf(o)/den:0;cells[id]=o.base.map((q,p)=>{const raw=Math.max(0,q*k),fl=Math.floor(raw),pr=o.prices[p].value||0;val+=fl*pr;if(pr>0&&raw-fl>0)frac.push({id,p,f:raw-fl,pr});return fl;});}
+  const tilt=p=>optimistic()?(OPT_TILT[p]||1):1,valOf=o=>o.base.reduce((s,q,p)=>s+q*tilt(p)*(o.prices[p].value||0),0),wOf=o=>perOutlet?1+o.adj.pct/100:1,den=[...c.outlets.values()].reduce((s,o)=>s+valOf(o)*wOf(o),0);
+  for(const [id,o] of c.outlets){const k=den>0?target*wOf(o)/den:0;cells[id]=o.base.map((q,p)=>{const raw=Math.max(0,q*tilt(p)*k),fl=Math.floor(raw),pr=o.prices[p].value||0;val+=fl*pr;if(pr>0&&raw-fl>0)frac.push({id,p,f:raw-fl,pr});return fl;});}
   frac.sort((a,b)=>b.f-a.f);
   for(const x of frac){if(val+x.pr/2>target)continue;cells[x.id][x.p]++;val+=x.pr;}
   applyModelSplit(cells,c,wOf);
@@ -500,6 +503,7 @@ window.ForecastTopdown=(()=>{
  function netWhy(c){
   const n=c.net,d=describe(c.wl?.net,c.W),per=c.wl?.wasteFrom&&c.wl?.wasteTo?` (${c.wl.wasteFrom.slice(8)}/${c.wl.wasteFrom.slice(5,7)}–${c.wl.wasteTo.slice(8)}/${c.wl.wasteTo.slice(5,7)})`:'';
   const txt=n.kind==='nodata'?'Data waste & habis stok 7 hari terakhir belum cukup, saran: sesuai prediksi.'
+   :n.kind==='opt'?`Mode optimis aktif · 7 hari terakhir ${d}${per}. Prediksi dibuat lebih berani agar stok tidak cepat habis. Silakan turunkan kalau menurut Anda terlalu tinggi.`
    :n.kind==='minus'?`Saran −${Math.abs(n.pct)}% · 7 hari terakhir ${d}${per}. Waste di atas ambang dan stok jarang habis, kiriman bisa dikurangi.`
    :n.kind==='plus'?`Saran +${n.pct}% · 7 hari terakhir ${d}${per}. Stok sering habis sementara waste rendah, kiriman bisa ditambah.`
    :n.kind==='mix'?`Saran sesuai prediksi · 7 hari terakhir ${d}${per}. Waste dan habis stok sama-sama tinggi, berarti komposisi produk yang perlu diatur, bukan jumlahnya.`

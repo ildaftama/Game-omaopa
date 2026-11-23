@@ -9,7 +9,7 @@ window.ForecastSettings=(()=>{
  const DEFAULTS={
   thresholds:{waste:3.5,lostSales:4.5,openHours:12,omzetHighlight:15,wasteLostHighlight:20,trendWindow:3},
   weather:{model:'best_match',rainLabelProb:45,highRiskProb:60},
-  display:{trend:true,wasteLost:true,accuracy:true,weather:true,events:true,operations:true},
+  display:{trend:true,wasteLost:true,accuracy:true,weather:true,events:true,operations:true,optimistic:true},
   products:JSON.parse(JSON.stringify(window.ForecastProducts?.DEFAULTS||{core:[],extra:[]})),
  };
  const SOURCE_INFO={
@@ -171,7 +171,7 @@ window.ForecastSettings=(()=>{
    <article class="workspace-card fs-card"><div class="fs-card-head"><div><h3>Cuaca</h3><span class="fs-sync auto">Langsung saat dibuka</span></div><a href="https://open-meteo.com/en/docs" target="_blank" rel="noopener">Open-Meteo ↗</a></div><p class="fs-use">Ramalan publik Open-Meteo (gratis, tanpa key) dari koordinat tiap outlet; "Sekarang" diperbarui tiap 15 menit.</p><label>Model cuaca<select data-pref="weather:model" ${dis}>${WEATHER_MODELS.map(([v,l])=>`<option value="${v}" ${p.weather.model===v?'selected':''}>${esc(l)}</option>`).join('')}</select></label><div class="fs-row">${WEATHER_FIELDS.map(f=>numberField(f,'weather',p.weather[f[0]],dis)).join('')}</div></article>
    <article class="workspace-card fs-card fs-locked"><div class="fs-card-head"><div><h3>Penjualan ESB</h3><span class="fs-sync auto">Otomatis tiap jam & tiap malam</span></div></div><p class="fs-use">Omzet & PCS per outlet dari ESB. Akun ESB disimpan sebagai rahasia di GitHub (ESB_USERNAME / ESB_PASSWORD), sengaja tidak bisa diubah dari web.</p></article>
    <article class="workspace-card fs-card fs-locked"><div class="fs-card-head"><div><h3>Akses Google Sheets</h3><span class="fs-sync auto">Dipakai sinkronisasi</span></div></div><p class="fs-use">API key Google Sheets disimpan sebagai rahasia GitHub (GOOGLE_SHEETS_API_KEY). Sheet cukup dibagikan "siapa saja yang punya link dapat melihat".</p></article></div>`;
-  else if(section==='thresholds')body=`<article class="workspace-card"><div class="fs-num-grid">${THRESHOLD_FIELDS.map(f=>numberField(f,'thresholds',p.thresholds[f[0]],dis)).join('')}</div></article>`;
+  else if(section==='thresholds')body=`<article class="workspace-card"><div class="fs-num-grid">${THRESHOLD_FIELDS.map(f=>numberField(f,'thresholds',p.thresholds[f[0]],dis)).join('')}</div></article><article class="workspace-card"><h3 class="fs-h3">Mode optimis</h3><p class="fs-use">Prediksi tidak diturunkan karena penjualan yang sudah terbatas stok, dan saran kiriman tidak dikurangi. Forecaster tetap menimbang angkanya sebelum menyimpan.</p><div class="fs-checks"><label class="fs-check"><input type="checkbox" data-pref="display:optimistic" ${p.display.optimistic?'checked':''} ${dis}><span>Aktifkan mode optimis</span></label></div></article>`;
   else if(section==='display')body=`<article class="workspace-card"><p class="fs-use">Kartu yang tampil di Dashboard. Berlaku untuk seluruh tim.</p><div class="fs-checks">${DISPLAY_FIELDS.map(([k,l])=>`<label class="fs-check"><input type="checkbox" data-pref="display:${k}" ${p.display[k]?'checked':''} ${dis}><span>${esc(l)}</span></label>`).join('')}</div></article>`;
   else if(section==='products')body=productsBody(dis);
   // Eksperimen (owner 2026-11-12): tab hanya muncul untuk Master; isinya terpisah di forecast-experiment.js.
