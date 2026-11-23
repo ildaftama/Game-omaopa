@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { pull as pullDailyRecap, recapSource } from './waste-recap.mjs';
 import { buildDemographics } from './customer-demographics.mjs';
+import { refreshOffice } from './office-status.mjs';
 
 // Nightly ESB -> private reference bundle sync (feature: otomasi ESB malam hari).
 //
@@ -107,6 +108,17 @@ export async function writeBundle(collectionPath, keyPrefix, kindManifest, kindC
 // Omzet hari berjalan per jam (owner 2026-11-23): SATU dokumen kecil dengan kunci tetap yang selalu
 // ditimpa, jadi tidak menambah potongan baru di Firestore dan tidak menyentuh bundle besar.
 export const LIVE_INTRADAY_KEY = 'reference_0000000000000000_0';
+export async function readSmallDoc(docKey, idToken) {
+  const d = await getDoc('forecastPlans/' + docKey, idToken);
+  if (!d?.payload) return null;
+  try { return JSON.parse(zlib.gunzipSync(Buffer.from(d.payload, 'base64')).toString('utf8')); } catch { return null; }
+}
+export async function writeSmallDoc(docKey, value, idToken, uid) {
+  const packed = packBundle(value);
+  if (packed.chunks.length !== 1) throw Error('Dokumen kecil terlalu besar.');
+  const write = { update: { name: resourceName('forecastPlans/' + docKey), fields: { schemaVersion: field(2), kind: field('reference-chunk'), payload: field(packed.chunks[0]), sha256: field(packed.sha256), updatedBy: field(uid) } }, updateTransforms: [{ fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' }] };
+  await request(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents:commit`, { method: 'POST', headers: { Authorization: 'Bearer ' + idToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ writes: [write] }) });
+}
 export async function readLiveIntraday(idToken) {
   const d = await getDoc('forecastPlans/' + LIVE_INTRADAY_KEY, idToken);
   if (!d?.payload) return null;
@@ -173,6 +185,10 @@ export async function run(env = process.env, salesPath = 'forecast/pcs-sales.jso
   const lean = buildLeanBundle(full), packedLean = packBundle(lean);
   await writeBundle('forecastBriefs', 'forecaster', 'forecaster-manifest', 'forecaster-chunk', packedLean, idToken, uid);
   console.log('Bundle forecaster (ramping) tersimpan: ' + packedLean.chunks.length + ' chunk.');
+  try {
+    const names = Object.fromEntries(Object.entries(full.globals.OUTLET_INTELLIGENCE?.outlets || {}).map(([id, o]) => [id, o.name]));
+    await refreshOffice({ read: k => readSmallDoc(k, idToken), write: (k, v) => writeSmallDoc(k, v, idToken, uid), data: { sales, recap: dailyRecap, prices: full.globals.FORECAST_REALIZED_PRICES, names } });
+  } catch { console.log('Data Kantor Mini belum diperbarui.'); }
   return { full: packedFull.sha256, lean: packedLean.sha256 };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

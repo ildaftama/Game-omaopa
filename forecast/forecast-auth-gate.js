@@ -4,7 +4,7 @@ import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'htt
 import {getFirestore,doc,getDoc,onSnapshot,writeBatch,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 const app=getApps().some(a=>a.name==='[DEFAULT]')?getApp():initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
 const auth=getAuth(app),db=getFirestore(app),gate=document.getElementById('forecast-access-gate'),root=document.getElementById('forecast-app');
-let loaded=false,loading=null,generation=0,roleStop=null,liveStop=null;
+let loaded=false,loading=null,generation=0,roleStop=null,liveStop=null,officeStop=null;
 // Layar pemuatan (owner 2026-11-23): progres mengikuti tahap yang benar-benar berjalan (akun, unduh
 // data per bagian, buka data, modul per file, tampilan). Perkiraan waktu dari pemuatan sebelumnya
 // di perangkat ini. Di dalam satu tahap bar tetap bergerak pelan, tapi tidak melewati batas tahapnya.
@@ -29,9 +29,9 @@ async function unpack(p){
 // Forecaster-only accounts load a separate, non-financial manifest (forecastBriefs) instead
 // of the full private bundle — same gzip/sha256 mechanism, a smaller set of globals/files.
 // Omzet hari berjalan per jam: dokumen kecil terpisah, dibaca setelah web terbuka dan ikut berubah saat ada tarikan baru.
-async function decodeLive(d){const bytes=Uint8Array.from(atob(d.payload),c=>c.charCodeAt(0)),raw=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
- const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',raw)),b=>b.toString(16).padStart(2,'0')).join('');if(hash!==d.sha256)throw Error('checksum');const x=JSON.parse(new TextDecoder().decode(raw));if(x.kind!=='intraday-live'||!Array.isArray(x.rows))throw Error('live');return x;}
-function watchLive(){liveStop?.();liveStop=onSnapshot(privateRef('reference_0000000000000000_0'),async s=>{if(!s.exists())return;try{window.ForecastLiveIntraday=await decodeLive(s.data());window.dispatchEvent(new Event('forecast-intraday'));}catch{}},()=>{});}
+async function decodeLive(d,kind='intraday-live'){const bytes=Uint8Array.from(atob(d.payload),c=>c.charCodeAt(0)),raw=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+ const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',raw)),b=>b.toString(16).padStart(2,'0')).join('');if(hash!==d.sha256)throw Error('checksum');const x=JSON.parse(new TextDecoder().decode(raw));if(x.kind!==kind||(kind==='intraday-live'&&!Array.isArray(x.rows)))throw Error('live');return x;}
+function watchLive(){liveStop?.();liveStop=onSnapshot(privateRef('reference_0000000000000000_0'),async s=>{if(!s.exists())return;try{window.ForecastLiveIntraday=await decodeLive(s.data());window.dispatchEvent(new Event('forecast-intraday'));}catch{}},()=>{});officeStop?.();officeStop=onSnapshot(privateRef('reference_0000000000000001_0'),async s=>{if(!s.exists())return;try{window.ForecastOfficeData=await decodeLive(s.data(),'office');window.dispatchEvent(new Event('forecast-office-data'));}catch{}},()=>{});}
 async function loadPrivate(role){
  const lean=window.ForecastRolePolicy.forecasterOnly(role),ref=lean?briefRef:privateRef,key=lean?'forecaster_current':'reference_current';
  flStage(1,5,7,'Mengambil daftar data');const manifest=await getDoc(ref(key));if(!manifest.exists())throw Error('missing-private-data');const m=manifest.data();
@@ -52,7 +52,7 @@ onAuthStateChanged(auth,async user=>{const run=++generation;
  // ulang auth.currentUser langsung -- kalau ternyata masih login, abaikan gema basi ini supaya
  // tidak menampilkan form login lagi padahal baru saja berhasil masuk.
  if(!user&&generation>1){await new Promise(r=>setTimeout(r,300));if(run!==generation)return;if(auth.currentUser)user=auth.currentUser;}
- roleStop?.();liveStop?.();liveStop=null;delete window.ForecastLiveIntraday;root.hidden=true;gate.hidden=false;
+ roleStop?.();liveStop?.();liveStop=null;officeStop?.();officeStop=null;delete window.ForecastLiveIntraday;delete window.ForecastOfficeData;root.hidden=true;gate.hidden=false;
  if(loaded){location.reload();return;}
  if(!user){locked('Masuk untuk membuka perencanaan dan data outlet.',true);return;}
  startLoader();

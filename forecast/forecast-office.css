@@ -1,0 +1,39 @@
+.kantor{--k-card:#fffdf8;--k-card2:#f8eee0;--k-ink:#3a2d3f;--k-muted:#756580;--k-line:#ecdcc8;--k-accent:#d9577f;--k-accent2:#3f9f8c;--k-warn:#b8730f;--k-bad:#c9423a;--k-good:#23835a;color:var(--k-ink);margin-top:14px}
+.kantor *{box-sizing:border-box}
+.kantor .kt-top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:flex-end;gap:4px 16px;margin-bottom:8px;color:var(--k-muted);font-variant-numeric:tabular-nums}
+.kantor .kt-top b{color:var(--k-ink)}
+.kantor .kt-steps{list-style:none;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;margin:0 0 10px;padding:0}
+.kantor .kt-steps li{position:relative;min-width:0;padding:7px 9px 9px;background:var(--k-card);border:1px solid var(--k-line);border-radius:9px;color:var(--k-muted);font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kantor .kt-steps li.done{color:var(--k-good)}
+.kantor .kt-steps li.now{color:var(--k-ink);border-color:var(--k-accent);background:var(--k-card2)}
+.kantor .kt-steps i{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--k-accent)}
+.kantor .kt-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:12px;align-items:start}
+.kantor .kt-stage{background:#3a2d3f;border:3px solid #3a2d3f;border-radius:14px;overflow:hidden;line-height:0}
+.kantor canvas{display:block;width:100%;height:auto;cursor:pointer;touch-action:manipulation;outline:none}
+.kantor canvas:focus-visible{outline:3px solid var(--k-accent);outline-offset:-3px}
+.kantor .kt-dock{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:9px}
+.kantor .kt-dock button{min-height:50px;padding:5px 3px;border:1px solid var(--k-line);border-bottom-width:3px;border-radius:10px;background:var(--k-card);color:var(--k-ink);font:700 12px inherit;font-family:inherit;cursor:pointer}
+.kantor .kt-dock button span{display:block;font-size:18px;line-height:1.15}
+.kantor .kt-dock button:hover{background:var(--k-card2)}
+.kantor .kt-dock button:active{transform:translateY(2px);border-bottom-width:1px}
+.kantor .kt-dock button.on{border-color:var(--k-accent);background:var(--k-card2)}
+.kantor .kt-dock button:focus-visible,.kantor .kt-roster button:focus-visible{outline:2px solid var(--k-accent);outline-offset:1px}
+.kantor .kt-hint{margin:7px 2px 0;color:var(--k-muted);font-size:12.5px}
+.kantor aside{display:grid;gap:10px}
+.kantor .kt-card{background:var(--k-card);border:1px solid var(--k-line);border-radius:11px;padding:11px}
+.kantor .kt-card h2{margin:0 0 7px;font-size:12px;color:var(--k-muted)}
+.kantor .kt-roster{display:grid;gap:2px}
+.kantor .kt-roster button{display:grid;grid-template-columns:11px minmax(0,1fr);gap:1px 8px;align-items:center;width:100%;min-height:43px;padding:5px 7px;background:transparent;color:var(--k-ink);border:1px solid transparent;border-radius:8px;text-align:left;font:inherit;cursor:pointer}
+.kantor .kt-roster button:hover,.kantor .kt-roster button.sel{background:var(--k-card2);border-color:var(--k-line)}
+.kantor .dot{grid-row:span 2;width:10px;height:10px;border-radius:50%}
+.kantor .kt-roster b{font-size:12.5px}
+.kantor .kt-roster small{color:var(--k-muted);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.kantor .bar{grid-column:2;height:3px;background:var(--k-line);border-radius:2px;overflow:hidden}
+.kantor .bar i{display:block;height:100%;background:var(--k-accent2)}
+.kantor .stats{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.kantor .stat{background:var(--k-card2);border-radius:7px;padding:6px 8px;min-width:0}
+.kantor .stat span{display:block;color:var(--k-muted);font-size:11px}
+.kantor .stat b{font-size:12.5px}
+.kantor .ok{color:var(--k-good)}.kantor .mid{color:var(--k-warn)}.kantor .hot{color:var(--k-bad)}
+@media(max-width:980px){.kantor .kt-layout{grid-template-columns:minmax(0,1fr)}.kantor .kt-steps{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:560px){.kantor .kt-dock{grid-template-columns:repeat(4,minmax(0,1fr))}.kantor .kt-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -6,7 +6,8 @@ import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {createEsbClient} from './esb-client.mjs';
 import {collect} from './pcs-sales.mjs';
-import {signIn,readLiveIntraday,writeLiveIntraday} from './pack-forecast-reference.mjs';
+import {signIn,readLiveIntraday,writeLiveIntraday,readSmallDoc,writeSmallDoc} from './pack-forecast-reference.mjs';
+import {refreshOffice} from './office-status.mjs';
 
 // Outlet yang gagal terbaca kali ini tetap memakai angka tarikan sebelumnya pada hari yang sama.
 export function mergeLive(previous,results,date,asOf){
@@ -30,5 +31,6 @@ async function main(){
  const {idToken,uid}=await signIn(process.env);
  await writeLiveIntraday(mergeLive(await readLiveIntraday(idToken),results,today,new Date().toISOString()),idToken,uid);
  console.log('Omzet sementara tersimpan.');
+ try{await refreshOffice({read:k=>readSmallDoc(k,idToken),write:(k,v)=>writeSmallDoc(k,v,idToken,uid)});}catch{console.log('Data Kantor Mini belum diperbarui.');}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(()=>{console.error('Tarikan omzet sementara belum berhasil. Isi laporan dan akses tidak dicetak.');process.exitCode=1;});
