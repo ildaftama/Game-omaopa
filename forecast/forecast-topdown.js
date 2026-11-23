@@ -120,17 +120,9 @@ window.ForecastTopdown=(()=>{
   return cur.some(v=>v>0)?['new','Belum terekam']:['saved','Tidak ada pesanan'];
  }
  // Dihitung sekali per tanggal (recommend 28 outlet cukup berat).
- // Model pembagian (owner 2026-11-23): untuk 4 produk inti, PORSI antar outlet memakai hasil model
- // malam; total per produk tetap sama seperti sebelumnya. Tanpa data model untuk tanggal ini, median dipakai.
- function applyModelSplit(outlets){
-  const M=window.FORECAST_MODEL_SPLIT,day=M?.schemaVersion===1?M.dates?.[date]:null;if(!day)return false;let used=false;
-  for(let p=0;p<4;p++){const xs=[...outlets.values()].filter(o=>Number.isFinite(day[o.id]?.[p])&&day[o.id][p]>=0);if(xs.length<24)continue;
-   const tot=xs.reduce((s,o)=>s+(o.base[p]||0),0),sum=xs.reduce((s,o)=>s+day[o.id][p],0);if(!(tot>0&&sum>0))continue;for(const o of xs)o.base[p]=day[o.id][p]*tot/sum;used=true;}
-  if(used)for(const o of outlets.values())o.value=o.base.reduce((s,q,p)=>s+q*(o.prices[p].value||0),0);return used;
- }
  function compute(){
   const d=data(),recsAll=cloud().records||[];cloud().watch?.(model.shift(date,-28),date);
-  const key=date+'|'+d.sales.days.length+'|'+(d.orders?.days?.length||0)+'|'+recsAll.filter(r=>r.date<date).length+'|'+(window.FORECAST_MODEL_SPLIT?.generatedAt||'');
+  const key=date+'|'+d.sales.days.length+'|'+(d.orders?.days?.length||0)+'|'+recsAll.filter(r=>r.date<date).length;
   if(cache?.key===key)return cache;
   const ids=[...d.sales.outletIds],from=model.shift(date,-56),byOutlet=new Map();
   for(const r of d.sales.days){if(r.date<from||r.date>=date||!r.complete||!Array.isArray(r.qty)||wd(r.date)!==wd(date))continue;if(!byOutlet.has(r.id))byOutlet.set(r.id,[]);byOutlet.get(r.id).push(r);}
@@ -145,7 +137,6 @@ window.ForecastTopdown=(()=>{
    const lw=lwRow?Math.max(0,lwRow.qty.slice(0,12).reduce((a,b)=>a+(b||0),0)-(lwOrd?.knownQty||lwOrd?.qty||[]).reduce((a,b)=>a+(Number(b)||0),0)):null;
    outlets.set(id,{id,recs,prices,base,value,orders:orderQty(id),roti,lw});
   }
-  if(applyModelSplit(outlets))B=[...outlets.values()].reduce((s,o)=>s+o.value,0);
   const pred=window.ForecastDashboard?.predict?.(date)||null;
   let wl=null;try{wl=window.ForecastDashboard?.recentWasteLost?.(7)||null;}catch{}
   const W=wl?.wasteThreshold??3.5,L=wl?.lostThreshold??4.5;
@@ -202,12 +193,23 @@ window.ForecastTopdown=(()=>{
    }
   }
  }
+ // Model pembagian (owner 2026-11-23): setelah total tiap produk inti terbentuk, porsi antar outlet
+ // mengikuti model malam. Total per produk dan produk lain tidak berubah. Tanpa data model, tetap median.
+ function applyModelSplit(cells,c,wOf){
+  const M=window.FORECAST_MODEL_SPLIT,day=M?.schemaVersion===1?M.dates?.[date]:null;if(!day)return;
+  for(let p=0;p<4;p++){const ids=[...c.outlets.keys()].filter(id=>cells[id]&&Number.isFinite(day[id]?.[p])&&day[id][p]>=0);if(ids.length<24)continue;
+   const N=ids.reduce((s,id)=>s+(cells[id][p]||0),0),w=Object.fromEntries(ids.map(id=>[id,day[id][p]*wOf(c.outlets.get(id))])),W=ids.reduce((s,id)=>s+w[id],0);if(!(N>0&&W>0))continue;
+   const raw=ids.map(id=>({id,v:w[id]*N/W})),base=raw.map(x=>Math.floor(x.v));let left=N-base.reduce((a,b)=>a+b,0);
+   raw.map((x,i)=>({i,f:x.v-base[i],id:x.id})).sort((a,b)=>b.f-a.f||a.id.localeCompare(b.id)).forEach(x=>{if(left>0){base[x.i]++;left--;}});
+   ids.forEach((id,i)=>{cells[id][p]=base[i];});}
+ }
  function allocate(target,perOutlet=true){
   const c=compute(),cells={},frac=[];let val=0;
   const wOf=o=>perOutlet?1+o.adj.pct/100:1,den=[...c.outlets.values()].reduce((s,o)=>s+o.value*wOf(o),0);
   for(const [id,o] of c.outlets){const k=den>0?target*wOf(o)/den:0;cells[id]=o.base.map((q,p)=>{const raw=Math.max(0,q*k),fl=Math.floor(raw),pr=o.prices[p].value||0;val+=fl*pr;if(pr>0&&raw-fl>0)frac.push({id,p,f:raw-fl,pr});return fl;});}
   frac.sort((a,b)=>b.f-a.f);
   for(const x of frac){if(val+x.pr/2>target)continue;cells[x.id][x.p]++;val+=x.pr;}
+  applyModelSplit(cells,c,wOf);
   applyCenters(cells);
   for(const id in cells)cells[id]=cells[id].map(String);
   return cells;
