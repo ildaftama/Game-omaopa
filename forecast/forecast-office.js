@@ -2,7 +2,7 @@
 // Nama staf dan jadwal datang dari dokumen privat, tidak ditulis di file publik ini.
 window.ForecastOffice=(()=>{
 'use strict';
-const TEMPLATE='<div class="kt-top"><span><b id="kt-clock">--.--</b> WIB · <span id="kt-phase"></span></span></div><ol class="kt-steps" id="kt-steps"></ol><div class="kt-layout"><div><div class="kt-stage"><canvas id="kt-game" width="1664" height="1088" tabindex="0" aria-label="Kantor mini. Klik lantai untuk menggerakkan forecaster, klik mesin kopi, snack, kulkas, sofa, atau toilet untuk beraktivitas."></canvas></div><div class="kt-dock" id="kt-dock" aria-label="Aksi forecaster"></div><p class="kt-hint" id="kt-dockHint"></p></div><aside><section class="kt-card"><h2>Tim kantor</h2><div class="kt-roster" id="kt-roster"></div></section><section class="kt-card"><h2>Kondisi hari ini</h2><div class="stats" id="kt-stats"></div></section></aside></div>';
+const TEMPLATE='<div class="kt-top"><span><b id="kt-clock">--.--</b> WIB · <span id="kt-phase"></span></span></div><div class="kt-layout"><div><div class="kt-stage"><canvas id="kt-game" width="1664" height="1088" tabindex="0" aria-label="Kantor mini. Klik lantai untuk menggerakkan forecaster, klik mesin kopi, snack, kulkas, sofa, atau toilet untuk beraktivitas."></canvas></div><div class="kt-dock" id="kt-dock" aria-label="Aksi forecaster"></div><p class="kt-hint" id="kt-dockHint"></p></div><aside><section class="kt-card"><h2>Tim kantor</h2><div class="kt-roster" id="kt-roster"></div></section><section class="kt-card"><h2>Kondisi hari ini</h2><div class="stats" id="kt-stats"></div></section></aside></div>';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let api=null;
 function boot(){
@@ -19,7 +19,6 @@ const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.leng
 const hash=(x,y)=>{const s=Math.sin(x*127.1+y*311.7)*43758.5453;return s-Math.floor(s);};
 
 const S={hour:null,weather:'cerah',waste:'aman',lost:'aman',t:0,step:-1,stepP:0,pulled:0,lastPull:null,chart:0,radar:0,calc:0,filled:0,audit:0,kick:false,printing:0,flag:[],wcQ:[],sel:'f1',date:null,realCd:7,weatherTomorrow:null,wasteTrend:'stabil',lostTrend:'stabil',flagNames:[],wasteOutlets:[],lostOutlets:[],modelReady:false,statusReady:false,brew:0,micro:0,chatCd:0,trayP:0,trayF:0};
-const STEPS=['Tarik data ESB','Cek cuaca','Hitung prediksi','Susun forecast','Audit waste & lost','Istirahat'];
 
 // ===== Denah =====
 const blocked=new Set();
@@ -71,17 +70,17 @@ function windowP(x,y,w,h){
  R(x+w/2,y,1,h,'#fff');R(x-5,y-3,6,h+7,'#ffc2d1');R(x+w-1,y-3,6,h+7,'#ffc2d1');for(let i=0;i<h;i+=3){R(x-3,y+i,1,2,'#f29db7');R(x+w+2,y+i,1,2,'#f29db7');}R(x-6,y-4,w+12,2,'#a47854');
 }
 function fairy(){const cols=['#ff8fab','#ffd166','#7bdff2','#b8f28d','#cdb4f6'],n=26;for(let i=0;i<n;i++){const x=16+i*(VW-32)/(n-1),y=7+Math.abs(Math.sin(i*.62))*5;R(x,y-2,1,2,'#7d6a70');const on=Math.sin(S.t*2+i*1.3)>-.4;R(x-1,y,3,3,on?cols[i%5]:'#e7d9cd');}}
-function rack(){for(let i=0;i<3;i++){const x=16+i*16;box(x,6,16,56,'#4a4158');for(let r=0;r<7;r++){const ry=10+r*7;R(x+2,ry,12,5,'#2d2636');const n=i*7+r,on=n<S.pulled*21/28;R(x+3,ry+1,2,2,on?(Math.sin(S.t*14+n)>-.2?'#6ff5ac':'#2a8f5c'):'#5d5270');R(x+6,ry+1,2,2,Math.sin(S.t*9+n*2)>.2?'#7bdff2':'#35566b');R(x+9,ry+2,4,1,'#6a5e7d');}}if(S.step===0&&S.pulled<28)for(let i=0;i<4;i++){const p=(S.t*.9+i/4)%1;R(36+p*20,66+p*24,2,2,'#6ff5ac');}}
+function rack(){for(let i=0;i<3;i++){const x=16+i*16;box(x,6,16,56,'#4a4158');for(let r=0;r<7;r++){const ry=10+r*7;R(x+2,ry,12,5,'#2d2636');const n=i*7+r,on=n<S.pulled*21/28;R(x+3,ry+1,2,2,on?(Math.sin(S.t*14+n)>-.2?'#6ff5ac':'#2a8f5c'):'#5d5270');R(x+6,ry+1,2,2,Math.sin(S.t*9+n*2)>.2?'#7bdff2':'#35566b');R(x+9,ry+2,4,1,'#6a5e7d');}}if(S.pulling)for(let i=0;i<4;i++){const p=(S.t*.9+i/4)%1;R(36+p*20,66+p*24,2,2,'#6ff5ac');}}
 function whiteboard(){const x=82,y=7,w=64,h=34;box(x,y,w,h,'#fffef8','#8f7d92');R(x+3,y+h,w-6,2,'#8f7d92');R(x+6,y+h,4,1,'#e8799a');R(x+14,y+h,4,1,'#58b8a4');const pts=[.25,.42,.33,.6,.5,.72,.62,.85],n=Math.floor(S.chart*(pts.length-1));c.strokeStyle='#e8799a';c.lineWidth=1;c.beginPath();for(let i=0;i<=n;i++){const px=x+6+i*(w-12)/(pts.length-1),py=y+h-6-pts[i]*(h-12);i?c.lineTo(px+.5,py+.5):c.moveTo(px+.5,py+.5);}c.stroke();for(let i=0;i<=n;i++){const px=x+6+i*(w-12)/(pts.length-1),py=y+h-6-pts[i]*(h-12);R(px-1,py-1,3,3,'#5a8fe0');}R(x+4,y+h-5,w-8,1,'#cbbfce');for(let i=0;i<Math.floor(S.chart*3);i++)R(x+5,y+4+i*3,8+i*3,1,'#58b8a4');}
 const status=i=>{const l=watchLevel();if(!l)return 'ok';if(S.flag.includes(i))return l===2?'hot':'mid';return 'ok';};
-function board(){const x=155,y=7,w=64,h=34;box(x,y,w,h,'#2d2636');for(let i=0;i<28;i++){const cx=x+4+(i%7)*8,cy=y+4+Math.floor(i/7)*7;let col='#4c5a58';if(S.audit*28>i||S.step>4)col=status(i)==='hot'?(Math.sin(S.t*7)>0?'#ff6b61':'#8c3a35'):status(i)==='mid'?'#ffc14d':'#6ff5ac';else if(S.pulled>i)col='#3a9c70';R(cx,cy,6,5,col);R(cx,cy,6,1,'rgba(255,255,255,.25)');}if(S.step===4){const i=clamp(Math.floor(S.audit*28),0,27),cx=x+3+(i%7)*8,cy=y+3+Math.floor(i/7)*7;c.strokeStyle='#fff';c.lineWidth=1;c.strokeRect(cx+.5,cy+.5,7,6);}}
+function board(){const x=155,y=7,w=64,h=34;box(x,y,w,h,'#2d2636');for(let i=0;i<28;i++){const cx=x+4+(i%7)*8,cy=y+4+Math.floor(i/7)*7;let col='#4c5a58';if(S.audit*28>i||S.auditDone)col=status(i)==='hot'?(Math.sin(S.t*7)>0?'#ff6b61':'#8c3a35'):status(i)==='mid'?'#ffc14d':'#6ff5ac';else if(S.pulled>i)col='#3a9c70';R(cx,cy,6,5,col);R(cx,cy,6,1,'rgba(255,255,255,.25)');}if(S.auditing){const i=clamp(Math.floor(S.audit*28),0,27),cx=x+3+(i%7)*8,cy=y+3+Math.floor(i/7)*7;c.strokeStyle='#fff';c.lineWidth=1;c.strokeRect(cx+.5,cy+.5,7,6);}}
 function radar(){const x=228,y=7,w=44,h=34;box(x,y,w,h,'#123c3b');const cx=x+15,cy=y+17,r=13;c.strokeStyle='#2d8a78';c.lineWidth=1;for(const k of [.45,1]){c.beginPath();c.arc(cx,cy,r*k,0,7);c.stroke();}R(cx-r,cy,r*2,1,'#2d8a78');R(cx,cy-r,1,r*2,'#2d8a78');const a=S.t*2.2;c.strokeStyle='#8affdb';c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);c.stroke();const bl=S.weather==='hujan'?9:S.weather==='mendung'?4:1;for(let i=0;i<bl;i++){const q=i*2.3,d=3+i*1.1;R(cx+Math.cos(q)*d,cy+Math.sin(q)*d,3,2,S.weather==='hujan'?'#ff8177':'#ffe27a');}R(x+31,y+5,10,9,S.weather==='hujan'?'#42658a':S.weather==='mendung'?'#73808a':'#4ba6dc');if(S.weather==='cerah')ell(x+36,y+9,2,2,'#ffe27a');else R(x+33,y+8,7,3,'#fff');R(x+31,y+18,10,2,'#2d8a78');R(x+31,y+18,10*S.radar,2,'#8affdb');}
 function monitor(x,y,w,h,draw){box(x,y,w,h,'#2d2636');c.save();c.beginPath();c.rect(x+1,y+1,w-2,h-2);c.clip();draw(x+1,y+1,w-2,h-2);c.restore();R(x+w/2-2,y+h,4,2,'#6a5e7d');R(x+w/2-5,y+h+2,10,1,OL);}
-const scrEsb=(x,y,w,h)=>{R(x,y,w,h,'#1a2740');for(let i=0;i<4;i++){const n=(Math.floor(S.t*(S.step===0?8:1))+i*3)%6;R(x+2,y+2+i*3,4+n*2,1,i%2?'#6ff5ac':'#7bdff2');}R(x+1,y+h-2,(w-2)*S.pulled/28,1,'#6ff5ac');};
-const scrPred=(x,y,w,h)=>{R(x,y,w,h,'#2a2350');[.4,.6,.5,.8,.7,.95].forEach((b,i)=>{const k=S.step===2?clamp(S.calc*6-i,0,1):S.step>2?1:.25;R(x+2+i*4,y+h-2-b*(h-4)*k,3,b*(h-4)*k,i===5?'#ffc14d':'#b49cff');});};
+const scrEsb=(x,y,w,h)=>{R(x,y,w,h,'#1a2740');for(let i=0;i<4;i++){const n=(Math.floor(S.t*(S.pulling?8:1))+i*3)%6;R(x+2,y+2+i*3,4+n*2,1,i%2?'#6ff5ac':'#7bdff2');}R(x+1,y+h-2,(w-2)*S.pulled/28,1,'#6ff5ac');};
+const scrPred=(x,y,w,h)=>{R(x,y,w,h,'#2a2350');[.4,.6,.5,.8,.7,.95].forEach((b,i)=>{const k=S.calcing?clamp(S.calc*6-i,0,1):S.calc>=1?1:.25;R(x+2+i*4,y+h-2-b*(h-4)*k,3,b*(h-4)*k,i===5?'#ffc14d':'#b49cff');});};
 const scrW=(x,y,w,h)=>{R(x,y,w,h,S.weather==='hujan'?'#32506e':'#4ba6dc');if(S.weather==='cerah')ell(x+w/2,y+6,3,3,'#ffe27a');else{R(x+4,y+5,w-8,4,'#fff');if(S.weather==='hujan')for(let i=0;i<4;i++)R(x+5+i*4,y+10+((S.t*8+i)%3),1,2,'#bfe8ff');}};
 const scrWatch=(x,y,w,h)=>{R(x,y,w,h,'#231d2c');const l=watchLevel(),col=l===2?'#ff6b61':l===1?'#ffc14d':'#6ff5ac';c.strokeStyle=col;c.lineWidth=1;c.beginPath();for(let i=0;i<w;i++){const v=y+h/2+Math.sin(i*.8+S.t*3)*(l+1)*1.5;i?c.lineTo(x+i,v):c.moveTo(x+i,v);}c.stroke();};
-function scrGrid(x,y,w,h){R(x,y,w,h,'#fffdf8');R(x,y,w,3,'#e8799a');const cw=4,ch=2,cols=Math.floor((w-1)/cw),rows=Math.floor((h-4)/(ch+1));for(let r=0;r<rows;r++)for(let k=0;k<cols;k++){const idx=(r*cols+k)/(rows*cols);R(x+1+k*cw,y+4+r*(ch+1),cw-1,ch,idx<S.filled?(k===cols-1?'#ffc14d':'#58b8a4'):'#e9dfd5');}}
+function scrGrid(x,y,w,h,done=0){R(x,y,w,h,'#fffdf8');R(x,y,w,3,'#e8799a');const cw=4,ch=2,cols=Math.floor((w-1)/cw),rows=Math.floor((h-4)/(ch+1));for(let r=0;r<rows;r++)for(let k=0;k<cols;k++){const idx=(r*cols+k)/(rows*cols);R(x+1+k*cw,y+4+r*(ch+1),cw-1,ch,idx<done?(k===cols-1?'#ffc14d':'#58b8a4'):'#e9dfd5');}}
 const scrSide=(x,y,w,h)=>{R(x,y,w,h,'#2a2350');c.strokeStyle='#ffc14d';c.lineWidth=1;c.beginPath();for(let i=0;i<w;i++){const v=y+h-3-(Math.sin(i*.5)+1)*2-i*.25;i?c.lineTo(x+i,v):c.moveTo(x+i,v);}c.stroke();};
 function desk(x,y,w,col='#f5d6a8'){R(x,y,w,23,OL);R(x+1,y+1,w-2,14,col);R(x+1,y+1,w-2,1,'#fff0d4');R(x+1,y+15,w-2,7,'#d9a875');R(x+4,y+17,w-8,1,'#c4935f');R(x+3,y+23,3,3,OL);R(x+w-6,y+23,3,3,OL);R(x+2,y+26,w-4,1,'rgba(58,45,63,.18)');}
 const kb=(x,y)=>{box(x,y,14,5,'#fff');R(x+2,y+2,10,1,'#d0c8d6');};
@@ -95,7 +94,7 @@ const PROPS=[
  {y:7*T+12,d(){desk(6*T,6*T+4,48,'#f3d0dc');monitor(6*T+7,5*T+6,26,16,scrPred);kb(6*T+14,7*T+6);papers(7*T+13,7*T+11,1+S.trayP);sprout(6*T+1,6*T+7);}},
  {y:7*T+13,d(){desk(10*T,6*T+4,48,'#d7e8f7');monitor(10*T+4,5*T+7,20,14,scrWatch);monitor(11*T+9,5*T+9,17,12,scrWatch);kb(10*T+17,7*T+6);box(12*T+3,7*T+4,9,8,'#fff4c9');R(12*T+5,7*T+7,5,1,'#d9534f');}},
  {y:7*T+14,d(){desk(14*T,6*T+4,48,'#fff0b8');monitor(14*T+7,5*T+6,26,16,scrW);kb(14*T+14,7*T+6);R(16*T+4,6*T+4,1,10,'#6a5e7d');R(16*T+1,6*T+3,7,2,'#e8799a');R(16*T+3+Math.sin(S.t*6)*3,6*T+1,3,2,'#fff');}},
- {y:13*T+11,d(){R(6*T,12*T+4,6*T,26,OL);R(6*T+1,12*T+5,6*T-2,18,'#ffe2b5');R(6*T+1,12*T+5,6*T-2,1,'#fff3d8');R(6*T+1,12*T+23,6*T-2,6,'#d9a875');R(6*T+3,12*T+30,3,3,OL);R(12*T-6,12*T+30,3,3,OL);monitor(6*T+6,10*T+15,35,24,scrGrid);monitor(9*T+6,10*T+15,35,24,scrGrid);R(8*T+11,12*T+9,10,12,'#d9cfc2');kb(7*T+1,13*T+7);kb(10*T+1,13*T+7);papers(10*T+3,13*T+12,S.trayF);sprout(6*T+2,13*T);}},
+ {y:13*T+11,d(){R(6*T,12*T+4,6*T,26,OL);R(6*T+1,12*T+5,6*T-2,18,'#ffe2b5');R(6*T+1,12*T+5,6*T-2,1,'#fff3d8');R(6*T+1,12*T+23,6*T-2,6,'#d9a875');R(6*T+3,12*T+30,3,3,OL);R(12*T-6,12*T+30,3,3,OL);monitor(6*T+6,10*T+15,35,24,(x,y,w,h)=>scrGrid(x,y,w,h,FW.filled||0));monitor(9*T+6,10*T+15,35,24,(x,y,w,h)=>scrGrid(x,y,w,h,FE.filled||0));R(8*T+11,12*T+9,10,12,'#d9cfc2');kb(7*T+1,13*T+7);kb(10*T+1,13*T+7);papers(10*T+3,13*T+12,S.trayF);sprout(6*T+2,13*T);}},
  {y:13*T+14,d(){box(13*T+1,12*T+1,30,28,'#fff5ea');R(13*T+3,12*T+5,26,4,'#5a4d63');R(13*T+22,12*T+13,5,2,S.printing?'#6ff5ac':'#c9bfd0');R(13*T+1,14*T-5,30,4,'#d8cbc0');if(S.printing){const p=(S.t*2)%1;R(13*T+7,12*T+9+p*6,16,6-p*2,'#fff');}else R(13*T+7,12*T+10,16,3,'#fff');}},
  {y:5*T-1,d(){ // counter pantry
    R(18*T,3*T,7*T,31,OL);R(18*T,3*T+1,7*T,8,'#fff8ec');R(18*T,3*T+9,7*T,21,'#f7b7c6');for(let x=18;x<25;x++){R(x*T,3*T+10,1,19,'#e596ab');ell(x*T+8,3*T+19,1,1,'#fff');}
@@ -150,8 +149,10 @@ const watchLevel=()=>S.waste==='lewat'||S.lost==='lewat'?2:S.waste==='waspada'||
 const hourNow=()=>{if(S.hour!=null)return S.hour;const d=new Date(Date.now()+7*3600000);return d.getUTCHours()+d.getUTCMinutes()/60;};
 const asleep=()=>{const h=hourNow();return h>=22||h<7;};
 const hhmm=h=>String(Math.floor(h)).padStart(2,'0')+'.'+String(Math.floor((h%1)*60)).padStart(2,'0');
-function say(n,text,sec=3.2){n.say=text;n.sayT=sec;}
-function chat(n,arr,prob=1){if(S.chatCd>0||Math.random()>prob||n.sayT>0)return false;say(n,pick(arr));S.chatCd=rnd(4.5,7.5);return true;}
+function say(n,text,sec=3.2){if(n.ff>0)return;n.say=text;n.sayT=sec;}
+const seeded=str=>{let h=2166136261;for(let i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);let a=h>>>0;return ()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};};
+const nr=n=>n.rng||Math.random,nrnd=(n,a,b)=>a+nr(n)()*(b-a),npick=(n,x)=>x[Math.floor(nr(n)()*x.length)];
+function chat(n,arr,prob=1){const a=nr(n)(),b=nr(n)();if(S.chatCd>0||a>prob||n.sayT>0||n.ff>0)return false;say(n,arr[Math.floor(b*arr.length)]);S.chatCd=3.5;return true;}
 const mood=(n,m,sec=2.4)=>{n.mood=m;n.moodT=sec;};
 
 // ===== Obrolan =====
@@ -163,13 +164,13 @@ const WC_LINES=['Ada orang!','Jangan diketuk!','Ide terbaik lahir di sini.'];
 // ===== Mesin tugas =====
 const CANCEL=Symbol('cancel');let epoch=0;const waiters=[];
 function cancel(n){n.gen++;const w=n.wait;n.wait=null;n.path=[];n.p=null;n.fast=false;n.slot=null;n.slot2=null;n.carry=null;if(w)w.reject(CANCEL);}
-const timer=(n,sec,tick)=>new Promise((resolve,reject)=>{n.wait={resolve,reject,left:sec,total:sec,tick};});
-const walk=(n,cell,fast=false)=>new Promise((resolve,reject)=>{n.slot=null;n.slot2=null;const p=route([Math.round(n.x),Math.round(n.y)],cell);if(!p.length){resolve();return;}n.path=p;n.fast=fast;n.pose='walk';n.wait={resolve,reject,walk:true};});
+const timer=(n,sec,tick)=>{const total=sec;if(n.ff>0){const u=Math.min(n.ff,sec);n.ff-=u;sec-=u;if(sec<=.001){tick?.(1);return Promise.resolve();}}return new Promise((resolve,reject)=>{n.wait={resolve,reject,left:sec,total,tick};});};
+const walk=(n,cell,fast=false)=>new Promise((resolve,reject)=>{n.slot=null;n.slot2=null;let p=route([Math.round(n.x),Math.round(n.y)],cell);if(!p.length){resolve();return;}if(n.ff>0){const sp=(fast?5.2:3)*(n.spd||1),used=Math.min(Math.floor(n.ff*sp),p.length);if(used>0){const q=p[used-1];n.x=q[0];n.y=q[1];n.ff=Math.max(0,n.ff-used/sp);p=p.slice(used);}if(!p.length){n.pose='stand';resolve();return;}n.ff=0;}n.path=p;n.fast=fast;n.pose='walk';n.wait={resolve,reject,walk:true};});
 const until=f=>new Promise(r=>waiters.push({f,r}));
 const held=n=>n.held>S.t;const alive=e=>e===epoch;
-async function sitDown(n){await walk(n,n.seat);n.pose='sit';n.face=1;if(n.food?.where==='hand'){n.food.where='desk';n.sipT=0;n.food.cd=rnd(3,6);}}
-function give(n,kind){const left=rnd(36,50);n.food={kind,left,total:left,where:'hand',cd:rnd(2.5,4)};}
-function foodTick(n,dt){const f=n.food;if(!f)return;f.left-=dt;n.sipT=Math.max(0,(n.sipT||0)-dt);if(f.left<=0){n.food=null;n.sipT=0;if(n.pose==='sit'&&f.kind==='cup')chat(n,VOICE[n.id].empty,.3);return;}f.cd-=dt;if(f.cd<=0&&!n.carry&&n.pose!=='toilet'&&(f.where==='hand'||n.pose==='sit')){n.sipT=1.3;f.cd=rnd(5,9);}}
+async function sitDown(n){await walk(n,n.seat);n.pose='sit';n.face=1;if(n.food?.where==='hand'){n.food.where='desk';n.sipT=0;n.food.cd=4;}}
+function give(n,kind){const left=nrnd(n,36,50);n.food={kind,left,total:left,where:'hand',cd:3};}
+function foodTick(n,dt){const f=n.food;if(!f)return;f.left-=dt;n.sipT=Math.max(0,(n.sipT||0)-dt);if(f.left<=0){n.food=null;n.sipT=0;if(n.pose==='sit'&&f.kind==='cup')chat(n,VOICE[n.id].empty,.3);return;}f.cd-=dt;if(f.cd<=0&&!n.carry&&n.pose!=='toilet'&&(f.where==='hand'||n.pose==='sit')){n.sipT=1.3;f.cd=5+(f.left*7)%4;}}
 async function standAt(n,cell,face=1,fast=false){await walk(n,cell,fast);n.pose='stand';n.face=face;}
 async function doing(n,label,sec,action='type',tick){n.task=label;n.action=action;await timer(n,sec,p=>{n.p=p;tick?.(p);});n.p=null;}
 function assign(n){n.busy=true;cancel(n);}
@@ -181,7 +182,7 @@ async function wcVisit(n,sec){
  const V=VOICE[n.id];if(!S.wcQ.includes(n)&&S.wcQ.length>WC_Q.length)return false;S.wcQ.push(n);n.task='Ke toilet';n.action='break';chat(n,V.want.toilet,n===FC?1:.7);let complained=false;
  try{
   while(S.wcQ[0]!==n){const i=S.wcQ.indexOf(n)-1;n.task=`Antre toilet (${i+1})`;await standAt(n,WC_Q[i],0);if(!complained&&i===0){complained=true;chat(n,WC_WAIT,.75);}await timer(n,.35);}
-  n.task='Ke toilet';await walk(n,SPOT.toilet[0]);n.slot=key(SPOT.toilet[0][0],SPOT.toilet[0][1]);n.pose='toilet';n.face=0;n.action='wc';n.task='Di toilet';if(Math.random()<.55)say(n,pick(V.wc),2.2);await timer(n,sec||rnd(6,9));n.pose='stand';
+  n.task='Ke toilet';await walk(n,SPOT.toilet[0]);n.slot=key(SPOT.toilet[0][0],SPOT.toilet[0][1]);n.pose='toilet';n.face=0;n.action='wc';n.task='Di toilet';if(nr(n)()<.55)say(n,npick(n,V.wc),2.2);await timer(n,sec||nrnd(n,6,9));n.pose='stand';
  }finally{S.wcQ=S.wcQ.filter(x=>x!==n);n.slot=null;}
  return true;
 }
@@ -189,7 +190,7 @@ async function napVisit(n,sec){
  if(n===PAW)return activity(n,'sofa',sec);
  const V=VOICE[n.id],seats=SPOT.sofa.map(q=>key(q[0],q[1])),taken=()=>NPC.some(o=>o!==n&&(seats.includes(o.slot)||seats.includes(o.slot2)));
  if(taken())return activity(n,'sofa',sec);n.task='Tidur di sofa';n.action='break';chat(n,V.want.sofa,n===FC?1:.7);await walk(n,[19,12]);if(taken())return activity(n,'sofa',sec);
- n.slot=seats[0];n.slot2=seats[1];n.pose='nap';n.face=0;n.task='Tidur di sofa';await timer(n,sec||rnd(13,19));n.slot=null;n.slot2=null;n.pose='stand';return true;
+ n.slot=seats[0];n.slot2=seats[1];n.pose='nap';n.face=0;n.task='Tidur di sofa';await timer(n,sec||nrnd(n,13,19));n.slot=null;n.slot2=null;n.pose='stand';return true;
 }
 async function occupy(n,cell,pose,face){await walk(n,cell);n.slot=key(cell[0],cell[1]);n.pose=pose;n.face=face;}
 const LABEL={kopi:'Bikin kopi',snack:'Ambil snack',makan:'Makan',sofa:'Duduk di sofa',nap:'Tidur di sofa',toilet:'Ke toilet'};
@@ -199,51 +200,44 @@ async function activity(n,a,sec){
  n.task=LABEL[a];n.action='break';const V=VOICE[n.id];chat(n,V.want[a],n===FC?1:.7);
  if(a==='kopi'){await occupy(n,cell,'stand',1);S.brew++;try{await doing(n,'Menyeduh kopi',3,'reach');}finally{S.brew=Math.max(0,S.brew-1);}give(n,'cup');n.pose='sip';n.face=0;n.action='sip';n.task='Mencicipi kopi';n.sipT=1.8;chat(n,V.enjoy.kopi,.8);await timer(n,2.2);n.task='Membawa kopi';}
  if(a==='snack'){await occupy(n,cell,'stand',1);await doing(n,'Memilih snack',1.4,'reach');give(n,'snack');n.pose='eat';n.face=0;n.action='eat';n.task='Mencicipi snack';n.sipT=1.8;chat(n,V.enjoy.snack,.8);await timer(n,2.2);n.task='Membawa snack';}
- if(a==='makan'){await occupy(n,cell,'stand',1);S.micro++;try{await doing(n,'Menghangatkan bekal',2.4,'reach');}finally{S.micro=Math.max(0,S.micro-1);}n.carry='bento';const t=free(n,SPOT.eat);if(t){const f=t[0]<20?3:2;await occupy(n,t,'eat',f);n.action='eat';n.task='Makan bekal';mood(n,'heart');chat(n,V.enjoy.makan,.8);await timer(n,sec||rnd(7,10));}n.carry=null;}
- if(a==='sofa'){await occupy(n,cell,'sofa',0);n.action='rest';n.task='Duduk di sofa';mood(n,'note',3);chat(n,V.enjoy.sofa,.6);await timer(n,sec||rnd(8,13));}
- if(a==='toilet'){await occupy(n,cell,'toilet',0);n.action='wc';n.task='Di toilet';if(Math.random()<.55)say(n,pick(V.wc),2.2);await timer(n,sec||rnd(5,7));n.pose='stand';}
+ if(a==='makan'){await occupy(n,cell,'stand',1);S.micro++;try{await doing(n,'Menghangatkan bekal',2.4,'reach');}finally{S.micro=Math.max(0,S.micro-1);}n.carry='bento';const t=free(n,SPOT.eat);if(t){const f=t[0]<20?3:2;await occupy(n,t,'eat',f);n.action='eat';n.task='Makan bekal';mood(n,'heart');chat(n,V.enjoy.makan,.8);await timer(n,sec||nrnd(n,7,10));}n.carry=null;}
+ if(a==='sofa'){await occupy(n,cell,'sofa',0);n.action='rest';n.task='Duduk di sofa';mood(n,'note',3);chat(n,V.enjoy.sofa,.6);await timer(n,sec||nrnd(n,8,13));}
+ if(a==='toilet'){await occupy(n,cell,'toilet',0);n.action='wc';n.task='Di toilet';if(nr(n)()<.55)say(n,npick(n,V.wc),2.2);await timer(n,sec||nrnd(n,5,7));n.pose='stand';}
  n.slot=null;return true;
 }
-async function idle(n){if(isF(n)&&(!n.present||n.leaving))return;const g=n.gen;try{
- if(key(Math.round(n.x),Math.round(n.y))!==key(n.seat[0],n.seat[1])){n.task='Kembali ke meja';n.action='walk';}
- await sitDown(n);
- while(g===n.gen){await doing(n,pick(IDLE[n.id]),rnd(8,13),'type');
-  if(Math.random()<.2){await activity(n,pick(n.food?['toilet']:['kopi','kopi','snack','toilet']));await sitDown(n);}
- }}catch(e){if(e!==CANCEL)throw e;}}
-async function fStep(e){
- for(;;){
-  if(!alive(e))throw CANCEL;const team=[FW,FE].filter(n=>n.present&&!n.leaving);
-  if(!team.length){S.filled=0;S.stepP=1;await new Promise(r=>waiters.push({f:()=>{S._w=(S._w||0)+1;if(S._w>40){S._w=0;return true;}return false;},r}));return;}
-  if(team.some(held)){await until(()=>!team.some(held)||team.some(n=>!n.present||n.leaving)||!alive(e));continue;}
-  team.forEach(assign);
-  try{
-   if(S.filled<1)await Promise.all(team.map((n,i)=>(async()=>{await sitDown(n);await doing(n,team.length>1?`Mengisi outlet ${i?'15-28':'1-14'}`:'Mengisi rencana 28 outlet',team.length>1?8:11,'type',p=>{S.filled=Math.max(S.filled,p);S.stepP=S.filled;});})()));
-   S.filled=1;const lead=team[0];team.slice(1).forEach(release);lead.carry='folder';lead.task='Menyerahkan ke Pemantau';await standAt(lead,PLACE.toWatch,2);lead.carry=null;S.trayF=0;mood(lead,'star');release(lead);return;
-  }catch(x){if(x!==CANCEL||!alive(e))throw x;team.forEach(n=>{n.busy=false;});}
- }
+const SLOT=42;
+const speak=(n,list)=>{const a=(Array.isArray(list)?list:[list]).filter(Boolean),x=a.length?a[Math.floor(nr(n)()*a.length)]:'';if(x&&!(n.ff>0))say(n,x,4.2);};
+function planCount(){const c=window.ForecastPlanCloud;if(!c?.records)return null;const t=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date()),b=new Date(Date.parse(t+'T00:00:00Z')+864e5).toISOString().slice(0,10);return new Set(c.records.filter(r=>r.date===b).map(r=>r.outlet)).size;}
+const weatherLine=()=>S.weatherReady?TODAY_W[S.weather]:'Radar cuaca lagi dibaca.',tomorrowLine=()=>S.weatherTomorrow?TOMORROW_W[S.weatherTomorrow]:weatherLine();
+const WORK={
+ esb:[async n=>{speak(n,'Lagi cek data ESB terbaru.');await standAt(n,PLACE.rack,1);S.pulling=true;try{await doing(n,'Memeriksa data 28 outlet',9,'reach',p=>{S.pulled=Math.floor(p*28);});}finally{S.pulling=false;}S.pulled=28;speak(n,S.lastPull?`Rekap data jam ${S.lastPull} sudah selesai.`:'Belum ada rekap baru hari ini.');n.carry='crate';n.task='Mengantar data';await standAt(n,PLACE.toPred,2,true);n.carry=null;S.trayP=Math.min(3,S.trayP+1);await timer(n,.8);},
+  async n=>{await sitDown(n);await doing(n,'Memeriksa log server',7);speak(n,realLines(n));await doing(n,'Merapikan kabel data',7);}],
+ pawang:[async n=>{await standAt(n,PLACE.radar,1);await doing(n,'Membaca radar hujan',8,'point',p=>{S.radar=p;});speak(n,weatherLine());await sitDown(n);await doing(n,'Mencatat peluang hujan',6);speak(n,tomorrowLine());},
+  async n=>{await sitDown(n);await doing(n,'Memantau awan',8);speak(n,realLines(n));await doing(n,'Mencatat suhu',6);}],
+ pred:[async n=>{await standAt(n,PLACE.white,1);await doing(n,'Menggambar tren',8,'write',p=>{S.chart=p;});speak(n,'Tren penjualan sudah kugambar.');await sitDown(n);S.calcing=true;try{await doing(n,'Menghitung prediksi',7,'type',p=>{S.calc=p;});}finally{S.calcing=false;}S.calc=1;speak(n,S.modelReady?'Prediksi besok sudah siap.':'Model malam belum selesai.');},
+  async n=>{await standAt(n,PLACE.printer,1);S.printing++;try{await doing(n,'Mencetak hasil',3,'stand');}finally{S.printing=Math.max(0,S.printing-1);}n.carry='paper';n.task='Menaruh ke meja forecaster';await standAt(n,PLACE.toFc,2);n.carry=null;S.trayF=3;speak(n,realLines(n).concat('Hasil prediksi kutaruh di meja forecaster.'));await timer(n,1);}],
+ watch:[async n=>{speak(n,'Saya cek waste dan lost dulu.');await standAt(n,PLACE.board,1);S.auditing=true;try{await doing(n,'Mengecek waste & lost',9,'point',p=>{S.audit=p;});}finally{S.auditing=false;}S.audit=1;S.auditDone=true;speak(n,realLines(n));mood(n,watchLevel()?'alert':'star',3);await timer(n,1.5);},
+  async n=>{await sitDown(n);await doing(n,'Memantau layar outlet',8);speak(n,realLines(n));await doing(n,'Mencatat temuan',6);}],
+};
+const forecasterWork=[async n=>{await sitDown(n);n.filled=0;await doing(n,'Menyusun rencana kirim',12,'type',p=>{n.filled=p;});n.filled=1;const c=planCount();speak(n,c==null?realLines(n):`Rencana besok sudah ${c} dari 28 outlet.`);await doing(n,'Mengecek ulang rencana',5);},
+ async n=>{await sitDown(n);await doing(n,'Mengecek selisih stok',8);speak(n,realLines(n));await doing(n,'Meninjau rencana besok',6);}];
+async function runSlot(n,g){
+ try{
+  const roll=nr(n)(),jobs=isF(n)?forecasterWork:WORK[n.id],job=jobs[Math.floor(nr(n)()*jobs.length)],brk=npick(n,n.food?['sofa','nap','toilet']:['kopi','kopi','snack','makan','sofa','nap','toilet']);
+  if(roll<.72)await job(n);else{await activity(n,brk);await sitDown(n);}
+  await sitDown(n);while(g===n.gen)await doing(n,npick(n,IDLE[n.id]),8,'type');
+ }catch(e){if(e!==CANCEL)throw e;}
 }
-const setStep=(i,p=0)=>{S.step=i;S.stepP=p;};
-async function cycle(){const e=epoch;try{for(;;){
- S.kick=false;S.pulled=0;S.chart=0;S.radar=0;S.calc=0;S.filled=0;S.audit=0;S.trayP=0;
- setStep(0);assign(ESB);await standAt(ESB,PLACE.rack,1);await doing(ESB,'Menarik data 28 outlet',8,'reach',p=>{S.pulled=Math.floor(p*28);S.stepP=p;});S.pulled=28;ESB.carry='crate';ESB.task='Mengantar data';await standAt(ESB,PLACE.toPred,2,true);ESB.carry=null;S.trayP++;say(ESB,'Data masuk, gas!',2.4);mood(ESB,'star');await timer(ESB,.7);release(ESB);
- setStep(1);assign(PAW);await standAt(PAW,PLACE.radar,1);await doing(PAW,'Membaca radar hujan',4.5,'point',p=>{S.radar=p*.6;S.stepP=p*.6;});await sitDown(PAW);await doing(PAW,'Mencatat cuaca',2.5,'type',p=>{S.radar=.6+p*.4;S.stepP=.6+p*.4;});PAW.carry='note';PAW.task='Mengantar laporan';await standAt(PAW,PLACE.toPred,2);PAW.carry=null;S.trayP++;say(PAW,S.weather==='hujan'?'Hujan kupanggil, siap-siap!':S.weather==='mendung'?'Awannya lagi galau.':'Langit aman, aku yang atur.',2.6);await timer(PAW,.7);release(PAW);
- setStep(2);assign(PRED);await standAt(PRED,PLACE.white,1);await doing(PRED,'Menggambar tren',6,'write',p=>{S.chart=p;S.stepP=p*.5;});await sitDown(PRED);await doing(PRED,'Menghitung prediksi',5,'type',p=>{S.calc=p;S.stepP=.5+p*.35;});PRED.task='Mencetak hasil';await standAt(PRED,PLACE.printer,1);S.printing=1;await doing(PRED,'Mencetak hasil',2.2,'stand',p=>{S.stepP=.85+p*.15;});S.printing=0;PRED.carry='paper';PRED.task='Mengantar prediksi';await standAt(PRED,PLACE.toFc,2);PRED.carry=null;S.trayF=3;say(PRED,'Sudah kuhitung. Jangan diubah.',2.6);await timer(PRED,.7);release(PRED);
- setStep(3);await fStep(e);
- setStep(4);assign(WAT);await standAt(WAT,PLACE.board,1);await doing(WAT,'Mengecek waste & lost',7,'point',p=>{S.audit=p;S.stepP=p;});S.audit=1;const lv=watchLevel(),who=(S.waste==='lewat'?S.wasteOutlets[0]:S.lostOutlets[0])||S.flagNames[0]||'outlet terkait';if(lv===2)say(WAT,(S.waste==='lewat'?'Waste':'Lost')+' lewat batas! Cek '+who,4.2);else if(lv===1)say(WAT,(S.waste==='waspada'?'Waste':'Lost')+' mulai naik. Saya catat.',3.6);else say(WAT,'Aman. Untuk sekarang.',3);mood(WAT,lv?'alert':'star',3);await timer(WAT,1.8);release(WAT);
- setStep(5);const opts=['kopi','snack','makan','sofa','nap','toilet','toilet'].sort(()=>Math.random()-.5),crew=[ESB,PAW,PRED,WAT].sort(()=>Math.random()-.5).slice(0,3);[FW,FE].forEach(n=>{if(n.present&&!n.leaving&&!held(n))crew.push(n);});const start=S.t;let left=crew.length;
- crew.forEach((n,i)=>{(async()=>{assign(n);try{await activity(n,opts[i%opts.length]);left--;release(n);}catch(x){left--;n.busy=false;n.carry=null;if(x!==CANCEL)throw x;}})();});
- setTimeout(()=>{},0);await until(()=>left<=0||S.kick||!alive(e));S.stepP=1;if(!alive(e))throw CANCEL;
- if(S.kick)crew.forEach(n=>{if(n.busy){cancel(n);n.busy=false;n.carry=null;n.slot=null;idle(n);}});else await until(()=>S.t-start>2||!alive(e));
- if(!alive(e))throw CANCEL;
-}}catch(x){if(x!==CANCEL)console.error(x);}}
-function startDay(){epoch++;NPC.filter(n=>!isF(n)||(n.present&&!n.leaving)).forEach(n=>{cancel(n);n.busy=false;n.carry=null;n.say='';n.slot=null;if(n!==ESB)idle(n);});cycle();}
-function goSleep(){epoch++;S.step=-1;S.printing=0;S.brew=0;S.micro=0;S.wcQ=[];const place={pred:[19,12]};NPC.filter(n=>!isF(n)).forEach(n=>{cancel(n);n.busy=false;n.carry=null;n.slot=null;n.held=0;n.food=null;n.sipT=0;n.task='Menuju tempat tidur';n.action='sleep';const cell=place[n.id]||n.seat,sofa=!!place[n.id];(async()=>{try{await walk(n,cell);n.pose=sofa?'nap':'sleepDesk';n.face=sofa?0:1;if(sofa){n.slot=key(18,12);n.slot2=key(20,12);}n.task='Tidur';}catch(e){if(e!==CANCEL)throw e;}})();});}
-
+function startSlot(n,k,late,catchUp){cancel(n);n.busy=false;n.task='Kembali ke meja';n.action='walk';n.rng=seeded(`${n.id}|${k}`);n.ff=catchUp&&late>1?late:0;runSlot(n,n.gen);}
+function slotTick(){const now=Date.now()/1000;NPC.forEach((n,i)=>{if((isF(n)&&(!n.present||n.leaving))||held(n))return;const t=now+i*7,k=Math.floor(t/SLOT),late=t%SLOT;if(n.slotK!==k){const catchUp=n.slotK===undefined&&!n.noFF;n.slotK=k;n.noFF=false;startSlot(n,k,late,catchUp);}});}
+function idle(n){n.slotK=null;n.noFF=true;}
+function startDay(){epoch++;NPC.filter(n=>!isF(n)||(n.present&&!n.leaving)).forEach(n=>{cancel(n);n.busy=false;n.carry=null;n.say='';n.slot=null;n.slotK=undefined;n.noFF=false;});}
+function goSleep(){epoch++;S.pulling=false;S.auditing=false;S.calcing=false;S.printing=0;S.brew=0;S.micro=0;S.wcQ=[];const place={pred:[19,12]};NPC.filter(n=>!isF(n)).forEach(n=>{cancel(n);n.slotK=null;n.ff=0;n.busy=false;n.carry=null;n.slot=null;n.held=0;n.food=null;n.sipT=0;n.task='Menuju tempat tidur';n.action='sleep';const cell=place[n.id]||n.seat,sofa=!!place[n.id];(async()=>{try{await walk(n,cell);n.pose=sofa?'nap':'sleepDesk';n.face=sofa?0:1;if(sofa){n.slot=key(18,12);n.slot2=key(20,12);}n.task='Tidur';}catch(e){if(e!==CANCEL)throw e;}})();});}
 
 const TODAY_W={cerah:'Hari ini cerah, aman.',mendung:'Hari ini cukup mendung.',hujan:'Hari ini berpotensi hujan.'},TOMORROW_W={cerah:'Besok kelihatannya cerah.',mendung:'Besok kayaknya mendung.',hujan:'Besok kayaknya hujan.'};
 function realLines(n){
  const a=[];
- if(n===ESB){if(S.step===0&&S.pulled<28)a.push('Data ESB lagi diproses.');if(S.lastPull)a.push(`Rekap data jam ${S.lastPull} sudah selesai.`,`Data terakhir masuk jam ${S.lastPull}.`);}
+ if(n===ESB){if(S.pulling)a.push('Data ESB lagi diproses.');if(S.lastPull)a.push(`Rekap data jam ${S.lastPull} sudah selesai.`,`Data terakhir masuk jam ${S.lastPull}.`);}
  if(n===PAW&&S.weatherReady){a.push(TODAY_W[S.weather]);if(S.weatherTomorrow)a.push(TOMORROW_W[S.weatherTomorrow]);}
  if(n===WAT&&S.statusReady){
   a.push(S.waste==='lewat'?'Waste sudah lewat batas.':S.waste==='waspada'?'Waste mulai mendekati batas.':'Waste masih aman.');
@@ -254,9 +248,8 @@ function realLines(n){
  }
  if(n===PRED&&S.modelReady)a.push('Prediksi besok sudah siap.','Model semalam sudah diperbarui.');
  if(isF(n)&&n.present&&!n.leaving){const h=SHIFT[shiftOf(n)];if(h)a.push(`Shift saya sampai jam ${clockText(h[1])}.`);if(S.statusReady&&S.waste==='lewat')a.push('Waste tinggi, kirimannya hati-hati.');if(S.weatherTomorrow==='hujan')a.push('Besok hujan, rencananya dijaga.');}
- return a.filter(x=>x!==n.lastReal);
+ return a;
 }
-function realTick(dt){S.realCd-=dt;if(S.realCd>0)return;const c=NPC.filter(n=>n.pose!=='away'&&n.pose!=='toilet'&&n.pose!=='nap'&&!n.sayT&&!n.fast&&realLines(n).length);if(!c.length){S.realCd=2;return;}const n=pick(c),t=pick(realLines(n));n.lastReal=t;say(n,t,4);S.chatCd=Math.max(S.chatCd,3);S.realCd=rnd(10,16);}
 function syncReal(){
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date()),sales=window.PcsPanels?.data?.().sales,live=window.ForecastLiveIntraday,opts=[live?.date===today?live.asOf:null,sales?.intraday?.date===today?sales.intraday.asOf:null].filter(Boolean).sort();
  const at=opts.at(-1);S.lastPull=at?new Date(at).toLocaleTimeString('id-ID',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit'}):null;
@@ -269,11 +262,11 @@ async function syncWeather(){
  if(S.weatherBusy||S.t-(S.weatherAt??-9999)<1800)return;const ids=window.PcsPanels?.data?.().sales?.outletIds;if(!ids?.length||!window.WeatherForecast)return;S.weatherBusy=true;
  try{const t=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date()),b=new Date(Date.parse(t+'T00:00:00Z')+864e5).toISOString().slice(0,10),map=await window.WeatherForecast.getNetwork(ids,t,b),p=window.ForecastSettings?.get?.().weather||{},rain=p.highRiskProb||60,cloud=p.rainLabelProb||45,avg=day=>{const v=[...map.values()].map(w=>w.error?null:w.days?.find(x=>x.date===day)?.probability).filter(Number.isFinite);return v.length?v.reduce((x,y)=>x+y,0)/v.length:null;},kind=v=>v==null?null:v>=rain?'hujan':v>=cloud?'mendung':'cerah',a=kind(avg(t)),c=kind(avg(b));if(a){S.weather=a;S.weatherTomorrow=c;S.weatherReady=true;S.weatherAt=S.t;}}catch{}finally{S.weatherBusy=false;}
 }
-window.addEventListener('forecast-intraday',()=>{const before=S.lastPull;syncReal();if(S.lastPull&&before&&S.lastPull!==before&&!asleep())S.kick=true;});
+window.addEventListener('forecast-intraday',()=>{const before=S.lastPull;syncReal();if(S.lastPull&&before&&S.lastPull!==before&&!asleep()&&ESB.pose!=='toilet')say(ESB,`Data jam ${S.lastPull} baru masuk!`,4.2);});
 window.addEventListener('forecast-office-data',syncReal);
 window.addEventListener('pcs-data-loaded',()=>{syncReal();syncWeather();});
 let dutyReady=false;
-function arrive(n){n.present=true;n.leaving=false;n.x=4;n.y=15;n.path=[];n.pose='stand';n.face=1;n.food=null;n.task='Baru datang';say(n,'Halo, masuk shift!',2.4);idle(n);}
+function arrive(n){n.present=true;n.leaving=false;n.x=4;n.y=15;n.path=[];n.pose='stand';n.face=1;n.food=null;n.task='Baru datang';n.ff=0;say(n,'Halo, masuk shift!',2.4);idle(n);}
 function leave(n){n.leaving=true;cancel(n);n.busy=false;n.held=0;n.food=null;n.task='Pulang';say(n,'Duluan ya!',2.2);(async()=>{try{await walk(n,[4,15]);}catch(e){if(e!==CANCEL)throw e;}n.present=false;n.leaving=false;n.pose='away';n.sayT=0;if(pickFC()&&S.sel===n.id)S.sel=FC.id;})();}
 function dutyTick(){if(!officeReady){for(const n of [FW,FE]){n.present=false;n.pose='away';n.x=4;n.y=15;}return;}for(const n of [FW,FE]){const want=onShift(n);if(!dutyReady){if(want){n.present=true;n.pose='sit';n.face=1;n.x=n.seat[0];n.y=n.seat[1];}else{n.present=false;n.pose='away';n.x=4;n.y=15;}}else if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!dutyReady){dutyReady=true;pickFC();}}
 let wasSleep=null;
@@ -283,9 +276,8 @@ function update(dt){
   if(n.path.length){const [tx,ty]=n.path[0],sp=(n.fast?5.2:3)*(n.spd||1)*dt,dx=tx-n.x,dy=ty-n.y,d=Math.hypot(dx,dy);if(Math.abs(dx)>Math.abs(dy))n.face=dx>0?3:2;else if(dy)n.face=dy>0?0:1;n.walkT+=dt*(n.fast?17:12);if(d<=sp){n.x=tx;n.y=ty;n.path.shift();if(!n.path.length&&n.wait?.walk){const w=n.wait;n.wait=null;n.fast=false;n.pose='stand';w.resolve();}}else{n.x+=dx/d*sp;n.y+=dy/d*sp;}}
   else if(n.wait&&!n.wait.walk){const w=n.wait;w.left-=dt;w.tick?.(clamp(1-w.left/w.total,0,1));if(w.left<=0){n.wait=null;w.resolve();}}
  }
- if(!sl&&S.chatCd<=0&&Math.random()<dt*.05){const pan=NPC.filter(n=>['sip','eat'].includes(n.pose)),o=NPC.filter(n=>!pan.includes(n)&&n.pose!=='toilet'&&n.pose!=='away'&&!n.sayT&&n.x>16);if(pan.length&&o.length)chat(pick(o),REPLY);}
- if(!sl)realTick(dt);
- for(const F of [FW,FE])if(F.held&&!held(F)&&!F.path.length){F.held=0;if(!F.busy&&!sl&&F.present&&!F.leaving)idle(F);}
+ if(!sl)slotTick();
+ for(const F of [FW,FE])if(F.held&&!held(F)&&!F.path.length){F.held=0;if(!sl&&F.present&&!F.leaving)idle(F);}
  for(let i=waiters.length-1;i>=0;i--)if(waiters[i].f()){const w=waiters.splice(i,1)[0];w.r();}
 }
 
@@ -449,7 +441,6 @@ function render(){
 }
 
 // ===== Panel =====
-$('steps').innerHTML=STEPS.map((s,i)=>`<li id="kt-st${i}">${i+1}. ${s}<i></i></li>`).join('');
 $('roster').innerHTML=NPC.map(n=>`<button type="button" data-id="${n.id}"><span class="dot" style="background:${n.color}"></span><b></b><small></small><span class="bar"><i></i></span></button>`).join('');
 $('roster').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.sel=b.dataset.id;const n=by(b.dataset.id);if(isF(n)&&n.present)FC=n;});
 const ACTIONS=[['kopi','☕','Bikin kopi'],['snack','🍩','Ambil snack'],['makan','🍱','Makan'],['sofa','🛋️','Duduk sofa'],['nap','😴','Tidur sofa'],['toilet','🚻','Toilet'],['kerja','💻','Balik kerja']];
@@ -458,22 +449,28 @@ $('dock').addEventListener('click',e=>{const b=e.target.closest('button');if(b)p
 const lv=v=>v==='lewat'?['hot','Lewat ambang']:v==='waspada'?['mid','Mulai banyak']:['ok','Masih aman'];
 function panel(){
  const h=hourNow();$('clock').textContent=hhmm(h);$('phase').textContent=asleep()?'Kantor tidur':h>=19?'Lembur malam':h>=16.5?'Sore':h<11?'Pagi':'Jam kerja';
- STEPS.forEach((_,i)=>{const el=$('st'+i);el.className=S.step>i?'done':S.step===i?'now':'';el.querySelector('i').style.width=S.step===i?S.stepP*100+'%':S.step>i?'100%':'0';});
  [...$('roster').children].forEach((b,i)=>{const n=NPC[i];b.className=S.sel===n.id?'sel':'';b.children[1].textContent=n.name;b.children[2].textContent=n.pose==='away'?shiftText(n):n===FC&&held(n)&&!n.wait?'Sedang kamu arahkan':n.task;b.querySelector('.bar i').style.width=n.p!=null?n.p*100+'%':'0';});
  const [a,b]=S.statusReady?lv(S.waste):['','Belum ada'],[d,e]=S.statusReady?lv(S.lost):['','Belum ada'],w=S.weatherReady?{cerah:'Cerah',mendung:'Mendung',hujan:'Hujan'}[S.weather]:'Memuat';$('stats').innerHTML=`<div class="stat"><span>Tarikan ESB</span><b>${S.lastPull?S.lastPull+' WIB':'Belum'}</b></div><div class="stat"><span>Cuaca</span><b>${w}</b></div><div class="stat"><span>Waste</span><b class="${a}">${b}</b></div><div class="stat"><span>Lost sales</span><b class="${d}">${e}</b></div><div class="stat" style="grid-column:1/-1"><span>Jadwal forecaster</span><b>${esc(FW.short||'Forecaster 1')}: ${shiftText(FW)}<br>${esc(FE.short||'Forecaster 2')}: ${shiftText(FE)}</b></div>`;const on=[FW,FE].filter(n=>n.present&&!n.leaving);$('dockHint').textContent=on.length?`Mengarahkan ${FC.name}${on.length>1?'. Klik forecaster lain untuk berganti.':'.'}`:'Tidak ada forecaster yang sedang bertugas.';
  root.querySelectorAll('#kt-dock button').forEach(x=>x.classList.toggle('on',held(FC)&&FC.task===LABEL[x.dataset.do]));
 }
 
 // ===== Kontrol Admin =====
-function holdFC(sec=25){FC.held=S.t+sec;cancel(FC);FC.carry=null;FC.slot=null;S.sel=FC.id;}
-function fcTo(cell){holdFC();FC.task='Sedang kamu arahkan';FC.action='walk';(async()=>{try{await walk(FC,cell);FC.pose='stand';FC.face=0;}catch(e){if(e!==CANCEL)throw e;}})();}
-function playerDo(a){
- if(!pickFC())return;
- if(asleep()){say(FC,'Zzz... besok aja...',1.6);return;}
- if(a==='kerja'){FC.held=0;cancel(FC);S.sel=FC.id;if(!FC.busy)idle(FC);return;}
+function holdF(f,sec=25){f.held=S.t+sec;cancel(f);f.ff=0;f.carry=null;f.slot=null;}
+function goF(f,cell){holdF(f);f.task='Sedang diarahkan';f.action='walk';(async()=>{try{await walk(f,cell);f.pose='stand';f.face=0;}catch(e){if(e!==CANCEL)throw e;}})();}
+function actF(f,a){
+ if(a==='kerja'){holdF(f,14);f.task='Kembali ke meja';f.action='walk';(async()=>{try{await sitDown(f);await doing(f,'Menyusun rencana kirim',12,'type',p=>{f.filled=p;});}catch(e){if(e!==CANCEL)throw e;}})();return;}
  const list=a==='makan'?SPOT.kulkas:SPOT[a],QUEUE={kopi:[19,6],snack:[21,6],makan:[23,6],sofa:[19,13],toilet:[20,13]};
- holdFC(999);S.chatCd=0;(async()=>{try{if(a!=='toilet'&&a!=='nap'&&!free(FC,list)){FC.task='Antre';FC.action='walk';say(FC,a==='toilet'?'Cepetan dong, kebelet!':'Antre dulu ya.',2.2);await standAt(FC,QUEUE[a],1);while(!free(FC,list))await timer(FC,.4);}await activity(FC,a);FC.pose='stand';FC.face=0;FC.task='Sedang kamu arahkan';FC.held=S.t+7;}catch(e){if(e!==CANCEL)throw e;}})();
+ holdF(f,999);f.rng=seeded(`${f.id}|act|${Math.floor(Date.now()/5000)}`);S.chatCd=0;(async()=>{try{if(a!=='toilet'&&a!=='nap'&&!free(f,list)){f.task='Antre';f.action='walk';say(f,'Antre dulu ya.',2.2);await standAt(f,QUEUE[a],1);while(!free(f,list))await timer(f,.4);}await activity(f,a);f.pose='stand';f.face=0;f.task='Sedang diarahkan';f.held=S.t+7;}catch(e){if(e!==CANCEL)throw e;}})();
 }
+const send=(f,act,x=0,y=0)=>window.ForecastOfficeControl?.send(f.id,act,clamp(Math.round(x),0,25),clamp(Math.round(y),0,16));
+function fcTo(cell){goF(FC,cell);send(FC,'go',cell[0],cell[1]);S.sel=FC.id;}
+function playerDo(a){
+ if(!pickFC())return;S.sel=FC.id;
+ if(asleep()){say(FC,'Zzz... besok aja...',1.6);return;}
+ actF(FC,a);send(FC,a);
+}
+let lastCmd={},stopControl=null;
+function onRemote(c){const f=c.id==='f1'?FW:c.id==='f2'?FE:null;if(!f||c.at<=(lastCmd[c.id]||0))return;lastCmd[c.id]=c.at;if(c.own||Date.now()-c.at>25000||!f.present||f.leaving||asleep())return;if(c.act==='go')goF(f,nearestFree(c.x,c.y));else actF(f,c.act);}
 function cellAt(e){const r=view.getBoundingClientRect();return [(e.clientX-r.left)/r.width*COLS,(e.clientY-r.top)/r.height*ROWS];}
 view.addEventListener('pointerdown',e=>{
  view.focus({preventScroll:true});const [fx,fy]=cellAt(e),hit=NPC.find(n=>n!==FC&&n.pose!=='toilet'&&n.pose!=='away'&&Math.abs(n.x+.5-fx)<.75&&fy>n.y-1.5&&fy<n.y+1.05);if(hit){S.sel=hit.id;if(isF(hit))FC=hit;return;}if(!pickFC())return;
@@ -482,12 +479,12 @@ view.addEventListener('pointerdown',e=>{
  if(x>=18&&x<=20&&y>=10&&y<=12)return playerDo('sofa');if(x>=22&&x<=24&&y>=10&&y<=15)return playerDo('toilet');if(x>=6&&x<=11&&y>=11&&y<=14)return playerDo('kerja');fcTo(nearestFree(x,y));
 });
 const DIR={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};
-window.addEventListener('keydown',e=>{if(document.activeElement!==view)return;const m=DIR[e.key];if(!m)return;e.preventDefault();if(asleep()||!pickFC())return;const cur=FC.path[0]||[Math.round(FC.x),Math.round(FC.y)],nx=[cur[0]+m[0],cur[1]+m[1]];if(blocked.has(key(nx[0],nx[1])))return;if(FC.path.length&&held(FC)&&FC.wait?.walk){FC.held=S.t+25;FC.path=[FC.path[0],nx];return;}fcTo(nx);});
+window.addEventListener('keydown',e=>{if(document.activeElement!==view)return;const m=DIR[e.key];if(!m)return;e.preventDefault();if(asleep()||!pickFC())return;const cur=FC.path[0]||[Math.round(FC.x),Math.round(FC.y)],nx=[cur[0]+m[0],cur[1]+m[1]];if(blocked.has(key(nx[0],nx[1])))return;S.sel=FC.id;clearTimeout(S.keySend);const f=FC;S.keySend=setTimeout(()=>send(f,'go',nx[0],nx[1]),220);if(FC.path.length&&held(FC)&&FC.wait?.walk){FC.held=S.t+25;FC.path=[FC.path[0],nx];return;}goF(FC,nx);});
 
 buildBG();syncReal();let last=performance.now(),pt=0,running=false;
-function frame(now){if(!root.isConnected){running=false;return;}const dt=Math.min(.05,(now-last)/1000);last=now;update(dt);render();pt+=dt;if(pt>.15){pt=0;panel();}requestAnimationFrame(frame);}
+function frame(now){if(!root.isConnected){running=false;stopControl?.();stopControl=null;return;}const dt=Math.min(.05,(now-last)/1000);last=now;update(dt);render();pt+=dt;if(pt>.15){pt=0;panel();}requestAnimationFrame(frame);}
 update(0);panel();
-function start(){syncReal();syncWeather();if(running)return;running=true;last=performance.now();requestAnimationFrame(frame);}
+function start(){syncReal();syncWeather();if(!stopControl)stopControl=window.ForecastOfficeControl?.listen(onRemote)||null;if(running)return;running=true;NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});last=performance.now();requestAnimationFrame(frame);}
 setInterval(()=>{if(root.isConnected){syncReal();syncWeather();}},60000);
 return {root,start};
 }

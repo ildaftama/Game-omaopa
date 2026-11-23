@@ -213,6 +213,18 @@ match /forecastBriefs/{key} {
   allow create, update: if forecastBrief(request.resource.data, key);
   allow delete: if false;
 }
+// Kantor Mini: arahan terakhir untuk karakter forecaster, supaya gerakannya sama di semua layar.
+match /officeState/{id} {
+  allow read: if forecastPlanner();
+  allow create, update: if forecastPlanner() && id in ['f1','f2']
+    && request.resource.data.keys().hasOnly(['act','x','y','at','by','cid'])
+    && request.resource.data.act in ['go','kopi','snack','makan','sofa','nap','toilet','kerja']
+    && request.resource.data.x is int && request.resource.data.x >= 0 && request.resource.data.x <= 25
+    && request.resource.data.y is int && request.resource.data.y >= 0 && request.resource.data.y <= 16
+    && request.resource.data.at == request.time && request.resource.data.by == request.auth.uid
+    && request.resource.data.cid is string && request.resource.data.cid.size() <= 12;
+  allow delete: if false;
+}
 // OPSIONAL -- hanya tambahkan kalau owner SETUJU akun sinkronisasi forecast (FIREBASE_SYNC_
 // EMAIL, sudah forecastManager() lewat staff/{uid}.super atau .master) boleh MEMBACA collection
 // "users" (database member: nama, telepon, tanggal lahir, umur, gender, homeOutlet, dll --
