@@ -148,6 +148,21 @@ window.ForecastSettings=(()=>{
  function numberField([k,label,unit,min,max,step,hint],group,value,dis){
   return `<label class="fs-num">${esc(label)}<span class="fs-num-input"><input type="number" data-pref="${group}:${k}" value="${esc(value)}" min="${min}" max="${max}" step="${step}" ${dis}><em>${esc(unit)}</em></span>${hint?`<small>${esc(hint)}</small>`:''}</label>`;
  }
+ // Link jadwal Kantor Mini disimpan di dokumen privat, bukan settings/forecastSources yang bisa dibaca publik.
+ let officeDraft=null,officeStatus='';
+ function officeLinkCard(){
+  if(!isMaster())return '';const d=window.ForecastOfficeData,url=d?.sheetId?`https://docs.google.com/spreadsheets/d/${d.sheetId}/edit`:'',days=Object.keys(d?.schedule||{}).length,at=d?.scheduleAt?new Date(d.scheduleAt).toLocaleString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  const state=!d?'<span class="fs-office-bad">Data jadwal belum termuat</span>':d.scheduleOk===false?'<span class="fs-office-bad">Link belum terbaca. Pastikan sheet bisa dibuka lewat link.</span>':d.scheduleOk==null?'<span>Menunggu pembacaan berikutnya, paling lama sekitar 1 jam.</span>':`<span class="fs-office-ok">Terhubung</span><span>${days} hari jadwal · terakhir dibaca ${esc(at)} WIB</span>`;
+  return `<article class="workspace-card fs-office-link"><h3 class="fs-h3">Link jadwal forecaster</h3><p class="fs-use">Dipakai tab Kantor untuk menampilkan forecaster sesuai shift. Link disimpan privat.</p><label for="fs-office-link">Link Google Sheets</label><input id="fs-office-link" type="url" value="${esc(officeDraft??url)}" placeholder="https://docs.google.com/spreadsheets/d/..." autocomplete="off"><div class="fs-office-row"><button type="button" class="button fp-primary" data-office-link-save>Simpan link</button>${state}</div><span role="status">${esc(officeStatus)}</span></article>`;
+ }
+ async function saveOfficeLink(){
+  const v=String(document.getElementById('fs-office-link')?.value||'').trim(),m=v.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]{20,})/);officeDraft=v;
+  if(!m){officeStatus='Masukkan link Google Sheets yang benar.';window.dispatchEvent(new Event('forecast-settings-changed'));return;}
+  officeStatus='Menyimpan...';window.dispatchEvent(new Event('forecast-settings-changed'));
+  try{await window.ForecastOfficeSaveLink(m[1]);officeDraft=null;officeStatus='Link tersimpan. Jadwal dibaca ulang pada sinkronisasi berikutnya.';}catch{officeStatus='Link belum tersimpan. Akun ini perlu akses Master.';}
+  window.dispatchEvent(new Event('forecast-settings-changed'));
+ }
+ window.addEventListener('forecast-office-data',()=>{if(section==='support')window.dispatchEvent(new Event('forecast-settings-changed'));});
  function render(){
   const p=get(),dis=canEdit()?'':'disabled',sources=window.DATA_SOURCES?.sources||[];
   const tabs=[['sources','Sumber data'],['thresholds','Ambang batas'],['display','Tampilan'],['products','Produk'],['support','Data pendukung'+(isMaster()?'':' 🔒')],...(isMaster()?[['experiment','Eksperimen']]:[])].map(([k,l])=>`<button type="button" class="fs-tab ${section===k?'active':''}" data-settings-tab="${k}" aria-pressed="${section===k}">${l}</button>`).join('');
@@ -162,7 +177,7 @@ window.ForecastSettings=(()=>{
   // Eksperimen (owner 2026-11-12): tab hanya muncul untuk Master; isinya terpisah di forecast-experiment.js.
   else if(section==='experiment')body=isMaster()&&window.ForecastExperiment?window.ForecastExperiment.render():'<article class="workspace-card"><p class="fs-lock">🔒 Eksperimen hanya bisa dibuka akun Master.</p></article>';
   else if(!isMaster())body=`<article class="workspace-card"><p class="fs-lock">🔒 Data pendukung hanya bisa dibuka akun Master.</p></article>`;
-  else body=`<article class="workspace-card"><p class="fs-use">Data rinci & analisa pendukung. Pilih untuk membuka.</p><div class="fs-support">${SUPPORT_VIEWS.map(([k,l])=>`<button type="button" class="fs-support-btn" data-support-view="${k}">${esc(l)}<span>→</span></button>`).join('')}</div></article>`;
+  else body=`${officeLinkCard()}<article class="workspace-card"><p class="fs-use">Data rinci & analisa pendukung. Pilih untuk membuka.</p><div class="fs-support">${SUPPORT_VIEWS.map(([k,l])=>`<button type="button" class="fs-support-btn" data-support-view="${k}">${esc(l)}<span>→</span></button>`).join('')}</div></article>`;
   const actions=section==='support'||section==='experiment'?'':canEdit()?`<div class="fs-actions ${section==='products'?'fsp-actions'+(prodDirty()?' dirty':''):''}"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status||(section==='products'&&prodDirty()?'Ada perubahan yang belum disimpan.':''))}</span></div>`:`<p class="fs-lock">🔒 Akun ini belum punya akses Forecast untuk mengubah pengaturan.</p>`;
   return `<div class="focus-intro"><h2>Pengaturan</h2><span>Berlaku untuk seluruh tim</span></div><div class="fs-tabs">${tabs}</div><form id="forecast-settings-form" novalidate>${body}${actions}</form>`;
  }
@@ -198,6 +213,7 @@ window.ForecastSettings=(()=>{
  function submit(e){
   if(e.target.id!=='forecast-settings-form')return false;
   e.preventDefault();
+  if(document.activeElement?.id==='fs-office-link'){saveOfficeLink();return true;}
   if(document.activeElement?.id==='fs-cat-new'){addCategory(e.target);rerender();setTimeout(()=>document.getElementById('fs-cat-new')?.focus(),0);return true;}
   if(document.activeElement?.id==='fs-prod-new-name'){addProduct(e.target);rerender();setTimeout(()=>document.getElementById('fs-prod-new-name')?.focus(),0);return true;}
   try{save(collect(e.target));}catch(err){status=err.message;rerender();}
@@ -205,6 +221,7 @@ window.ForecastSettings=(()=>{
  }
  function click(e){
   const t=e.target.closest('[data-settings-tab]');if(t){section=t.dataset.settingsTab;status='';prod=null;return 'render';}
+  if(e.target.closest('[data-office-link-save]')){saveOfficeLink();return false;}
   const sv=e.target.closest('[data-support-view]');if(sv)return isMaster()?{support:sv.dataset.supportView}:false;
   const form=e.target.closest('form');
   if(e.target.closest('[data-prod-cat-add]')){addCategory(form);return 'render';}

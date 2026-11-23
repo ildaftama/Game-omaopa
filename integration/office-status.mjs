@@ -90,14 +90,15 @@ export async function refreshOffice({ read, write, data }) {
   const cur = await read(OFFICE_KEY);
   if (!cur?.sheetId || !Array.isArray(cur.people)) { console.log('Data Kantor Mini belum disiapkan.'); return false; }
   let schedule = { ...(cur.schedule || {}) };
-  try { Object.assign(schedule, await pullSchedule(cur.sheetId, cur.people)); } catch { console.log('Jadwal Kantor Mini belum terbaca, memakai jadwal terakhir.'); }
+  let scheduleOk = false;
+  try { const got = await pullSchedule(cur.sheetId, cur.people); scheduleOk = Object.keys(got).length > 0; Object.assign(schedule, got); } catch { scheduleOk = false; }
+  if (!scheduleOk) console.log('Jadwal Kantor Mini belum terbaca, memakai jadwal terakhir.');
   const floor = shiftDay(wibDay(), -KEEP_DAYS);
   schedule = Object.fromEntries(Object.entries(schedule).filter(([d]) => d >= floor).sort());
   let status = cur.status || null;
   if (data?.recap) status = computeStatus({ ...data, thresholds: await readThresholds() });
-  const next = { schemaVersion: 1, kind: 'office', sheetId: cur.sheetId, people: cur.people, schedule, status };
-  const same = JSON.stringify({ ...cur, updatedAt: undefined }) === JSON.stringify({ ...next, updatedAt: undefined });
-  if (!same) await write(OFFICE_KEY, { ...next, updatedAt: new Date().toISOString() });
+  const next = { schemaVersion: 1, kind: 'office', sheetId: cur.sheetId, people: cur.people, schedule, status, scheduleOk, scheduleAt: scheduleOk ? new Date().toISOString() : cur.scheduleAt || null };
+  await write(OFFICE_KEY, { ...next, updatedAt: new Date().toISOString() });
   console.log('Data Kantor Mini diperiksa: ' + Object.keys(schedule).length + ' hari jadwal.');
   return true;
 }

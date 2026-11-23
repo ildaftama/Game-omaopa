@@ -37,3 +37,5 @@
 .kantor .ok{color:var(--k-good)}.kantor .mid{color:var(--k-warn)}.kantor .hot{color:var(--k-bad)}
 @media(max-width:980px){.kantor .kt-layout{grid-template-columns:minmax(0,1fr)}.kantor .kt-steps{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:560px){.kantor .kt-dock{grid-template-columns:repeat(4,minmax(0,1fr))}.kantor .kt-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.focus-tabs .office-tab{margin-left:auto}
+.fs-office-link{display:grid;gap:8px;margin-bottom:12px}.fs-office-link input{width:100%;min-height:38px;padding:7px 10px;border:1px solid #d6dfe6;border-radius:7px;font:inherit}.fs-office-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.fs-office-ok{color:#23835a;font-weight:700}.fs-office-bad{color:#c9423a;font-weight:700}
