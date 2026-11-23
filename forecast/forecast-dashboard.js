@@ -1339,17 +1339,21 @@ window.ForecastDashboard=(()=>{
    <div class="fd-outlet-table-wrap"><table class="fd-acc-table"><thead><tr><th></th><th>Akurasi</th><th>Selisih total</th><th>Prediksi/rencana vs real</th></tr></thead><tbody>${rows.map(line).join('')}</tbody></table></div>
    </article>`;
  }
- // Omzet real hari ini (SEMENTARA, owner 2026-11-12): tarikan ESB jam 18-20 WIB sebelum outlet
+ // Omzet real hari ini (SEMENTARA, owner 2026-11-12; tiap jam 09-22 sejak 2026-11-23): tarikan ESB sebelum outlet
  // tutup (pcs-sales.json `intraday`). Hanya pantauan -- belum dipakai mesin prediksi, karena
  // laporan ESB per hari (bukan per jam) dan pola "jam X = Y% omzet sehari" baru dipelajari dari
  // catatan tarikan (intradayLog). Omzet = PCS x harga, cara yang sama dengan omzet real dashboard.
- function intradayCard(trend,outletId){
-  const it=window.PcsPanels.data().sales?.intraday;if(!it||it.date!==today())return '';
+ function intradayNow(){const sales=window.PcsPanels.data().sales,d=today();if(sales?.days?.some(r=>r.date===d))return null;
+  const xs=[sales?.intraday,window.ForecastLiveIntraday].filter(x=>x?.date===d&&Array.isArray(x.rows));return xs.sort((a,b)=>String(b.asOf).localeCompare(String(a.asOf)))[0]||null;}
+ function intradayCard(trend,outletId){return `<div data-fd-today="${esc(outletId)}" style="display:contents">${intradayInner(trend,outletId)}</div>`;}
+ window.addEventListener('forecast-intraday',()=>{if(!lastTrend)return;document.querySelectorAll('[data-fd-today]').forEach(el=>{el.innerHTML=intradayInner(lastTrend,el.dataset.fdToday);});});
+ function intradayInner(trend,outletId){
+  const it=intradayNow();if(!it)return '';
   const ids=outletIds(outletId,window.PcsPanels.data().sales),rows=it.rows.filter(r=>ids.includes(r.id));if(!rows.length)return '';
   let sum=0;for(const r of rows)for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,r.id,p);if(v!=null)sum+=(r.qty?.[p]||0)*v;}
   const pred=trend.rows.find(x=>x.date===it.date)?.forecastTotal,jam=new Date(it.asOf).toLocaleTimeString('id-ID',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit'});
   const pct=pred>0?sum/pred*100:null;
-  return `<div class="fd-today"><div><span>Omzet real hari ini · sementara s.d. ${esc(jam)} WIB</span><strong>Rp${Math.round(sum).toLocaleString('id-ID')}</strong></div><div><span>Prediksi hari ini</span><strong>${pred?'Rp'+Math.round(pred).toLocaleString('id-ID'):'—'}</strong></div><div><span>Tercapai</span><strong>${pct==null?'—':pct.toLocaleString('id-ID',{maximumFractionDigits:0})+'%'}</strong></div><small>${rows.length}/${ids.length} outlet terbaca. Outlet umumnya tutup 20.00 — angka final masuk setelah itu (diperbarui lagi s.d. 23.00 untuk outlet full shift).</small></div>`;
+  return `<div class="fd-today"><div><span>Omzet real hari ini · sementara s.d. ${esc(jam)} WIB</span><strong>Rp${Math.round(sum).toLocaleString('id-ID')}</strong></div><div><span>Prediksi hari ini</span><strong>${pred?'Rp'+Math.round(pred).toLocaleString('id-ID'):'—'}</strong></div><div><span>Tercapai</span><strong>${pct==null?'—':pct.toLocaleString('id-ID',{maximumFractionDigits:0})+'%'}</strong></div><small>${rows.length}/${ids.length} outlet terbaca. Outlet umumnya tutup 20.00 — diperbarui tiap jam, angka final masuk mulai 19.00 s.d. 22.00.</small></div>`;
  }
  function render(outletId){
   applySettings();

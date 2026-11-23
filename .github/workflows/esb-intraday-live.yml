@@ -1,0 +1,27 @@
+name: Omzet hari berjalan (tiap jam)
+# Dipicu Google Apps Script (integration/apps-script-sync-trigger.gs) karena jadwal bawaan
+# GitHub sering telat. Hanya menimpa satu dokumen kecil di Firestore.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: forecast-intraday-live
+  cancel-in-progress: false
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Tarik penjualan hari ini dan simpan omzet sementara
+        env:
+          ESB_USERNAME: ${{ secrets.ESB_USERNAME }}
+          ESB_PASSWORD: ${{ secrets.ESB_PASSWORD }}
+          FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}
+          FIREBASE_SYNC_PASSWORD: ${{ secrets.FIREBASE_SYNC_PASSWORD }}
+          FIREBASE_WEB_API_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: node integration/pcs-intraday-live.mjs

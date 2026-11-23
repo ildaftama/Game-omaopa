@@ -9,17 +9,18 @@
 // 3. Setelan proyek -> Properti skrip -> Tambahkan: nama GITHUB_TOKEN, nilai = token GitHub.
 // 4. Pilih fungsi "pasang" -> Jalankan -> izinkan akses. Selesai; cek dengan fungsi "uji".
 //
-// Jadwal (WIB): 18, 19, 20 = omzet SEMENTARA hari ini (outlet masih buka);
-// 21, 22, 23 = omzet FINAL hari ini (22 & 23 = ulangan kalau ada yang gagal). Sejak 2026-11-13
-// outlet dianggap tutup 20.00: pemicu jam 20 otomatis diperlakukan FINAL oleh workflow;
+// Jadwal (WIB, owner 2026-11-23: tiap jam 09-22):
+// 09-17 = omzet SEMENTARA jalur ringan (esb-intraday-live.yml, tanpa latih model/bundle besar);
+// 18 = omzet SEMENTARA + catatan pola harian; 19-22 = omzet FINAL hari ini (20-22 = ulangan);
 // 07 = tarik ulang 7 hari terakhir (perbaiki laporan yang sempat gagal semalam).
 
 const REPO = 'ildaftama/Game-omaopa';
 
 function tiapJam() {
   const jam = Number(Utilities.formatDate(new Date(), 'Asia/Jakarta', 'H'));
-  if (jam >= 18 && jam <= 20) return picu_('esb-forecast-refresh.yml', { intraday: '1' });
-  if (jam >= 21 && jam <= 23) return picu_('esb-forecast-refresh.yml', {});
+  if (jam >= 9 && jam <= 17) return picu_('esb-intraday-live.yml', null);
+  if (jam === 18) return picu_('esb-forecast-refresh.yml', { intraday: '1' });
+  if (jam >= 19 && jam <= 22) return picu_('esb-forecast-refresh.yml', {});
   if (jam === 7) return picu_('esb-forecast-orders-refresh.yml', null);
 }
 
@@ -46,7 +47,7 @@ function pasang() {
   ScriptApp.newTrigger('tiapJam').timeBased().everyHours(1).create();
   // Tarikan FINAL lebih awal, ~19.05 WIB (owner 2026-11-13: penjualan jam 20-21 biasanya sedikit,
   // jadi omzet jam 19 sudah cukup untuk mengoreksi prediksi besok malam itu juga). Tarikan tiap
-  // jam berikutnya (19.56, 20.56, ... 23.56) tetap memperbarui angka hari itu sampai benar2 final.
+  // jam berikutnya (s.d. jam 22) tetap memperbarui angka hari itu sampai benar2 final.
   ScriptApp.newTrigger('finalMalam').timeBased().atHour(19).nearMinute(5).everyDays(1).inTimezone('Asia/Jakarta').create();
   console.log('Pemicu tiap jam + final malam (~19.05 WIB) terpasang.');
 }

@@ -104,6 +104,20 @@ export async function writeBundle(collectionPath, keyPrefix, kindManifest, kindC
   await request(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents:commit`, { method: 'POST', headers: { Authorization: 'Bearer ' + idToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ writes }) });
   return keys;
 }
+// Omzet hari berjalan per jam (owner 2026-11-23): SATU dokumen kecil dengan kunci tetap yang selalu
+// ditimpa, jadi tidak menambah potongan baru di Firestore dan tidak menyentuh bundle besar.
+export const LIVE_INTRADAY_KEY = 'reference_0000000000000000_0';
+export async function readLiveIntraday(idToken) {
+  const d = await getDoc('forecastPlans/' + LIVE_INTRADAY_KEY, idToken);
+  if (!d?.payload) return null;
+  try { return JSON.parse(zlib.gunzipSync(Buffer.from(d.payload, 'base64')).toString('utf8')); } catch { return null; }
+}
+export async function writeLiveIntraday(live, idToken, uid) {
+  const packed = packBundle(live);
+  if (packed.chunks.length !== 1) throw Error('Data omzet sementara terlalu besar.');
+  const write = { update: { name: resourceName('forecastPlans/' + LIVE_INTRADAY_KEY), fields: { schemaVersion: field(2), kind: field('reference-chunk'), payload: field(packed.chunks[0]), sha256: field(packed.sha256), updatedBy: field(uid) } }, updateTransforms: [{ fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' }] };
+  await request(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents:commit`, { method: 'POST', headers: { Authorization: 'Bearer ' + idToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ writes: [write] }) });
+}
 export function buildLeanBundle(fullBundle) {
   const globals = Object.fromEntries(LEAN_GLOBALS.filter(k => Object.hasOwn(fullBundle.globals || {}, k)).map(k => [k, fullBundle.globals[k]]));
   return { schemaVersion: 1, globals, files: { 'pcs-sales.json': fullBundle.files['pcs-sales.json'], 'pcs-orders.json': fullBundle.files['pcs-orders.json'] } };
