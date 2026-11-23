@@ -179,7 +179,11 @@ window.ForecastTopdown=(()=>{
  ];
  const STAND_ALONE=['ambarawa','uksw','boyolali','sragen','karanganyar','sukoharjo'];
  const roleOf=id=>CLUSTERS.some(c=>c.centers.includes(id))?'center':STAND_ALONE.includes(id)?'stand':null;
+ // Owner 2026-11-23: potongan 15% anggota -> Center DIMATIKAN. Uji 4-19 Nov (transfer sesuai kebutuhan):
+ // aturan ini menambah waste DAN lost. Data kelompok tetap dipakai untuk peta/label. Aktifkan lagi hanya setelah diuji.
+ const CENTER_CUT_ENABLED=false;
  function applyCenters(cells){
+  if(!CENTER_CUT_ENABLED)return;
   for(const cl of CLUSTERS){
    const ids=cl.ids.filter(id=>cells[id]),cs=cl.centers.filter(id=>cells[id]);if(!cs.length)continue;
    for(let p=0;p<12;p++){
