@@ -424,13 +424,18 @@ function bubble(n){
  const px=(n.x*T+8)*Z,base=(n.pose==='toilet'?(10*T+8)*Z:(n.y*T+14)*Z-(n.pose==='sofa'?32:0))-(isF(n)&&held(n)?180:152);out.font='800 23px ui-rounded,"Segoe UI",system-ui,sans-serif';const w=out.measureText(n.say).width+30,x=clamp(px-w/2,8,view.width-w-8),y=Math.max(8,base-42);
  out.globalAlpha=Math.min(1,n.sayT*4);rr(x,y,w,42,18,'#fffdf8');out.strokeStyle='#3a2d3f';out.lineWidth=3.5;out.stroke();out.fillStyle='#fffdf8';const tx=clamp(px,x+18,x+w-18);out.beginPath();out.moveTo(tx-10,y+40);out.lineTo(tx+10,y+40);out.lineTo(tx,y+54);out.closePath();out.fill();out.strokeStyle='#3a2d3f';out.beginPath();out.moveTo(tx-10,y+41);out.lineTo(tx,y+54);out.lineTo(tx+10,y+41);out.stroke();txt(n.say,x+w/2,y+29,23,'#3a2d3f');out.globalAlpha=1;
 }
+let lightC=null,lightAt=-9,lightKey='';
 function lighting(){
  const h=hourNow();let a=0;if(h>=19||h<5)a=.62;else if(h>=17)a=(h-17)/2*.62;else if(h<7)a=(7-h)/2*.62;else if(S.weather==='hujan')a=.16;else if(S.weather==='mendung')a=.08;if(!a)return;const sl=asleep();
  c.save();c.globalCompositeOperation='multiply';c.fillStyle=`rgba(${sl?'52,44,104':'82,70,140'},${a})`;c.fillRect(0,0,VW,VH);c.globalCompositeOperation='lighter';
+ if(!lightC){lightC=document.createElement('canvas');lightC.width=VW;lightC.height=VH;}
+ if(S.t-lightAt>.25||lightKey!==a+'|'+sl){lightAt=S.t;lightKey=a+'|'+sl;const main=c;c=lightC.getContext('2d');c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.clearRect(0,0,VW,VH);c.globalCompositeOperation='lighter';
  const glow=(x,y,r,col,k)=>{const g=c.createRadialGradient(x,y,1,x,y,r);g.addColorStop(0,`rgba(${col},${k})`);g.addColorStop(1,`rgba(${col},0)`);c.fillStyle=g;c.fillRect(x-r,y-r,r*2,r*2);};
  const lamp=a*(sl?.05:.3);[[60,110],[150,110],[240,110],[140,210],[330,80],[310,200],[370,200]].forEach(([x,y])=>glow(x,y,74,'255,210,160',lamp));
  const scr=a*(sl?.14:.42);[[50,92],[112,92],[176,92],[240,92],[142,190]].forEach(([x,y])=>glow(x,y,26,'150,225,255',scr));
  const fl=['255,143,171','255,209,102','123,223,242','184,242,141','205,180,246'];for(let i=0;i<26;i+=2){const x=16+i*(VW-32)/25,y=9+Math.abs(Math.sin(i*.62))*5;glow(x,y,11,fl[i%5],a*(.45+Math.sin(S.t*2+i)*.1));}
+ c=main;}
+ c.imageSmoothingEnabled=true;c.drawImage(lightC,0,0,VW,VH);c.imageSmoothingEnabled=false;
  c.restore();
 }
 function render(){
