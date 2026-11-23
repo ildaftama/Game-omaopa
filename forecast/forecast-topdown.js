@@ -203,6 +203,10 @@ window.ForecastTopdown=(()=>{
    raw.map((x,i)=>({i,f:x.v-base[i],id:x.id})).sort((a,b)=>b.f-a.f||a.id.localeCompare(b.id)).forEach(x=>{if(left>0){base[x.i]++;left--;}});
    ids.forEach((id,i)=>{cells[id][p]=base[i];});}
  }
+ // Tambahan dari list habis harian (owner 2026-11-23). Isinya angka tujuan per outlet & produk dari dokumen
+ // privat. Tidak pernah menimpa rencana tersimpan sendiri: forecaster menekan tombol, meneliti, lalu menyimpan.
+ function boostLeft(){const day=window.ForecastStockBoost?.dates?.[date];if(!day||!draft)return null;let pcs=0;const outlets=new Set(),by=[0,0,0,0];for(const [id,row] of Object.entries(day)){const cells=draft.cells[id];if(!cells)continue;for(const [p,want] of Object.entries(row)){const gap=Number(want)-(Number(cells[p])||0);if(gap>0){pcs+=gap;outlets.add(id);by[+p<2?0:+p<4?1:+p<7?2:3]+=gap;}}}return {pcs,outlets:outlets.size,by};}
+ function boostHtml(){const b=boostLeft();if(!b)return '';if(!b.pcs)return '<div class="ft-boost done">Tambahan dari list habis sudah masuk ke rencana ini.</div>';const parts=[['Malmil',b.by[1]],['Chiffon',b.by[3]],['Ogura',b.by[0]],['Mini',b.by[2]]].filter(x=>x[1]).map(x=>`${x[0]} ${x[1]}`).join(', ');return `<div class="ft-boost"><span><b>Banyak outlet habis hari ini.</b> Saran tambah <b>${nf(b.pcs)} pcs</b> di ${b.outlets} outlet (${parts}).</span><button type="button" class="button fp-primary" data-ft-boost ${locked()?'disabled':''}>Tambahkan ke rencana</button></div>`;}
  function allocate(target,perOutlet=true){
   const c=compute(),cells={},frac=[];let val=0;
   const wOf=o=>perOutlet?1+o.adj.pct/100:1,den=[...c.outlets.values()].reduce((s,o)=>s+o.value*wOf(o),0);
@@ -461,7 +465,7 @@ window.ForecastTopdown=(()=>{
       <div class="ft-target"><label for="ft-target">Target omzet reguler</label><div class="ft-target-input"><span>Rp</span><input id="ft-target" inputmode="numeric" value="${esc(nf(draft.target))}" autocomplete="off"></div><small>${diff==null?'':Math.abs(diff)<.05?'sesuai prediksi':`${diff>0?'+':''}${diff.toLocaleString('id-ID',{maximumFractionDigits:1})}% dari prediksi`}</small></div>
      </div>
      ${pred?`<div class="ft-chips"><span class="ft-chips-l">Buffer</span>${BUFFERS.map(b=>`<button type="button" class="ft-chip ${Math.abs((diff??-99)-b)<.05?'on':''} ${b===c.net.pct?'sug':''}" data-ft-buffer="${b}">${b?(b>0?'+':'−')+Math.abs(b)+'%':'0%'}${b===c.net.pct?' · saran':''}</button>`).join('')}</div>`:''}
-     ${(()=>{const a=[dayWarn(),pred?netWhy(c):'',rainSummary(c)].filter(Boolean).join('');return a?`<div class="ft-advice"><span class="ft-advice-h">Saran untuk tanggal ini</span>${a}</div>`:'';})()}
+     ${(()=>{const a=[boostHtml(),dayWarn(),pred?netWhy(c):'',rainSummary(c)].filter(Boolean).join('');return a?`<div class="ft-advice"><span class="ft-advice-h">Saran untuk tanggal ini</span>${a}</div>`:'';})()}
      <div class="ft-ctrl-act"><label class="ft-toggle"><input type="checkbox" id="ft-per-outlet" ${draft.perOutlet?'checked':''}> Sesuaikan porsi outlet dari waste & habis stok <small>(${adjN} outlet digeser)</small></label><button type="button" class="button fp-primary" data-ft-allocate>Bagi otomatis ke outlet & produk</button></div>
     </div>
     <div class="ft-kpis">
@@ -567,6 +571,7 @@ window.ForecastTopdown=(()=>{
   const oo=e.target.closest('[data-ft-open-outlet]');
   if(oo){window.ForecastWorkspace?.openOutlet?.(oo.dataset.ftOpenOutlet,date);return true;}
   if(e.target.closest('[data-ft-delete-all]')){const recs=compute().ids.map(record).filter(Boolean);window.ForecastWorkspace?.askDelete?.(recs,`${recs.length} rencana outlet tanggal ${dateLabel(date)}`);return true;}
+  if(e.target.closest('[data-ft-boost]')){if(locked())return true;const day=window.ForecastStockBoost?.dates?.[date]||{};let n=0;for(const [id,row] of Object.entries(day)){const cells=draft.cells[id];if(!cells)continue;for(const [p,want] of Object.entries(row)){const cur=Number(cells[p])||0;if(Number(want)>cur){cells[p]=String(want);n+=Number(want)-cur;}}}persist();message=`${nf(n)} pcs ditambahkan. Teliti angkanya, lalu klik simpan.`;return true;}
   if(e.target.closest('[data-ft-allocate]')){
    const tgt=document.getElementById('ft-target');if(tgt)draft.target=Number(String(tgt.value).replace(/\D/g,''))||0;
    if(!draft.target){message='Isi target omzet dulu.';return true;}

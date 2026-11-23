@@ -559,7 +559,7 @@ window.ForecastDashboard=(()=>{
  // terakhir; potongan = 2,5 x kelebihan di atas target internal (maks 12%), karena memangkas
  // kiriman x% hanya mengurangi sebagian dari waste (sebagian potongan memotong yang laku).
  // Kalau lost sales juga di atas ambang, potongan diredam setengah supaya tidak sering habis.
- const PERF_V2_FROM='2026-11-18',PERF_FROM='2026-11-13',PERF_MARGIN=0.3,PERF_MAX_CUT=12,PERF_CUT_GAIN=2.5,PERF_MAX_ADD=4,PERF_LOST_GAIN=0.5;
+ const PERF_NO_CUT_FROM='2026-11-24',PERF_V2_FROM='2026-11-18',PERF_FROM='2026-11-13',PERF_MARGIN=0.3,PERF_MAX_CUT=12,PERF_CUT_GAIN=2.5,PERF_MAX_ADD=4,PERF_LOST_GAIN=0.5;
  const perfCache=new Map();
  function perfAdjust(asOf){
   const recap=window.DAILY_RECAP_SUMMARY;
@@ -585,6 +585,8 @@ window.ForecastDashboard=(()=>{
   if(wastePct==null&&lostPct==null){}
   else if(wastePct!=null&&wastePct>Wt){let cut=Math.min(PERF_MAX_CUT,(wastePct-Wt)*PERF_CUT_GAIN);if(lostPct!=null&&lostPct>L)cut/=2;pct=-cut;kind='waste';}
   else if(lostPct!=null&&lostPct>L){const room=wastePct==null?PERF_MAX_ADD:Math.max(0,Wt-wastePct);pct=Math.min(PERF_MAX_ADD,(lostPct-L)*PERF_LOST_GAIN,room);kind=pct>0?'lost':'ok';}
+  // Owner 2026-11-23: banyak outlet habis dan tren naik, potongan otomatis karena waste dihentikan dulu.
+  if(asOf>=PERF_NO_CUT_FROM&&pct<0){pct=0;kind='ok';}
   const v={pct:Math.round(pct*10)/10,pctV1:Math.round(pctV1*10)/10,kind,wastePct,wasteMtd,waste7,lostPct,monthly:wDates[0]>=monthStart,from:wDates[0]||null,to:wDates.at(-1)||null};
   perfCache.set(key,v);return v;
  }
