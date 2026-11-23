@@ -417,11 +417,11 @@ function tag(n){
  if(!dozing||sel){rr(x,y,w,26,13,sel?n.color:'rgba(58,45,63,.88)');txt(name,x+w/2,y+19,18,sel?'#2b2130':'#fff');}
  if(n.p!=null&&n.action!=='break'){const bw=88,bx=clamp(px-bw/2,6,view.width-bw-6),by=py-(sit(n)?140:150);rr(bx,by,bw,14,7,'#3a2d3f');rr(bx+3,by+3,Math.max(5,(bw-6)*n.p),8,4,n.color);}
  if(n.pose==='sleepDesk'||n.pose==='nap'){for(let i=0;i<3;i++){const p=(S.t*.45+i/3)%1;out.globalAlpha=1-p;txt('z',px+28+p*38,py-68-p*58,22+p*20,'#e7e0ff');out.globalAlpha=1;}}
- if(n===FC&&held(n)){out.fillStyle='#ffd166';out.strokeStyle='#3a2d3f';out.lineWidth=4;const yy=py-166+Math.sin(S.t*4)*6;out.beginPath();out.moveTo(px-16,yy);out.lineTo(px+16,yy);out.lineTo(px,yy+20);out.closePath();out.stroke();out.fill();}
+ if(isF(n)&&held(n)){const top=n.pose==='nap'?py-104:sit(n)?py-126:py-150,yy=top-(n.p!=null&&n.action!=='break'?22:0)+Math.sin(S.t*5)*3;out.save();out.lineJoin='round';out.strokeStyle='#2b2130';out.lineWidth=5;out.fillStyle='#ffe14d';out.beginPath();out.moveTo(px-10,yy);out.lineTo(px+10,yy);out.lineTo(px,yy+13);out.closePath();out.stroke();out.fill();out.fillStyle='rgba(255,255,255,.75)';out.beginPath();out.moveTo(px-6,yy+2);out.lineTo(px+1,yy+2);out.lineTo(px-2,yy+6);out.closePath();out.fill();out.restore();}
 }
 const sit=n=>['sit','sofa','sleepDesk','nap'].includes(n.pose);
 function bubble(n){
- const px=(n.x*T+8)*Z,base=(n.pose==='toilet'?(10*T+8)*Z:(n.y*T+14)*Z-(n.pose==='sofa'?32:0))-152;out.font='800 23px ui-rounded,"Segoe UI",system-ui,sans-serif';const w=out.measureText(n.say).width+30,x=clamp(px-w/2,8,view.width-w-8),y=Math.max(8,base-42);
+ const px=(n.x*T+8)*Z,base=(n.pose==='toilet'?(10*T+8)*Z:(n.y*T+14)*Z-(n.pose==='sofa'?32:0))-(isF(n)&&held(n)?180:152);out.font='800 23px ui-rounded,"Segoe UI",system-ui,sans-serif';const w=out.measureText(n.say).width+30,x=clamp(px-w/2,8,view.width-w-8),y=Math.max(8,base-42);
  out.globalAlpha=Math.min(1,n.sayT*4);rr(x,y,w,42,18,'#fffdf8');out.strokeStyle='#3a2d3f';out.lineWidth=3.5;out.stroke();out.fillStyle='#fffdf8';const tx=clamp(px,x+18,x+w-18);out.beginPath();out.moveTo(tx-10,y+40);out.lineTo(tx+10,y+40);out.lineTo(tx,y+54);out.closePath();out.fill();out.strokeStyle='#3a2d3f';out.beginPath();out.moveTo(tx-10,y+41);out.lineTo(tx,y+54);out.lineTo(tx+10,y+41);out.stroke();txt(n.say,x+w/2,y+29,23,'#3a2d3f');out.globalAlpha=1;
 }
 function lighting(){
