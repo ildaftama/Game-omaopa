@@ -482,7 +482,7 @@ const DIR={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0
 window.addEventListener('keydown',e=>{if(document.activeElement!==view)return;const m=DIR[e.key];if(!m)return;e.preventDefault();if(asleep()||!pickFC())return;const cur=FC.path[0]||[Math.round(FC.x),Math.round(FC.y)],nx=[cur[0]+m[0],cur[1]+m[1]];if(blocked.has(key(nx[0],nx[1])))return;S.sel=FC.id;clearTimeout(S.keySend);const f=FC;S.keySend=setTimeout(()=>send(f,'go',nx[0],nx[1]),220);if(FC.path.length&&held(FC)&&FC.wait?.walk){FC.held=S.t+25;FC.path=[FC.path[0],nx];return;}goF(FC,nx);});
 
 buildBG();syncReal();let last=performance.now(),pt=0,running=false;
-function frame(now){if(!root.isConnected){running=false;stopControl?.();stopControl=null;return;}const dt=Math.min(.05,(now-last)/1000);last=now;update(dt);render();pt+=dt;if(pt>.15){pt=0;panel();}requestAnimationFrame(frame);}
+function frame(now){if(!root.isConnected){running=false;stopControl?.();stopControl=null;return;}const gap=Math.max(0,(now-last)/1000);last=now;if(gap>2)NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});let rem=Math.min(gap,1);while(rem>.001){const d=Math.min(rem,.05);update(d);rem-=d;}render();pt+=gap;if(pt>.15){pt=0;panel();}requestAnimationFrame(frame);}
 update(0);panel();
 function start(){syncReal();syncWeather();if(!stopControl)stopControl=window.ForecastOfficeControl?.listen(onRemote)||null;if(running)return;running=true;NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});last=performance.now();requestAnimationFrame(frame);}
 setInterval(()=>{if(root.isConnected){syncReal();syncWeather();}},60000);
