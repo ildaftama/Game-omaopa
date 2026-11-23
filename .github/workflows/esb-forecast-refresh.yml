@@ -132,6 +132,9 @@ jobs:
               fi
             done
           fi
+      - name: Latih model pembagian outlet (kalau gagal, web tetap memakai median)
+        run: |
+          python -m pip install --quiet "numpy==2.5.4" "pandas==3.1.0" "scikit-learn==1.9.1" && python integration/forecast_model.py || echo "::warning::Model pembagian outlet belum berhasil; web memakai median."
       - name: Paketkan & simpan ke bundle referensi privat (bukan file publik)
         env:
           FIREBASE_SYNC_EMAIL: ${{ secrets.FIREBASE_SYNC_EMAIL }}

@@ -30,7 +30,7 @@ const CHUNK_LIMIT = 700000, MAX_CHUNKS = 10;
 // price references used by the plan's own revenue estimate. No revenue trend, profit,
 // waste, or evaluation globals -- DAILY_RECAP_SUMMARY (waste/lost sales) stays full-bundle
 // only for this same reason, matching PERFORMANCE_SUMMARY/WASTE_ESB_SUMMARY.
-const LEAN_GLOBALS = ['OUTLET_DATA', 'OUTLET_INTELLIGENCE', 'INSIGHT_DATA', 'FORECAST_REALIZED_PRICES'];
+const LEAN_GLOBALS = ['OUTLET_DATA', 'OUTLET_INTELLIGENCE', 'INSIGHT_DATA', 'FORECAST_REALIZED_PRICES', 'FORECAST_MODEL_SPLIT'];
 
 function field(v) {
   if (v === null || v === undefined) return { nullValue: null };
@@ -138,6 +138,12 @@ async function fetchDemographics(env, fallback) {
   try { return await buildDemographics(env); }
   catch (e) { console.log('Demografi member belum berhasil ditarik: ' + e.message); return fallback || null; }
 }
+// Hasil integration/forecast_model.py. Kalau model gagal malam ini, nilai lama tetap terbawa;
+// web hanya memakai tanggal yang tersedia dan otomatis kembali ke median untuk tanggal lain.
+function readModelSplit(file = '.pcs-temp/forecast-model.json') {
+  try { const m = JSON.parse(fs.readFileSync(file, 'utf8')); return m?.schemaVersion === 1 && m.dates && Object.keys(m.dates).length ? m : null; }
+  catch { return null; }
+}
 export async function run(env = process.env, salesPath = 'forecast/pcs-sales.json', ordersPath = 'forecast/pcs-orders.json') {
   const { idToken, uid } = await signIn(env);
   const current = await fetchBundle('forecastPlans/reference_current', idToken);
@@ -145,7 +151,8 @@ export async function run(env = process.env, salesPath = 'forecast/pcs-sales.jso
   const sales = JSON.parse(fs.readFileSync(salesPath, 'utf8')), orders = JSON.parse(fs.readFileSync(ordersPath, 'utf8'));
   const dailyRecap = await fetchDailyRecap(current.globals?.OUTLET_INTELLIGENCE, current.globals?.DAILY_RECAP_SUMMARY) || current.globals?.DAILY_RECAP_SUMMARY || null;
   const demographics = await fetchDemographics(env, current.globals?.CUSTOMER_DEMOGRAPHICS);
-  const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}), ...(demographics ? { CUSTOMER_DEMOGRAPHICS: demographics } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders } };
+  const modelSplit = readModelSplit();
+  const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}), ...(demographics ? { CUSTOMER_DEMOGRAPHICS: demographics } : {}), ...(modelSplit ? { FORECAST_MODEL_SPLIT: modelSplit } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders } };
   const packedFull = packBundle(full);
   await writeBundle('forecastPlans', 'reference', 'reference-manifest', 'reference-chunk', packedFull, idToken, uid);
   console.log('Bundle referensi penuh tersimpan: ' + packedFull.chunks.length + ' chunk.');

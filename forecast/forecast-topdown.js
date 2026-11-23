@@ -120,9 +120,17 @@ window.ForecastTopdown=(()=>{
   return cur.some(v=>v>0)?['new','Belum terekam']:['saved','Tidak ada pesanan'];
  }
  // Dihitung sekali per tanggal (recommend 28 outlet cukup berat).
+ // Model pembagian (owner 2026-11-23): untuk 4 produk inti, PORSI antar outlet memakai hasil model
+ // malam; total per produk tetap sama seperti sebelumnya. Tanpa data model untuk tanggal ini, median dipakai.
+ function applyModelSplit(outlets){
+  const M=window.FORECAST_MODEL_SPLIT,day=M?.schemaVersion===1?M.dates?.[date]:null;if(!day)return false;let used=false;
+  for(let p=0;p<4;p++){const xs=[...outlets.values()].filter(o=>Number.isFinite(day[o.id]?.[p])&&day[o.id][p]>=0);if(xs.length<24)continue;
+   const tot=xs.reduce((s,o)=>s+(o.base[p]||0),0),sum=xs.reduce((s,o)=>s+day[o.id][p],0);if(!(tot>0&&sum>0))continue;for(const o of xs)o.base[p]=day[o.id][p]*tot/sum;used=true;}
+  if(used)for(const o of outlets.values())o.value=o.base.reduce((s,q,p)=>s+q*(o.prices[p].value||0),0);return used;
+ }
  function compute(){
   const d=data(),recsAll=cloud().records||[];cloud().watch?.(model.shift(date,-28),date);
-  const key=date+'|'+d.sales.days.length+'|'+(d.orders?.days?.length||0)+'|'+recsAll.filter(r=>r.date<date).length;
+  const key=date+'|'+d.sales.days.length+'|'+(d.orders?.days?.length||0)+'|'+recsAll.filter(r=>r.date<date).length+'|'+(window.FORECAST_MODEL_SPLIT?.generatedAt||'');
   if(cache?.key===key)return cache;
   const ids=[...d.sales.outletIds],from=model.shift(date,-56),byOutlet=new Map();
   for(const r of d.sales.days){if(r.date<from||r.date>=date||!r.complete||!Array.isArray(r.qty)||wd(r.date)!==wd(date))continue;if(!byOutlet.has(r.id))byOutlet.set(r.id,[]);byOutlet.get(r.id).push(r);}
@@ -137,6 +145,7 @@ window.ForecastTopdown=(()=>{
    const lw=lwRow?Math.max(0,lwRow.qty.slice(0,12).reduce((a,b)=>a+(b||0),0)-(lwOrd?.knownQty||lwOrd?.qty||[]).reduce((a,b)=>a+(Number(b)||0),0)):null;
    outlets.set(id,{id,recs,prices,base,value,orders:orderQty(id),roti,lw});
   }
+  if(applyModelSplit(outlets))B=[...outlets.values()].reduce((s,o)=>s+o.value,0);
   const pred=window.ForecastDashboard?.predict?.(date)||null;
   let wl=null;try{wl=window.ForecastDashboard?.recentWasteLost?.(7)||null;}catch{}
   const W=wl?.wasteThreshold??3.5,L=wl?.lostThreshold??4.5;
