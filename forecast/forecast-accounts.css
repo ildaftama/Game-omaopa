@@ -59,3 +59,8 @@
 .fpf-table td small{display:block;color:#7a8896;font-size:11px}
 .fpf-table b.ok{color:#23835a}.fpf-table b.mid{color:#b8730f}.fpf-table b.hot{color:#c9423a}
 .fpf-team th,.fpf-team td{background:#f5f7fa;font-weight:700}
+
+.fa-pw{position:relative;display:block}
+.fa-pw input{padding-right:96px!important}
+.fa-eye,.forecast-login-card .fa-eye{position:absolute;top:50%;right:6px;transform:translateY(-50%);min-height:28px;padding:3px 10px;border:1px solid #d7e1e8;border-radius:6px;background:#f3f7f9;color:#205f70;font:600 12px inherit;font-family:inherit;cursor:pointer;margin:0}
+.fa-eye[aria-pressed="true"]{background:#205f70;color:#fff;border-color:#205f70}
