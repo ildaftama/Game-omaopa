@@ -40,8 +40,8 @@ export function parseStockTab(rows, year, month) {
       for (const k of [4, 5, 6]) { const v = qty(row[c + k]) || 0; if (v > 0) tfIn += v; else tfOut -= v; }
       const avail = awal + kirim + tfIn - tfOut, end = qty(row[c + 10]);
       if (avail <= 0 && !(end > 0)) continue;
-      const x = cells[label] || (cells[label] = [0, 0, 0, 0, 0, 1]);
-      x[0] += avail; x[1] += kirim; x[2] += tfIn; x[3] += tfOut; x[4] += Math.max(end || 0, 0);
+      const x = cells[label] || (cells[label] = [0, 0, 0, 0, 0, 1, 0]);
+      x[0] += avail; x[1] += kirim; x[2] += tfIn; x[3] += tfOut; x[4] += Math.max(end || 0, 0); x[6] += Math.max(qty(row[c + 7]) || 0, 0);
       if (end == null) x[5] = 0;
     }
     if (Object.keys(cells).length) out[date] = cells;
@@ -62,7 +62,7 @@ async function text(url, fetcher) {
 export async function pullDailyStock(folderId, previous, { now = new Date(), fetcher = fetch } = {}) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now), [y, m, d] = today.split('-').map(Number);
   const prior = m === 1 ? [y - 1, 12] : [y, m - 1], priorKey = `${prior[0]}-${String(prior[1]).padStart(2, '0')}`;
-  const hasPrior = Object.keys(previous?.days || {}).some(x => x.startsWith(priorKey));
+  const hasPrior = Object.entries(previous?.days || {}).some(([x, day]) => x.startsWith(priorKey) && Object.values(day).some(cells => Object.values(cells).some(v => v.length >= 7)));
   const wanted = new Set([`${y}-${m}`, ...(d <= 3 || !hasPrior ? [`${prior[0]}-${prior[1]}`] : [])]);
   const files = parseFolder(await text(`https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(folderId)}`, fetcher)).filter(f => wanted.has(`${f.year}-${f.month}`));
   if (!files.length) throw Error('Sheet Daily Report belum ditemukan.');
