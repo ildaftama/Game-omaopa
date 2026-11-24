@@ -167,7 +167,7 @@ function shiftText(n){if(!isF(n))return 'Tidak online';const v=shiftOf(n),h=SHIF
 // Setiap akun hanya mengendalikan karakternya sendiri; Master bisa semua (owner 2026-11-24).
 function myChars(){const r=window.ForecastAuth?.role||{};if(r.master)return NPC.map(n=>n.id);if(r.fu==='forecaster')return r.char?[r.char]:[];if(r.fu==='analyst')return ['pred'];if(r.fu==='factory')return ['mgr'];if(r.fu==='spv')return ['spv'];return window.ForecastRolePolicy?.planner?.(r)?['f1','f2']:[];}
 const mine=n=>!!n&&myChars().includes(n.id),ready=n=>n.present!==false&&!n.leaving&&n.pose!=='away';
-function pickFC(){if(FC&&mine(FC)&&ready(FC))return true;const o=NPC.find(n=>mine(n)&&ready(n));if(o){FC=o;return true;}return false;}
+function pickFC(){if(FC&&mine(FC)&&ready(FC))return true;const o=[FW,FE,MGR,SPV,PRED,...NPC].find(n=>mine(n)&&ready(n));if(o){FC=o;return true;}return false;}
 const watchLevel=()=>S.waste==='lewat'||S.lost==='lewat'?2:S.waste==='waspada'||S.lost==='waspada'?1:0;
 const hourNow=()=>{if(S.hour!=null)return S.hour;const d=new Date(Date.now()+7*3600000);return d.getUTCHours()+d.getUTCMinutes()/60;};
 const asleep=()=>{const h=hourNow();return h>=22||h<7;};
