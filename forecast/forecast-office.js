@@ -288,7 +288,9 @@ function talkState(n){if(n.pose==='nap'||n.pose==='sleepDesk')return 'nap';if(n.
 const occupied=(x,y,skip)=>NPC.some(o=>!skip.includes(o)&&o.pose!=='away'&&((Math.round(o.x)===x&&Math.round(o.y)===y)||(o.path.length&&o.path.at(-1)[0]===x&&o.path.at(-1)[1]===y)));
 // Tempat berdiri di depan/belakang lawan bicara (sprite hanya punya tampak depan & belakang).
 function meetCell(h,v){const hx=Math.round(h.x),hy=Math.round(h.y);for(const [dx,dy] of [[0,1],[0,-1],[-1,0],[1,0]]){const x=hx+dx,y=hy+dy;if(x<0||y<0||x>=COLS||y>=ROWS||blocked.has(key(x,y))||occupied(x,y,[h,v]))continue;return [x,y];}return null;}
-function faceEach(v,h){if(h.pose==='sit')h.pose='stand';if(!v.path.length&&v.pose!=='sip'&&v.pose!=='eat')v.pose='stand';const dy=Math.round(v.y)-Math.round(h.y);v.face=dy>0?1:0;h.face=dy<0?1:0;}
+const KEEP_POSE=['sip','eat'];
+function snap(n){n.path=[];const c=nearestFree(Math.round(n.x),Math.round(n.y));n.x=c[0];n.y=c[1];if(!KEEP_POSE.includes(n.pose))n.pose='stand';}
+function faceEach(v,h){if(!h.path.length&&!KEEP_POSE.includes(h.pose))h.pose='stand';if(!v.path.length&&!KEEP_POSE.includes(v.pose))v.pose='stand';const dy=Math.round(v.y)-Math.round(h.y);v.face=dy>0?1:0;h.face=dy<0?1:0;}
 function talkTo(n){
  const api=window.ForecastOfficeTalk;if(!api||!canTalk(n))return;
  const r=api.reply(n.id,talkFacts(),{state:talkState(n),task:n.task,asleep:asleep()},TK.memo),sec=api.dur(r.text)+.6;sayNow(n,r.text,sec);
@@ -305,7 +307,7 @@ function approach(n){
   try{await walk(f,cell);}catch(e){if(e!==CANCEL)throw e;return;}
   if(f.gen!==g)return;f.pose='stand';
   if(Math.hypot(n.x-f.x,n.y-f.y)>1.6||!canTalk(n)){f.face=0;say(f,'Lho, sudah pergi duluan.',2);f.held=S.t+3;return;}
-  cancel(n);n.ff=0;n.held=S.t+30;faceEach(f,n);f.task=`Mengobrol dengan ${n.name}`;n.task=`Mengobrol dengan ${f.name}`;n.action='break';talkTo(n);
+  cancel(n);n.ff=0;n.held=S.t+30;snap(n);faceEach(f,n);f.task=`Mengobrol dengan ${n.name}`;n.task=`Mengobrol dengan ${f.name}`;n.action='break';talkTo(n);
  })();
 }
 function sceneTimes(today){const r=seeded('jadwal-obrolan|'+today),base=Date.parse(today+'T07:00:00+07:00')/1000,end=base+15*3600,out=[];let t=base+20+r()*120;while(t<end){out.push(t);t+=120+Math.pow(r(),1.3)*480;}return out;}
@@ -316,8 +318,8 @@ function startScene(i,start,now){
  if(!sc)return;let v=by(sc.lines[0].id),h=by(sc.lines.find(l=>l.id!==v.id)?.id);if(!v||!h)return;
  // Forecaster sedang bekerja, jadi biasanya NPC yang datang ke mejanya.
  if(isF(v)&&!isF(h)&&seeded(`datang|${TK.day}|${i}`)()<.7)[v,h]=[h,v];
- const cell=meetCell(h,v);if(!cell)return;
- for(const n of [v,h]){cancel(n);n.ff=0;n.inScene=true;n.held=S.t+(start+WALK_IN+sc.total-now)+3;n.action='break';}
+ let cell=meetCell(h,v);if(!cell)return;
+ for(const n of [v,h]){cancel(n);n.ff=0;n.inScene=true;if(n===h)snap(n);n.held=S.t+(start+WALK_IN+sc.total-now)+3;n.action='break';}cell=meetCell(h,v)||cell;
  v.task=`Menghampiri ${h.name}`;h.task=`Mengobrol dengan ${v.name}`;TK.scene={...sc,start,v,h,cell,people:[v,h]};TK.idx=-1;
  if(now-start>=WALK_IN-1){v.x=cell[0];v.y=cell[1];v.path=[];faceEach(v,h);v.task=`Mengobrol dengan ${h.name}`;return;}
  const g=v.gen;(async()=>{try{await walk(v,cell);}catch(e){if(e!==CANCEL)throw e;return;}if(v.gen!==g||TK.scene?.v!==v)return;faceEach(v,h);v.task=`Mengobrol dengan ${h.name}`;})();
