@@ -250,8 +250,8 @@ const forecasterWork=[async n=>{await sitDown(n);n.filled=0;await doing(n,'Menyu
  async n=>{await sitDown(n);await doing(n,'Mengecek selisih stok',8);speak(n,realLines(n));await doing(n,'Meninjau rencana besok',6);}];
 async function runSlot(n,g){
  try{
-  const roll=nr(n)(),jobs=isF(n)?forecasterWork:WORK[n.id],job=jobs[Math.floor(nr(n)()*jobs.length)],brk=npick(n,n.food?['sofa','nap','toilet']:['kopi','kopi','snack','makan','sofa','nap','toilet']);
-  if(roll<.72)await job(n);else{await activity(n,brk);await sitDown(n);}
+  const roll=nr(n)(),jobs=isF(n)?forecasterWork:WORK[n.id],job=jobs[Math.floor(nr(n)()*jobs.length)],boss=n===MGR||n===SPV,brk=npick(n,boss?(n.food?['sofa','toilet']:['kopi','kopi','makan','sofa','toilet']):n.food?['sofa','nap','toilet']:['kopi','kopi','snack','makan','sofa','nap','toilet']);
+  if(roll<(boss?.85:.72))await job(n);else{await activity(n,brk);await sitDown(n);}
   await sitDown(n);while(g===n.gen)await doing(n,npick(n,IDLE[n.id]),8,'type');
  }catch(e){if(e!==CANCEL)throw e;}
 }
