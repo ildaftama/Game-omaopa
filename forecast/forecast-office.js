@@ -493,5 +493,5 @@ function start(){syncReal();syncWeather();if(!stopControl)stopControl=window.For
 setInterval(()=>{if(root.isConnected){syncReal();syncWeather();}},60000);
 return {root,start};
 }
-return {render:()=>'<div class="focus-intro"><h2>Kantor</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
+return {render:()=>'<div class="focus-intro"><h2>Kantor Agen AI</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
 })();
