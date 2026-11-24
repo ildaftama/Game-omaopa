@@ -47,7 +47,8 @@ function importer(){const card=gate.querySelector('.forecast-login-card');if(!wi
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // Login: metode lama (nomor HP + PIN) tetap ada. Akun baru memakai ID + password, dan bisa daftar
 // sendiri; akun yang daftar sendiri menunggu persetujuan Master (owner 2026-11-24).
-let loginMode='phone',registering=null;
+// Tab login terakhir diingat di perangkat ini.
+let loginMode=(()=>{try{return localStorage.getItem('forecast-login-mode')==='id'?'id':'phone';}catch{return 'phone';}})(),registering=null;
 const FU_DOMAIN='forecast.omaopa.fun',idEmail=id=>String(id).trim().toLowerCase()+'@'+FU_DOMAIN;
 const idOk=id=>/^[a-z0-9][a-z0-9._-]{2,29}$/.test(String(id).trim().toLowerCase());
 const passOk=p=>typeof p==='string'&&p.length>=8&&p.length<=64&&/[a-zA-Z]/.test(p)&&/[0-9]/.test(p);
@@ -99,7 +100,7 @@ gate.addEventListener('submit',async e=>{const form=e.target,fid=form.getAttribu
  registering=(async()=>{const c=await createUserWithEmailAndPassword(auth,idEmail(id),pw);await setDoc(doc(db,'forecastUsers',c.user.uid),{id,name,status:'pending',role:'',createdAt:serverTimestamp()});})();
  try{await registering;loginMode='id';}catch(err){say(err?.code==='auth/email-already-in-use'?'ID ini sudah dipakai. Pilih ID lain.':'Pendaftaran belum berhasil. Periksa koneksi lalu coba lagi.');button.disabled=false;}finally{registering=null;}
 });
-gate.addEventListener('click',e=>{const lm=e.target.closest('[data-login-mode]');if(lm){loginMode=lm.dataset.loginMode;locked('Masuk untuk membuka perencanaan dan data outlet.',true);gate.querySelector('input')?.focus();return;}if(e.target.closest('[data-gate-signout]')){beat(false).finally(()=>signOut(auth));}if(e.target.closest('[data-gate-retry]'))location.reload();if(e.target.closest('[data-private-import]'))document.getElementById('private-package').click();});
+gate.addEventListener('click',e=>{const lm=e.target.closest('[data-login-mode]');if(lm){loginMode=lm.dataset.loginMode;try{if(loginMode!=='register')localStorage.setItem('forecast-login-mode',loginMode);}catch{}locked('Masuk untuk membuka perencanaan dan data outlet.',true);gate.querySelector('input')?.focus();return;}if(e.target.closest('[data-gate-signout]')){beat(false).finally(()=>signOut(auth));}if(e.target.closest('[data-gate-retry]'))location.reload();if(e.target.closest('[data-private-import]'))document.getElementById('private-package').click();});
 gate.addEventListener('change',async e=>{if(e.target.id!=='private-package'||!e.target.files[0])return;const status=document.getElementById('private-import-status');try{
  if(!window.ForecastRolePolicy.manager(window.ForecastAuth?.role)||!auth.currentUser)throw Error('role');status.textContent='Memeriksa paket…';const p=JSON.parse(await e.target.files[0].text());await unpack(p);
  const batch=writeBatch(db),keys=p.chunks.map((payload,i)=>{const key='reference_'+p.sha256.slice(0,16)+'_'+i;batch.set(privateRef(key),{schemaVersion:2,kind:'reference-chunk',payload,sha256:p.sha256,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});return key;});
