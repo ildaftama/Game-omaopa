@@ -86,9 +86,9 @@ async function silentData(){
  for(const name of globals)if(Object.hasOwn(bundle.globals,name))window[name]=bundle.globals[name];window.ForecastSecureData=bundle.files;window.ForecastStudy=bundle.study;bundleSha=m.sha256;pendingData=false;
  const y=scrollY;window.dispatchEvent(new Event('forecast-data-refreshed'));setTimeout(()=>{if(Math.abs(scrollY-y)>2)scrollTo(0,y);},400);
 }
-const codeSet=()=>new Set([...document.querySelectorAll('[data-forecast-src],script[src],link[href]')].map(e=>e.getAttribute('data-forecast-src')||e.getAttribute('src')||e.getAttribute('href')||'').filter(v=>v.includes('?v=')));
+const codeSet=()=>new Set([...document.querySelectorAll('[data-forecast-src],[src],[href]')].map(e=>e.getAttribute('data-forecast-src')||e.getAttribute('src')||e.getAttribute('href')||'').filter(v=>v.includes('?v=')));
 async function checkCode(){try{const t=await(await fetch(location.pathname+'?vcheck='+Date.now(),{cache:'no-store'})).text(),have=codeSet(),want=[...t.matchAll(/(?:data-forecast-src|src|href)="([^"]+\?v=[^"]+)"/g)].map(x=>x[1]);if(want.length>5&&want.some(v=>!have.has(v)))pendingCode=true;}catch{}}
-let codeAt=Date.now();
+let codeAt=Date.now()-CHECK_CODE+60e3;
 setInterval(async()=>{
  if(!loaded||refreshing||root.hidden)return;const idle=Date.now()-lastAct;
  if(!pendingCode&&Date.now()-codeAt>CHECK_CODE){codeAt=Date.now();await checkCode();}
