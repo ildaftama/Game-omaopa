@@ -33,3 +33,5 @@
 .cl-detail li:last-child{border-bottom:0}
 .cl-detail span{color:#3d4d5b}
 @media(max-width:640px){.cl-row>button{grid-template-columns:minmax(0,1fr) auto}.cl-what{grid-column:1/-1}.cl-detail li{grid-template-columns:minmax(0,1fr) auto}.cl-detail span{grid-column:1/-1}}
+.cl-row>button>span,.cl-row>button>time{justify-self:start;text-align:left}
+.cl-row>button>time{justify-self:end}
