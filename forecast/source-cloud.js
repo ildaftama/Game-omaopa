@@ -13,8 +13,8 @@ window.ForecastSourceCloud={status:'Memuat pengaturan tim…',save:async()=>{thr
   window.ForecastSourceCloud.status=auth.currentUser?'Memakai sesi pengelola website. Izin penyimpanan diperiksa saat menyimpan.':'Untuk menyimpan bagi tim, masuk sebagai pengelola di website utama, lalu buka kembali halaman ini.';
   window.ForecastSourceCloud.save=async config=>{
    if(!auth.currentUser)throw Error('Masuk sebagai pengelola di omaopa.fun terlebih dahulu, lalu buka kembali halaman ini. Halaman Forecast memerlukan akun pengelola.');
-   const staff=await getDoc(doc(db,'staff',auth.currentUser.uid));const role=staff.exists()?staff.data():{};
-   if(!window.ForecastRolePolicy?.planner?.(role))throw Error('Pengaturan hanya dapat disimpan oleh akun Forecast (Admin, Admin Utama, Master, atau Forecaster).');
+   const role=window.ForecastAuth?.role||{};
+   if(!window.ForecastRolePolicy?.settingsEditor?.(role))throw Error('Akun ini tidak punya izin mengubah pengaturan.');
    try{await setDoc(ref,{config,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});}catch{throw Error('Izin penyimpanan pengaturan belum tersedia. Pengaturan belum berubah; gunakan Unduh pengaturan untuk menyimpan salinannya.');}
   };
  }catch{window.ForecastSourceCloud.status='Penyimpanan tim belum tersambung. Sumber bawaan tetap tersedia.';}

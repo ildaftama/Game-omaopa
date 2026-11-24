@@ -1,7 +1,7 @@
 'use strict';
 import {getApps,getApp,initializeApp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
-import {getFirestore,doc,getDoc,setDoc,collection,onSnapshot,writeBatch,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
+import {getFirestore,doc,getDoc,setDoc,deleteDoc,collection,onSnapshot,writeBatch,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 const app=getApps().some(a=>a.name==='[DEFAULT]')?getApp():initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
 const auth=getAuth(app),db=getFirestore(app),gate=document.getElementById('forecast-access-gate'),root=document.getElementById('forecast-app');
 let loaded=false,loading=null,generation=0,roleStop=null,liveStop=null,officeStop=null,boostStop=null,bundleSha=null,bundleSrc=null,dataStop=null,pendingData=false,pendingCode=false,lastAct=Date.now(),refreshing=false;
@@ -44,7 +44,27 @@ async function loadPrivate(role){
 }
 function importer(){const card=gate.querySelector('.forecast-login-card');if(!window.ForecastRolePolicy.manager(window.ForecastAuth?.role)||!card)return;card.insertAdjacentHTML('beforeend','<p>Data privat belum tersedia.</p><button type="button" data-private-import>Pilih paket data privat</button><input id="private-package" type="file" accept=".json" hidden><span id="private-import-status" role="status"></span>');}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function locked(message,login=false){stopLoader();root.hidden=true;gate.hidden=false;gate.innerHTML=`<div class="forecast-login-card"><span class="forecast-login-brand">OMA OPA CAKERY</span><h1>Forecast</h1><p>${esc(message)}</p>${login?'<form id="forecast-login"><label>Nomor HP<input name="phone" autocomplete="username" inputmode="tel" required></label><label>PIN<input name="pin" type="password" autocomplete="current-password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required></label><button type="submit">Masuk</button><span id="forecast-login-status" role="status"></span></form>':'<button type="button" data-gate-retry>Coba lagi</button>'}${auth.currentUser?'<button class="forecast-login-secondary" type="button" data-gate-signout>Ganti akun</button>':''}<small>Khusus Admin, Admin Utama, Master, dan Forecaster.</small></div>`;}
+// Login: metode lama (nomor HP + PIN) tetap ada. Akun baru memakai ID + password, dan bisa daftar
+// sendiri; akun yang daftar sendiri menunggu persetujuan Master (owner 2026-11-24).
+let loginMode='phone',registering=null;
+const FU_DOMAIN='forecast.omaopa.fun',idEmail=id=>String(id).trim().toLowerCase()+'@'+FU_DOMAIN;
+const idOk=id=>/^[a-z0-9][a-z0-9._-]{2,29}$/.test(String(id).trim().toLowerCase());
+const passOk=p=>typeof p==='string'&&p.length>=8&&p.length<=64&&/[a-zA-Z]/.test(p)&&/[0-9]/.test(p);
+function loginForm(){
+ const tabs=`<div class="fg-modes" role="tablist">${[['phone','Nomor HP & PIN'],['id','ID & password']].map(([k,l])=>`<button type="button" role="tab" class="${loginMode===k?'on':''}" aria-selected="${loginMode===k}" data-login-mode="${k}">${l}</button>`).join('')}</div>`;
+ const st='<span id="forecast-login-status" role="status"></span>';
+ if(loginMode==='register')return `<form id="forecast-register" class="fg-form"><label>ID<input name="id" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required></label><small class="fg-hint">3–30 huruf kecil, angka, titik, garis bawah, atau strip.</small><label>Nama<input name="name" autocomplete="name" maxlength="40" required></label><label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="64" required></label><small class="fg-hint">Minimal 8 karakter, campuran huruf dan angka.</small><label>Ulangi password<input name="password2" type="password" autocomplete="new-password" minlength="8" maxlength="64" required></label><button type="submit">Daftar</button>${st}<button type="button" class="forecast-login-secondary" data-login-mode="id">Sudah punya akun? Masuk</button></form>`;
+ if(loginMode==='id')return `${tabs}<form id="forecast-login-id" class="fg-form"><label>ID<input name="id" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required></label><label>Password<input name="password" type="password" autocomplete="current-password" maxlength="64" required></label><button type="submit">Masuk</button>${st}<button type="button" class="forecast-login-secondary" data-login-mode="register">Daftar akun baru</button></form>`;
+ return `${tabs}<form id="forecast-login" class="fg-form"><label>Nomor HP<input name="phone" autocomplete="username" inputmode="tel" required></label><label>PIN<input name="pin" type="password" autocomplete="current-password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required></label><button type="submit">Masuk</button>${st}</form>`;
+}
+function locked(message,login=false){stopLoader();root.hidden=true;gate.hidden=false;gate.innerHTML=`<div class="forecast-login-card"><span class="forecast-login-brand">OMA OPA CAKERY</span><h1>Forecast</h1><p>${esc(loginMode==='register'&&login?'Daftar akun Forecast. Akun aktif setelah disetujui Master.':message)}</p>${login?loginForm():'<button type="button" data-gate-retry>Coba lagi</button>'}${auth.currentUser?'<button class="forecast-login-secondary" type="button" data-gate-signout>Ganti akun</button>':''}<small>Khusus akun tim Forecast.</small></div>`;}
+// Peran akun: akun lama dari staff/{uid}, akun ID dari forecastUsers/{uid}.
+async function resolveRole(user){
+ if(!String(user.email||'').endsWith('@'+FU_DOMAIN)){const s=await getDoc(doc(db,'staff',user.uid));return {src:'staff',role:s.exists()?s.data():null,raw:null};}
+ const s=await getDoc(doc(db,'forecastUsers',user.uid)),d=s.exists()?s.data():null;return {src:'forecastUsers',role:window.ForecastRolePolicy.fromUser(d),raw:d};
+}
+const roleOf=(src,d)=>src==='staff'?d:window.ForecastRolePolicy.fromUser(d);
+function deniedText(r){const st=r.raw?.status;return st==='pending'?'Akun Anda sudah terdaftar dan sedang menunggu persetujuan Master.':st==='disabled'?'Akun ini dinonaktifkan Master.':r.src==='forecastUsers'?'Akun ini belum punya peran. Hubungi Master.':'Akun ini belum memiliki akses ke halaman Forecast.';}
 // Unduh modul bersamaan dengan data setelah akses terverifikasi. Hanya mengunduh, belum dijalankan.
 function preloadApp(){for(const tag of document.querySelectorAll('script[data-forecast-src]')){const l=document.createElement('link');l.rel='preload';l.as='script';l.href=tag.dataset.forecastSrc;document.head.appendChild(l);}}
 async function loadApp(){if(loaded)return;if(loading)return loading;loading=(async()=>{const tags=[...document.querySelectorAll('script[data-forecast-src]')],N=tags.length,M=Math.max(N-1,1);let done=0;flStage(3,22,22+56/M,`Modul 0 dari ${N-1}`);await nextPaint();await Promise.all(tags.map(tag=>new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=tag.dataset.forecastSrc;s.async=false;s.onload=()=>{done++;if(done>=N-1)flStage(4,78,99,'Menyusun dashboard, mohon tunggu');else flStage(3,22+56*done/M,22+56*(done+1)/M,`Modul ${done} dari ${N-1}`);resolve();};s.onerror=()=>reject(Error('load'));document.head.appendChild(s);})));loaded=true;})();return loading;}
@@ -59,14 +79,26 @@ onAuthStateChanged(auth,async user=>{const run=++generation;
  if(loaded){location.reload();return;}
  if(!user){locked('Masuk untuk membuka perencanaan dan data outlet.',true);return;}
  startLoader();
- try{flStage(0,2,5,'Memeriksa hak akses');const staff=await getDoc(doc(db,'staff',user.uid));if(run!==generation)return;const role=staff.exists()?staff.data():null;
-  if(!window.ForecastRolePolicy.planner(role)){locked('Akun ini belum memiliki akses ke halaman Forecast.');return;}
-  window.ForecastAuth={uid:user.uid,role};roleStop=onSnapshot(doc(db,'staff',user.uid),s=>{if(!window.ForecastRolePolicy.planner(s.exists()?s.data():null)){root.hidden=true;gate.hidden=false;locked('Akses akun ini sudah dinonaktifkan.');}},()=>{root.hidden=true;locked('Akses akun belum dapat diperiksa. Muat ulang halaman.');});
+ try{flStage(0,2,5,'Memeriksa hak akses');if(registering)await registering.catch(()=>{});const r=await resolveRole(user);if(run!==generation)return;const role=r.role;
+  if(!window.ForecastRolePolicy.viewer(role)){locked(deniedText(r));return;}
+  window.ForecastAuth={uid:user.uid,role,source:r.src};roleStop=onSnapshot(doc(db,r.src,user.uid),s=>{const d=s.exists()?s.data():null,next=roleOf(r.src,d);if(!window.ForecastRolePolicy.viewer(next)){root.hidden=true;gate.hidden=false;locked(r.src==='staff'?'Akses akun ini sudah dinonaktifkan.':deniedText({src:r.src,raw:d}));}else if(r.src!=='staff'&&next.fu!==window.ForecastAuth.role?.fu)location.reload();},()=>{root.hidden=true;locked('Akses akun belum dapat diperiksa. Muat ulang halaman.');});
   preloadApp();await loadPrivate(role);await loadApp();if(run!==generation)return;await finishLoader();if(run!==generation)return;gate.hidden=true;root.hidden=false;watchLive();
  }catch(e){if(run===generation){locked(e.message==='missing-private-data'?'Akun terverifikasi. Data privat sedang disiapkan.':'Data belum dapat dibuka. Periksa koneksi dan coba lagi.');importer();}}
 });
-gate.addEventListener('submit',async e=>{if(e.target.id!=='forecast-login')return;e.preventDefault();const form=e.target,button=form.querySelector('button'),status=document.getElementById('forecast-login-status');let phone=form.elements.phone.value.replace(/\D/g,'');if(phone.startsWith('0'))phone='62'+phone.slice(1);else if(phone.startsWith('8'))phone='62'+phone;button.disabled=true;status.textContent='Memeriksa akun…';try{await signInWithEmailAndPassword(auth,phone+'@phone.omaopa.fun',form.elements.pin.value);}catch{status.textContent='Nomor HP atau PIN tidak cocok, atau koneksi sedang bermasalah.';button.disabled=false;}});
-gate.addEventListener('click',e=>{if(e.target.closest('[data-gate-signout]'))signOut(auth);if(e.target.closest('[data-gate-retry]'))location.reload();if(e.target.closest('[data-private-import]'))document.getElementById('private-package').click();});
+gate.addEventListener('submit',async e=>{const form=e.target;if(!['forecast-login','forecast-login-id','forecast-register'].includes(form.id))return;e.preventDefault();const button=form.querySelector('button[type=submit]'),status=document.getElementById('forecast-login-status'),say=m=>{status.textContent=m;};
+ if(form.id==='forecast-login'){let phone=form.elements.phone.value.replace(/\D/g,'');if(phone.startsWith('0'))phone='62'+phone.slice(1);else if(phone.startsWith('8'))phone='62'+phone;button.disabled=true;say('Memeriksa akun…');try{await signInWithEmailAndPassword(auth,phone+'@phone.omaopa.fun',form.elements.pin.value);}catch{say('Nomor HP atau PIN tidak cocok, atau koneksi sedang bermasalah.');button.disabled=false;}return;}
+ const id=form.elements.id.value.trim().toLowerCase(),pw=form.elements.password.value;
+ if(form.id==='forecast-login-id'){if(!idOk(id)){say('ID tidak dikenal.');return;}button.disabled=true;say('Memeriksa akun…');try{await signInWithEmailAndPassword(auth,idEmail(id),pw);}catch{say('ID atau password tidak cocok, atau koneksi sedang bermasalah.');button.disabled=false;}return;}
+ const name=form.elements.name.value.trim();
+ if(!idOk(id))return say('ID harus 3–30 karakter: huruf kecil, angka, titik, garis bawah, atau strip.');
+ if(name.length<2)return say('Isi nama minimal 2 huruf.');
+ if(!passOk(pw))return say('Password minimal 8 karakter dan harus berisi huruf dan angka.');
+ if(pw!==form.elements.password2.value)return say('Ulangi password belum sama.');
+ button.disabled=true;say('Mendaftarkan akun…');
+ registering=(async()=>{const c=await createUserWithEmailAndPassword(auth,idEmail(id),pw);await setDoc(doc(db,'forecastUsers',c.user.uid),{id,name,status:'pending',role:'',createdAt:serverTimestamp()});})();
+ try{await registering;loginMode='id';}catch(err){say(err?.code==='auth/email-already-in-use'?'ID ini sudah dipakai. Pilih ID lain.':'Pendaftaran belum berhasil. Periksa koneksi lalu coba lagi.');button.disabled=false;}finally{registering=null;}
+});
+gate.addEventListener('click',e=>{const lm=e.target.closest('[data-login-mode]');if(lm){loginMode=lm.dataset.loginMode;locked('Masuk untuk membuka perencanaan dan data outlet.',true);gate.querySelector('input')?.focus();return;}if(e.target.closest('[data-gate-signout]'))signOut(auth);if(e.target.closest('[data-gate-retry]'))location.reload();if(e.target.closest('[data-private-import]'))document.getElementById('private-package').click();});
 gate.addEventListener('change',async e=>{if(e.target.id!=='private-package'||!e.target.files[0])return;const status=document.getElementById('private-import-status');try{
  if(!window.ForecastRolePolicy.manager(window.ForecastAuth?.role)||!auth.currentUser)throw Error('role');status.textContent='Memeriksa paket…';const p=JSON.parse(await e.target.files[0].text());await unpack(p);
  const batch=writeBatch(db),keys=p.chunks.map((payload,i)=>{const key='reference_'+p.sha256.slice(0,16)+'_'+i;batch.set(privateRef(key),{schemaVersion:2,kind:'reference-chunk',payload,sha256:p.sha256,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});return key;});
@@ -95,3 +127,19 @@ setInterval(async()=>{
  if(pendingCode&&idle>(document.hidden?2*60e3:IDLE_CODE)&&!busy()&&!NO_RELOAD.includes(window.ForecastFocus?.())){try{sessionStorage.setItem('forecast-restore',JSON.stringify({focus:window.ForecastFocus?.(),scroll:scrollY,at:Date.now()}));}catch{}location.reload();return;}
  if(pendingData&&bundleSrc&&idle>IDLE_DATA&&!busy()){refreshing=true;try{await silentData();}catch{}finally{refreshing=false;}}
 },20e3);
+// Kelola akun Forecast (khusus Master). Akun baru dibuat lewat app Firebase kedua supaya sesi
+// Master tidak ikut berganti. Password awal diketik Master sendiri di halaman ini.
+const fuRef=uid=>doc(db,'forecastUsers',uid);
+window.ForecastAccountsAPI={
+ idOk,passOk,domain:FU_DOMAIN,
+ listen(cb){return onSnapshot(collection(db,'forecastUsers'),s=>cb(s.docs.map(d=>({uid:d.id,...d.data()}))),()=>cb(null));},
+ async create({id,name,role,char,password}){
+  if(!window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role))throw Error('Hanya Master yang bisa membuat akun.');
+  const sec=getApps().find(a=>a.name==='fu-create')||initializeApp(app.options,'fu-create'),sa=getAuth(sec);
+  try{const c=await createUserWithEmailAndPassword(sa,idEmail(id),password);await setDoc(fuRef(c.user.uid),{id,name,role,status:'active',char:role==='forecaster'?char||'':'',createdAt:serverTimestamp(),approvedBy:auth.currentUser.uid});}
+  finally{await signOut(sa).catch(()=>{});}
+ },
+ async update(uid,patch){if(!window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role))throw Error('Hanya Master yang bisa mengubah akun.');await setDoc(fuRef(uid),{...patch,approvedBy:auth.currentUser.uid},{merge:true});},
+ async remove(uid){if(!window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role))throw Error('Hanya Master yang bisa menghapus akun.');await deleteDoc(fuRef(uid));},
+ me:()=>auth.currentUser?.uid||null,
+};

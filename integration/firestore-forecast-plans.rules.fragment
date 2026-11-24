@@ -3,17 +3,55 @@
 // Ordinary staff and old forecast-only grants do not grant access.
 function forecastManager() {
   return request.auth != null
-    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
-    && (get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('super',false) == true
-      || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true);
+    && ((exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+      && (get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('super',false) == true
+        || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true))
+      || forecastUserIn(['master','factory','spv']));
+}
+// Akun ID + password (owner 2026-11-24): peran di forecastUsers/{uid}, hanya berlaku saat status aktif.
+function forecastUserIn(roles) {
+  return request.auth != null
+    && exists(/databases/$(database)/documents/forecastUsers/$(request.auth.uid))
+    && get(/databases/$(database)/documents/forecastUsers/$(request.auth.uid)).data.get('status','') == 'active'
+    && get(/databases/$(database)/documents/forecastUsers/$(request.auth.uid)).data.get('role','') in roles;
 }
 // Forecaster: can read/write forecastPlans (plan + fulfillment) only.
 // Never grants the private reference bundle, the old access-grant collection or settings.
-function forecastPlanner() {
+function staffPlanner() {
   return request.auth != null && exists(/databases/$(database)/documents/staff/$(request.auth.uid)) && forecastPlannerRole(get(/databases/$(database)/documents/staff/$(request.auth.uid)).data);
+}
+function forecastPlanner() {
+  return staffPlanner() || forecastUserIn(['master','factory','spv','forecaster']);
+}
+// Data Analis hanya membaca.
+function forecastViewer() {
+  return forecastPlanner() || forecastUserIn(['analyst']);
 }
 function forecastPlannerRole(s) {
   return s.get('super',false) == true || s.get('master',false) == true || s.get('admin',false) == true || s.get('forecaster',false) == true;
+}
+function forecastUserValid(d) {
+  return d.keys().hasOnly(['id','name','status','role','char','createdAt','approvedBy'])
+    && d.id is string && d.id.matches('^[a-z0-9][a-z0-9._-]{2,29}$')
+    && d.name is string && d.name.size() > 0 && d.name.size() <= 40
+    && d.status in ['pending','active','disabled']
+    && d.role in ['','master','factory','spv','forecaster','analyst']
+    && (!('char' in d) || d.char in ['','f1','f2']);
+}
+// Daftar sendiri: hanya akun @forecast.omaopa.fun miliknya, status menunggu, tanpa peran.
+// Peran, status dan penghapusan hanya oleh Master.
+match /forecastUsers/{uid} {
+  allow read: if request.auth != null && (request.auth.uid == uid || forecastViewer() || forecastMasterUser());
+  allow create: if (request.auth != null && request.auth.uid == uid
+      && request.auth.token.email == request.resource.data.id + '@forecast.omaopa.fun'
+      && request.resource.data.keys().hasOnly(['id','name','status','role','createdAt'])
+      && request.resource.data.status == 'pending' && request.resource.data.role == ''
+      && request.resource.data.createdAt == request.time
+      && forecastUserValid(request.resource.data))
+    || (forecastMasterUser() && forecastUserValid(request.resource.data));
+  allow update: if forecastMasterUser() && forecastUserValid(request.resource.data)
+    && request.resource.data.id == resource.data.id;
+  allow delete: if forecastMasterUser();
 }
 match /forecastAccess/{uid} {
   allow read: if forecastManager();
@@ -39,7 +77,7 @@ match /forecastAccess/{uid} {
 // client). Sumber data, ambang batas, tampilan & daftar produk boleh diubah semua akun Forecast.
 match /settings/forecastSources {
   allow read: if notRadarSyncAccount() && (true);
-  allow write: if notRadarSyncAccount() && (forecastPlanner());
+  allow write: if notRadarSyncAccount() && (staffPlanner() || forecastUserIn(['master','factory','spv']));
 }
 function forecastReference(d, key) {
   return d.schemaVersion == 2 && forecastManager()
@@ -95,11 +133,12 @@ function forecastOpenDate(date) {
 }
 function forecastMasterUser() {
   return request.auth != null
-    && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
-    && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true;
+    && ((exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+      && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true)
+      || forecastUserIn(['master']));
 }
 match /forecastPlans/{key} {
-  allow read: if forecastPlanner();
+  allow read: if forecastViewer();
   allow create: if forecastReference(request.resource.data,key) || (forecastPlanner() && forecastRecord(request.resource.data,key)
     && (forecastOpenDate(request.resource.data.date) || forecastMasterUser())
     && request.resource.data.revision == 1
@@ -125,7 +164,7 @@ match /forecastPlans/{key} {
   // Dokumen tidak pernah benar-benar dihapus: "hapus" = tanda deleted + entri log permanen.
   allow delete: if false;
   match /revisions/{revision} {
-    allow read: if forecastPlanner();
+    allow read: if forecastViewer();
     // The matching parent is validated above in the same atomic write.
     // Avoid evaluating the entire 12-SKU payload twice for one revision.
     allow create: if forecastPlanner()
@@ -138,7 +177,7 @@ match /forecastPlans/{key} {
   // Separate from revisions: what was actually shipped (production), recorded after the
   // fact and possibly by someone other than the forecaster. Never perturbs plan/baseline.
   match /fulfillment/{entry} {
-    allow read: if forecastPlanner();
+    allow read: if forecastViewer();
     allow create, update: if forecastPlanner() && entry == 'current'
       && request.resource.data.keys().hasOnly(['schemaVersion','shipped','recordedAt','recordedBy','note'])
       && request.resource.data.schemaVersion == 1
@@ -176,7 +215,7 @@ function forecastRestoreMark() {
     && request.resource.data.get('deleted', null) == null;
 }
 match /forecastPlanLog/{id} {
-  allow read: if forecastPlanner();
+  allow read: if forecastViewer();
   allow create: if forecastPlanner()
     && request.resource.data.keys().hasOnly(['schemaVersion','action','key','date','outlet','revision','reason','by','byName','at','regular','orders'])
     && request.resource.data.schemaVersion == 1
@@ -209,13 +248,13 @@ function forecastBrief(d, key) {
       && d.payload is string && d.payload.size() <= 700000));
 }
 match /forecastBriefs/{key} {
-  allow read: if forecastPlanner();
+  allow read: if forecastViewer();
   allow create, update: if forecastBrief(request.resource.data, key);
   allow delete: if false;
 }
 // Kantor Mini: arahan terakhir untuk karakter forecaster, supaya gerakannya sama di semua layar.
 match /officeState/{id} {
-  allow read: if forecastPlanner();
+  allow read: if forecastViewer();
   allow create, update: if forecastPlanner() && id in ['f1','f2']
     && request.resource.data.keys().hasOnly(['act','x','y','at','by','cid'])
     && request.resource.data.act in ['go','kopi','snack','makan','sofa','nap','toilet','kerja']

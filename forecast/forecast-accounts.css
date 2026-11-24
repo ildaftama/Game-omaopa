@@ -1,0 +1,19 @@
+.fa-card{margin-bottom:12px}
+.fa-card h3 small{color:#6d7d8d;font-size:12px;font-weight:600}
+.fa-new{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin:8px 0 10px}
+.fa-new label{display:grid;gap:5px;font-size:12px;color:#4a5a69}
+.fa-new input,.fa-new select,.fa-ctl select{box-sizing:border-box;width:100%;min-height:36px;padding:7px 9px;border:1px solid #d7e1e8;border-radius:8px;background:#fff;font:inherit;font-size:13px}
+.fa-row{display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(0,1.6fr) auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid #edf1f4}
+.fa-who b{display:block;color:#172b42;font-size:14px}
+.fa-who span{color:#6d7d8d;font-size:12px}
+.fa-ctl{display:flex;flex-wrap:wrap;gap:6px}
+.fa-ctl select{width:auto;min-width:150px}
+.fa-acts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.fa-me{color:#6d7d8d;font-size:12px}
+.fa-bad{color:#b83a31}
+.fg-modes{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:20px;padding:4px;border-radius:10px;background:#eef3f6}
+.forecast-login-card .fg-modes button{padding:8px 6px;background:transparent;color:#205f70;font-weight:600}
+.forecast-login-card .fg-modes button.on{background:#205f70;color:#fff}
+.forecast-login-card .fg-form{margin-top:18px}
+.forecast-login-card .fg-hint{margin:-10px 0 0;font-size:11px}
+@media(max-width:640px){.fa-row{grid-template-columns:minmax(0,1fr)}.fa-acts{justify-content:flex-start}}

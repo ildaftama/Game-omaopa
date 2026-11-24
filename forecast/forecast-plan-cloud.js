@@ -36,9 +36,11 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
   authSDK.onAuthStateChanged(auth,async u=>{
    const current=++generation;stop?.();stopLog?.();cloud.records=[];cloud.allRecords=[];cloud.log=[];cloud.canManage=false;cloud.uid=null;cloud.state='loading';emit();
    if(!u){cloud.state='signed-out';cloud.message='Masuk dengan akun staf untuk melihat dan menyimpan rencana tim.';emit();return;}
-   try{const s=await dbSDK.getDoc(dbSDK.doc(db,'staff',u.uid));if(current!==generation)return;
-    if(!s.exists()){cloud.state='not-staff';cloud.message='Akun ini belum terdaftar sebagai staf.';emit();return;}
-    const role=s.data(),privileged=policy.planner(role);staffName=String(role.name||role.nama||role.displayName||u.displayName||u.email||'').slice(0,100);cloud.canManage=role.super===true||role.master===true;cloud.isForecaster=policy.forecasterOnly(role);
+   try{const fu=String(u.email||'').endsWith('@'+policy.DOMAIN),s=await dbSDK.getDoc(dbSDK.doc(db,fu?'forecastUsers':'staff',u.uid));if(current!==generation)return;
+    const role=fu?policy.fromUser(s.exists()?s.data():null):(s.exists()?s.data():null);
+    if(!role){cloud.state='not-staff';cloud.message=fu?'Akun ini belum aktif.':'Akun ini belum terdaftar sebagai staf.';emit();return;}
+    const privileged=policy.planner(role);staffName=String(role.name||role.nama||role.displayName||u.displayName||u.email||'').slice(0,100);cloud.canManage=role.super===true||role.master===true;cloud.isForecaster=policy.forecasterOnly(role);
+    if(!privileged&&policy.viewer(role)){cloud.state='readonly';cloud.uid=u.uid;cloud.message='Akun ini hanya bisa melihat rencana tim.';subscribe();emit();return;}
     if(!privileged){cloud.state='no-access';cloud.message='Khusus Admin, Admin Utama, Master, dan Forecaster.';emit();return;}
     cloud.state='ready';cloud.uid=u.uid;cloud.message='Akun staf tersambung.';subscribe();emit();
    }catch{if(current!==generation)return;cloud.state='error';cloud.message='Akun staf belum bisa diperiksa. Coba muat ulang halaman.';emit();}
@@ -61,7 +63,7 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
   // rencana. Staf yang tidak boleh membaca dokumen staf lain cukup melihat "Akun staf".
   const names=new Map();
   cloud.staffName=uid=>{if(!uid)return '';if(uid===cloud.uid)return staffName||'Anda';if(names.has(uid))return names.get(uid);names.set(uid,null);
-   dbSDK.getDoc(dbSDK.doc(db,'staff',uid)).then(s=>{const d=s.exists()?s.data():{};names.set(uid,String(d.name||d.nama||d.displayName||'').slice(0,60)||'Akun staf');emit();}).catch(()=>{names.set(uid,'Akun staf');emit();});return null;};
+   dbSDK.getDoc(dbSDK.doc(db,'staff',uid)).then(s=>s.exists()?s:dbSDK.getDoc(dbSDK.doc(db,'forecastUsers',uid))).then(s=>{const d=s.exists()?s.data():{};names.set(uid,String(d.name||d.nama||d.displayName||'').slice(0,60)||'Akun staf');emit();}).catch(()=>{names.set(uid,'Akun staf');emit();});return null;};
   cloud.getRevisions=async key=>{const s=await dbSDK.getDocs(dbSDK.collection(db,'forecastPlans',key,'revisions'));return s.docs.map(d=>d.data()).sort((a,b)=>a.revision-b.revision);};
   // Hapus rencana: dokumen & semua revisinya TETAP ada; hanya diberi tanda "deleted" + entri
   // log permanen (alasan wajib) dalam satu tulisan. Satu outlet per tulisan.

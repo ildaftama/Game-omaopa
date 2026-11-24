@@ -41,8 +41,11 @@ window.ForecastSettings=(()=>{
  // Revisi owner 2026-11-10: yang dikunci khusus Master hanya "Data pendukung". Sumber data,
  // ambang batas, tampilan & produk boleh diubah semua akun Forecast (rules settings/forecastSources
  // ikut dilonggarkan ke forecastPlanner()).
- const isMaster=()=>window.ForecastAuth?.role?.master===true;
- const canEdit=()=>!!window.ForecastRolePolicy?.planner?.(window.ForecastAuth?.role);
+ // Owner 2026-11-24: Factory Manager & SPV Logistik setara Master untuk pengaturan; Forecaster dan
+ // Data Analis akun baru hanya melihat. Kelola akun khusus Master.
+ const isMaster=()=>!!window.ForecastRolePolicy?.fullSettings?.(window.ForecastAuth?.role);
+ const canEdit=()=>!!window.ForecastRolePolicy?.settingsEditor?.(window.ForecastAuth?.role);
+ const isAccountAdmin=()=>!!window.ForecastRolePolicy?.accountAdmin?.(window.ForecastAuth?.role);
  let section='sources',status='',prod=null;
  const P=()=>window.ForecastProducts;
  // Tab Produk (desain ulang 2026-11-10): produk dikelompokkan per kategori seperti urutan di
@@ -165,7 +168,7 @@ window.ForecastSettings=(()=>{
  window.addEventListener('forecast-office-data',()=>{if(section==='support')window.dispatchEvent(new Event('forecast-settings-changed'));});
  function render(){
   const p=get(),dis=canEdit()?'':'disabled',sources=window.DATA_SOURCES?.sources||[];
-  const tabs=[['sources','Sumber data'],['thresholds','Ambang batas'],['display','Tampilan'],['products','Produk'],['support','Data pendukung'+(isMaster()?'':' 🔒')],...(isMaster()?[['experiment','Eksperimen']]:[])].map(([k,l])=>`<button type="button" class="fs-tab ${section===k?'active':''}" data-settings-tab="${k}" aria-pressed="${section===k}">${l}</button>`).join('');
+  const tabs=[['sources','Sumber data'],['thresholds','Ambang batas'],['display','Tampilan'],['products','Produk'],['support','Data pendukung'+(isMaster()?'':' 🔒')],...(isMaster()?[['experiment','Eksperimen']]:[]),...(isAccountAdmin()?[['accounts','Akun & akses']]:[])].map(([k,l])=>`<button type="button" class="fs-tab ${section===k?'active':''}" data-settings-tab="${k}" aria-pressed="${section===k}">${l}</button>`).join('');
   let body='';
   if(section==='sources')body=`<div class="fs-grid">${sources.map(s=>sourceCard(s,dis)).join('')}
    <article class="workspace-card fs-card"><div class="fs-card-head"><div><h3>Cuaca</h3><span class="fs-sync auto">Langsung saat dibuka</span></div><a href="https://open-meteo.com/en/docs" target="_blank" rel="noopener">Open-Meteo ↗</a></div><p class="fs-use">Ramalan publik Open-Meteo (gratis, tanpa key) dari koordinat tiap outlet; "Sekarang" diperbarui tiap 15 menit.</p><label>Model cuaca<select data-pref="weather:model" ${dis}>${WEATHER_MODELS.map(([v,l])=>`<option value="${v}" ${p.weather.model===v?'selected':''}>${esc(l)}</option>`).join('')}</select></label><div class="fs-row">${WEATHER_FIELDS.map(f=>numberField(f,'weather',p.weather[f[0]],dis)).join('')}</div></article>
@@ -176,9 +179,10 @@ window.ForecastSettings=(()=>{
   else if(section==='products')body=productsBody(dis);
   // Eksperimen (owner 2026-11-12): tab hanya muncul untuk Master; isinya terpisah di forecast-experiment.js.
   else if(section==='experiment')body=isMaster()&&window.ForecastExperiment?window.ForecastExperiment.render():'<article class="workspace-card"><p class="fs-lock">🔒 Eksperimen hanya bisa dibuka akun Master.</p></article>';
+  else if(section==='accounts')body=isAccountAdmin()&&window.ForecastAccounts?window.ForecastAccounts.render():'<article class="workspace-card"><p class="fs-lock">🔒 Akun & akses hanya bisa dibuka akun Master.</p></article>';
   else if(!isMaster())body=`<article class="workspace-card"><p class="fs-lock">🔒 Data pendukung hanya bisa dibuka akun Master.</p></article>`;
   else body=`${officeLinkCard()}<article class="workspace-card"><p class="fs-use">Data rinci & analisa pendukung. Pilih untuk membuka.</p><div class="fs-support">${SUPPORT_VIEWS.map(([k,l])=>`<button type="button" class="fs-support-btn" data-support-view="${k}">${esc(l)}<span>→</span></button>`).join('')}</div></article>`;
-  const actions=section==='support'||section==='experiment'?'':canEdit()?`<div class="fs-actions ${section==='products'?'fsp-actions'+(prodDirty()?' dirty':''):''}"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status||(section==='products'&&prodDirty()?'Ada perubahan yang belum disimpan.':''))}</span></div>`:`<p class="fs-lock">🔒 Akun ini belum punya akses Forecast untuk mengubah pengaturan.</p>`;
+  const actions=section==='support'||section==='experiment'||section==='accounts'?'':canEdit()?`<div class="fs-actions ${section==='products'?'fsp-actions'+(prodDirty()?' dirty':''):''}"><button type="submit" class="button fp-primary">Simpan untuk tim</button><button type="button" class="button quiet" data-settings-reset>Kembalikan bawaan</button><span id="fs-status" role="status">${esc(status||(section==='products'&&prodDirty()?'Ada perubahan yang belum disimpan.':''))}</span></div>`:`<p class="fs-lock">🔒 Akun ini belum punya akses Forecast untuk mengubah pengaturan.</p>`;
   return `<div class="focus-intro"><h2>Pengaturan</h2><span>Berlaku untuk seluruh tim</span></div><div class="fs-tabs">${tabs}</div><form id="forecast-settings-form" novalidate>${body}${actions}</form>`;
  }
  function collect(form){
@@ -213,6 +217,7 @@ window.ForecastSettings=(()=>{
  function submit(e){
   if(e.target.id!=='forecast-settings-form')return false;
   e.preventDefault();
+  if(section==='accounts')return true;
   if(document.activeElement?.id==='fs-office-link'){saveOfficeLink();return true;}
   if(document.activeElement?.id==='fs-cat-new'){addCategory(e.target);rerender();setTimeout(()=>document.getElementById('fs-cat-new')?.focus(),0);return true;}
   if(document.activeElement?.id==='fs-prod-new-name'){addProduct(e.target);rerender();setTimeout(()=>document.getElementById('fs-prod-new-name')?.focus(),0);return true;}
@@ -221,6 +226,7 @@ window.ForecastSettings=(()=>{
  }
  function click(e){
   const t=e.target.closest('[data-settings-tab]');if(t){section=t.dataset.settingsTab;status='';prod=null;return 'render';}
+  if(section==='accounts'&&window.ForecastAccounts?.click(e))return false;
   if(e.target.closest('[data-office-link-save]')){saveOfficeLink();return false;}
   const sv=e.target.closest('[data-support-view]');if(sv)return isMaster()?{support:sv.dataset.supportView}:false;
   const form=e.target.closest('form');
