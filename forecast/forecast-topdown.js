@@ -593,7 +593,7 @@ window.ForecastTopdown=(()=>{
   if(e.target.closest('[data-ft-prod-apply]')){if(proposal){const ids=new Set();for(const [p,pr] of proposal.map)for(const x of pr.list){const cur=qtyOf(draft.cells[x.id][p]);draft.cells[x.id][p]=String(Math.max(0,cur+x.delta));ids.add(x.id);}persist();message=`Penyesuaian angkatan diterapkan ke ${ids.size} outlet (kotak kuning). Teliti lalu simpan ke tim.`;proposal=null;}return true;}
   if(e.target.closest('[data-ft-prod-download]')){window.ForecastShipping?.exportProduction?.(date,false);return false;}
   if(e.target.closest('[data-ft-prod-share]')){window.ForecastShipping?.exportProduction?.(date,true);return false;}
-  if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.';return true;}saveAll();return true;}
+  if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.';return true;}requestSave();return true;}
   return false;
  }
  // Navigasi ala spreadsheet di tabel area: Enter/↓ ke bawah, Shift+Enter/↑ ke atas (panah tidak
@@ -620,6 +620,15 @@ window.ForecastTopdown=(()=>{
  // = puluhan render penuh dalam beberapa detik -> layar berkedip). Pesan progres diperbarui di
  // tempat; render penuh sekali di akhir.
  const say=t=>{message=t;const m=q('.ft-msg');if(m){m.textContent=t;m.hidden=false;}};
+ // Owner 2026-11-24: produk reguler berstatus Tidak laku perlu konfirmasi sebelum disimpan. Pesanan tidak dihitung.
+ let askingSave=false;
+ function requestSave(){
+  if(saving||askingSave)return;
+  let list=[];const todo=compute().ids.filter(id=>statusOf(id)[0]!=='saved');
+  try{const core=Array(12).fill(0),extra={};for(const id of todo){(draft.cells[id]||[]).forEach((v,p)=>{core[p]+=qtyOf(v)||0;});for(const nm of draft.names){const n=qtyOf(draft.extra[id]?.[nm]?.r)||0;if(n>0)extra[nm]=(extra[nm]||0)+n;}}list=window.ForecastWasteLost?.criticalFor?.({core,extra})||[];}catch{list=[];}
+  if(!list.length){saveAll();return;}
+  askingSave=true;window.ForecastWasteLost.confirmPlan(list,todo.length).then(ok=>{askingSave=false;if(ok)saveAll();},()=>{askingSave=false;});
+ }
  async function saveAll(){
   const c=compute(),todo=c.ids.filter(id=>statusOf(id)[0]!=='saved'),bad=v=>v===''||!model.integer(Number(v)),facTodo=!!draft.fac&&facStatus()[0]!=='saved';
   if(facTodo&&draft.fac.cells.some(bad)){message='Angka pesanan pabrik belum valid (harus bilangan bulat 0–10000).';rerender();return;}

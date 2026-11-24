@@ -1367,7 +1367,7 @@ window.ForecastDashboard=(()=>{
   if(show.weather)ensureWeather(outletId);
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
-   ${(()=>{const accHtml=show.accuracy?accuracyCard(trend,outletId):'';return `${briefCard(trend,outletId)}
+   ${(()=>{const accHtml=show.accuracy?accuracyCard(trend,outletId):'';return `${window.ForecastWasteLost?.noticeHtml?.()||''}${briefCard(trend,outletId)}
    ${intradayCard(trend,outletId)}
    ${accHtml}`;})()}
    ${fold('mon','Monitoring rencana tim','rencana vs penjualan per tanggal, outlet & produk · performa bulanan',window.ForecastWorkspace?.monitorSection?.()||'')}
