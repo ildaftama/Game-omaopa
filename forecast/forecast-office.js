@@ -2,15 +2,16 @@
 // Nama staf dan jadwal datang dari dokumen privat, tidak ditulis di file publik ini.
 window.ForecastOffice=(()=>{
 'use strict';
-const TEMPLATE='<div class="kt-top"><span><b id="kt-clock">--.--</b> WIB · <span id="kt-phase"></span></span></div><div class="kt-layout"><div><div class="kt-stage"><canvas id="kt-game" width="1664" height="1088" tabindex="0" aria-label="Kantor Agen AI. Klik karakter untuk menghampiri dan mengobrol, klik lantai untuk menggerakkan forecaster, klik mesin kopi, snack, kulkas, sofa, atau toilet untuk beraktivitas."></canvas></div><div class="kt-dock" id="kt-dock" aria-label="Aksi forecaster"></div><p class="kt-hint" id="kt-dockHint"></p></div><aside><section class="kt-card"><h2>Tim kantor</h2><div class="kt-roster" id="kt-roster"></div></section><section class="kt-card"><h2>Kondisi hari ini</h2><div class="stats" id="kt-stats"></div></section></aside></div>';
+const TEMPLATE='<div class="kt-top"><span><b id="kt-clock">--.--</b> WIB · <span id="kt-phase"></span></span></div><div class="kt-layout"><div><div class="kt-stage"><canvas id="kt-game" width="1984" height="1088" tabindex="0" aria-label="Kantor Agen AI. Klik karakter untuk menghampiri dan mengobrol, klik lantai untuk menggerakkan forecaster, klik mesin kopi, snack, kulkas, sofa, atau toilet untuk beraktivitas."></canvas></div><div class="kt-dock" id="kt-dock" aria-label="Aksi forecaster"></div><p class="kt-hint" id="kt-dockHint"></p></div><aside><section class="kt-card"><h2>Tim kantor</h2><div class="kt-roster" id="kt-roster"></div></section><section class="kt-card"><h2>Kondisi hari ini</h2><div class="stats" id="kt-stats"></div></section></aside></div>';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let api=null;
 function boot(){
 const root=document.createElement('div');root.className='kantor';root.innerHTML=TEMPLATE;
 const $=id=>root.querySelector('#kt-'+id),view=$('game'),out=view.getContext('2d');
-const T=16,COLS=26,ROWS=17,VW=COLS*T,VH=ROWS*T,Z=view.width/VW;
-const low=document.createElement('canvas');low.width=VW*2;low.height=VH*2;const lc=low.getContext('2d');lc.setTransform(2,0,0,2,0,0);
-const bgC=document.createElement('canvas');bgC.width=VW*2;bgC.height=VH*2;bgC.getContext('2d').setTransform(2,0,0,2,0,0);let c=lc;
+// OX: ruang manajer di kiri (owner 2026-11-24). Dunia lama tetap x 0..25, ruang baru x -5..-1.
+const T=16,COLS=26,ROWS=17,OX=5,VW=COLS*T,VWT=(COLS+OX)*T,VH=ROWS*T,Z=view.width/VWT;
+const low=document.createElement('canvas');low.width=VWT*2;low.height=VH*2;const lc=low.getContext('2d');lc.setTransform(2,0,0,2,0,0);
+const bgC=document.createElement('canvas');bgC.width=VWT*2;bgC.height=VH*2;bgC.getContext('2d').setTransform(2,0,0,2,0,0);let c=lc;
 const OL='#3a2d3f';
 const half=v=>Math.round(v*2)/2,R=(x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(half(x),half(y),half(w),half(h));};
 const box=(x,y,w,h,f,o=OL)=>{R(x,y,w,h,o);R(x+1,y+1,w-2,h-2,f);};
@@ -27,14 +28,24 @@ const V=(x,a,b,doors=[])=>{for(let y=a;y<=b;y++)if(!doors.includes(y))blocked.ad
 B(0,0,25,2);B(0,0,0,16);B(25,0,25,16);B(0,16,25,16);V(17,3,15,[5,6,12,13]);B(18,9,24,9);V(21,10,15,[13]);
 B(1,3,3,3);B(2,6,4,7);B(6,6,8,7);B(10,6,12,7);B(14,6,16,7);B(6,12,11,13);B(13,12,14,13);B(1,15,1,15);B(16,15,16,15);B(1,11,2,12);
 B(18,3,24,4);B(20,7,21,8);B(18,10,20,11);B(19,14,19,14);B(18,15,18,15);B(22,10,22,10);B(24,10,24,10);
+B(-OX,0,-1,2);B(-OX,0,-OX,16);B(-OX,16,-1,16);B(-4,4,-2,5);B(-4,10,-2,11);blocked.delete(key(0,9));blocked.delete(key(0,10));
 const SPOT={kopi:[[19,5]],snack:[[21,5]],kulkas:[[23,5]],eat:[[19,7],[22,7]],sofa:[[18,12],[20,12]],toilet:[[23,11]]};
 const PLACE={rack:[2,4],white:[7,4],board:[11,4],radar:[15,4],printer:[13,14],toPred:[9,8],toFc:[12,14],toWatch:[13,8]};
-function route(a,b){const st=key(a[0],a[1]),go=key(b[0],b[1]);if(st===go)return [];const q=[[a[0],a[1]]],prev=new Map([[st,null]]);for(let i=0;i<q.length;i++){const [x,y]=q[i];if(key(x,y)===go)break;for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,k=key(nx,ny);if(nx<0||ny<0||nx>=COLS||ny>=ROWS||blocked.has(k)||prev.has(k))continue;prev.set(k,[x,y]);q.push([nx,ny]);}}if(!prev.has(go))return [];const p=[];let cur=[b[0],b[1]];while(key(cur[0],cur[1])!==st){p.unshift(cur);cur=prev.get(key(cur[0],cur[1]));}return p;}
-function nearestFree(x,y){if(!blocked.has(key(x,y)))return [x,y];const seen=new Set([key(x,y)]),q=[[x,y]];for(let i=0;i<q.length;i++)for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]){const nx=q[i][0]+dx,ny=q[i][1]+dy,k=key(nx,ny);if(nx<1||ny<3||nx>=COLS-1||ny>=ROWS-1||seen.has(k))continue;if(!blocked.has(k))return [nx,ny];seen.add(k);q.push([nx,ny]);}return [x,y];}
+function route(a,b){const st=key(a[0],a[1]),go=key(b[0],b[1]);if(st===go)return [];const q=[[a[0],a[1]]],prev=new Map([[st,null]]);for(let i=0;i<q.length;i++){const [x,y]=q[i];if(key(x,y)===go)break;for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,k=key(nx,ny);if(nx<-OX||ny<0||nx>=COLS||ny>=ROWS||blocked.has(k)||prev.has(k))continue;prev.set(k,[x,y]);q.push([nx,ny]);}}if(!prev.has(go))return [];const p=[];let cur=[b[0],b[1]];while(key(cur[0],cur[1])!==st){p.unshift(cur);cur=prev.get(key(cur[0],cur[1]));}return p;}
+function nearestFree(x,y){if(!blocked.has(key(x,y)))return [x,y];const seen=new Set([key(x,y)]),q=[[x,y]];for(let i=0;i<q.length;i++)for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]){const nx=q[i][0]+dx,ny=q[i][1]+dy,k=key(nx,ny);if(nx<1-OX||ny<3||nx>=COLS-1||ny>=ROWS-1||seen.has(k))continue;if(!blocked.has(k))return [nx,ny];seen.add(k);q.push([nx,ny]);}return [x,y];}
 
 // ===== Latar =====
+// Ruang manajer di sisi kiri (owner 2026-11-24): meja Factory Manager & SPV Logistik.
+function leftRoom(){
+ const x0=-OX*T,w=OX*T;
+ for(let y=3;y<ROWS;y++)for(let x=-OX;x<0;x++){const px=x*T,py=y*T,h=hash(x+40,y);R(px,py,T,T,(x+y)%2?'#e4e9f1':'#dbe2ec');R(px,py,T,1,'rgba(150,165,190,.35)');R(px,py,1,T,'rgba(150,165,190,.35)');if(h>.8)R(px+h*10,py+h*8,2,1,'#cdd6e3');}
+ R(x0,0,w,48,'#f3ecf6');for(let x=x0;x<0;x+=8)for(let y=4;y<30;y+=8)if((x+y)%16===4)R(x,y,1,1,'#e3d6ea');R(x0,30,w,16,'#b9c8e6');for(let x=x0;x<0;x+=8)R(x,30,1,16,'#a4b6dc');R(x0,29,w,2,'#fbf7fd');R(x0,45,w,3,'#6e7fae');R(x0,48,w,2,'rgba(58,45,63,.18)');
+ R(x0,0,w,3,OL);R(x0,0,T-6,VH,OL);R(x0,VH-T+6,w,T,OL);
+ box(x0+20,8,34,14,'#fffaf2');R(x0+24,12,26,2,'#6e7fae');R(x0+24,16,18,2,'#b9c8e6');
+ box(x0+60,7,14,14,'#fff');R(x0+66,10,1,5,OL);R(x0+66,14,4,1,OL);
+}
 function buildBG(){
- c=bgC.getContext('2d');
+ c=bgC.getContext('2d');c.save();c.translate(OX*T,0);leftRoom();
  for(let y=3;y<ROWS;y++)for(let x=0;x<COLS;x++){const px=x*T,py=y*T,h=hash(x,y);
   if(x>17&&y<9){R(px,py,T,T,(x+y)%2?'#fff3e4':'#fbd9cf');R(px,py,T,1,'rgba(205,150,140,.3)');R(px,py,1,T,'rgba(205,150,140,.3)');}
   else if(x>21&&y>9){R(px,py,T,T,(x+y)%2?'#d4f0ea':'#bde6de');R(px,py,T,1,'#a5d7cd');R(px,py,1,T,'#a5d7cd');}
@@ -56,7 +67,9 @@ function buildBG(){
  frame(88,6,16,20,(x,y,w,h)=>{R(x,y,w,h,'#ffc2d1');ell(x+6,y+8,4,4,'#e8799a');R(x+1,y+h-3,w-2,1,'#fff');});
  frame(282,6,18,20,(x,y,w,h)=>{R(x,y,w,h,'#bfe6ff');ell(x+7,y+6,3,3,'#ffe27a');R(x,y+h-5,w,5,'#79c98f');});
  R(3*T+12,16*T-2,24,12,'#a97f5a');R(3*T+13,16*T-1,22,11,'#c79d72');R(3*T+24,16*T-1,1,11,'#8f6a4a');box(3*T+10,15*T+8,28,7,'#8f6f52');R(3*T+13,15*T+10,22,1,'#b08f6e');R(3*T+13,15*T+12,22,1,'#b08f6e');
- c=lc;
+ // pintu ke ruang manajer
+ for(const y of [9,10]){R(0,y*T,T-6,T,'#d6b48a');R(0,y*T,T-6,1,'#b89268');}R(0,9*T-1,T-6,1,OL);R(0,11*T,T-6,1,OL);
+ c.restore();c=lc;
 }
 
 // ===== Benda dinamis =====
@@ -90,6 +103,8 @@ function papers(x,y,n){for(let i=0;i<Math.min(n,5);i++){box(x,y-i,10,7,'#fffef8'
 function plant(x,y,big=false){box(x+3,y+8,10,8,'#ffb7a1');R(x+4,y+9,8,2,'#ffd2c2');R(x+7,y+1,2,8,'#4f9b6c');const l=big?[[1,2,6],[9,0,6],[0,6,6],[10,5,6],[5,-3,6]]:[[2,2,5],[9,1,5],[5,-2,5]];for(const [a,b,w] of l){box(x+a,y+b,w,5,'#7ad192','#3f7d58');R(x+a+1,y+b+1,w-3,1,'#a8ecb8');}}
 
 const PROPS=[
+ {y:5*T+11,d(){desk(-4*T,4*T+4,48,'#d9dde6');monitor(-4*T+7,3*T+6,26,16,(x,y,w,h)=>{R(x,y,w,h,'#22324a');for(let i=0;i<5;i++){const v=(Math.sin(S.t*.7+i)*.5+.5)*.7+.2;R(x+2+i*4.5,y+h-2-v*(h-5),3,v*(h-5),i===4?'#ffd166':'#7fb3ff');}});kb(-4*T+14,5*T+6);papers(-2*T+3,5*T+9,2);}},
+ {y:11*T+11,d(){desk(-4*T,10*T+4,48,'#dfe9f7');monitor(-4*T+7,9*T+6,26,16,(x,y,w,h)=>{R(x,y,w,h,'#f4f8ff');c.strokeStyle='#4f8fd9';c.lineWidth=1;c.beginPath();c.moveTo(x+3,y+h-4);c.lineTo(x+9,y+5);c.lineTo(x+15,y+h-6);c.lineTo(x+w-3,y+4);c.stroke();for(const [a,b] of [[3,h-4],[9,5],[15,h-6],[w-3,4]])R(x+a-1,y+b-1,2,2,'#e8799a');});kb(-4*T+14,11*T+6);box(-2*T+2,11*T+2,10,8,'#fff4c9');}},
  {y:7*T+11,d(){desk(2*T,6*T+4,48);monitor(2*T+4,5*T+7,20,14,scrEsb);monitor(3*T+9,5*T+9,17,12,scrEsb);kb(2*T+17,7*T+6);}},
  {y:7*T+12,d(){desk(6*T,6*T+4,48,'#f3d0dc');monitor(6*T+7,5*T+6,26,16,scrPred);kb(6*T+14,7*T+6);papers(7*T+13,7*T+11,1+S.trayP);sprout(6*T+1,6*T+7);}},
  {y:7*T+13,d(){desk(10*T,6*T+4,48,'#d7e8f7');monitor(10*T+4,5*T+7,20,14,scrWatch);monitor(11*T+9,5*T+9,17,12,scrWatch);kb(10*T+17,7*T+6);box(12*T+3,7*T+4,9,8,'#fff4c9');R(12*T+5,7*T+7,5,1,'#d9534f');}},
@@ -126,25 +141,33 @@ const NPC=[
  mk('pred','Penganalisa Data',[7,8],{shirt:'#efe4cf',shade:'#d3c4a8',inner:'#2f3c63',skin:'#f3d2b8',skinS:'#dcae92',hair:'#6d57b0',iris:'#4a3a7a',color:'#a886ea',pants:'#2f3c63',shoes:'#7d6ac0',bw:5,tall:1,spd:.98}),
  mk('f1','Forecaster',[7,14],{shirt:'#28416f',shade:'#1c3054',inner:'#eef0f2',skin:'#e3b692',skinS:'#c79572',hair:'#241f26',iris:'#33291f',color:'#3f66b8',pants:'#2f3644',shoes:'#e8e4da',bw:5.25,tall:.75,spd:.96}),
  mk('f2','Forecaster',[10,14],{shirt:'#f8dbe6',shade:'#e8b9cb',inner:'#f8dbe6',skin:'#f3d0b6',skinS:'#dcae92',hair:'#e8809f',iris:'#4a2f2a',color:'#ec6fa6',pants:'#4b4254',shoes:'#c9587c',bw:4.75,tall:0,spd:1}),
- mk('watch','Pemantau Produk',[11,8],{shirt:'#2f6f5e',shade:'#245548',inner:'#f6f1ea',skin:'#f4cfb3',skinS:'#dca98c',hair:'#b5502c',iris:'#2f5a4c',color:'#35b58f',pants:'#2b2732',shoes:'#1f1b22',bw:4.75,tall:.5,spd:1.08})
+ mk('watch','Pemantau Produk',[11,8],{shirt:'#2f6f5e',shade:'#245548',inner:'#f6f1ea',skin:'#f4cfb3',skinS:'#dca98c',hair:'#b5502c',iris:'#2f5a4c',color:'#35b58f',pants:'#2b2732',shoes:'#1f1b22',bw:4.75,tall:.5,spd:1.08}),
+ mk('mgr','Factory Manager',[-3,6],{shirt:'#26252b',shade:'#161519',inner:'#26252b',skin:'#d9a682',skinS:'#bd8865',hair:'#1c1716',iris:'#2a1d15',color:'#8a93a6',pants:'#3a3f4d',shoes:'#2a2a2e',bw:5.25,tall:1,spd:1}),
+ mk('spv','SPV Logistik',[-3,12],{shirt:'#e3ebf7',shade:'#c4d2e8',inner:'#e3ebf7',skin:'#f2cfb4',skinS:'#daab8e',hair:'#4f8fd9',iris:'#3b2a24',color:'#4f8fd9',pants:'#3f4a5e',shoes:'#2f5f9e',bw:4.75,tall:0,spd:1,hj:['#4f8fd9','#356fb5','#a9cdf3']})
 ];
-const DESK={esb:[4*T+5,7*T+6],pawang:[14*T+4,7*T+7],pred:[6*T+5,7*T+7],watch:[10*T+5,7*T+7],f1:[8*T+6,13*T+6],f2:[11*T+3,13*T+6]};
+const DESK={esb:[4*T+5,7*T+6],pawang:[14*T+4,7*T+7],pred:[6*T+5,7*T+7],watch:[10*T+5,7*T+7],f1:[8*T+6,13*T+6],f2:[11*T+3,13*T+6],mgr:[-4*T+5,5*T+7],spv:[-4*T+5,11*T+7]};
 const VOICE={
  esb:{want:{kopi:['Kopi kilat, gas!','Bentar, isi bensin dulu!'],snack:['Ganjal perut, cepet!','Snack dulu, server aman.'],makan:['Makan sambil lari juga bisa.','Lima menit, langsung balik!'],sofa:['Rebahan semenit aja.','Kaki minta servis.'],toilet:['Darurat! Minggir!','Toilet, ngebut!']},enjoy:{kopi:['Nah, koneksi stabil.','Mantap, full sinyal.'],snack:['Bandwidth perut naik.','Gas lagi abis ini.'],makan:['Enak, tambah tenaga!'],sofa:['Oke, reboot sebentar.']},wc:['Lagi proses, jangan ganggu!','Loading...'],empty:['Yah, kopinya timeout.']},
  pawang:{want:{kopi:['Kopi dulu, awannya parkir.','Es kopi, biar kubekukan sendiri.'],snack:['Awan nggak bikin kenyang.','Ngemil sebelum bikin badai.'],makan:['Laper, petirnya ikut bunyi.','Makan dulu, langit bisa nunggu.'],sofa:['Awanku butuh istirahat.','Cuti dari langit sebentar.'],toilet:['Hujan lokal, permisi!','Awan, tunggu di sini.']},enjoy:{kopi:['Cerah lagi nih suasana hati.','Pas, kayak angin sore.'],snack:['Mood naik 30 derajat.'],makan:['Enak, langit jadi cerah.'],sofa:['Awan juga bisa rebahan.']},wc:['Lagi turun hujan, jangan masuk!'],empty:['Kopinya menguap, literally.']},
  pred:{want:{kopi:['Kafein naikkan akurasi 12%.','Saya butuh variabel kopi.'],snack:['Gula darah di bawah rata-rata.','Koreksi kalori sebentar.'],makan:['Waktunya isi data ke perut.','Makan sesuai jadwal.'],sofa:['Istirahat optimal 7 menit.','Otak perlu kalibrasi.'],toilet:['Sebentar, ada outlier.','Permisi, keluar dari sampel.']},enjoy:{kopi:['Signifikan.','Hasilnya sesuai hipotesis.'],snack:['Korelasinya positif.'],makan:['Rasanya di atas median.'],sofa:['Sedang konvergen...']},wc:['Mohon tunggu hasil uji.'],empty:['Sampel kopi habis.']},
  f1:{want:{kopi:['Kopi dulu, sheet-nya nanti.','Angka butuh kafein.'],snack:['Ngemil biar fokus.','Satu snack, lanjut hitung.'],makan:['Makan dulu, revisi belakangan.','Perut minta di-update.'],sofa:['Lima menit, sumpah.','Mata istirahat dulu.'],toilet:['Izin, sebelum ada revisi.','Kabur sebentar dari sheet.']},enjoy:{kopi:['Oke, otak nyala lagi.','Nah, baru bisa mikir.'],snack:['Lumayan buat amunisi.'],makan:['Akhirnya makan juga.'],sofa:['Jangan dibangunin ya.']},wc:['Sebentar, lagi audit.'],empty:['Kopinya habis, lanjut deh.']},
  f2:{want:{kopi:['Bikin kopi dulu ya.','Biar makin semangat!'],snack:['Ada camilan apa hari ini?','Ngemil dikit boleh dong.'],makan:['Waktunya makan, yuk!','Istirahat makan dulu.'],sofa:['Duduk sebentar ya.','Kaki pegal nih.'],toilet:['Izin ke belakang ya.','Sebentar ya, teman-teman.']},enjoy:{kopi:['Hmm, pas banget.','Enak, jadi semangat.'],snack:['Enak juga ini.'],makan:['Alhamdulillah, kenyang.'],sofa:['Enaknya istirahat sebentar.']},wc:['Sebentar ya!'],empty:['Yah, sudah habis.']},
- watch:{want:{kopi:['Kopi. Tetap saya pantau.','Saya ambil kopi, jangan curang.'],snack:['Snack satu saja, disiplin.','Saya catat ini sebagai istirahat.'],makan:['Makan tepat waktu, contoh ya.','Istirahat makan, 15 menit.'],sofa:['Saya duduk, bukan santai.','Dari sini juga kelihatan.'],toilet:['Dua menit. Jangan aneh-aneh.','Saya segera kembali.']},enjoy:{kopi:['Boleh juga.','Standarnya cukup.'],snack:['Tidak ada yang terbuang.'],makan:['Porsinya pas, nol waste.'],sofa:['Tetap awas.']},wc:['Sedang inspeksi.'],empty:['Habis. Nol waste.']}
+ watch:{want:{kopi:['Kopi. Tetap saya pantau.','Saya ambil kopi, jangan curang.'],snack:['Snack satu saja, disiplin.','Saya catat ini sebagai istirahat.'],makan:['Makan tepat waktu, contoh ya.','Istirahat makan, 15 menit.'],sofa:['Saya duduk, bukan santai.','Dari sini juga kelihatan.'],toilet:['Dua menit. Jangan aneh-aneh.','Saya segera kembali.']},enjoy:{kopi:['Boleh juga.','Standarnya cukup.'],snack:['Tidak ada yang terbuang.'],makan:['Porsinya pas, nol waste.'],sofa:['Tetap awas.']},wc:['Sedang inspeksi.'],empty:['Habis. Nol waste.']},
+ mgr:{want:{kopi:['Kopi hitam, tanpa gula.','Kopi dulu, laporan nanti.'],snack:['Satu saja.'],makan:['Makan dulu, rapat nanti.'],sofa:['Duduk sebentar.'],toilet:['Sebentar.']},enjoy:{kopi:['Pas.'],snack:['Boleh juga.'],makan:['Cukup.'],sofa:['Lumayan.']},wc:['Sebentar.'],empty:['Habis ya.']},
+ spv:{want:{kopi:['Kopi dulu, rute nanti.','Isi tenaga sebelum jam kirim.'],snack:['Ngemil sambil cek rute.'],makan:['Makan dulu ya.'],sofa:['Duduk sebentar.'],toilet:['Izin sebentar.']},enjoy:{kopi:['Segar lagi.'],snack:['Enak.'],makan:['Kenyang.'],sofa:['Enaknya.']},wc:['Sebentar ya.'],empty:['Yah, habis.']}
 };
-const by=id=>NPC.find(n=>n.id===id),ESB=by('esb'),PAW=by('pawang'),PRED=by('pred'),FW=by('f1'),FE=by('f2'),WAT=by('watch'),isF=n=>n===FW||n===FE;let FC=FW;
+const by=id=>NPC.find(n=>n.id===id),ESB=by('esb'),PAW=by('pawang'),PRED=by('pred'),FW=by('f1'),FE=by('f2'),WAT=by('watch'),isF=n=>n===FW||n===FE,MGR=by('mgr'),SPV=by('spv'),comes=n=>isF(n)||n===MGR||n===SPV;let FC=FW;
+for(const n of [MGR,SPV]){n.present=false;n.pose='away';n.x=4;n.y=15;}
 let SCHEDULE={},officeReady=false;const SHIFT={'7:00':[7,16],'10:30':[10.5,21],'12:00':[12,21]};
 const dateNow=()=>S.date||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
 const shiftOf=n=>SCHEDULE[dateNow()]?.[n===FW?0:1]||'';
 const onShift=n=>{const h=SHIFT[shiftOf(n)],t=hourNow();return !!h&&t>=h[0]&&t<h[1];};
 const clockText=v=>String(Math.floor(v)).padStart(2,'0')+'.'+(v%1?'30':'00');
-function shiftText(n){const v=shiftOf(n),h=SHIFT[v];if(h)return `Shift ${clockText(h[0])}-${clockText(h[1])}`;if(v==='WFH')return 'WFH';if(/CUTI/i.test(v))return 'Cuti';if(/OFF/i.test(v))return 'Libur';if(/SAKIT/i.test(v))return 'Sakit';if(/IZIN/i.test(v))return 'Izin';return v||'Belum ada jadwal';}
-function pickFC(){if(FC.present&&!FC.leaving)return true;const o=[FW,FE].find(n=>n.present&&!n.leaving);if(o){FC=o;return true;}return false;}
+function shiftText(n){if(!isF(n))return 'Tidak online';const v=shiftOf(n),h=SHIFT[v];if(h)return `Shift ${clockText(h[0])}-${clockText(h[1])}`;if(v==='WFH')return 'WFH';if(/CUTI/i.test(v))return 'Cuti';if(/OFF/i.test(v))return 'Libur';if(/SAKIT/i.test(v))return 'Sakit';if(/IZIN/i.test(v))return 'Izin';return v||'Belum ada jadwal';}
+// Setiap akun hanya mengendalikan karakternya sendiri; Master bisa semua (owner 2026-11-24).
+function myChars(){const r=window.ForecastAuth?.role||{};if(r.master)return NPC.map(n=>n.id);if(r.fu==='forecaster')return r.char?[r.char]:[];if(r.fu==='analyst')return ['pred'];if(r.fu==='factory')return ['mgr'];if(r.fu==='spv')return ['spv'];return window.ForecastRolePolicy?.planner?.(r)?['f1','f2']:[];}
+const mine=n=>!!n&&myChars().includes(n.id),ready=n=>n.present!==false&&!n.leaving&&n.pose!=='away';
+function pickFC(){if(FC&&mine(FC)&&ready(FC))return true;const o=NPC.find(n=>mine(n)&&ready(n));if(o){FC=o;return true;}return false;}
 const watchLevel=()=>S.waste==='lewat'||S.lost==='lewat'?2:S.waste==='waspada'||S.lost==='waspada'?1:0;
 const hourNow=()=>{if(S.hour!=null)return S.hour;const d=new Date(Date.now()+7*3600000);return d.getUTCHours()+d.getUTCMinutes()/60;};
 const asleep=()=>{const h=hourNow();return h>=22||h<7;};
@@ -175,7 +198,7 @@ async function standAt(n,cell,face=1,fast=false){await walk(n,cell,fast);n.pose=
 async function doing(n,label,sec,action='type',tick){n.task=label;n.action=action;await timer(n,sec,p=>{n.p=p;tick?.(p);});n.p=null;}
 function assign(n){n.busy=true;cancel(n);}
 function release(n){n.busy=false;n.carry=null;if(!asleep())idle(n);}
-const IDLE={esb:['Memeriksa log server','Merapikan kabel data'],pawang:['Memantau awan','Mencatat suhu'],pred:['Mengecek rumus','Membaca pola penjualan'],f1:['Meninjau rencana besok','Mengecek selisih stok'],f2:['Merapikan rencana kirim','Mengecek stok outlet'],watch:['Memantau layar outlet','Mencatat temuan']};
+const IDLE={esb:['Memeriksa log server','Merapikan kabel data'],pawang:['Memantau awan','Mencatat suhu'],pred:['Mengecek rumus','Membaca pola penjualan'],f1:['Meninjau rencana besok','Mengecek selisih stok'],f2:['Merapikan rencana kirim','Mengecek stok outlet'],watch:['Memantau layar outlet','Mencatat temuan'],mgr:['Membaca laporan','Meninjau target'],spv:['Mengatur rute kirim','Mengecek jadwal driver']};
 const free=(n,list)=>list.find(s=>!NPC.some(o=>o!==n&&(o.slot===key(s[0],s[1])||o.slot2===key(s[0],s[1]))));
 const WC_Q=[[20,13],[19,13],[18,13]],WC_WAIT=['Buruan dong!','Masih lama nggak?','Tolong, ini darurat.','Jangan tidur di dalam ya!'];
 async function wcVisit(n,sec){
@@ -218,6 +241,10 @@ const WORK={
   async n=>{await standAt(n,PLACE.printer,1);S.printing++;try{await doing(n,'Mencetak hasil',3,'stand');}finally{S.printing=Math.max(0,S.printing-1);}n.carry='paper';n.task='Menaruh ke meja forecaster';await standAt(n,PLACE.toFc,2);n.carry=null;S.trayF=3;speak(n,realLines(n).concat('Hasil prediksi kutaruh di meja forecaster.'));await timer(n,1);}],
  watch:[async n=>{speak(n,'Saya cek waste dan lost dulu.');await standAt(n,PLACE.board,1);S.auditing=true;try{await doing(n,'Mengecek waste & lost',9,'point',p=>{S.audit=p;});}finally{S.auditing=false;}S.audit=1;S.auditDone=true;speak(n,realLines(n));mood(n,watchLevel()?'alert':'star',3);await timer(n,1.5);},
   async n=>{await sitDown(n);await doing(n,'Memantau layar outlet',8);speak(n,realLines(n));await doing(n,'Mencatat temuan',6);}],
+ mgr:[async n=>{await sitDown(n);await doing(n,'Meninjau laporan produksi',10);if(nr(n)()<.35)speak(n,['Target hari ini dijaga ya.','Laporan kemarin sudah saya baca.','Produksi aman, lanjutkan.']);await doing(n,'Menyetujui rencana',8);},
+  async n=>{await standAt(n,PLACE.toFc,0);await doing(n,'Mengecek meja forecaster',5,'point');if(nr(n)()<.3)speak(n,['Rencana besok sudah aman?','Jangan lupa cek cuaca.','Kalau ada kendala, kabari saya.']);await sitDown(n);await doing(n,'Membaca laporan',8);}],
+ spv:[async n=>{await sitDown(n);await doing(n,'Mengatur rute kirim',10);if(nr(n)()<.35)speak(n,['Rute pagi sudah siap.','Driver sudah saya kabari.','Jam kirim jangan molor ya.']);await doing(n,'Mengecek jadwal driver',7);},
+  async n=>{await standAt(n,PLACE.printer,1);S.printing++;try{await doing(n,'Mencetak rincian kirim',4,'stand');}finally{S.printing=Math.max(0,S.printing-1);}n.carry='paper';n.task='Membawa rincian kirim';await sitDown(n);n.carry=null;await doing(n,'Memeriksa rincian kirim',8);}],
 };
 const forecasterWork=[async n=>{await sitDown(n);n.filled=0;await doing(n,'Menyusun rencana kirim',12,'type',p=>{n.filled=p;});n.filled=1;const c=planCount();speak(n,c==null?realLines(n):`Rencana besok sudah ${c} dari 28 outlet.`);await doing(n,'Mengecek ulang rencana',5);},
  async n=>{await sitDown(n);await doing(n,'Mengecek selisih stok',8);speak(n,realLines(n));await doing(n,'Meninjau rencana besok',6);}];
@@ -229,10 +256,10 @@ async function runSlot(n,g){
  }catch(e){if(e!==CANCEL)throw e;}
 }
 function startSlot(n,k,late,catchUp){cancel(n);n.busy=false;n.task='Kembali ke meja';n.action='walk';n.rng=seeded(`${n.id}|${k}`);n.ff=catchUp&&late>1?late:0;runSlot(n,n.gen);}
-function slotTick(){const now=Date.now()/1000;NPC.forEach((n,i)=>{if((isF(n)&&(!n.present||n.leaving))||held(n))return;const t=now+i*7,k=Math.floor(t/SLOT),late=t%SLOT;if(n.slotK!==k){const catchUp=n.slotK===undefined&&!n.noFF;n.slotK=k;n.noFF=false;startSlot(n,k,late,catchUp);}});}
+function slotTick(){const now=Date.now()/1000;NPC.forEach((n,i)=>{if((comes(n)&&(!n.present||n.leaving))||held(n))return;const t=now+i*7,k=Math.floor(t/SLOT),late=t%SLOT;if(n.slotK!==k){const catchUp=n.slotK===undefined&&!n.noFF;n.slotK=k;n.noFF=false;startSlot(n,k,late,catchUp);}});}
 function idle(n){n.slotK=null;n.noFF=true;}
-function startDay(){epoch++;NPC.filter(n=>!isF(n)||(n.present&&!n.leaving)).forEach(n=>{cancel(n);n.busy=false;n.carry=null;n.say='';n.slot=null;n.slotK=undefined;n.noFF=false;});}
-function goSleep(){epoch++;S.pulling=false;S.auditing=false;S.calcing=false;S.printing=0;S.brew=0;S.micro=0;S.wcQ=[];const place={pred:[19,12]};NPC.filter(n=>!isF(n)).forEach(n=>{cancel(n);n.slotK=null;n.ff=0;n.busy=false;n.carry=null;n.slot=null;n.held=0;n.food=null;n.sipT=0;n.task='Menuju tempat tidur';n.action='sleep';const cell=place[n.id]||n.seat,sofa=!!place[n.id];(async()=>{try{await walk(n,cell);n.pose=sofa?'nap':'sleepDesk';n.face=sofa?0:1;if(sofa){n.slot=key(18,12);n.slot2=key(20,12);}n.task='Tidur';}catch(e){if(e!==CANCEL)throw e;}})();});}
+function startDay(){epoch++;NPC.filter(n=>!comes(n)||(n.present&&!n.leaving)).forEach(n=>{cancel(n);n.busy=false;n.carry=null;n.say='';n.slot=null;n.slotK=undefined;n.noFF=false;});}
+function goSleep(){epoch++;S.pulling=false;S.auditing=false;S.calcing=false;S.printing=0;S.brew=0;S.micro=0;S.wcQ=[];const place={pred:[19,12]};NPC.filter(n=>!comes(n)).forEach(n=>{cancel(n);n.slotK=null;n.ff=0;n.busy=false;n.carry=null;n.slot=null;n.held=0;n.food=null;n.sipT=0;n.task='Menuju tempat tidur';n.action='sleep';const cell=place[n.id]||n.seat,sofa=!!place[n.id];(async()=>{try{await walk(n,cell);n.pose=sofa?'nap':'sleepDesk';n.face=sofa?0:1;if(sofa){n.slot=key(18,12);n.slot2=key(20,12);}n.task='Tidur';}catch(e){if(e!==CANCEL)throw e;}})();});}
 
 const TODAY_W={cerah:'Hari ini cerah, aman.',mendung:'Hari ini cukup mendung.',hujan:'Hari ini berpotensi hujan.'},TOMORROW_W={cerah:'Besok kelihatannya cerah.',mendung:'Besok kayaknya mendung.',hujan:'Besok kayaknya hujan.'};
 function realLines(n){
@@ -266,9 +293,11 @@ window.addEventListener('forecast-intraday',()=>{const before=S.lastPull;syncRea
 window.addEventListener('forecast-office-data',syncReal);
 window.addEventListener('pcs-data-loaded',()=>{syncReal();syncWeather();});
 let dutyReady=false;
-function arrive(n){n.present=true;n.leaving=false;n.x=4;n.y=15;n.path=[];n.pose='stand';n.face=1;n.food=null;n.task='Baru datang';n.ff=0;say(n,'Halo, masuk shift!',2.4);idle(n);}
+function arrive(n){n.present=true;n.leaving=false;n.x=4;n.y=15;n.path=[];n.pose='stand';n.face=1;n.food=null;n.task='Baru datang';n.ff=0;say(n,n===MGR?'Pagi, tim.':n===SPV?'Halo semua!':'Halo, masuk shift!',2.4);idle(n);}
 function leave(n){n.leaving=true;cancel(n);n.busy=false;n.held=0;n.food=null;n.task='Pulang';say(n,'Duluan ya!',2.2);(async()=>{try{await walk(n,[4,15]);}catch(e){if(e!==CANCEL)throw e;}n.present=false;n.leaving=false;n.pose='away';n.sayT=0;if(pickFC()&&S.sel===n.id)S.sel=FC.id;})();}
-function dutyTick(){if(!officeReady){for(const n of [FW,FE]){n.present=false;n.pose='away';n.x=4;n.y=15;}return;}for(const n of [FW,FE]){const want=onShift(n);if(!dutyReady){if(want){n.present=true;n.pose='sit';n.face=1;n.x=n.seat[0];n.y=n.seat[1];}else{n.present=false;n.pose='away';n.x=4;n.y=15;}}else if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!dutyReady){dutyReady=true;pickFC();}}
+// Muncul saat shift (forecaster) atau saat akunnya online. Manajer & SPV hanya saat online.
+function onlineAs(id){const now=Date.now(),role={mgr:'factory',spv:'spv'}[id];return (S.pres||[]).some(p=>p.online!==false&&now-(p.at?.toMillis?.()||0)<150e3&&(role?p.role===role:(p.role==='forecaster'&&p.char===id)));}
+function dutyTick(){for(const n of [MGR,SPV]){const want=onlineAs(n.id)&&!asleep();if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!officeReady){for(const n of [FW,FE]){n.present=false;n.pose='away';n.x=4;n.y=15;}return;}for(const n of [FW,FE]){const want=onShift(n)||(onlineAs(n.id)&&!asleep());if(!dutyReady){if(want){n.present=true;n.pose='sit';n.face=1;n.x=n.seat[0];n.y=n.seat[1];}else{n.present=false;n.pose='away';n.x=4;n.y=15;}}else if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!dutyReady){dutyReady=true;pickFC();}}
 // ===== Obrolan interaktif =====
 // Lawan bicara selalu berdekatan dan saling menghadap. Jadwal obrolan antar-karakter acak tetapi
 // berasal dari seed harian, jadi semua layar melihat obrolan yang sama pada waktu yang sama.
@@ -285,7 +314,7 @@ function talkFacts(){
  TK.facts={wasteProd:wp&&{label:wp.label,rp:rpS(wp.nom)},lostProd:lp&&lp.lostHigh>0?{label:lp.label,pcs:Math.round((lp.lostLow+lp.lostHigh)/2).toLocaleString('id-ID')}:null,soldOut:h.items.filter(x=>x.habisRate>=60).sort((a,b)=>b.habisRate-a.habisRate).map(x=>({label:x.label,rate:Math.round(x.habisRate)})),areaW:aw&&{name:aw.name,pct:n1(aw.wastePct)},areaBest:ab&&{name:ab.name,pct:n1(ab.wastePct)},areaL:al&&{name:al.name},outletW:ow&&{name:ow.name,pct:n1(ow.wastePct)},outletL:ol&&{name:ol.name},trend,today,h:hourNow(),date:+today.slice(8),day:DAYS[dow],tomorrow:DAYS[nx],weekendToday:dow===0||dow===6,weekendTomorrow:nx===0||nx===6,weather:S.weather,weatherKnown:!!S.weatherReady,tomorrowW:S.weatherReady?S.weatherTomorrow:null,pull:S.lastPull,status:!!S.statusReady,waste:S.waste,lost:S.lost,wasteTrend:S.statusReady?S.wasteTrend:null,lostTrend:S.statusReady?S.lostTrend:null,wasteOutlets:S.wasteOutlets||[],lostOutlets:S.lostOutlets||[],plan:planCount(),model:!!S.modelReady,omzet,notSell:of('bad').map(x=>({label:x.label,pct:Math.round(x.wasteOfShip||0)})),slow:of('slow').map(x=>x.label),laris:of('win').map(x=>x.label),place:of('place').map(x=>x.label),who};
  TK.at=S.t;return TK.facts;
 }
-const canTalk=n=>n&&n.pose!=='away'&&n.pose!=='toilet'&&!n.leaving&&(!isF(n)||n.present);
+const canTalk=n=>n&&n.pose!=='away'&&n.pose!=='toilet'&&!n.leaving&&(!comes(n)||n.present);
 function sayNow(n,text,sec){n.say=text;n.sayT=sec;n.talkUntil=S.t+sec;}
 function talkState(n){if(n.pose==='nap'||n.pose==='sleepDesk')return 'nap';if(n.pose==='sofa')return 'sofa';if(n.pose==='sip'||n.food?.kind==='cup')return 'coffee';if(n.pose==='eat'||n.food)return 'eat';return null;}
 const occupied=(x,y,skip)=>NPC.some(o=>!skip.includes(o)&&o.pose!=='away'&&((Math.round(o.x)===x&&Math.round(o.y)===y)||(o.path.length&&o.path.at(-1)[0]===x&&o.path.at(-1)[1]===y)));
@@ -315,9 +344,9 @@ function approach(n){
  })();
 }
 function sceneTimes(today){const r=seeded('jadwal-obrolan|'+today),base=Date.parse(today+'T07:00:00+07:00')/1000,end=base+15*3600,out=[];let t=base+20+r()*120;while(t<end){out.push(t);t+=120+Math.pow(r(),1.3)*480;}return out;}
-function endScene(){const sc=TK.scene;TK.scene=null;TK.idx=-1;if(!sc)return;for(const n of sc.people){n.talkUntil=0;n.inScene=false;if(n.held>S.t)n.held=0;if(!asleep()&&(!isF(n)||(n.present&&!n.leaving)))idle(n);}}
+function endScene(){const sc=TK.scene;TK.scene=null;TK.idx=-1;if(!sc)return;for(const n of sc.people){n.talkUntil=0;n.inScene=false;if(n.held>S.t)n.held=0;if(!asleep()&&(!comes(n)||(n.present&&!n.leaving)))idle(n);}}
 function startScene(i,start,now){
- const api=window.ForecastOfficeTalk,ok=n=>canTalk(n)&&!held(n)&&!['nap','sofa','sleepDesk'].includes(n.pose)&&(!isF(n)||(n.present&&!n.leaving));
+ const api=window.ForecastOfficeTalk,ok=n=>canTalk(n)&&!held(n)&&!['nap','sofa','sleepDesk'].includes(n.pose)&&(!comes(n)||(n.present&&!n.leaving));
  let sc=null;try{TK.at=-99;sc=api.scene(i,talkFacts(),NPC.filter(ok).map(n=>n.id));}catch{sc=null;}
  if(!sc)return;let v=by(sc.lines[0].id),h=by(sc.lines.find(l=>l.id!==v.id)?.id);if(!v||!h)return;
  // Forecaster sedang bekerja, jadi biasanya NPC yang datang ke mejanya.
@@ -353,7 +382,7 @@ function update(dt){
  }
  if(!sl)slotTick();
  talkTick(sl);
- for(const F of [FW,FE])if(F.held&&!held(F)&&!F.path.length){F.held=0;if(!sl&&F.present&&!F.leaving)idle(F);}
+ for(const F of NPC)if(F.held&&!held(F)&&!F.path.length){F.held=0;F.directed=false;if(!sl&&F.present!==false&&!F.leaving&&!F.inScene)idle(F);}
  for(let i=waiters.length-1;i>=0;i--)if(waiters[i].f()){const w=waiters.splice(i,1)[0];w.r();}
 }
 
@@ -377,8 +406,8 @@ function eye(n,ex,ey,o){
  if(o.bags)R(ex,ey+h+.5,3.5,.5,'rgba(92,62,84,.5)');
 }
 const brow=(x,y,w,tilt,col,th=.75)=>{R(x,y+(tilt>0?tilt:0),w/2,th,col);R(x+w/2,y+(tilt<0?-tilt:0),w/2,th,col);};
-function mood2(n){const tasty=n.pose==='sip'||n.pose==='eat'||n.sipT>0,rest=n.pose==='sofa',sl=n.pose==='nap'||n.pose==='sleepDesk',talk=n.sayT>0&&!sl,alert=n===WAT&&watchLevel()>0,blink=Math.sin(S.t*1.1+n.bob*3)>.985;const o={...({esb:{wide:1},pawang:{wide:1},pred:{lid:.5},f1:{lid:.5},f2:{},watch:{lid:.5}}[n.id]),closed:sl||blink||(rest&&Math.sin(S.t*.5+n.bob)>.35)};if(tasty)o.lid=Math.max(o.lid||0,1.25);if(alert||n.fast){o.lid=0;o.wide=1;}return {o,tasty,talk,sl,alert};}
-function mouth(n,mx,my,st){const c1='#7b3f42',osc=Math.floor(S.t*9)%2;if(st.talk){R(mx-1.5,my,3,1.25+osc*.5,'#6b2f36');R(mx-1,my,2,.5,'#fff');}else if(n.pose==='eat'||(n.sipT>0&&n.food?.kind==='snack'))R(mx-1,my+.25,2,.5+osc*.5,c1);else if(st.sl)R(mx-.5,my+.25,1,.75,c1);else if(st.tasty||n===ESB||n===PAW||n===FE){R(mx-1.5,my,.5,.5,c1);R(mx-1,my+.5,2.25,.5,c1);R(mx+1.25,my,.5,.5,c1);if(n===ESB)R(mx-1,my,2.25,.5,'#fff');}else if(n===PRED){R(mx-1,my+.5,2,.5,c1);R(mx+1,my,.75,.5,c1);}else if(n===FW){R(mx-1,my+.5,2,.5,c1);R(mx+1,my+.25,.5,.5,c1);}else R(mx-1,my+.5,2.5,.5,c1);}
+function mood2(n){const tasty=n.pose==='sip'||n.pose==='eat'||n.sipT>0,rest=n.pose==='sofa',sl=n.pose==='nap'||n.pose==='sleepDesk',talk=n.sayT>0&&!sl,alert=n===WAT&&watchLevel()>0,blink=Math.sin(S.t*1.1+n.bob*3)>.985;const o={...({esb:{wide:1},pawang:{wide:1},pred:{lid:.5},f1:{lid:.5},f2:{},watch:{lid:.5},mgr:{lid:.25},spv:{}}[n.id]),closed:sl||blink||(rest&&Math.sin(S.t*.5+n.bob)>.35)};if(tasty)o.lid=Math.max(o.lid||0,1.25);if(alert||n.fast){o.lid=0;o.wide=1;}return {o,tasty,talk,sl,alert};}
+function mouth(n,mx,my,st){const c1='#7b3f42',osc=Math.floor(S.t*9)%2;if(st.talk){R(mx-1.5,my,3,1.25+osc*.5,'#6b2f36');R(mx-1,my,2,.5,'#fff');}else if(n.pose==='eat'||(n.sipT>0&&n.food?.kind==='snack'))R(mx-1,my+.25,2,.5+osc*.5,c1);else if(st.sl)R(mx-.5,my+.25,1,.75,c1);else if(st.tasty||n===ESB||n===PAW||n===FE||n===SPV){R(mx-1.5,my,.5,.5,c1);R(mx-1,my+.5,2.25,.5,c1);R(mx+1.25,my,.5,.5,c1);if(n===ESB)R(mx-1,my,2.25,.5,'#fff');}else if(n===PRED){R(mx-1,my+.5,2,.5,c1);R(mx+1,my,.75,.5,c1);}else if(n===FW){R(mx-1,my+.5,2,.5,c1);R(mx+1,my+.25,.5,.5,c1);}else R(mx-1,my+.5,2.5,.5,c1);}
 function face(n,x,hy){
  const ey=hy-.5,st=mood2(n),o={...st.o,look:Math.sin(S.t*.6+n.bob)*.55},lx=x-5,rx=x+1.5,by=ey-2,bc=n===PAW?'#8fa8c8':n===WAT?'#7a3519':n===PRED?'#4c3a86':n.hair;
  eye(n,lx,ey,o);eye(n,rx,ey,o);
@@ -388,6 +417,8 @@ function face(n,x,hy){
  if(n===WAT){brow(lx,by,3.5,st.alert?-.75:-.5,bc);brow(rx,by,3.5,st.alert?.75:.5,bc);}
  if(n===FW){brow(lx,by,3.5,.25,bc);brow(rx,by,3.5,-.25,bc);c.strokeStyle='#17202f';c.lineWidth=.6;c.strokeRect(lx-.75,ey-.75,5,4.5);c.strokeRect(rx-.75,ey-.75,5,4.5);R(lx+4.25,ey+.75,1.5,.5,'#17202f');R(lx,ey-.5,1,.5,'rgba(255,255,255,.75)');}
  if(n===FE){brow(lx,by-.25,3.5,.25,'#5b4036',.5);brow(rx,by-.25,3.5,-.25,'#5b4036',.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
+ if(n===SPV){brow(lx,by-.25,3.5,.25,'#4a3a33',.5);brow(rx,by-.25,3.5,-.25,'#4a3a33',.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
+ if(n===MGR){brow(lx,by,3.5,0,'#1c1716',1);brow(rx,by,3.5,0,'#1c1716',1);}
  R(x-.25,hy+1.5,.75,1.5,n.skinS);R(x-6,hy+2.5,2,.75,'rgba(214,120,110,.26)');R(x+4,hy+2.5,2,.75,'rgba(214,120,110,.26)');mouth(n,x,hy+4.25,st);
  if(n===PRED){c.strokeStyle=OL;c.lineWidth=.5;c.beginPath();c.arc(lx+1.75,ey+1.5,3,0,7);c.stroke();c.beginPath();c.arc(rx+1.75,ey+1.5,3,0,7);c.stroke();R(lx+4.5,ey+1,1.25,.5,OL);R(lx,ey-.75,1,.5,'rgba(255,255,255,.75)');}
  if(n===WAT){R(x+6,hy+3.5,.75,.75,'#ffd166');}
@@ -402,8 +433,8 @@ function headBack(n,x,hy,f){
 }
 const HJ=[[-8.75,3],[-8.25,4.75],[-7.5,6],[-6.5,7],[-4.5,7.75],[0,8],[4,8],[6.5,8.25],[8,8],[10,6.75],[12,4.25],[13.25,1.75]];
 const hjW=d=>{for(let i=1;i<HJ.length;i++)if(d<=HJ[i][0]){const [a,u]=HJ[i-1],[b,v]=HJ[i];return u+(v-u)*(d-a)/(b-a);}return HJ[HJ.length-1][1];};
-function hijab(x,hy,front){
- const base='#e8809f',dk='#cc5f86',lt='#f8b3c9';let prev=hjW(-8.75);R(x-prev,hy-9.25,2*prev,.5,OL);
+function hijab(x,hy,front,pal){
+ const [base,dk,lt]=pal||['#e8809f','#cc5f86','#f8b3c9'];let prev=hjW(-8.75);R(x-prev,hy-9.25,2*prev,.5,OL);
  for(let d=-8.75;d<=13.25;d+=.5){const w=hjW(d),hi=Math.max(w,prev),lo=Math.min(w,prev);
   if(front&&d>-4.25&&d<6.75){const t=Math.abs(d-1.25)/5.5,o=5.6*Math.pow(1-Math.pow(t,3.2),1/3.2);R(x-w,hy+d,w-o,.5,base);R(x+o,hy+d,w-o,.5,base);R(x-o-.5,hy+d,.5,.5,dk);R(x+o,hy+d,.5,.5,dk);}
   else R(x-w,hy+d,2*w,.5,base);
@@ -422,6 +453,8 @@ function hair(n,x,hy,f){
   if(n===WAT){const sw=Math.sin(S.t*2.2+n.bob)*.75;R(x-1.5,hy-7,3.5,1.25,'#ffd166');fe(x+sw,hy-1,3,5,OL);fe(x+sw,hy-1,2.5,4.5,n.hair);fe(x+sw*1.5,hy+5,2,3.5,OL);fe(x+sw*1.5,hy+5,1.5,3,n.hair);}
   if(n===FW){for(const [a,b] of [[-6,-8],[-2,-8.5],[2,-8],[5,-6.5]])R(x+a,hy+b,2,2.25,h);}
   if(n===FE)hijab(x,hy,false);
+  if(n===SPV)hijab(x,hy,false,n.hj);
+  if(n===MGR){R(x-7,hy-6,14,3,h);R(x-8,hy-2,16,6,h);}
   return;
  }
  if(n===ESB){fe(x,hy-4,11.5,6,h,true);R(x-11,hy-5,22,2,h);fe(x-7.5,hy-3,3.5,2.5,h);fe(x+7.5,hy-3,3.5,2.5,h);fe(x-2.5,hy-4,3,2,h);fe(x+3,hy-4,3,2,h);curls(x,hy-6,11,6,'#3b2b2c','#171113');}
@@ -430,6 +463,8 @@ function hair(n,x,hy,f){
  if(n===WAT){fe(x,hy-1.5,7.5,6,h,true);R(x-7.5,hy-2,1.5,3.5,h);R(x+6,hy-2,1.5,3.5,h);R(x-6.5,hy-3.25,9,1.5,h);R(x-6.5,hy-2,4,.75,h);R(x-1,hy-6,4,.75,hl);}
  if(n===FW){fe(x,hy-1.5,7.5,6,h,true);R(x-7.5,hy-2,1.75,3.5,h);R(x+5.75,hy-2,1.75,3.5,h);for(const [a,b] of [[-6.5,-8],[-3,-8.75],[1,-8.5],[4.5,-7]])R(x+a,hy+b,2,2.25,h);R(x-5.5,hy-3.25,2.5,1.75,h);R(x-2.25,hy-3,3,1.25,h);R(x+1.5,hy-3.25,3.5,1.75,h);R(x-2,hy-6,3,.75,hl);}
  if(n===FE)hijab(x,hy,true);
+ if(n===SPV)hijab(x,hy,true,n.hj);
+ if(n===MGR){fe(x,hy-1.5,7.5,6,h,true);R(x-7.5,hy-2,1.5,3,h);R(x+6,hy-2,1.5,3,h);R(x-6.5,hy-3.25,13,1.75,h);R(x+1,hy-6.5,.75,4,'rgba(255,255,255,.22)');R(x-5,hy-5.5,4,.75,hl);}
 }
 function torso(n,x,by,f){
  const b=n.bw,t=by-12;R(x-b-.5,t+1,2*b+1,12,OL);fe(x,t+2,b+.5,2.5,OL,true);R(x-b,t+1.5,2*b,11,n.shirt);fe(x,t+2,b,2,n.shirt,true);R(x+b-1.5,t+1.5,1.5,11,n.shade);R(x-b,by-1,2*b,1,n.shade);
@@ -438,7 +473,8 @@ function torso(n,x,by,f){
  if(n===PAW){if(f===0){R(x-.25,t+2,.5,10,n.inner);R(x-b+1,t+7,2.5,1.5,n.shade);R(x+b-3.5,t+7,2.5,1.5,n.shade);}R(x-b,t+6,2*b,.75,n.inner);fe(x,t+2,5.5,2.25,OL);fe(x,t+2,5,1.75,'#ff7b6e');R(x-5,t+2,10,.75,'#e85f54');}
  if(n===WAT){if(f===0){R(x-2,t+1.5,4,4.5,n.inner);R(x-.5,t+2,1,4,'#2b2732');R(x+b-3.5,t+5,2,1,'#e6c35c');}else R(x-.25,t+3,.5,9,n.shade);}
  if(n===FW){for(let i=0;i<4;i++)R(x-b,t+3+i*2.75,2*b,.5,'#6c8cc8');for(let i=-1;i<2;i++)R(x+i*3.25,t+2,.5,10,'#6c8cc8');for(let i=0;i<3;i++)R(x-b,t+4.5+i*2.75,2*b,.25,'#c9554f');if(f===0){R(x-2.25,t+2,4.5,10,n.inner);R(x-.25,t+2,.5,10,'#c9cdd2');R(x-3,t+1.5,1.75,2,n.shade);R(x+1.25,t+1.5,1.75,2,n.shade);}else R(x-3.5,t+1.5,7,1.5,n.shade);}
- if(n===FE){R(x-b-.75,by-1.5,2*b+1.5,3.5,OL);R(x-b-.25,by-1.5,2*b+.5,3,n.shirt);R(x+b-1,by-1.5,1,3,n.shade);if(f===0){R(x-.25,t+5,.5,8,'#d9a4b8');for(let i=0;i<3;i++)R(x-.5,t+6+i*2,1,.75,'#e8809f');}R(x-b,by+.75,2*b,.5,'#e8809f');}
+ if(n===MGR){if(f===0){fe(x,t+2,2.75,1.25,n.skinS);R(x+1.5,t+5,2.5,2,'#3d3d46');}else R(x-.25,t+3,.5,9,n.shade);}
+ if(n===FE||n===SPV){const ac=n===SPV?n.hj[0]:'#e8809f',ac2=n===SPV?n.hj[2]:'#d9a4b8';R(x-b-.75,by-1.5,2*b+1.5,3.5,OL);R(x-b-.25,by-1.5,2*b+.5,3,n.shirt);R(x+b-1,by-1.5,1,3,n.shade);if(f===0){R(x-.25,t+5,.5,8,ac2);for(let i=0;i<3;i++)R(x-.5,t+6+i*2,1,.75,ac);}R(x-b,by+.75,2*b,.5,ac);}
 }
 function cloud(x,y,front=false){
  const col=S.weather==='hujan'?'#98a4b8':S.weather==='mendung'?'#d3d9e2':'#ffffff',sh=S.weather==='hujan'?'#76839a':S.weather==='mendung'?'#b4bdca':'#d7e8f6',pts=front?[[-8,1,4,2.5],[0,2,5,2.5],[8,1,4,2.5]]:[[-10,0,5,3.5],[-4,-2,6,4.5],[4,-2,6,4.5],[10,0,5,3.5],[0,1,10,3.5]];
@@ -488,23 +524,23 @@ function rr(x,y,w,h,r,col){out.fillStyle=col;out.beginPath();out.roundRect(x,y,w
 function txt(s,x,y,size,col,a='center',wt=800){out.fillStyle=col;out.font=`${wt} ${size}px ui-rounded,"Segoe UI",system-ui,sans-serif`;out.textAlign=a;out.textBaseline='alphabetic';out.fillText(s,x,y);}
 const tagBoxes=[];
 function tag(n){
- if(n.pose==='toilet'||n.pose==='away')return;const sofa=n.pose==='sofa'||n.pose==='nap',px=(n.x*T+8)*Z,py=(n.y*T+14-(sofa?8:0))*Z,name=n.name,sel=S.sel===n.id,dozing=n.pose==='sleepDesk'||n.pose==='nap';
+ if(n.pose==='toilet'||n.pose==='away')return;const sofa=n.pose==='sofa'||n.pose==='nap',px=((n.x+OX)*T+8)*Z,py=(n.y*T+14-(sofa?8:0))*Z,name=n.name,sel=S.sel===n.id,dozing=n.pose==='sleepDesk'||n.pose==='nap';
  out.font='800 18px ui-rounded,"Segoe UI",system-ui,sans-serif';const w=out.measureText(name).width+16,x=clamp(px-w/2,6,view.width-w-6);let y=py+12;while(tagBoxes.some(b=>x<b.x+b.w&&x+w>b.x&&y<b.y+27&&y+27>b.y))y+=29;tagBoxes.push({x,y,w});
  if(!dozing||sel){rr(x,y,w,26,13,sel?n.color:'rgba(58,45,63,.88)');txt(name,x+w/2,y+19,18,sel?'#2b2130':'#fff');}
  if(n.p!=null&&n.action!=='break'){const bw=88,bx=clamp(px-bw/2,6,view.width-bw-6),by=py-(sit(n)?140:150);rr(bx,by,bw,14,7,'#3a2d3f');rr(bx+3,by+3,Math.max(5,(bw-6)*n.p),8,4,n.color);}
  if(n.pose==='sleepDesk'||n.pose==='nap'){for(let i=0;i<3;i++){const p=(S.t*.45+i/3)%1;out.globalAlpha=1-p;txt('z',px+28+p*38,py-68-p*58,22+p*20,'#e7e0ff');out.globalAlpha=1;}}
- if(isF(n)&&held(n)&&!n.inScene&&!/^Mengobrol/.test(n.task)){const top=n.pose==='nap'?py-104:sit(n)?py-126:py-150,yy=top-(n.p!=null&&n.action!=='break'?22:0)+Math.sin(S.t*5)*3;out.save();out.lineJoin='round';out.strokeStyle='#2b2130';out.lineWidth=5;out.fillStyle='#ffe14d';out.beginPath();out.moveTo(px-10,yy);out.lineTo(px+10,yy);out.lineTo(px,yy+13);out.closePath();out.stroke();out.fill();out.fillStyle='rgba(255,255,255,.75)';out.beginPath();out.moveTo(px-6,yy+2);out.lineTo(px+1,yy+2);out.lineTo(px-2,yy+6);out.closePath();out.fill();out.restore();}
+ if(n.directed&&held(n)&&!n.inScene&&!/^Mengobrol/.test(n.task)){const top=n.pose==='nap'?py-104:sit(n)?py-126:py-150,yy=top-(n.p!=null&&n.action!=='break'?22:0)+Math.sin(S.t*5)*3;out.save();out.lineJoin='round';out.strokeStyle='#2b2130';out.lineWidth=5;out.fillStyle='#ffe14d';out.beginPath();out.moveTo(px-10,yy);out.lineTo(px+10,yy);out.lineTo(px,yy+13);out.closePath();out.stroke();out.fill();out.fillStyle='rgba(255,255,255,.75)';out.beginPath();out.moveTo(px-6,yy+2);out.lineTo(px+1,yy+2);out.lineTo(px-2,yy+6);out.closePath();out.fill();out.restore();}
 }
 const sit=n=>['sit','sofa','sleepDesk','nap'].includes(n.pose);
 function wrapSay(s,max){const words=String(s).split(' '),out2=[];let cur='';for(const w of words){const t=cur?cur+' '+w:w;if(cur&&out.measureText(t).width>max){out2.push(cur);cur=w;}else cur=t;}if(cur)out2.push(cur);return out2;}
 function bubble(n){
- const px=(n.x*T+8)*Z,base=(n.pose==='toilet'?(10*T+8)*Z:(n.y*T+14)*Z-(n.pose==='sofa'?32:0))-(isF(n)&&held(n)?180:152);out.font='800 23px ui-rounded,"Segoe UI",system-ui,sans-serif';const lines=wrapSay(n.say,Math.min(470,view.width-60)),w=Math.max(...lines.map(l=>out.measureText(l).width))+30,h=14+lines.length*28,x=clamp(px-w/2,8,view.width-w-8),y=Math.max(8,base-h);
+ const px=((n.x+OX)*T+8)*Z,base=(n.pose==='toilet'?(10*T+8)*Z:(n.y*T+14)*Z-(n.pose==='sofa'?32:0))-(n.directed&&held(n)?180:152);out.font='800 23px ui-rounded,"Segoe UI",system-ui,sans-serif';const lines=wrapSay(n.say,Math.min(470,view.width-60)),w=Math.max(...lines.map(l=>out.measureText(l).width))+30,h=14+lines.length*28,x=clamp(px-w/2,8,view.width-w-8),y=Math.max(8,base-h);
  out.globalAlpha=Math.min(1,n.sayT*4);rr(x,y,w,h,18,'#fffdf8');out.strokeStyle='#3a2d3f';out.lineWidth=3.5;out.stroke();out.fillStyle='#fffdf8';const tx=clamp(px,x+18,x+w-18);out.beginPath();out.moveTo(tx-10,y+h-2);out.lineTo(tx+10,y+h-2);out.lineTo(tx,y+h+12);out.closePath();out.fill();out.strokeStyle='#3a2d3f';out.beginPath();out.moveTo(tx-10,y+h-1);out.lineTo(tx,y+h+12);out.lineTo(tx+10,y+h-1);out.stroke();lines.forEach((l,i)=>txt(l,x+w/2,y+29+i*28,23,'#3a2d3f'));out.globalAlpha=1;
 }
 let lightC=null,lightAt=-9,lightKey='';
 function lighting(){
  const h=hourNow();let a=0;if(h>=19||h<5)a=.62;else if(h>=17)a=(h-17)/2*.62;else if(h<7)a=(7-h)/2*.62;else if(S.weather==='hujan')a=.16;else if(S.weather==='mendung')a=.08;if(!a)return;const sl=asleep();
- c.save();c.globalCompositeOperation='multiply';c.fillStyle=`rgba(${sl?'52,44,104':'82,70,140'},${a})`;c.fillRect(0,0,VW,VH);c.globalCompositeOperation='lighter';
+ c.save();c.globalCompositeOperation='multiply';c.fillStyle=`rgba(${sl?'52,44,104':'82,70,140'},${a})`;c.fillRect(-OX*T,0,VWT,VH);c.globalCompositeOperation='lighter';
  if(!lightC){lightC=document.createElement('canvas');lightC.width=VW;lightC.height=VH;}
  if(S.t-lightAt>.25||lightKey!==a+'|'+sl){lightAt=S.t;lightKey=a+'|'+sl;const main=c;c=lightC.getContext('2d');c.setTransform(1,0,0,1,0,0);c.globalCompositeOperation='source-over';c.clearRect(0,0,VW,VH);c.globalCompositeOperation='lighter';
  const glow=(x,y,r,col,k)=>{const g=c.createRadialGradient(x,y,1,x,y,r);g.addColorStop(0,`rgba(${col},${k})`);g.addColorStop(1,`rgba(${col},0)`);c.fillStyle=g;c.fillRect(x-r,y-r,r*2,r*2);};
@@ -516,15 +552,15 @@ function lighting(){
  c.restore();
 }
 function render(){
- c=lc;c.imageSmoothingEnabled=false;c.drawImage(bgC,0,0,VW,VH);windowP(19*T+2,6,40,22);fairy();rack();whiteboard();board();radar();
+ c=lc;c.imageSmoothingEnabled=false;c.drawImage(bgC,0,0,VWT,VH);c.save();c.translate(OX*T,0);windowP(19*T+2,6,40,22);fairy();rack();whiteboard();board();radar();
  const items=[...PROPS.map(p=>({y:p.y,d:p.d})),...NPC.map(n=>({y:n.y*T+14,d:()=>drawNPC(n)}))].sort((a,b)=>a.y-b.y);items.forEach(i=>i.d());
- const busy=NPC.some(n=>n.pose==='toilet');box(21*T+3,13*T+1,10,15,busy?'#ff8177':'#7ad192');R(21*T+5,13*T+4,6,2,'#fff');R(21*T+6,13*T+10,4,1,'#fff');lighting();
+ const busy=NPC.some(n=>n.pose==='toilet');box(21*T+3,13*T+1,10,15,busy?'#ff8177':'#7ad192');R(21*T+5,13*T+4,6,2,'#fff');R(21*T+6,13*T+10,4,1,'#fff');lighting();c.restore();
  out.setTransform(1,0,0,1,0,0);out.imageSmoothingEnabled=false;out.drawImage(low,0,0,view.width,view.height);tagBoxes.length=0;NPC.forEach(tag);NPC.filter(n=>n.sayT>0&&n.say&&n.pose!=='away').forEach(bubble);
 }
 
 // ===== Panel =====
 $('roster').innerHTML=NPC.map(n=>`<button type="button" data-id="${n.id}"><span class="dot" style="background:${n.color}"></span><b></b><small></small><span class="bar"><i></i></span></button>`).join('');
-$('roster').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.sel=b.dataset.id;const n=by(b.dataset.id);if(isF(n)&&n.present)FC=n;});
+$('roster').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.sel=b.dataset.id;const n=by(b.dataset.id);if(mine(n)&&ready(n))FC=n;});
 const ACTIONS=[['kopi','☕','Bikin kopi'],['snack','🍩','Ambil snack'],['makan','🍱','Makan'],['sofa','🛋️','Duduk sofa'],['nap','😴','Tidur sofa'],['toilet','🚻','Toilet'],['kerja','💻','Balik kerja']];
 $('dock').innerHTML=ACTIONS.map(([id,ic,l])=>`<button type="button" data-do="${id}"><span aria-hidden="true">${ic}</span>${l}</button>`).join('');
 $('dock').addEventListener('click',e=>{const b=e.target.closest('button');if(b)playerDo(b.dataset.do);});
@@ -532,19 +568,19 @@ const lv=v=>v==='lewat'?['hot','Lewat ambang']:v==='waspada'?['mid','Mulai banya
 function panel(){
  const h=hourNow();$('clock').textContent=hhmm(h);$('phase').textContent=asleep()?'Kantor tidur':h>=19?'Lembur malam':h>=16.5?'Sore':h<11?'Pagi':'Jam kerja';
  [...$('roster').children].forEach((b,i)=>{const n=NPC[i];b.className=S.sel===n.id?'sel':'';b.children[1].textContent=n.name;b.children[2].textContent=n.pose==='away'?shiftText(n):n===FC&&held(n)&&!n.wait&&!n.inScene&&!/^Meng/.test(n.task)?'Sedang diarahkan':n.task;b.querySelector('.bar i').style.width=n.p!=null?n.p*100+'%':'0';});
- const [a,b]=S.statusReady?lv(S.waste):['','Belum ada'],[d,e]=S.statusReady?lv(S.lost):['','Belum ada'],w=S.weatherReady?{cerah:'Cerah',mendung:'Mendung',hujan:'Hujan'}[S.weather]:'Memuat';$('stats').innerHTML=`<div class="stat"><span>Tarikan ESB</span><b>${S.lastPull?S.lastPull+' WIB':'Belum'}</b></div><div class="stat"><span>Cuaca</span><b>${w}</b></div><div class="stat"><span>Waste</span><b class="${a}">${b}</b></div><div class="stat"><span>Lost sales</span><b class="${d}">${e}</b></div><div class="stat" style="grid-column:1/-1"><span>Jadwal forecaster</span><b>${esc(FW.short||'Forecaster 1')}: ${shiftText(FW)}<br>${esc(FE.short||'Forecaster 2')}: ${shiftText(FE)}</b></div>`;const on=[FW,FE].filter(n=>n.present&&!n.leaving);$('dockHint').textContent=on.length?`Mengarahkan ${FC.name}${on.length>1?'. Klik forecaster lain untuk berganti.':'.'} Klik karakter lain untuk menghampiri dan mengobrol.`:'Tidak ada forecaster yang sedang bertugas.';
+ const [a,b]=S.statusReady?lv(S.waste):['','Belum ada'],[d,e]=S.statusReady?lv(S.lost):['','Belum ada'],w=S.weatherReady?{cerah:'Cerah',mendung:'Mendung',hujan:'Hujan'}[S.weather]:'Memuat';$('stats').innerHTML=`<div class="stat"><span>Tarikan ESB</span><b>${S.lastPull?S.lastPull+' WIB':'Belum'}</b></div><div class="stat"><span>Cuaca</span><b>${w}</b></div><div class="stat"><span>Waste</span><b class="${a}">${b}</b></div><div class="stat"><span>Lost sales</span><b class="${d}">${e}</b></div><div class="stat" style="grid-column:1/-1"><span>Jadwal forecaster</span><b>${esc(FW.short||'Forecaster 1')}: ${shiftText(FW)}<br>${esc(FE.short||'Forecaster 2')}: ${shiftText(FE)}</b></div>`;const on=NPC.filter(n=>mine(n)&&ready(n));$('dockHint').textContent=on.length?`Mengarahkan ${FC.name}${on.length>1?'. Pilih karaktermu yang lain di daftar untuk berganti.':'.'} Klik karakter lain untuk menghampiri dan mengobrol.`:(myChars().length?'Karaktermu sedang tidak ada di kantor.':'Klik karakter untuk mengobrol.');
  root.querySelectorAll('#kt-dock button').forEach(x=>x.classList.toggle('on',held(FC)&&FC.task===LABEL[x.dataset.do]));
 }
 
 // ===== Kontrol Admin =====
-function holdF(f,sec=25){if(f.inScene)endScene();f.held=S.t+sec;cancel(f);f.ff=0;f.carry=null;f.slot=null;}
+function holdF(f,sec=25){if(f.inScene)endScene();f.held=S.t+sec;f.directed=true;cancel(f);f.ff=0;f.carry=null;f.slot=null;}
 function goF(f,cell){holdF(f);f.task='Sedang diarahkan';f.action='walk';(async()=>{try{await walk(f,cell);f.pose='stand';f.face=0;}catch(e){if(e!==CANCEL)throw e;}})();}
 function actF(f,a){
  if(a==='kerja'){holdF(f,14);f.task='Kembali ke meja';f.action='walk';(async()=>{try{await sitDown(f);await doing(f,'Menyusun rencana kirim',12,'type',p=>{f.filled=p;});}catch(e){if(e!==CANCEL)throw e;}})();return;}
  const list=a==='makan'?SPOT.kulkas:SPOT[a],QUEUE={kopi:[19,6],snack:[21,6],makan:[23,6],sofa:[19,13],toilet:[20,13]};
  holdF(f,999);f.rng=seeded(`${f.id}|act|${Math.floor(Date.now()/5000)}`);S.chatCd=0;(async()=>{try{if(a!=='toilet'&&a!=='nap'&&!free(f,list)){f.task='Antre';f.action='walk';say(f,'Antre dulu ya.',2.2);await standAt(f,QUEUE[a],1);while(!free(f,list))await timer(f,.4);}await activity(f,a);f.pose='stand';f.face=0;f.task='Sedang diarahkan';f.held=S.t+7;}catch(e){if(e!==CANCEL)throw e;}})();
 }
-const send=(f,act,x=0,y=0)=>window.ForecastOfficeControl?.send(f.id,act,clamp(Math.round(x),0,25),clamp(Math.round(y),0,16));
+const send=(f,act,x=0,y=0)=>window.ForecastOfficeControl?.send(f.id,act,clamp(Math.round(x),-OX,25),clamp(Math.round(y),0,16));
 function fcTo(cell){goF(FC,cell);send(FC,'go',cell[0],cell[1]);S.sel=FC.id;}
 function playerDo(a){
  if(!pickFC())return;S.sel=FC.id;
@@ -552,10 +588,10 @@ function playerDo(a){
  actF(FC,a);send(FC,a);
 }
 let lastCmd={},stopControl=null;
-function onRemote(c){const f=c.id==='f1'?FW:c.id==='f2'?FE:null;if(!f||c.at<=(lastCmd[c.id]||0))return;lastCmd[c.id]=c.at;if(c.own||Date.now()-c.at>25000||!f.present||f.leaving||asleep())return;if(c.act==='go')goF(f,nearestFree(c.x,c.y));else actF(f,c.act);}
-function cellAt(e){const r=view.getBoundingClientRect();return [(e.clientX-r.left)/r.width*COLS,(e.clientY-r.top)/r.height*ROWS];}
+function onRemote(c){const f=by(c.id);if(!f||c.at<=(lastCmd[c.id]||0))return;lastCmd[c.id]=c.at;if(c.own||Date.now()-c.at>25000||!ready(f)||asleep())return;if(c.act==='go')goF(f,nearestFree(c.x,c.y));else actF(f,c.act);}
+function cellAt(e){const r=view.getBoundingClientRect();return [(e.clientX-r.left)/r.width*(COLS+OX)-OX,(e.clientY-r.top)/r.height*ROWS];}
 view.addEventListener('pointerdown',e=>{
- view.focus({preventScroll:true});const [fx,fy]=cellAt(e),hit=NPC.find(n=>n!==FC&&n.pose!=='toilet'&&n.pose!=='away'&&Math.abs(n.x+.5-fx)<.75&&fy>n.y-1.5&&fy<n.y+1.05);if(hit){S.sel=hit.id;if(isF(hit)){FC=hit;return;}approach(hit);return;}if(!pickFC())return;
+ view.focus({preventScroll:true});const [fx,fy]=cellAt(e),hit=NPC.find(n=>n!==FC&&n.pose!=='toilet'&&n.pose!=='away'&&Math.abs(n.x+.5-fx)<.75&&fy>n.y-1.5&&fy<n.y+1.05);if(hit){S.sel=hit.id;if(mine(hit)&&ready(hit)&&(comes(hit)||myChars().length===1)){FC=hit;return;}approach(hit);return;}if(!pickFC())return;
  if(asleep()){S.sel=FC.id;say(FC,'Zzz...',1.4);return;}const x=Math.floor(fx),y=Math.floor(fy);
  if(y>=1&&y<=5&&x>=18&&x<=19)return playerDo('kopi');if(y>=1&&y<=5&&x>=20&&x<=21)return playerDo('snack');if((y>=1&&y<=5&&x>=22&&x<=24)||(x>=20&&x<=21&&y>=7&&y<=8))return playerDo('makan');
  if(x>=18&&x<=20&&y>=10&&y<=12)return playerDo('sofa');if(x>=22&&x<=24&&y>=10&&y<=15)return playerDo('toilet');if(x>=6&&x<=11&&y>=11&&y<=14)return playerDo('kerja');fcTo(nearestFree(x,y));
@@ -564,11 +600,12 @@ const DIR={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0
 window.addEventListener('keydown',e=>{if(document.activeElement!==view)return;const m=DIR[e.key];if(!m)return;e.preventDefault();if(asleep()||!pickFC())return;const cur=FC.path[0]||[Math.round(FC.x),Math.round(FC.y)],nx=[cur[0]+m[0],cur[1]+m[1]];if(blocked.has(key(nx[0],nx[1])))return;S.sel=FC.id;clearTimeout(S.keySend);const f=FC;S.keySend=setTimeout(()=>send(f,'go',nx[0],nx[1]),220);if(FC.path.length&&held(FC)&&FC.wait?.walk){FC.held=S.t+25;FC.path=[FC.path[0],nx];return;}goF(FC,nx);});
 
 buildBG();syncReal();let last=performance.now(),pt=0,running=false;
-function frame(now){if(!root.isConnected){running=false;stopControl?.();stopControl=null;return;}const gap=Math.max(0,(now-last)/1000);last=now;if(gap>2)NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});let rem=Math.min(gap,1);while(rem>.001){const d=Math.min(rem,.05);update(d);rem-=d;}render();pt+=gap;if(pt>.15){pt=0;panel();}requestAnimationFrame(frame);}
+function frame(now){if(!root.isConnected){running=false;stopControl?.();stopControl=null;stopPres?.();stopPres=null;return;}const gap=Math.max(0,(now-last)/1000);last=now;if(gap>2)NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});let rem=Math.min(gap,1);while(rem>.001){const d=Math.min(rem,.05);update(d);rem-=d;}render();pt+=gap;if(pt>.15){pt=0;panel();}requestAnimationFrame(frame);}
 update(0);panel();
-function start(){syncReal();syncWeather();if(!stopControl)stopControl=window.ForecastOfficeControl?.listen(onRemote)||null;if(running)return;running=true;NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});last=performance.now();requestAnimationFrame(frame);}
+let stopPres=null;function watchPresence(){if(stopPres||!window.ForecastChatAPI?.listenPresence)return;stopPres=window.ForecastChatAPI.listenPresence(list=>{if(list)S.pres=list;});}
+function start(){watchPresence();syncReal();syncWeather();if(!stopControl)stopControl=window.ForecastOfficeControl?.listen(onRemote)||null;if(running)return;running=true;NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});last=performance.now();requestAnimationFrame(frame);}
 setInterval(()=>{if(root.isConnected){syncReal();syncWeather();}},60000);
-return {root,start,debug:()=>NPC.map(n=>({id:n.id,x:+n.x.toFixed(2),y:+n.y.toFixed(2),pose:n.pose,face:n.face,task:n.task,scene:!!n.inScene,say:n.sayT>0?n.say:''}))};
+return {root,start,sim:l=>{S.pres=l;},debug:()=>NPC.map(n=>({id:n.id,x:+n.x.toFixed(2),y:+n.y.toFixed(2),pose:n.pose,face:n.face,task:n.task,scene:!!n.inScene,say:n.sayT>0?n.say:''}))};
 }
-return {debug:()=>api?.debug?.(),render:()=>'<div class="focus-intro"><h2>Kantor Agen AI</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
+return {debug:()=>api?.debug?.(),sim:l=>api?.sim?.(l),render:()=>'<div class="focus-intro"><h2>Kantor Agen AI</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
 })();

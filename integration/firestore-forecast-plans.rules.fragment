@@ -265,13 +265,22 @@ match /forecastBriefs/{key} {
   allow create, update: if forecastBrief(request.resource.data, key);
   allow delete: if false;
 }
-// Kantor Mini: arahan terakhir untuk karakter forecaster, supaya gerakannya sama di semua layar.
+// Kendali karakter Kantor (owner 2026-11-24): tiap akun hanya karakternya sendiri, Master semua.
+function forecastOfficeOwner(id) {
+  return forecastMasterUser()
+    || (id in ['f1','f2'] && (staffPlanner()
+      || (forecastUserIn(['forecaster']) && get(/databases/$(database)/documents/forecastUsers/$(request.auth.uid)).data.get('char','') == id)))
+    || (id == 'pred' && forecastUserIn(['analyst']))
+    || (id == 'mgr' && forecastUserIn(['factory']))
+    || (id == 'spv' && forecastUserIn(['spv']));
+}
+// Kantor Mini: arahan terakhir untuk karakter, supaya gerakannya sama di semua layar.
 match /officeState/{id} {
   allow read: if forecastViewer();
-  allow create, update: if forecastPlanner() && id in ['f1','f2']
+  allow create, update: if id in ['f1','f2','pred','mgr','spv','esb','pawang','watch'] && forecastOfficeOwner(id)
     && request.resource.data.keys().hasOnly(['act','x','y','at','by','cid'])
     && request.resource.data.act in ['go','kopi','snack','makan','sofa','nap','toilet','kerja']
-    && request.resource.data.x is int && request.resource.data.x >= 0 && request.resource.data.x <= 25
+    && request.resource.data.x is int && request.resource.data.x >= -5 && request.resource.data.x <= 25
     && request.resource.data.y is int && request.resource.data.y >= 0 && request.resource.data.y <= 16
     && request.resource.data.at == request.time && request.resource.data.by == request.auth.uid
     && request.resource.data.cid is string && request.resource.data.cid.size() <= 12;
