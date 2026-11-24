@@ -4,18 +4,22 @@
 window.ForecastSourceCloud={status:'Memuat pengaturan tim…',save:async()=>{throw Error('Koneksi penyimpanan belum siap. Coba kembali.');}};
 (async()=>{
  try{
-  const [{getApps,getApp,initializeApp},{getAuth,onAuthStateChanged},{getFirestore,doc,getDoc,setDoc,serverTimestamp}]=await Promise.all([
+  const [{getApps,getApp,initializeApp},{getAuth,onAuthStateChanged},{getFirestore,doc,getDoc,setDoc,serverTimestamp,writeBatch,collection,Timestamp}]=await Promise.all([
    import('https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js')]);
   const app=getApps().some(a=>a.name==='[DEFAULT]')?getApp():initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
   const db=getFirestore(app),auth=getAuth(app);await new Promise(resolve=>{const off=onAuthStateChanged(auth,()=>{off();resolve();});});
   const ref=doc(db,'settings','forecastSources');
   try{const s=await getDoc(ref);if(s.exists()){const d=s.data().config;if(d?.schemaVersion===1&&Array.isArray(d.sources)&&d.sources.every(s=>window.SourceSettings.validLink(s.url)))window.DATA_SOURCES={...d,sources:window.DATA_SOURCES.sources.map(s=>d.sources.find(x=>x.key===s.key)||s)};}}catch{/* Original configuration remains usable offline or if settings reads are restricted. */}
   window.ForecastSourceCloud.status=auth.currentUser?'Memakai sesi pengelola website. Izin penyimpanan diperiksa saat menyimpan.':'Untuk menyimpan bagi tim, masuk sebagai pengelola di website utama, lalu buka kembali halaman ini.';
-  window.ForecastSourceCloud.save=async config=>{
+  window.ForecastSourceCloud.save=async(config,changes=[])=>{
    if(!auth.currentUser)throw Error('Masuk sebagai pengelola di omaopa.fun terlebih dahulu, lalu buka kembali halaman ini. Halaman Forecast memerlukan akun pengelola.');
    const role=window.ForecastAuth?.role||{};
    if(!window.ForecastRolePolicy?.settingsEditor?.(role))throw Error('Akun ini tidak punya izin mengubah pengaturan.');
-   try{await setDoc(ref,{config,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});}catch{throw Error('Izin penyimpanan pengaturan belum tersedia. Pengaturan belum berubah; gunakan Unduh pengaturan untuk menyimpan salinannya.');}
+   try{const who=window.ForecastWhoAmI?.()||{name:'Akun tim',role:''},batch=writeBatch(db),logRef=doc(collection(db,'forecastChangeLog'));
+    batch.set(logRef,{type:'settings',summary:changes.length?`${changes.length} pengaturan diubah`:'Pengaturan disimpan tanpa perubahan nilai',changes:changes.map(s=>String(s).slice(0,80)).slice(0,60),by:auth.currentUser.uid,byName:String(who.name).slice(0,60),role:String(who.role).slice(0,20),at:serverTimestamp(),expireAt:Timestamp.fromMillis(Date.now()+90*864e5)});
+    batch.set(ref,{config,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid,logId:logRef.id});
+    try{await batch.commit();}catch(e){if(e?.code!=='permission-denied')throw e;await setDoc(ref,{config,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});}
+   }catch{throw Error('Izin penyimpanan pengaturan belum tersedia. Pengaturan belum berubah; gunakan Unduh pengaturan untuk menyimpan salinannya.');}
   };
  }catch{window.ForecastSourceCloud.status='Penyimpanan tim belum tersambung. Sumber bawaan tetap tersedia.';}
  window.dispatchEvent(new Event('forecast-sources-loaded'));

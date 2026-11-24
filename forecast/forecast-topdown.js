@@ -318,7 +318,7 @@ window.ForecastTopdown=(()=>{
  const LW_ALERT=25;
  // Kunci setelah hari H (owner 2026-11-10): mulai 00.00 WIB tanggal kiriman, rencana hanya bisa
  // disimpan/dihapus akun Master -- juga dijaga rules Firestore (forecastOpenDate).
- const locked=()=>date<=today()&&window.ForecastAuth?.role?.master!==true;
+ const locked=()=>date<=today()&&!window.ForecastRolePolicy?.lateEditor?.(window.ForecastAuth?.role);
  function lwCell(o,pcs){if(o.lw==null)return {txt:'—',cls:'ft-muted',title:'Penjualan minggu lalu belum lengkap'};if(!o.lw)return {txt:pcs?'baru':'—',cls:'ft-muted',title:'Minggu lalu tidak ada penjualan reguler'};const d=(pcs/o.lw-1)*100,big=Math.abs(d)>LW_ALERT;return {txt:(d>0?'+':d<0?'−':'')+Math.abs(Math.round(d))+'%',cls:big?(d>0?'ft-lw-up':'ft-lw-down'):'ft-lw-ok',title:`Minggu lalu terjual ${o.lw} pcs reguler · rencana ${pcs} pcs${big?' · selisih besar, cek lagi':''}`};}
  const qtyOf=v=>{const n=Number(v);return Number.isFinite(n)&&n>=0?n:0;};
  function outletTotals(c,id){const o=c.outlets.get(id),cells=draft.cells[id]||[];let pcs=0,val=0;cells.forEach((v,p)=>{const q=qtyOf(v);pcs+=q;val+=q*(o.prices[p].value||0);});const ex=draft.extra[id]||{};let extra=0,exOrd=0;for(const nm of draft.names){extra+=qtyOf(ex[nm]?.r);exOrd+=qtyOf(ex[nm]?.o);}const ordVal=(draft.orders[id]||[]).reduce((a,b,p)=>a+qtyOf(b)*(o.prices[p]?.value||0),0);return {pcs,val,extra,ordVal,orders:(draft.orders[id]||[]).reduce((a,b)=>a+qtyOf(b),0)+exOrd};}
@@ -479,7 +479,7 @@ window.ForecastTopdown=(()=>{
      <div class="ft-kpi-fac" title="${fo?esc(fo.qty.map((q,p)=>q?`${model.names[p]} ${q}`:'').filter(Boolean).join(' · ')||'Tidak ada pesanan pabrik'):'Menunggu sinkron pesanan'}"><span>Pesanan pabrik</span><strong>${foN==null?'—':nf(foN)+' pcs'}</strong><small>${foN==null?'menunggu sinkron':`omzet ${rp(foV||0)} · tidak masuk total`}</small>${fo&&foN?`<small class="ft-fac-items">${fo.qty.map((q,p)=>q?`${esc(SHORT[p].join(' '))} <b>${q}</b>`:'').filter(Boolean).join(' · ')}</small>`:''}</div>
     </div>
    </div>
-   ${locked()?'<p class="fp-lock-note">🔒 Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.</p>':date<=today()?'<p class="fs-ship-note">Hari H sudah dimulai. Anda Master, jadi masih bisa mengubah, tapi rencana yang disimpan sekarang tidak dihitung di akurasi.</p>':''}
+   ${locked()?'<p class="fp-lock-note">🔒 Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya Master, Factory Manager, dan SPV Logistik yang bisa mengubah, menyimpan, atau menghapusnya, dan setiap perubahan dicatat di log.</p>':date<=today()?'<p class="fs-ship-note">Hari H sudah dimulai. Akun Anda masih bisa mengubah, tetapi setiap perubahan dicatat di log dan rencana yang disimpan sekarang tidak dihitung di akurasi.</p>':''}
    <div class="ft-bar">
     <div class="ft-area-tabs" role="tablist" aria-label="Pilih area">${[{name:AREA_ALL},...c.groups].map(g=>`<button type="button" role="tab" data-ft-area="${esc(g.name)}" aria-selected="${(draft.area||AREA_ALL)===g.name}">${g.name===AREA_ALL?'Semua area':esc(g.name)}</button>`).join('')}</div>
     <div class="ft-view" role="tablist" aria-label="Tabel yang ditampilkan">${[['reg','1 · Stok outlet',''],['ord','2 · Pesanan',t.orders?` <i>${nf(t.orders)}</i>`:''],['kir','3 · Total kirim','']].map(([k,l,n])=>`<button type="button" role="tab" data-ft-view="${k}" aria-selected="${(draft.view||'reg')===k}">${l}${n}</button>`).join('')}</div>
@@ -594,7 +594,7 @@ window.ForecastTopdown=(()=>{
   if(e.target.closest('[data-ft-prod-apply]')){if(proposal){const ids=new Set();for(const [p,pr] of proposal.map)for(const x of pr.list){const cur=qtyOf(draft.cells[x.id][p]);draft.cells[x.id][p]=String(Math.max(0,cur+x.delta));ids.add(x.id);}persist();message=`Penyesuaian angkatan diterapkan ke ${ids.size} outlet (kotak kuning). Teliti lalu simpan ke tim.`;proposal=null;}return true;}
   if(e.target.closest('[data-ft-prod-download]')){window.ForecastShipping?.exportProduction?.(date,false);return false;}
   if(e.target.closest('[data-ft-prod-share]')){window.ForecastShipping?.exportProduction?.(date,true);return false;}
-  if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya akun Master yang bisa mengubah, menyimpan, atau menghapusnya.';return true;}requestSave();return true;}
+  if(e.target.closest('[data-ft-save]')){if(locked()){message='Rencana tanggal ini terkunci karena hari H sudah dimulai (00.00 WIB). Hanya Master, Factory Manager, dan SPV Logistik yang bisa mengubah, menyimpan, atau menghapusnya, dan setiap perubahan dicatat di log.';return true;}requestSave();return true;}
   return false;
  }
  // Navigasi ala spreadsheet di tabel area: Enter/↓ ke bawah, Shift+Enter/↑ ke atas (panah tidak

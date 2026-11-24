@@ -16,6 +16,9 @@
   fullSettings:r=>!!r&&(r.master===true||r.factory===true||r.spv===true),
   // Hanya Master yang mengelola akun.
   accountAdmin:r=>!!r&&r.master===true,
+  // Boleh mengubah rencana setelah hari H (tercatat di log) dan melihat log perubahan.
+  lateEditor:r=>!!r&&(r.master===true||r.factory===true||r.spv===true),
+  logViewer:r=>!!r&&(r.master===true||r.factory===true),
   fromUser:d=>{
    if(!d||d.status!=='active')return null;
    const base={name:String(d.name||d.id||'').slice(0,60),fu:d.role,loginId:String(d.id||''),char:d.char||''};

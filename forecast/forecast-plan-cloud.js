@@ -45,7 +45,18 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
     cloud.state='ready';cloud.uid=u.uid;cloud.message='Akun staf tersambung.';subscribe();emit();
    }catch{if(current!==generation)return;cloud.state='error';cloud.message='Akun staf belum bisa diperiksa. Coba muat ulang halaman.';emit();}
   });
-  cloud.save=async(plan,expectedRevision)=>{
+  // Log perubahan (owner 2026-11-24): simpanan pada/ setelah hari H dicatat di forecastChangeLog pada
+  // transaksi yang sama. Aturan Firestore menolak simpanan terlambat tanpa log.
+  const wibToday=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jakarta'});
+  const pname=p=>window.ForecastProducts?.core?.()?.[p]?.label||('Produk '+(p+1));
+  function planDiff(a,b){
+   const out=[];for(const [k,lab] of [['regular',''],['orders',' (pesanan)']])for(let p=0;p<12;p++){const x=a?.[k]?.[p]||0,y=b?.[k]?.[p]||0;if(x!==y)out.push(`${pname(p)}${lab}: ${x} → ${y}`);}
+   const m=it=>new Map((it||[]).map(i=>[i.name,i])),A=m(a?.customItems),B=m(b?.customItems);
+   for(const n of new Set([...A.keys(),...B.keys()])){const x=A.get(n),y=B.get(n);if((x?.regular||0)!==(y?.regular||0))out.push(`${n}: ${x?.regular||0} → ${y?.regular||0}`);if((x?.orders||0)!==(y?.orders||0))out.push(`${n} (pesanan): ${x?.orders||0} → ${y?.orders||0}`);}
+   if((a?.note||'')!==(b?.note||''))out.push('Catatan diubah');
+   return out.map(s=>String(s).slice(0,80)).slice(0,60);
+  }
+  cloud.save=async(plan,expectedRevision,noLog)=>{
    if(cloud.state!=='ready'||!auth.currentUser)throw Error('Masuk dengan akun staf terlebih dahulu.');
    const uid=auth.currentUser.uid,ref=dbSDK.doc(db,'forecastPlans',plan.date+'_'+plan.outlet);
    // Rencana yang dihapus tidak ada di records, jadi pemanggil mengirim revisi 0 -> pakai revisi dokumen yang dihapus.
@@ -55,9 +66,12 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
      const snap=await tx.get(ref),previous=snap.exists()?snap.data():null;
      if((previous?.revision||0)!==expectedRevision)throw Error('CONFLICT');
      const revision=(previous?.revision||0)+1,stamp=dbSDK.serverTimestamp(),fresh=!previous||!!previous.deleted,record={schemaVersion:1,date:plan.date,outlet:plan.outlet,revision,plan,baseline:fresh?plan:previous.baseline,firstSavedAt:fresh?stamp:previous.firstSavedAt,savedAt:stamp,savedBy:uid};
-     tx.set(ref,record);tx.set(dbSDK.doc(ref,'revisions',String(revision)),record);return revision;
+     tx.set(ref,record);tx.set(dbSDK.doc(ref,'revisions',String(revision)),record);
+     if(!noLog&&plan.date<=wibToday()){const who=window.ForecastWhoAmI?.()||{name:staffName||'Akun tim',role:''},ch=planDiff(previous&&!previous.deleted?previous.plan:null,plan);
+      tx.set(dbSDK.doc(db,'forecastChangeLog',plan.date+'_'+plan.outlet+'_r'+revision),{type:'plan',key:plan.date+'_'+plan.outlet,date:plan.date,outlet:plan.outlet,revision,summary:previous&&!previous.deleted?`${ch.length} perubahan setelah hari H`:'Rencana dibuat setelah hari H',changes:ch,by:uid,byName:String(who.name).slice(0,60),role:String(who.role).slice(0,20),at:stamp,expireAt:dbSDK.Timestamp.fromMillis(Date.now()+90*864e5)});}
+     return revision;
     });return revision;
-   }catch(e){console.error('[forecast save]',plan.date,plan.outlet,e?.code,e?.message);const why=` (kode: ${e?.code||e?.message||'tidak diketahui'})`;if(e.message==='CONFLICT')throw Error('Rencana ini baru diubah rekan tim. Buka rencana tim terbaru sebelum menyimpan lagi. Draft Anda tetap tersimpan.');if(e.code==='permission-denied')throw Error('Izin menyimpan ditolak aturan Firestore'+why+'. Draft tetap tersimpan di perangkat ini.');throw Error('Rencana belum tersimpan ke tim'+why+'. Draft tetap tersimpan di perangkat ini.');}
+   }catch(e){if(!noLog&&e?.code==='permission-denied'&&plan.date<=wibToday())return cloud.save(plan,expectedRevision,true);console.error('[forecast save]',plan.date,plan.outlet,e?.code,e?.message);const why=` (kode: ${e?.code||e?.message||'tidak diketahui'})`;if(e.message==='CONFLICT')throw Error('Rencana ini baru diubah rekan tim. Buka rencana tim terbaru sebelum menyimpan lagi. Draft Anda tetap tersimpan.');if(e.code==='permission-denied')throw Error('Izin menyimpan ditolak aturan Firestore'+why+'. Draft tetap tersimpan di perangkat ini.');throw Error('Rencana belum tersimpan ke tim'+why+'. Draft tetap tersimpan di perangkat ini.');}
   };
   // Riwayat: nama staf dari uid (dibaca sekali per uid, disimpan di memori) & semua versi satu
   // rencana. Staf yang tidak boleh membaca dokumen staf lain cukup melihat "Akun staf".

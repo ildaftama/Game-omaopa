@@ -77,7 +77,9 @@ match /forecastAccess/{uid} {
 // client). Sumber data, ambang batas, tampilan & daftar produk boleh diubah semua akun Forecast.
 match /settings/forecastSources {
   allow read: if notRadarSyncAccount() && (true);
-  allow write: if notRadarSyncAccount() && (staffPlanner() || forecastUserIn(['master','factory','spv']));
+  allow write: if notRadarSyncAccount() && (staffPlanner() || forecastUserIn(['master','factory','spv']))
+    && request.resource.data.get('logId','') is string && request.resource.data.get('logId','').size() > 0
+    && getAfter(/databases/$(database)/documents/forecastChangeLog/$(request.resource.data.logId)).data.at == request.time;
 }
 function forecastReference(d, key) {
   return d.schemaVersion == 2 && forecastManager()
@@ -131,6 +133,17 @@ function forecastRecord(d, key) {
 function forecastOpenDate(date) {
   return request.time < timestamp.date(int(date.split('-')[0]), int(date.split('-')[1]), int(date.split('-')[2])) - duration.value(7, 'h');
 }
+// Boleh mengubah rencana setelah hari H (owner 2026-11-24): Master, Factory Manager, SPV Logistik,
+// dan setiap simpanan terlambat wajib punya entri forecastChangeLog pada tulisan yang sama.
+function forecastLateEditor() {
+  return request.auth != null
+    && ((exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+      && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true)
+      || forecastUserIn(['master','factory','spv']));
+}
+function forecastLateLogged(key, revision) {
+  return getAfter(/databases/$(database)/documents/forecastChangeLog/$(key + '_r' + string(revision))).data.at == request.time;
+}
 function forecastMasterUser() {
   return request.auth != null
     && ((exists(/databases/$(database)/documents/staff/$(request.auth.uid))
@@ -140,13 +153,13 @@ function forecastMasterUser() {
 match /forecastPlans/{key} {
   allow read: if forecastViewer();
   allow create: if forecastReference(request.resource.data,key) || (forecastPlanner() && forecastRecord(request.resource.data,key)
-    && (forecastOpenDate(request.resource.data.date) || forecastMasterUser())
+    && (forecastOpenDate(request.resource.data.date) || (forecastLateEditor() && forecastLateLogged(key, request.resource.data.revision)))
     && request.resource.data.revision == 1
     && request.resource.data.firstSavedAt == request.time
     && request.resource.data.baseline == request.resource.data.plan
     && getAfter(/databases/$(database)/documents/forecastPlans/$(key)/revisions/1).data == request.resource.data);
   allow update: if forecastReference(request.resource.data,key) || (forecastPlanner() && forecastRecord(request.resource.data,key)
-    && (forecastOpenDate(request.resource.data.date) || forecastMasterUser())
+    && (forecastOpenDate(request.resource.data.date) || (forecastLateEditor() && forecastLateLogged(key, request.resource.data.revision)))
     && request.resource.data.date == resource.data.date
     && request.resource.data.outlet == resource.data.outlet
     && request.resource.data.revision == resource.data.revision + 1
@@ -193,7 +206,7 @@ match /forecastPlans/{key} {
 // tulisan yang sama. Akurasi memakai rencana yang tidak dihapus; manajer melihat log-nya.
 function forecastDeleteMark() {
   return forecastPlanner()
-    && (forecastOpenDate(resource.data.date) || forecastMasterUser())
+    && (forecastOpenDate(resource.data.date) || forecastLateEditor())
     && resource.data.get('deleted', null) == null
     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted'])
     && request.resource.data.deleted is map
@@ -290,6 +303,23 @@ match /forecastPresence/{uid} {
     && request.resource.data.online is bool
     && request.resource.data.at == request.time;
   allow delete: if false;
+}
+// Log perubahan rencana setelah hari H & pengaturan. Dibaca Master & Factory Manager, 90 hari.
+match /forecastChangeLog/{id} {
+  allow read: if forecastMasterUser() || forecastUserIn(['factory']);
+  allow create: if request.auth != null
+    && request.resource.data.keys().hasOnly(['type','key','date','outlet','revision','summary','changes','by','byName','role','at','expireAt'])
+    && request.resource.data.by == request.auth.uid
+    && request.resource.data.at == request.time
+    && request.resource.data.expireAt is timestamp
+    && request.resource.data.summary is string && request.resource.data.summary.size() <= 300
+    && request.resource.data.changes is list && request.resource.data.changes.size() <= 60
+    && request.resource.data.byName is string && request.resource.data.byName.size() <= 60
+    && request.resource.data.role is string && request.resource.data.role.size() <= 20
+    && ((request.resource.data.type == 'plan' && forecastPlanner() && id == request.resource.data.key + '_r' + string(request.resource.data.revision))
+      || (request.resource.data.type == 'settings' && (staffPlanner() || forecastUserIn(['master','factory','spv']))));
+  allow update: if false;
+  allow delete: if forecastMasterUser();
 }
 // OPSIONAL -- hanya tambahkan kalau owner SETUJU akun sinkronisasi forecast (FIREBASE_SYNC_
 // EMAIL, sudah forecastManager() lewat staff/{uid}.super atau .master) boleh MEMBACA collection
