@@ -487,7 +487,7 @@ function tag(n){
  if(!dozing||sel){rr(x,y,w,26,13,sel?n.color:'rgba(58,45,63,.88)');txt(name,x+w/2,y+19,18,sel?'#2b2130':'#fff');}
  if(n.p!=null&&n.action!=='break'){const bw=88,bx=clamp(px-bw/2,6,view.width-bw-6),by=py-(sit(n)?140:150);rr(bx,by,bw,14,7,'#3a2d3f');rr(bx+3,by+3,Math.max(5,(bw-6)*n.p),8,4,n.color);}
  if(n.pose==='sleepDesk'||n.pose==='nap'){for(let i=0;i<3;i++){const p=(S.t*.45+i/3)%1;out.globalAlpha=1-p;txt('z',px+28+p*38,py-68-p*58,22+p*20,'#e7e0ff');out.globalAlpha=1;}}
- if(isF(n)&&held(n)){const top=n.pose==='nap'?py-104:sit(n)?py-126:py-150,yy=top-(n.p!=null&&n.action!=='break'?22:0)+Math.sin(S.t*5)*3;out.save();out.lineJoin='round';out.strokeStyle='#2b2130';out.lineWidth=5;out.fillStyle='#ffe14d';out.beginPath();out.moveTo(px-10,yy);out.lineTo(px+10,yy);out.lineTo(px,yy+13);out.closePath();out.stroke();out.fill();out.fillStyle='rgba(255,255,255,.75)';out.beginPath();out.moveTo(px-6,yy+2);out.lineTo(px+1,yy+2);out.lineTo(px-2,yy+6);out.closePath();out.fill();out.restore();}
+ if(isF(n)&&held(n)&&!n.inScene&&!/^Mengobrol/.test(n.task)){const top=n.pose==='nap'?py-104:sit(n)?py-126:py-150,yy=top-(n.p!=null&&n.action!=='break'?22:0)+Math.sin(S.t*5)*3;out.save();out.lineJoin='round';out.strokeStyle='#2b2130';out.lineWidth=5;out.fillStyle='#ffe14d';out.beginPath();out.moveTo(px-10,yy);out.lineTo(px+10,yy);out.lineTo(px,yy+13);out.closePath();out.stroke();out.fill();out.fillStyle='rgba(255,255,255,.75)';out.beginPath();out.moveTo(px-6,yy+2);out.lineTo(px+1,yy+2);out.lineTo(px-2,yy+6);out.closePath();out.fill();out.restore();}
 }
 const sit=n=>['sit','sofa','sleepDesk','nap'].includes(n.pose);
 function wrapSay(s,max){const words=String(s).split(' '),out2=[];let cur='';for(const w of words){const t=cur?cur+' '+w:w;if(cur&&out.measureText(t).width>max){out2.push(cur);cur=w;}else cur=t;}if(cur)out2.push(cur);return out2;}
@@ -525,7 +525,7 @@ $('dock').addEventListener('click',e=>{const b=e.target.closest('button');if(b)p
 const lv=v=>v==='lewat'?['hot','Lewat ambang']:v==='waspada'?['mid','Mulai banyak']:['ok','Masih aman'];
 function panel(){
  const h=hourNow();$('clock').textContent=hhmm(h);$('phase').textContent=asleep()?'Kantor tidur':h>=19?'Lembur malam':h>=16.5?'Sore':h<11?'Pagi':'Jam kerja';
- [...$('roster').children].forEach((b,i)=>{const n=NPC[i];b.className=S.sel===n.id?'sel':'';b.children[1].textContent=n.name;b.children[2].textContent=n.pose==='away'?shiftText(n):n===FC&&held(n)&&!n.wait?'Sedang diarahkan':n.task;b.querySelector('.bar i').style.width=n.p!=null?n.p*100+'%':'0';});
+ [...$('roster').children].forEach((b,i)=>{const n=NPC[i];b.className=S.sel===n.id?'sel':'';b.children[1].textContent=n.name;b.children[2].textContent=n.pose==='away'?shiftText(n):n===FC&&held(n)&&!n.wait&&!n.inScene&&!/^Meng/.test(n.task)?'Sedang diarahkan':n.task;b.querySelector('.bar i').style.width=n.p!=null?n.p*100+'%':'0';});
  const [a,b]=S.statusReady?lv(S.waste):['','Belum ada'],[d,e]=S.statusReady?lv(S.lost):['','Belum ada'],w=S.weatherReady?{cerah:'Cerah',mendung:'Mendung',hujan:'Hujan'}[S.weather]:'Memuat';$('stats').innerHTML=`<div class="stat"><span>Tarikan ESB</span><b>${S.lastPull?S.lastPull+' WIB':'Belum'}</b></div><div class="stat"><span>Cuaca</span><b>${w}</b></div><div class="stat"><span>Waste</span><b class="${a}">${b}</b></div><div class="stat"><span>Lost sales</span><b class="${d}">${e}</b></div><div class="stat" style="grid-column:1/-1"><span>Jadwal forecaster</span><b>${esc(FW.short||'Forecaster 1')}: ${shiftText(FW)}<br>${esc(FE.short||'Forecaster 2')}: ${shiftText(FE)}</b></div>`;const on=[FW,FE].filter(n=>n.present&&!n.leaving);$('dockHint').textContent=on.length?`Mengarahkan ${FC.name}${on.length>1?'. Klik forecaster lain untuk berganti.':'.'} Klik karakter lain untuk menghampiri dan mengobrol.`:'Tidak ada forecaster yang sedang bertugas.';
  root.querySelectorAll('#kt-dock button').forEach(x=>x.classList.toggle('on',held(FC)&&FC.task===LABEL[x.dataset.do]));
 }
@@ -562,7 +562,7 @@ function frame(now){if(!root.isConnected){running=false;stopControl?.();stopCont
 update(0);panel();
 function start(){syncReal();syncWeather();if(!stopControl)stopControl=window.ForecastOfficeControl?.listen(onRemote)||null;if(running)return;running=true;NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});last=performance.now();requestAnimationFrame(frame);}
 setInterval(()=>{if(root.isConnected){syncReal();syncWeather();}},60000);
-return {root,start};
+return {root,start,debug:()=>NPC.map(n=>({id:n.id,x:+n.x.toFixed(2),y:+n.y.toFixed(2),pose:n.pose,face:n.face,task:n.task,scene:!!n.inScene,say:n.sayT>0?n.say:''}))};
 }
-return {render:()=>'<div class="focus-intro"><h2>Kantor Agen AI</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
+return {debug:()=>api?.debug?.(),render:()=>'<div class="focus-intro"><h2>Kantor Agen AI</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
 })();
