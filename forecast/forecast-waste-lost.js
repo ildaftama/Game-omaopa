@@ -40,7 +40,7 @@ window.ForecastWasteLost=(()=>{
  const blank=()=>({pcs:0,nom:0,habis:0,low:0,high:0,lowRp:0,highRp:0,omzet:0,days:0});
  const addTo=(a,b)=>{for(const k of Object.keys(a))a[k]+=b[k]||0;return a;};
  function collect(){
-  const recap=window.DAILY_RECAP_SUMMARY,stock=window.STOCK_DAILY,items=recap?.wasteItems||{},ds=dates(Object.keys(items).filter(d=>Object.keys(items[d]).length));
+  const recap=window.DAILY_RECAP_SUMMARY,stock=window.STOCK_DAILY,items=recap?.wasteItems||window.WASTE_LOST_ITEMS||{},ds=dates(Object.keys(items).filter(d=>Object.keys(items[d]).length));
   const ids=selected==='__all__'?window.PcsPanels?.data?.().sales?.outletIds||[]:[selected],gross=new Map(),grossProduct=new Map(),series=window.ForecastDashboard?.grossSeries?.(),base=baselines(stock),prices=window.FORECAST_REALIZED_PRICES?.outlets||{};
   if(series)for(const [id,s] of series.byOutlet)for(const pt of s){gross.set(pt.date+'|'+id,pt.gross);grossProduct.set(pt.date+'|'+id,pt.grossProduct);}
   const prod={},out=new Map(ids.map(id=>[id,{id,omzet:0,sum:blank(),items:{}}]));
@@ -88,7 +88,7 @@ window.ForecastWasteLost=(()=>{
   return `<section class="wl-section"><h2>Per area</h2><p class="wl-note">Klik area untuk melihat outlet di dalamnya.</p><div class="wl-areas">${cards}</div>${active?areaPanel(active,L):''}</section>`;
  }
  function view(){
-  if(!window.DAILY_RECAP_SUMMARY)return '<div class="workspace-empty">Data waste belum tersedia untuk akun ini.</div>';
+  if(!window.DAILY_RECAP_SUMMARY&&!window.WASTE_LOST_ITEMS)return '<div class="workspace-empty">Data waste belum tersedia untuk akun ini.</div>';
   const c=collect(),L=limits(),wp=c.omzet>0?c.total.nom/c.omzet*100:null;
   const per=[['mtd','Bulan ini'],['7','7 hari terakhir'],['prev','Bulan lalu']].map(([k,t])=>`<button type="button" data-wl-period="${k}" aria-pressed="${state.period===k}" class="${state.period===k?'on':''}">${t}</button>`).join('');
   return `<div class="wl-build" role="status"><b>🚧 Sedang dibangun</b><span>Angka masih diperiksa. Untuk keputusan, tetap cocokkan dengan sheet tim.</span></div>

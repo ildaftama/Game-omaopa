@@ -134,7 +134,6 @@ function touchInspect(e){
 $('#workspace-content').addEventListener('touchstart',touchInspect,{passive:true});
 $('#workspace-content').addEventListener('touchmove',touchInspect,{passive:true});
 window.addEventListener('pcs-selection-changed',()=>{if(['pcs','orders'].includes(focus))schedule();});
-if(window.ForecastRolePolicy?.forecasterOnly?.(window.ForecastAuth?.role)){const wl=document.querySelector('[data-focus="wastelost"]');if(wl)wl.hidden=true;}
 window.addEventListener('pcs-data-loaded',()=>{if(['pcs','orders','forecast','dashboard','wastelost'].includes(focus))schedule();});
 window.addEventListener('forecast-operations-changed',()=>{if(['forecast','access','dashboard'].includes(focus))schedule();});
 window.addEventListener('forecast-plans-changed',()=>{if(focus==='access'||focus==='dashboard'||(focus==='forecast'&&window.ForecastWorkspace.cloudChanged()))schedule();});

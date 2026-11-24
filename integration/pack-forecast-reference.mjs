@@ -32,7 +32,9 @@ const CHUNK_LIMIT = 700000, MAX_CHUNKS = 10;
 // price references used by the plan's own revenue estimate. No revenue trend, profit,
 // waste, or evaluation globals -- DAILY_RECAP_SUMMARY (waste/lost sales) stays full-bundle
 // only for this same reason, matching PERFORMANCE_SUMMARY/WASTE_ESB_SUMMARY.
-const LEAN_GLOBALS = ['OUTLET_DATA', 'OUTLET_INTELLIGENCE', 'INSIGHT_DATA', 'FORECAST_REALIZED_PRICES', 'FORECAST_MODEL_SPLIT'];
+// Owner 2026-11-24: forecaster boleh melihat tab Waste & Lost Sales, jadi stok harian dan waste
+// per produk ikut dikirim. Rekap penuh tetap tidak dikirim agar perhitungan lain tidak berubah.
+const LEAN_GLOBALS = ['OUTLET_DATA', 'OUTLET_INTELLIGENCE', 'INSIGHT_DATA', 'FORECAST_REALIZED_PRICES', 'FORECAST_MODEL_SPLIT', 'STOCK_DAILY'];
 
 function field(v) {
   if (v === null || v === undefined) return { nullValue: null };
@@ -133,6 +135,8 @@ export async function writeLiveIntraday(live, idToken, uid) {
 }
 export function buildLeanBundle(fullBundle) {
   const globals = Object.fromEntries(LEAN_GLOBALS.filter(k => Object.hasOwn(fullBundle.globals || {}, k)).map(k => [k, fullBundle.globals[k]]));
+  const wasteItems = fullBundle.globals?.DAILY_RECAP_SUMMARY?.wasteItems, stockDays = Object.keys(fullBundle.globals?.STOCK_DAILY?.days || {}).sort();
+  if (wasteItems) globals.WASTE_LOST_ITEMS = Object.fromEntries(Object.entries(wasteItems).filter(([d]) => !stockDays.length || d >= stockDays[0]));
   return { schemaVersion: 1, globals, files: { 'pcs-sales.json': fullBundle.files['pcs-sales.json'], 'pcs-orders.json': fullBundle.files['pcs-orders.json'] } };
 }
 // Menulis pcs-sales.json dari bundle LIVE ke disk, SEBELUM pcs-sales.mjs dijalankan. Tanpa
