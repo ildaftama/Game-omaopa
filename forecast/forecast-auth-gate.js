@@ -146,7 +146,8 @@ window.ForecastAccountsAPI={
 // Chat tim & status online (owner 2026-11-24). Pesan disimpan 30 hari; Master membersihkan yang
 // kedaluwarsa saat membuka chat. Status online diperbarui tiap menit selama web terbuka.
 const chatCol=collection(db,'forecastChat'),presRef=uid=>doc(db,'forecastPresence',uid),DAY=864e5;
-const myName=()=>{const r=window.ForecastAuth?.role||{};return String(r.name||r.nama||r.displayName||auth.currentUser?.email?.split('@')[0]||'Akun').slice(0,60);};
+// Nama tampil: nama akun, atau label peran. Nomor HP (email akun lama) tidak pernah ditampilkan.
+const myName=()=>{const r=window.ForecastAuth?.role||{},n=String(r.name||r.nama||r.displayName||'').trim();if(n&&!/^\+?\d{8,}$/.test(n))return n.slice(0,60);const em=String(auth.currentUser?.email||'');if(em.endsWith('@'+FU_DOMAIN))return em.split('@')[0].slice(0,60);return ({master:'Master',super:'Admin Utama',admin:'Admin',forecaster:'Forecaster'})[myRole()]||'Akun tim';};
 const myRole=()=>{const r=window.ForecastAuth?.role||{};return r.fu||(r.master?'master':r.super?'super':r.admin?'admin':r.forecaster?'forecaster':'');};
 window.ForecastChatAPI={
  uid:()=>auth.currentUser?.uid||null,
