@@ -19,7 +19,7 @@
 .wl-prods{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:10px}
 .wl-prod{min-width:0;padding:13px 15px;background:#fff;border:1px solid #e0e7ed;border-radius:10px}
 .wl-prod h4{margin:0 0 9px;color:#172b42;font-size:14px}
-.wl-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.wl-pair{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:10px}
 .wl-stat{display:block;min-width:0}
 .wl-stat>span{display:block;color:#6d7d8d;font-size:12px;font-weight:600}
 .wl-stat>strong{display:block;margin-top:1px;font-size:24px;line-height:1.2;font-variant-numeric:tabular-nums;white-space:nowrap}
