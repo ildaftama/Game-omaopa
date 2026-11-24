@@ -1,65 +1,99 @@
 // Tab Waste & Lost Sales (owner 2026-11-24). Masih tahap dibangun sampai seluruh data dipastikan.
-// Waste per produk dari tab WASTE tim, stok habis dari Daily Report, menit lost dari rekap harian.
+// Waste dari tab WASTE tim. Stok dari Daily Report: kolom waste hari ini adalah sisa kemarin, jadi
+// produk dianggap habis bila stok setelah waste masih ada, lalu stok akhir 0 tanpa transfer keluar.
 window.ForecastWasteLost=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const nf=v=>Math.round(v||0).toLocaleString('id-ID'),rp=v=>'Rp'+nf(v),pc=(v,d=2)=>v==null||!Number.isFinite(v)?'—':v.toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
+ const nf=v=>Math.round(v||0).toLocaleString('id-ID'),pc=(v,d=2)=>v==null||!Number.isFinite(v)?'—':v.toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
+ const rp=v=>{const n=Math.abs(v||0);if(n>=1e9)return 'Rp'+(v/1e9).toLocaleString('id-ID',{maximumFractionDigits:2})+' M';if(n>=1e6)return 'Rp'+(v/1e6).toLocaleString('id-ID',{maximumFractionDigits:1})+' jt';if(n>=1e3)return 'Rp'+nf(v/1e3)+' rb';return 'Rp'+nf(v);};
  const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
- const ORDER=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Malmil Cheese Less Sugar','Malmil Choco Less Sugar','Mini Ogura','Chiffon Keju','Chiffon Ekstra Keju','Chiffon Butter','Chiffon Kurma','Chiffon Lite Ekstra Keju','Chiffon Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Keju','Roti Coklat Pisang','Roti Vanilla'];
- const GROUPS=[['Ogura',/^Ogura/],['Malmil',/^Malmil/],['Mini',/^Mini/],['Chiffon',/^Chiffon/],['Roti',/^Roti/]];
- const state={period:'mtd',sort:'nom',open:null};let selected='__all__';
+ const FAMILIES=[['Ogura',['Ogura Cheese','Ogura Choco']],['Malmil',['Malmil Cheese','Malmil Choco','Malmil Cheese Less Sugar','Malmil Choco Less Sugar']],['Mini',['Mini Ogura']],['Chiffon',['Chiffon Keju','Chiffon Ekstra Keju','Chiffon Butter','Chiffon Kurma','Chiffon Lite Ekstra Keju','Chiffon Lite Keju']],['Roti',['Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Keju','Roti Coklat Pisang','Roti Vanilla']]];
+ const ORDER=FAMILIES.flatMap(f=>f[1]);
+ // Estimasi lost baru untuk 4 produk utama: varian kecil terlalu jarang terjual untuk diukur dari data harian.
+ const PRICE_NAME={'Ogura Cheese':'Ogura Cheese','Ogura Choco':'Ogura Chocolate','Malmil Cheese':'Malmil Cheese','Malmil Choco':'Malmil Chocolate'};
+ const state={period:'mtd',area:null,outlet:null};let selected='__all__',cache=null;
  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
- const limits=()=>{const t=window.ForecastSettings?.get?.().thresholds||{};return {waste:t.waste||3.5,lost:t.lostSales||4.5,open:(t.openHours||12)*60};};
- function range(allDates){
-  const t=today(),past=allDates.filter(d=>d<t).sort();
-  if(state.period==='7')return past.slice(-7);
-  if(state.period==='prev'){const m=t.slice(0,7),[y,mo]=m.split('-').map(Number),p=mo===1?`${y-1}-12`:`${y}-${String(mo-1).padStart(2,'0')}`;return past.filter(d=>d.startsWith(p));}
-  return past.filter(d=>d.startsWith(t.slice(0,7)));
- }
- function collect(){
-  const recap=window.DAILY_RECAP_SUMMARY,stock=window.STOCK_DAILY,items=recap?.wasteItems||{},dates=range(Object.keys(items).filter(d=>Object.keys(items[d]).length));
-  const ids=(selected==='__all__'?window.PcsPanels?.data?.().sales?.outletIds||[]:[selected]),gross=new Map(),series=window.ForecastDashboard?.grossSeries?.();
-  if(series)for(const [id,s] of series.byOutlet)for(const pt of s)gross.set(pt.date+'|'+id,pt.gross);
-  const blank=()=>({pcs:0,nom:0,kirim:0,habis:0,cek:0,days:0,tfIn:0,tfOut:0}),prod={},out=new Map(ids.map(id=>[id,{id,pcs:0,nom:0,omzet:0,lostM:0,lostD:0,habis:0,cek:0,kirim:0,items:{}}]));
-  const cell=(o,l)=>o.items[l]||(o.items[l]=blank()),P=l=>prod[l]||(prod[l]=blank());
-  for(const d of dates)for(const [id,o] of out){o.omzet+=gross.get(d+'|'+id)||0;
-   for(const [l,[pcs,nom]] of Object.entries(items[d]?.[id]||{})){o.pcs+=pcs;o.nom+=nom;const a=cell(o,l),b=P(l);a.pcs+=pcs;a.nom+=nom;b.pcs+=pcs;b.nom+=nom;}
-   const m=recap?.lostSalesMinutes?.[d]?.[id];if(Number.isFinite(m)){o.lostM+=m;o.lostD++;}
-   const day=stock?.days?.[d]?.[id];if(day)for(const [k,v] of Object.entries(day)){const l=stock.labels[+k];if(!l)continue;const a=cell(o,l),b=P(l),closed=v[5]===1,zero=closed&&v[0]>0&&v[4]<=0&&!v[3],wasted=(v[6]??items[d]?.[id]?.[l]?.[0]??0)>0,empty=zero&&!wasted,check=zero&&wasted;for(const x of [a,b]){x.kirim+=v[1];x.tfIn+=v[2];x.tfOut+=v[3];if(closed&&v[0]>0)x.days++;if(empty)x.habis++;if(check)x.cek++;}o.kirim+=v[1];if(empty)o.habis++;if(check)o.cek++;}
-  }
-  const rows=[...out.values()],sum=k=>rows.reduce((s,r)=>s+r[k],0);
-  return {dates,rows,prod,pcs:sum('pcs'),nom:sum('nom'),omzet:sum('omzet'),habis:sum('habis'),cek:sum('cek'),lostM:sum('lostM'),lostD:sum('lostD'),hasStock:!!stock,hasItems:Object.keys(items).length>0};
- }
+ const limits=()=>({waste:window.ForecastSettings?.get?.().thresholds?.waste||3.5});
  const tone=(v,lim)=>v==null?'':v>lim?'hot':v>=lim*.9?'mid':'ok';
  const span=ds=>ds.length?`${+ds[0].slice(8)}/${+ds[0].slice(5,7)} – ${+ds.at(-1).slice(8)}/${+ds.at(-1).slice(5,7)}`:'belum ada data';
- function productTable(c){
-  const total=c.nom||1,labels=ORDER.filter(l=>c.prod[l]&&(c.prod[l].pcs||c.prod[l].kirim||c.prod[l].days));
-  const body=GROUPS.map(([g,re])=>{const ls=labels.filter(l=>re.test(l));if(!ls.length)return '';const a=ls.reduce((s,l)=>({pcs:s.pcs+c.prod[l].pcs,nom:s.nom+c.prod[l].nom,kirim:s.kirim+c.prod[l].kirim}),{pcs:0,nom:0,kirim:0});
-   return `<tr class="wl-group"><th scope="row">${g}</th><td>${nf(a.pcs)}</td><td>${rp(a.nom)}</td><td>${pc(a.nom/total*100,1)}</td><td>${a.kirim?pc(a.pcs/a.kirim*100,1):'—'}</td></tr>`+ls.map(l=>{const p=c.prod[l];return `<tr><th scope="row">${esc(l)}</th><td>${nf(p.pcs)}</td><td>${rp(p.nom)}</td><td>${pc(p.nom/total*100,1)}</td><td>${p.kirim?pc(p.pcs/p.kirim*100,1):'—'}</td></tr>`;}).join('');}).join('');
-  return `<article class="workspace-card wl-card"><h3>Waste per produk</h3><div class="wl-scroll"><table class="wl-table"><thead><tr><th>Produk</th><th>Pcs</th><th>Nominal HPP</th><th>Porsi</th><th>Dari kiriman</th></tr></thead><tbody>${body||'<tr><td colspan="5">Belum ada data waste per produk.</td></tr>'}</tbody><tfoot><tr><th>Total</th><td>${nf(c.pcs)}</td><td>${rp(c.nom)}</td><td>100%</td><td></td></tr></tfoot></table></div></article>`;
+ const range=(a,b)=>{const x=nf(a),y=nf(b);return x===y?x:`${x}–${y}`;};
+ const rpRange=(a,b)=>{const x=rp(a),y=rp(b);return x===y?x:`${x} – ${y}`;};
+ const dayType=d=>{const w=new Date(d+'T00:00:00Z').getUTCDay();return w===0||w===6?'we':'wd';};
+ const flow=v=>{const sell=v[0]-(v[6]||0);return {sell,sold:Math.max(0,sell-v[4]),empty:v[5]===1&&sell>0&&v[4]<=0&&!v[3]};};
+ const quant=(s,p)=>{const i=(s.length-1)*p,l=Math.floor(i);return s[l]+(s[Math.ceil(i)]-s[l])*(i-l);};
+ function dates(all){
+  const t=today(),past=all.filter(d=>d<t).sort();
+  if(state.period==='7')return past.slice(-7);
+  if(state.period==='prev'){const [y,m]=t.split('-').map(Number),p=m===1?`${y-1}-12`:`${y}-${String(m-1).padStart(2,'0')}`;return past.filter(d=>d.startsWith(p));}
+  return past.filter(d=>d.startsWith(t.slice(0,7)));
  }
- function lostTable(c){
-  const labels=ORDER.filter(l=>c.prod[l]?.days);
-  const body=GROUPS.map(([g,re])=>{const ls=labels.filter(l=>re.test(l));if(!ls.length)return '';const a=ls.reduce((s,l)=>({h:s.h+c.prod[l].habis,k:s.k+c.prod[l].cek,d:s.d+c.prod[l].days,i:s.i+c.prod[l].tfIn}),{h:0,k:0,d:0,i:0});
-   return `<tr class="wl-group"><th scope="row">${g}</th><td>${nf(a.h)}</td><td>${nf(a.k)}</td><td>${pc(a.d?a.h/a.d*100:null,1)}</td><td>${nf(a.i)}</td></tr>`+ls.map(l=>{const p=c.prod[l];return `<tr><th scope="row">${esc(l)}</th><td>${nf(p.habis)}</td><td>${nf(p.cek)}</td><td>${pc(p.days?p.habis/p.days*100:null,1)}</td><td>${nf(p.tfIn)}</td></tr>`;}).join('');}).join('');
-  return `<article class="workspace-card wl-card"><h3>Lost sales per produk</h3><p class="wl-note">Habis = stok akhir 0 tanpa waste dan tanpa transfer keluar. Perlu dicek = stok akhir 0 tetapi ada waste, jadi belum tentu kehabisan. Estimasi pcs dan rupiah menyusul setelah jam habis dipastikan.</p><div class="wl-scroll"><table class="wl-table"><thead><tr><th>Produk</th><th>Outlet-hari habis</th><th>Perlu dicek</th><th>Dari hari berstok</th><th>Transfer masuk</th></tr></thead><tbody>${body||'<tr><td colspan="5">Data stok Daily Report belum masuk.</td></tr>'}</tbody></table></div></article>`;
+ // Patokan penjualan normal per outlet x produk x hari kerja/akhir pekan, rentang P75-P90.
+ function baselines(stock){
+  const key=stock?.updatedAt||'';if(cache?.key===key)return cache.map;
+  const raw=new Map(),t=today();
+  for(const [d,day] of Object.entries(stock?.days||{})){if(d>=t)continue;const type=dayType(d);
+   for(const [id,cells] of Object.entries(day))for(const [k,v] of Object.entries(cells)){const l=stock.labels[+k];if(!PRICE_NAME[l]||v[5]!==1)continue;const f=flow(v);if(f.sell<=0)continue;const m=`${id}|${l}|${type}`;if(!raw.has(m))raw.set(m,[]);raw.get(m).push(f.sold);}}
+  const map=new Map();for(const [m,a] of raw){if(a.length<4)continue;a.sort((x,y)=>x-y);map.set(m,[quant(a,.75),quant(a,.9)]);}
+  cache={key,map};return map;
  }
- function outletTable(c){
-  const L=limits(),m=r=>({...r,wp:r.omzet>0?r.nom/r.omzet*100:null,lp:r.lostD?r.lostM/r.lostD/L.open*100:null}),rows=c.rows.map(m),key={nom:'nom',pcs:'pcs',wp:'wp',lp:'lp',habis:'habis',cek:'cek'}[state.sort]||'nom';rows.sort((a,b)=>(b[key]??-1)-(a[key]??-1));
-  const th=(k,t)=>`<th aria-sort="${state.sort===k?'descending':'none'}"><button type="button" data-wl-sort="${k}">${t}${state.sort===k?' ↓':''}</button></th>`;
-  const body=rows.map(r=>{const open=state.open===r.id,detail=open?`<tr class="wl-detail"><td colspan="8"><table class="wl-table wl-mini"><thead><tr><th>Produk</th><th>Waste pcs</th><th>Nominal</th><th>Kiriman</th><th>Transfer masuk</th><th>Transfer keluar</th><th>Hari habis</th><th>Perlu dicek</th></tr></thead><tbody>${ORDER.filter(l=>r.items[l]).map(l=>{const p=r.items[l];return `<tr><th scope="row">${esc(l)}</th><td>${nf(p.pcs)}</td><td>${rp(p.nom)}</td><td>${nf(p.kirim)}</td><td>${nf(p.tfIn)}</td><td>${nf(p.tfOut)}</td><td>${nf(p.habis)}</td><td>${nf(p.cek)}</td></tr>`;}).join('')}</tbody></table></td></tr>`:'';
-   return `<tr class="${open?'wl-open':''}"><th scope="row"><button type="button" data-wl-open="${esc(r.id)}" aria-expanded="${open}">${open?'▾':'▸'} ${esc(name(r.id))}</button></th><td>${nf(r.pcs)}</td><td>${rp(r.nom)}</td><td><span class="wl-pill ${tone(r.wp,L.waste)}">${pc(r.wp)}</span></td><td><span class="wl-pill ${tone(r.lp,L.lost)}">${pc(r.lp)}</span></td><td>${nf(r.habis)}</td><td>${nf(r.cek)}</td><td>${r.lostD?nf(r.lostM/r.lostD):'—'}</td></tr>${detail}`;}).join('');
-  return `<article class="workspace-card wl-card"><h3>Performa outlet</h3><p class="wl-note">Klik nama outlet untuk melihat rincian per produk. Batas waste ${pc(L.waste,1)}, lost sales ${pc(L.lost,1)}.</p><div class="wl-scroll"><table class="wl-table wl-outlets"><thead><tr><th>Outlet</th>${th('pcs','Waste pcs')}${th('nom','Nominal')}${th('wp','Waste %')}${th('lp','Lost %')}${th('habis','Produk habis')}${th('cek','Perlu dicek')}<th>Menit lost/hari</th></tr></thead><tbody>${body}</tbody></table></div></article>`;
+ const blank=()=>({pcs:0,nom:0,habis:0,low:0,high:0,lowRp:0,highRp:0});
+ const addTo=(a,b)=>{for(const k of Object.keys(a))a[k]+=b[k]||0;return a;};
+ function collect(){
+  const recap=window.DAILY_RECAP_SUMMARY,stock=window.STOCK_DAILY,items=recap?.wasteItems||{},ds=dates(Object.keys(items).filter(d=>Object.keys(items[d]).length));
+  const ids=selected==='__all__'?window.PcsPanels?.data?.().sales?.outletIds||[]:[selected],gross=new Map(),series=window.ForecastDashboard?.grossSeries?.(),base=baselines(stock),prices=window.FORECAST_REALIZED_PRICES?.outlets||{};
+  if(series)for(const [id,s] of series.byOutlet)for(const pt of s)gross.set(pt.date+'|'+id,pt.gross);
+  const prod={},out=new Map(ids.map(id=>[id,{id,omzet:0,sum:blank(),items:{}}]));
+  const P=l=>prod[l]||(prod[l]=blank()),I=(o,l)=>o.items[l]||(o.items[l]=blank());
+  for(const d of ds)for(const [id,o] of out){o.omzet+=gross.get(d+'|'+id)||0;
+   for(const [l,[pcs,nom]] of Object.entries(items[d]?.[id]||{}))for(const x of [P(l),I(o,l),o.sum]){x.pcs+=pcs;x.nom+=nom;}
+   const day=stock?.days?.[d]?.[id];if(!day)continue;
+   for(const [k,v] of Object.entries(day)){const l=stock.labels[+k];if(!l)continue;const f=flow(v);if(!f.empty)continue;
+    const q=PRICE_NAME[l]?base.get(`${id}|${l}|${dayType(d)}`):null,price=PRICE_NAME[l]?prices[id]?.[PRICE_NAME[l]]?.price||0:0,low=q?Math.max(0,q[0]-f.sold):0,high=q?Math.max(0,q[1]-f.sold):0;
+    for(const x of [P(l),I(o,l),o.sum]){x.habis++;x.low+=low;x.high+=high;x.lowRp+=low*price;x.highRp+=high*price;}}
+  }
+  const rows=[...out.values()],total=rows.reduce((a,r)=>addTo(a,r.sum),blank()),omzet=rows.reduce((s,r)=>s+r.omzet,0);
+  return {ds,rows,prod,total,omzet};
+ }
+ function areaGroups(c){
+  const api=window.ForecastTopdown?.areas?.(),seen=new Set(),byId=new Map(c.rows.map(r=>[r.id,r])),groups=[];
+  const push=(key,title,sub,ids)=>{const rows=ids.filter(id=>byId.has(id)&&!seen.has(id)).map(id=>{seen.add(id);return byId.get(id);});if(rows.length)groups.push({key,title,sub,rows,centers:api?.CLUSTERS?.find(x=>x.name===key)?.centers||[],sum:rows.reduce((a,r)=>addTo(a,r.sum),blank()),omzet:rows.reduce((s,r)=>s+r.omzet,0)});};
+  for(const a of api?.CLUSTERS||[]){const list=a.centers.map(x=>name(x)+(a.ids.includes(x)?'':' (luar area)')).join(', ');push(a.name,a.name,`Center: ${list}`,a.ids);}
+  push('Stand Alone','Stand Alone','Tanpa Center',api?.STAND_ALONE||[]);
+  push('Lainnya','Lainnya','Belum masuk area',c.rows.map(r=>r.id));
+  return groups.sort((a,b)=>b.sum.nom-a.sum.nom);
+ }
+ const lostStat=x=>x.high>0?`<strong>${range(x.low,x.high)}</strong><small>pcs · ${rpRange(x.lowRp,x.highRp)}</small>`:'<strong class="na">—</strong><small>belum diestimasi</small>';
+ const stat=(label,body,cls='')=>`<div class="wl-stat ${cls}"><span>${label}</span>${body}</div>`;
+ const wasteStat=x=>`<strong>${nf(x.pcs)}</strong><small>pcs · ${rp(x.nom)}</small>`;
+ function productView(c){
+  const html=FAMILIES.map(([f,ls])=>{const cards=ls.filter(l=>c.prod[l]&&(c.prod[l].pcs||c.prod[l].habis)).map(l=>`<article class="wl-prod"><h4>${esc(l)}</h4><div class="wl-pair">${stat('Waste',wasteStat(c.prod[l]),'waste')}${stat('Est. lost',lostStat(c.prod[l]),'lost')}</div></article>`).join('');return cards?`<div class="wl-family"><h3>${f}</h3><div class="wl-prods">${cards}</div></div>`:'';}).join('');
+  return `<section class="wl-section"><h2>Per produk</h2>${html||'<p class="wl-note">Belum ada data pada periode ini.</p>'}</section>`;
+ }
+ function outletDetail(r){
+  const rows=ORDER.filter(l=>r.items[l]&&(r.items[l].pcs||r.items[l].habis)).map(l=>{const p=r.items[l];return `<li><span>${esc(l)}</span><b>${nf(p.pcs)} pcs</b><em>${p.high>0?`lost ${range(p.low,p.high)}`:p.habis?`habis ${nf(p.habis)} hari`:''}</em></li>`;}).join('');
+  return `<ul class="wl-items">${rows||'<li><span>Tidak ada data produk.</span></li>'}</ul>`;
+ }
+ function areaPanel(a,L){
+  const rows=[...a.rows].sort((x,y)=>y.sum.nom-x.sum.nom).map(r=>{const open=state.outlet===r.id,wp=r.omzet>0?r.sum.nom/r.omzet*100:null,center=a.centers.includes(r.id);
+   return `<div class="wl-outlet ${open?'open':''}"><button type="button" data-wl-outlet="${esc(r.id)}" aria-expanded="${open}"><span class="wl-oname">${open?'▾':'▸'} ${esc(name(r.id))}${center?' <i>Center</i>':''}</span><span class="wl-onum"><small>Waste</small><b>${nf(r.sum.pcs)} pcs</b><em>${rp(r.sum.nom)} · <u class="${tone(wp,L.waste)}">${pc(wp,1)}</u></em></span><span class="wl-onum"><small>Est. lost</small><b>${r.sum.high>0?range(r.sum.low,r.sum.high)+' pcs':'—'}</b><em>${r.sum.high>0?rpRange(r.sum.lowRp,r.sum.highRp):'belum diestimasi'}</em></span></button>${open?outletDetail(r):''}</div>`;}).join('');
+  return `<div class="wl-panel"><h3>${esc(a.title)} <small>${a.rows.length} outlet</small></h3>${rows}</div>`;
+ }
+ function areaView(c,L){
+  const groups=areaGroups(c);if(selected!=='__all__'&&groups[0])state.area=groups[0].key;
+  const active=groups.find(a=>a.key===state.area);
+  const cards=groups.map(a=>{const on=a===active,wp=a.omzet>0?a.sum.nom/a.omzet*100:null;return `<button type="button" class="wl-area ${on?'on':''}" data-wl-area="${esc(a.key)}" aria-expanded="${on}"><span class="wl-atitle">${esc(a.title)}</span><span class="wl-asub">${esc(a.sub)} · ${a.rows.length} outlet</span><span class="wl-pair">${stat('Waste',`<strong>${rp(a.sum.nom)}</strong><small>${nf(a.sum.pcs)} pcs · <u class="${tone(wp,L.waste)}">${pc(wp,1)}</u></small>`,'waste')}${stat('Est. lost',a.sum.high>0?`<strong>${rp((a.sum.lowRp+a.sum.highRp)/2)}</strong><small>${range(a.sum.low,a.sum.high)} pcs</small>`:'<strong class="na">—</strong><small>belum diestimasi</small>','lost')}</span></button>`;}).join('');
+  return `<section class="wl-section"><h2>Per area</h2><p class="wl-note">Klik area untuk melihat outlet di dalamnya.</p><div class="wl-areas">${cards}</div>${active?areaPanel(active,L):''}</section>`;
  }
  function view(){
   if(!window.DAILY_RECAP_SUMMARY)return '<div class="workspace-empty">Data waste belum tersedia untuk akun ini.</div>';
-  const c=collect(),L=limits(),wp=c.omzet>0?c.nom/c.omzet*100:null,lp=c.lostD?c.lostM/c.lostD/L.open*100:null;
+  const c=collect(),L=limits(),wp=c.omzet>0?c.total.nom/c.omzet*100:null;
   const per=[['mtd','Bulan ini'],['7','7 hari terakhir'],['prev','Bulan lalu']].map(([k,t])=>`<button type="button" data-wl-period="${k}" aria-pressed="${state.period===k}" class="${state.period===k?'on':''}">${t}</button>`).join('');
-  return `<div class="wl-build" role="status"><b>🚧 Sedang dibangun</b><span>Angka di halaman ini masih diperiksa sampai seluruh data fix. Untuk keputusan, tetap cocokkan dengan sheet tim.</span></div>
-  <div class="wl-bar"><div class="wl-periods" role="group" aria-label="Periode">${per}</div><span>${esc(selected==='__all__'?'Semua outlet':name(selected))} · ${span(c.dates)}</span></div>
-  <div class="wl-kpis"><div><span>Waste</span><strong>${nf(c.pcs)} pcs</strong></div><div><span>Nominal waste</span><strong>${rp(c.nom)}</strong></div><div><span>Waste dari omzet</span><strong class="${tone(wp,L.waste)}">${pc(wp)}</strong></div><div><span>Lost sales tercatat</span><strong class="${tone(lp,L.lost)}">${pc(lp)}</strong></div><div><span>Produk habis</span><strong>${nf(c.habis)} <small>outlet-hari</small></strong><small>+${nf(c.cek)} perlu dicek</small></div></div>
-  <div class="wl-grid">${productTable(c)}${lostTable(c)}</div>${outletTable(c)}`;
+  return `<div class="wl-build" role="status"><b>🚧 Sedang dibangun</b><span>Angka masih diperiksa. Untuk keputusan, tetap cocokkan dengan sheet tim.</span></div>
+  <div class="wl-bar"><div class="wl-periods" role="group" aria-label="Periode">${per}</div><span>${esc(selected==='__all__'?'Semua outlet':name(selected))} · ${span(c.ds)}</span></div>
+  <div class="wl-hero"><div class="waste"><span>Total waste</span><strong>${rp(c.total.nom)}</strong><small>${nf(c.total.pcs)} pcs · <u class="${tone(wp,L.waste)}">${pc(wp)} dari omzet</u></small></div><div class="lost"><span>Estimasi lost sales</span><strong>${c.total.high>0?rpRange(c.total.lowRp,c.total.highRp):'—'}</strong><small>${c.total.high>0?`${range(c.total.low,c.total.high)} pcs · Ogura dan Malmil utama`:'Menunggu data stok terbaru'}</small></div></div>
+  ${productView(c)}${areaView(c,L)}
+  <p class="wl-foot">Estimasi lost membandingkan penjualan di hari stok habis dengan penjualan normal outlet tersebut, jadi berupa rentang, bukan angka pasti. Varian lain belum diestimasi karena penjualannya terlalu kecil untuk diukur dari data harian.</p>`;
  }
  function paint(){const el=document.getElementById('wl-root');if(el)el.innerHTML=view();}
- document.addEventListener('click',e=>{if(!e.target.closest?.('#wl-root'))return;const a=e.target.closest('[data-wl-period]'),b=e.target.closest('[data-wl-sort]'),o=e.target.closest('[data-wl-open]');if(a){state.period=a.dataset.wlPeriod;state.open=null;paint();}else if(b){state.sort=b.dataset.wlSort;paint();}else if(o){state.open=state.open===o.dataset.wlOpen?null:o.dataset.wlOpen;paint();}});
- return {render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Waste & Lost Sales</h2><span>Rangkuman per produk dan outlet</span></div><div id="wl-root">${view()}</div>`;}};
+ document.addEventListener('click',e=>{if(!e.target.closest?.('#wl-root'))return;const a=e.target.closest('[data-wl-period]'),b=e.target.closest('[data-wl-area]'),o=e.target.closest('[data-wl-outlet]');if(a){state.period=a.dataset.wlPeriod;state.outlet=null;paint();}else if(b){state.area=state.area===b.dataset.wlArea?null:b.dataset.wlArea;state.outlet=null;paint();}else if(o){state.outlet=state.outlet===o.dataset.wlOutlet?null:o.dataset.wlOutlet;paint();}});
+ return {render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Waste & Lost Sales</h2><span>Ringkasan per produk dan area</span></div><div id="wl-root">${view()}</div>`;}};
 })();
