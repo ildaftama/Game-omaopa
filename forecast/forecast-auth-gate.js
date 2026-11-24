@@ -1,7 +1,7 @@
 'use strict';
 import {getApps,getApp,initializeApp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
-import {getFirestore,doc,getDoc,setDoc,deleteDoc,collection,onSnapshot,writeBatch,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import {getFirestore,doc,getDoc,getDocs,setDoc,deleteDoc,collection,onSnapshot,writeBatch,serverTimestamp,query,where,orderBy,limit,Timestamp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 const app=getApps().some(a=>a.name==='[DEFAULT]')?getApp():initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
 const auth=getAuth(app),db=getFirestore(app),gate=document.getElementById('forecast-access-gate'),root=document.getElementById('forecast-app');
 let loaded=false,loading=null,generation=0,roleStop=null,liveStop=null,officeStop=null,boostStop=null,bundleSha=null,bundleSrc=null,dataStop=null,pendingData=false,pendingCode=false,lastAct=Date.now(),refreshing=false;
@@ -82,7 +82,7 @@ onAuthStateChanged(auth,async user=>{const run=++generation;
  try{flStage(0,2,5,'Memeriksa hak akses');if(registering)await registering.catch(()=>{});const r=await resolveRole(user);if(run!==generation)return;const role=r.role;
   if(!window.ForecastRolePolicy.viewer(role)){locked(deniedText(r));return;}
   window.ForecastAuth={uid:user.uid,role,source:r.src};roleStop=onSnapshot(doc(db,r.src,user.uid),s=>{const d=s.exists()?s.data():null,next=roleOf(r.src,d);if(!window.ForecastRolePolicy.viewer(next)){root.hidden=true;gate.hidden=false;locked(r.src==='staff'?'Akses akun ini sudah dinonaktifkan.':deniedText({src:r.src,raw:d}));}else if(r.src!=='staff'&&next.fu!==window.ForecastAuth.role?.fu)location.reload();},()=>{root.hidden=true;locked('Akses akun belum dapat diperiksa. Muat ulang halaman.');});
-  preloadApp();await loadPrivate(role);await loadApp();if(run!==generation)return;await finishLoader();if(run!==generation)return;gate.hidden=true;root.hidden=false;watchLive();
+  preloadApp();await loadPrivate(role);await loadApp();if(run!==generation)return;await finishLoader();if(run!==generation)return;gate.hidden=true;root.hidden=false;watchLive();startPresence();
  }catch(e){if(run===generation){locked(e.message==='missing-private-data'?'Akun terverifikasi. Data privat sedang disiapkan.':'Data belum dapat dibuka. Periksa koneksi dan coba lagi.');importer();}}
 });
 gate.addEventListener('submit',async e=>{const form=e.target;if(!['forecast-login','forecast-login-id','forecast-register'].includes(form.id))return;e.preventDefault();const button=form.querySelector('button[type=submit]'),status=document.getElementById('forecast-login-status'),say=m=>{status.textContent=m;};
@@ -98,13 +98,13 @@ gate.addEventListener('submit',async e=>{const form=e.target;if(!['forecast-logi
  registering=(async()=>{const c=await createUserWithEmailAndPassword(auth,idEmail(id),pw);await setDoc(doc(db,'forecastUsers',c.user.uid),{id,name,status:'pending',role:'',createdAt:serverTimestamp()});})();
  try{await registering;loginMode='id';}catch(err){say(err?.code==='auth/email-already-in-use'?'ID ini sudah dipakai. Pilih ID lain.':'Pendaftaran belum berhasil. Periksa koneksi lalu coba lagi.');button.disabled=false;}finally{registering=null;}
 });
-gate.addEventListener('click',e=>{const lm=e.target.closest('[data-login-mode]');if(lm){loginMode=lm.dataset.loginMode;locked('Masuk untuk membuka perencanaan dan data outlet.',true);gate.querySelector('input')?.focus();return;}if(e.target.closest('[data-gate-signout]'))signOut(auth);if(e.target.closest('[data-gate-retry]'))location.reload();if(e.target.closest('[data-private-import]'))document.getElementById('private-package').click();});
+gate.addEventListener('click',e=>{const lm=e.target.closest('[data-login-mode]');if(lm){loginMode=lm.dataset.loginMode;locked('Masuk untuk membuka perencanaan dan data outlet.',true);gate.querySelector('input')?.focus();return;}if(e.target.closest('[data-gate-signout]')){beat(false).finally(()=>signOut(auth));}if(e.target.closest('[data-gate-retry]'))location.reload();if(e.target.closest('[data-private-import]'))document.getElementById('private-package').click();});
 gate.addEventListener('change',async e=>{if(e.target.id!=='private-package'||!e.target.files[0])return;const status=document.getElementById('private-import-status');try{
  if(!window.ForecastRolePolicy.manager(window.ForecastAuth?.role)||!auth.currentUser)throw Error('role');status.textContent='Memeriksa paket…';const p=JSON.parse(await e.target.files[0].text());await unpack(p);
  const batch=writeBatch(db),keys=p.chunks.map((payload,i)=>{const key='reference_'+p.sha256.slice(0,16)+'_'+i;batch.set(privateRef(key),{schemaVersion:2,kind:'reference-chunk',payload,sha256:p.sha256,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});return key;});
  batch.set(privateRef('reference_current'),{schemaVersion:2,kind:'reference-manifest',chunks:keys,sha256:p.sha256,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});await batch.commit();status.textContent='Data privat tersimpan. Membuka Forecast…';location.reload();
  }catch{status.textContent='Paket belum tersimpan. Periksa format, izin, dan koneksi.';}});
-document.addEventListener('click',e=>{if(e.target.closest('[data-forecast-signout]'))signOut(auth);});
+document.addEventListener('click',async e=>{if(e.target.closest('[data-forecast-signout]')){await beat(false);signOut(auth);}});
 // Penyegaran diam-diam (owner 2026-11-24). Data baru dipasang tanpa memuat ulang halaman setelah
 // pengguna diam 1 menit. Versi web baru memuat ulang halaman hanya setelah lama diam, lalu tab dan
 // posisi scroll dikembalikan. Draft Buat forecast tersimpan di browser, jadi tidak hilang.
@@ -143,3 +143,21 @@ window.ForecastAccountsAPI={
  async remove(uid){if(!window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role))throw Error('Hanya Master yang bisa menghapus akun.');await deleteDoc(fuRef(uid));},
  me:()=>auth.currentUser?.uid||null,
 };
+// Chat tim & status online (owner 2026-11-24). Pesan disimpan 30 hari; Master membersihkan yang
+// kedaluwarsa saat membuka chat. Status online diperbarui tiap menit selama web terbuka.
+const chatCol=collection(db,'forecastChat'),presRef=uid=>doc(db,'forecastPresence',uid),DAY=864e5;
+const myName=()=>{const r=window.ForecastAuth?.role||{};return String(r.name||r.nama||r.displayName||auth.currentUser?.email?.split('@')[0]||'Akun').slice(0,60);};
+const myRole=()=>{const r=window.ForecastAuth?.role||{};return r.fu||(r.master?'master':r.super?'super':r.admin?'admin':r.forecaster?'forecaster':'');};
+window.ForecastChatAPI={
+ uid:()=>auth.currentUser?.uid||null,
+ isMaster:()=>window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role),
+ listen(cb){return onSnapshot(query(chatCol,where('at','>=',Timestamp.fromMillis(Date.now()-30*DAY)),orderBy('at','desc'),limit(300)),s=>cb(s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})).reverse()),()=>cb(null));},
+ send(text){const t=String(text).trim().slice(0,1000);if(!t||!auth.currentUser)return Promise.resolve();return setDoc(doc(chatCol),{uid:auth.currentUser.uid,name:myName(),text:t,at:serverTimestamp(),expireAt:Timestamp.fromMillis(Date.now()+30*DAY)});},
+ remove(id){return deleteDoc(doc(db,'forecastChat',id));},
+ async cleanup(){const s=await getDocs(query(chatCol,where('expireAt','<',Timestamp.now()),limit(100)));await Promise.all(s.docs.map(d=>deleteDoc(d.ref).catch(()=>{})));},
+ listenPresence(cb){return onSnapshot(collection(db,'forecastPresence'),s=>cb(s.docs.map(d=>({uid:d.id,...d.data({serverTimestamps:'estimate'})}))),()=>cb(null));},
+};
+let beatT=null;
+function beat(online=true){if(!auth.currentUser||!window.ForecastAuth)return Promise.resolve();return setDoc(presRef(auth.currentUser.uid),{name:myName(),role:myRole(),char:String(window.ForecastAuth.role?.char||''),at:serverTimestamp(),online}).catch(()=>{});}
+function startPresence(){clearInterval(beatT);beat(true);beatT=setInterval(()=>beat(true),60e3);}
+window.addEventListener('pagehide',()=>{beat(false);});

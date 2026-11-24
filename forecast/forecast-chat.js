@@ -1,0 +1,71 @@
+// Chat tim (owner 2026-11-24): satu grup untuk semua akun Forecast, titik hijau untuk yang sedang
+// membuka web, bunyi "ting" untuk pesan baru, tarik pesan dalam 30 detik, Master bisa hapus pesan.
+window.ForecastChat=(()=>{
+ 'use strict';
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const ROLE={master:'Master',factory:'Factory Manager',spv:'SPV Logistik',forecaster:'Forecaster',analyst:'Data Analis',super:'Admin Utama',admin:'Admin'};
+ const UNSEND=30e3,ONLINE=150e3,ms=t=>t?.toMillis?.()??(typeof t==='number'?t:0);
+ let msgs=[],pres=[],open=false,stopM=null,stopP=null,first=true,unread=0,el=null,tick=null,cleaned=false,audio=null;
+ const A=()=>window.ForecastChatAPI,me=()=>A()?.uid?.();
+ const readKey=()=>'forecast-chat-read-'+me();
+ const lastRead=()=>{try{return +localStorage.getItem(readKey())||0;}catch{return 0;}};
+ const markRead=()=>{const t=msgs.length?ms(msgs.at(-1).at):Date.now();try{localStorage.setItem(readKey(),String(t));}catch{}unread=0;badge();};
+ function ting(){
+  try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();const t0=audio.currentTime;
+   [[1318.5,0],[1760,.11]].forEach(([f,d])=>{const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t0+d);g.gain.linearRampToValueAtTime(.16,t0+d+.012);g.gain.exponentialRampToValueAtTime(.0001,t0+d+.32);o.connect(g).connect(audio.destination);o.start(t0+d);o.stop(t0+d+.34);});
+  }catch{}
+ }
+ // Browser hanya mengizinkan suara setelah ada interaksi; siapkan audio pada klik pertama.
+ window.addEventListener('pointerdown',()=>{try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();}catch{}},{once:true,capture:true});
+ const isOnline=p=>p.online!==false&&Date.now()-ms(p.at)<ONLINE;
+ const ago=t=>{const m=Math.round((Date.now()-ms(t))/60e3);return m<1?'baru saja':m<60?m+' menit lalu':m<1440?Math.round(m/60)+' jam lalu':Math.round(m/1440)+' hari lalu';};
+ const hhmm=t=>new Date(ms(t)).toLocaleTimeString('id-ID',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit'});
+ const dayLabel=t=>{const f=d=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(d),d=f(new Date(ms(t))),now=f(new Date()),y=f(new Date(Date.now()-864e5));return d===now?'Hari ini':d===y?'Kemarin':new Date(ms(t)).toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta',weekday:'long',day:'numeric',month:'long'});};
+ function badge(){const b=el?.querySelector('.fc-badge');if(!b)return;b.textContent=unread>99?'99+':String(unread);b.hidden=!unread;el.querySelector('.fc-btn').setAttribute('aria-label',unread?`Chat tim, ${unread} pesan baru`:'Chat tim');}
+ function people(){
+  const list=pres.slice().sort((a,b)=>isOnline(b)-isOnline(a)||ms(b.at)-ms(a.at)).filter(p=>isOnline(p)||Date.now()-ms(p.at)<30*864e5);
+  const on=list.filter(isOnline).length;
+  return `<div class="fc-people"><span class="fc-count">${on} online</span>${list.map(p=>`<span class="fc-person ${isOnline(p)?'on':''}" title="${esc(isOnline(p)?'Sedang membuka web':'Terakhir '+ago(p.at))}"><i></i>${esc(p.name)}${p.uid===me()?' (Anda)':''}<small>${esc(ROLE[p.role]||'')}</small></span>`).join('')}</div>`;
+ }
+ function list(){
+  if(!msgs.length)return '<p class="fc-empty">Belum ada pesan. Sapa tim di sini.</p>';
+  const master=A()?.isMaster?.(),now=Date.now();let day='',out='';
+  for(const m of msgs){const d=dayLabel(m.at);if(d!==day){day=d;out+=`<div class="fc-day">${esc(d)}</div>`;}
+   const mine=m.uid===me(),left=UNSEND-(now-ms(m.at)),pr=pres.find(p=>p.uid===m.uid),role=ROLE[pr?.role]||'';
+   const act=mine&&left>0?`<button type="button" data-fc-unsend="${esc(m.id)}">Tarik (${Math.ceil(left/1000)})</button>`:master?`<button type="button" data-fc-del="${esc(m.id)}">Hapus</button>`:'';
+   out+=`<div class="fc-msg ${mine?'mine':''}"><div class="fc-meta"><b>${esc(mine?'Anda':m.name)}</b>${role&&!mine?`<span>${esc(role)}</span>`:''}<time>${hhmm(m.at)}</time>${act}</div><p>${esc(m.text)}</p></div>`;}
+  return out;
+ }
+ function paint(keepScroll){
+  if(!el)return;const box=el.querySelector('.fc-list'),atBottom=!box||box.scrollHeight-box.scrollTop-box.clientHeight<40;
+  el.querySelector('.fc-people-wrap').innerHTML=people();box.innerHTML=list();
+  if(!keepScroll||atBottom)box.scrollTop=box.scrollHeight;
+ }
+ function mount(){
+  el=document.createElement('div');el.className='fc';el.innerHTML=`<button type="button" class="fc-btn" aria-label="Chat tim" aria-expanded="false"><span aria-hidden="true">💬</span><b class="fc-badge" hidden>0</b></button><section class="fc-panel" role="dialog" aria-label="Chat tim" hidden><header><div><h2>Chat tim</h2><span>Bisa dibaca semua akun Forecast</span></div><button type="button" class="fc-close" aria-label="Tutup chat">✕</button></header><div class="fc-people-wrap"></div><div class="fc-list" aria-live="polite"></div><form class="fc-form"><textarea rows="1" maxlength="1000" placeholder="Tulis pesan… (Enter kirim, Shift+Enter baris baru)" aria-label="Pesan"></textarea><button type="submit">Kirim</button></form><p class="fc-err" role="status"></p></section>`;
+  document.body.appendChild(el);
+  const panel=el.querySelector('.fc-panel'),btn=el.querySelector('.fc-btn'),ta=el.querySelector('textarea'),err=el.querySelector('.fc-err');
+  const setOpen=v=>{open=v;panel.hidden=!v;btn.setAttribute('aria-expanded',String(v));clearInterval(tick);if(v){markRead();paint();tick=setInterval(()=>{if(msgs.some(m=>m.uid===me()&&Date.now()-ms(m.at)<UNSEND+1500))paint(true);else el.querySelector('.fc-people-wrap').innerHTML=people();},1000);setTimeout(()=>ta.focus(),0);}else btn.focus();};
+  btn.addEventListener('click',()=>setOpen(!open));
+  el.querySelector('.fc-close').addEventListener('click',()=>setOpen(false));
+  panel.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();setOpen(false);}});
+  ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();el.querySelector('.fc-form').requestSubmit();}});
+  ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=Math.min(120,ta.scrollHeight)+'px';});
+  el.querySelector('.fc-form').addEventListener('submit',async e=>{e.preventDefault();const t=ta.value.trim();if(!t)return;err.textContent='';ta.value='';ta.style.height='auto';try{await A().send(t);}catch{ta.value=t;err.textContent='Pesan belum terkirim. Periksa koneksi lalu coba lagi.';}});
+  el.querySelector('.fc-list').addEventListener('click',async e=>{const u=e.target.closest('[data-fc-unsend]'),d=e.target.closest('[data-fc-del]');if(!u&&!d)return;if(d&&!confirm('Hapus pesan ini untuk semua orang?'))return;try{await A().remove((u||d).dataset[u?'fcUnsend':'fcDel']);}catch{err.textContent=u?'Waktu tarik pesan sudah lewat.':'Pesan belum terhapus.';}});
+ }
+ function start(){
+  if(stopM||!A()||!window.ForecastAuth)return;mount();
+  stopM=A().listen(list=>{if(list==null){if(el)el.querySelector('.fc-err').textContent='Chat belum tersambung. Aturan Firestore chat mungkin belum dipublikasikan.';return;}
+   const prev=new Set(msgs.map(m=>m.id)),fresh=list.filter(m=>!prev.has(m.id)&&m.uid!==me());msgs=list;
+   if(first){first=false;const lr=lastRead();unread=msgs.filter(m=>m.uid!==me()&&ms(m.at)>lr).length;}
+   else if(fresh.length){ting();if(open&&!document.hidden)markRead();else unread+=fresh.length;}
+   badge();if(open)paint(true);
+   if(!cleaned&&A().isMaster?.()){cleaned=true;A().cleanup?.().catch(()=>{});}
+  });
+  stopP=A().listenPresence(list=>{if(list){pres=list;if(open)el.querySelector('.fc-people-wrap').innerHTML=people();}});
+  document.addEventListener('visibilitychange',()=>{if(open&&!document.hidden)markRead();});
+ }
+ const wait=setInterval(()=>{if(window.ForecastChatAPI&&window.ForecastAuth&&!document.getElementById('forecast-app')?.hidden){clearInterval(wait);start();}},1000);
+ return {start};
+})();

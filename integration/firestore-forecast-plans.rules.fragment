@@ -264,6 +264,33 @@ match /officeState/{id} {
     && request.resource.data.cid is string && request.resource.data.cid.size() <= 12;
   allow delete: if false;
 }
+// Chat tim (owner 2026-11-24): dibaca & ditulis semua akun Forecast. Pengirim bisa menarik pesan
+// dalam 30 detik (aturan memberi kelonggaran 35 detik), Master bisa menghapus pesan apa pun.
+match /forecastChat/{id} {
+  allow read: if forecastViewer();
+  allow create: if forecastViewer()
+    && request.resource.data.keys().hasOnly(['uid','name','text','at','expireAt'])
+    && request.resource.data.uid == request.auth.uid
+    && request.resource.data.name is string && request.resource.data.name.size() <= 60
+    && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+    && request.resource.data.at == request.time
+    && request.resource.data.expireAt is timestamp;
+  allow update: if false;
+  allow delete: if forecastMasterUser()
+    || (request.auth != null && resource.data.uid == request.auth.uid && request.time < resource.data.at + duration.value(35, 's'));
+}
+// Status online: tiap akun hanya menulis dokumennya sendiri.
+match /forecastPresence/{uid} {
+  allow read: if forecastViewer();
+  allow create, update: if request.auth != null && request.auth.uid == uid && forecastViewer()
+    && request.resource.data.keys().hasOnly(['name','role','char','at','online'])
+    && request.resource.data.name is string && request.resource.data.name.size() <= 60
+    && request.resource.data.role is string && request.resource.data.role.size() <= 20
+    && request.resource.data.char is string && request.resource.data.char.size() <= 4
+    && request.resource.data.online is bool
+    && request.resource.data.at == request.time;
+  allow delete: if false;
+}
 // OPSIONAL -- hanya tambahkan kalau owner SETUJU akun sinkronisasi forecast (FIREBASE_SYNC_
 // EMAIL, sudah forecastManager() lewat staff/{uid}.super atau .master) boleh MEMBACA collection
 // "users" (database member: nama, telepon, tanggal lahir, umur, gender, homeOutlet, dll --
