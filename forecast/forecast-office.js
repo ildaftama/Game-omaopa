@@ -296,6 +296,7 @@ function snap(n){n.path=[];const c=nearestFree(Math.round(n.x),Math.round(n.y));
 function faceEach(v,h){if(!h.path.length&&!KEEP_POSE.includes(h.pose))h.pose='stand';if(!v.path.length&&!KEEP_POSE.includes(v.pose))v.pose='stand';const dy=Math.round(v.y)-Math.round(h.y);v.face=dy>0?1:0;h.face=dy<0?1:0;}
 function talkTo(n){
  const api=window.ForecastOfficeTalk;if(!api||!canTalk(n))return;
+ if(TK.release&&TK.release.n!==n){const p=TK.release.n;TK.release=null;if(!p.inScene){p.held=0;if(!asleep())idle(p);}}
  const r=api.reply(n.id,talkFacts(),{state:talkState(n),task:n.task,asleep:asleep()},TK.memo),sec=api.dur(r.text)+.6;sayNow(n,r.text,sec);
  const ans=FC!==n&&canTalk(FC)&&!asleep()&&Math.random()<.5?api.fcReply(r.tag):null;
  TK.queue=ans?{at:S.t+sec,text:ans}:null;TK.release={n,f:FC,at:S.t+sec+(ans?api.dur(ans)+.3:0)+.8};
