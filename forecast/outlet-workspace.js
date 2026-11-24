@@ -10,6 +10,11 @@ const decimal=n=>n==null?'—':n.toLocaleString('id-ID',{maximumFractionDigits:1
 const date=s=>new Date(s+'T12:00:00+07:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
 const list=Object.entries(data.outlets).filter(([id,o])=>o.hasProfile).sort((a,b)=>a[1].name.localeCompare(b[1].name));
 let selected='nusa-indah',focus='dashboard',period='3',lastOutlet='nusa-indah';try{const saved=localStorage.getItem('forecast-outlet');if(saved==='__all__'||list.some(([id])=>id===saved))selected=saved;}catch{}
+// Kembali ke tab & posisi scroll yang sama setelah muat ulang otomatis.
+let restore=null;try{const r=JSON.parse(sessionStorage.getItem('forecast-restore')||'null');sessionStorage.removeItem('forecast-restore');if(r&&Date.now()-r.at<180000)restore=r;}catch{}
+if(restore?.focus&&document.querySelector(`[data-focus="${restore.focus}"]`))focus=restore.focus;
+if(restore?.scroll)window.addEventListener('pcs-data-loaded',()=>setTimeout(()=>scrollTo(0,restore.scroll),600),{once:true});
+window.ForecastFocus=()=>focus;
 const outlet=()=>data.outlets[selected==='__all__'?lastOutlet:selected],periodData=()=>analysis.periods[period];
 const events=()=>periodData().events.filter(e=>e.outletIds.includes(selected)&&e.scope!=='agenda-wilayah');
 const patterns=()=>periodData().patterns.filter(g=>g.id===selected);

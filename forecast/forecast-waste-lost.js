@@ -12,7 +12,7 @@ window.ForecastWasteLost=(()=>{
  const PRICE_NAME={'Ogura Cheese':'Ogura Cheese','Ogura Choco':'Ogura Chocolate','Malmil Cheese':'Malmil Cheese','Malmil Choco':'Malmil Chocolate'};
  const SALES_LABEL=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Ogura','Mini Ogura','Mini Ogura','Chiffon Keju','Chiffon Ekstra Keju','Chiffon Butter','Chiffon Lite Ekstra Keju','Chiffon Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Pisang','Roti Coklat Keju','Roti Vanilla','Malmil Cheese Less Sugar','Malmil Choco Less Sugar'];
  const SOLD_OUT_OFTEN=40,NOT_SELLING=.5;
- const state={period:'mtd',area:null,outlet:null};let selected='__all__',cache=null,healthCache=null;
+ const state={period:'mtd',area:null,outlet:null};let selected='__all__',cache=null,healthCache=null;window.addEventListener?.('forecast-data-refreshed',()=>{cache=null;healthCache=null;});
  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
  const limits=()=>({waste:window.ForecastSettings?.get?.().thresholds?.waste||3.5});
  const tone=(v,lim)=>v==null?'':v>lim?'hot':v>=lim*.9?'mid':'ok';
