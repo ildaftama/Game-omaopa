@@ -1358,6 +1358,7 @@ window.ForecastDashboard=(()=>{
   const pct=pred>0?sum/pred*100:null;
   return `<div class="fd-today"><div><span>Omzet real hari ini · sementara s.d. ${esc(jam)} WIB</span><strong>Rp${Math.round(sum).toLocaleString('id-ID')}</strong></div><div><span>Prediksi hari ini</span><strong>${pred?'Rp'+Math.round(pred).toLocaleString('id-ID'):'—'}</strong></div><div><span>Tercapai</span><strong>${pct==null?'—':pct.toLocaleString('id-ID',{maximumFractionDigits:0})+'%'}</strong></div><small>${rows.length}/${ids.length} outlet terbaca. Outlet umumnya tutup 20.00 — diperbarui tiap jam, angka final masuk mulai 19.00 s.d. 22.00.</small></div>`;
  }
+ function todaySnapshot(){const it=intradayNow();if(!it)return null;const trend=lastTrend||revenueTrend('__all__');let sum=0;for(const r of it.rows)for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,r.id,p);if(v!=null)sum+=(r.qty?.[p]||0)*v;}const pred=revenueTrend('__all__')?.rows.find(x=>x.date===it.date)?.forecastTotal;return {sum,pct:pred>0?sum/pred*100:null,outlets:it.rows.length,asOf:it.asOf};}
  function render(outletId){
   applySettings();
   const show=window.ForecastSettings?.get().display||{trend:true,wasteLost:true,accuracy:true,weather:true,events:true,operations:true};
@@ -1473,5 +1474,5 @@ window.ForecastDashboard=(()=>{
   const net={wastePct:all.wd>=MIN_RECAP_DAYS&&all.wr>0?all.wn/all.wr*100:null,lostPct:all.ld>0&&lDates.length>=MIN_RECAP_DAYS?all.lm/all.ld/OPEN_MINUTES*100:null,lostPerDay:all.ld>0&&lDates.length>=MIN_RECAP_DAYS?all.lm/all.ld:null};
   return {net,byOutlet:new Map([...by].map(([id,r])=>[id,pctOf(r)])),wasteThreshold:WASTE_THRESHOLD,lostThreshold:LOST_SALES_THRESHOLD,wasteFrom:wDates[0]||null,wasteTo:wDates.at(-1)||null,lostFrom:lDates[0]||null,lostTo:lDates.at(-1)||null};
  }
- return {render,inspect,change,mount,click,predict,insight,recentWasteLost,grossSeries:()=>dailyOutletProductSeries()};
+ return {render,inspect,change,mount,click,predict,insight,recentWasteLost,todaySnapshot,grossSeries:()=>dailyOutletProductSeries()};
 })();

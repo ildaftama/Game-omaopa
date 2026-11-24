@@ -2,7 +2,7 @@
 // Nama staf dan jadwal datang dari dokumen privat, tidak ditulis di file publik ini.
 window.ForecastOffice=(()=>{
 'use strict';
-const TEMPLATE='<div class="kt-top"><span><b id="kt-clock">--.--</b> WIB · <span id="kt-phase"></span></span></div><div class="kt-layout"><div><div class="kt-stage"><canvas id="kt-game" width="1664" height="1088" tabindex="0" aria-label="Kantor Agen AI. Klik lantai untuk menggerakkan forecaster, klik mesin kopi, snack, kulkas, sofa, atau toilet untuk beraktivitas."></canvas></div><div class="kt-dock" id="kt-dock" aria-label="Aksi forecaster"></div><p class="kt-hint" id="kt-dockHint"></p></div><aside><section class="kt-card"><h2>Tim kantor</h2><div class="kt-roster" id="kt-roster"></div></section><section class="kt-card"><h2>Kondisi hari ini</h2><div class="stats" id="kt-stats"></div></section></aside></div>';
+const TEMPLATE='<div class="kt-top"><span><b id="kt-clock">--.--</b> WIB · <span id="kt-phase"></span></span></div><div class="kt-layout"><div><div class="kt-stage"><canvas id="kt-game" width="1664" height="1088" tabindex="0" aria-label="Kantor Agen AI. Klik karakter untuk mengobrol, klik lantai untuk menggerakkan forecaster, klik mesin kopi, snack, kulkas, sofa, atau toilet untuk beraktivitas."></canvas></div><div class="kt-dock" id="kt-dock" aria-label="Aksi forecaster"></div><p class="kt-hint" id="kt-dockHint"></p></div><aside><section class="kt-card"><h2>Tim kantor</h2><div class="kt-roster" id="kt-roster"></div></section><section class="kt-card"><h2>Kondisi hari ini</h2><div class="stats" id="kt-stats"></div></section></aside></div>';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let api=null;
 function boot(){
@@ -149,7 +149,7 @@ const watchLevel=()=>S.waste==='lewat'||S.lost==='lewat'?2:S.waste==='waspada'||
 const hourNow=()=>{if(S.hour!=null)return S.hour;const d=new Date(Date.now()+7*3600000);return d.getUTCHours()+d.getUTCMinutes()/60;};
 const asleep=()=>{const h=hourNow();return h>=22||h<7;};
 const hhmm=h=>String(Math.floor(h)).padStart(2,'0')+'.'+String(Math.floor((h%1)*60)).padStart(2,'0');
-function say(n,text,sec=3.2){if(n.ff>0)return;n.say=text;n.sayT=sec;}
+function say(n,text,sec=3.2){if(n.ff>0||S.t<(n.talkUntil||0))return;n.say=text;n.sayT=sec;}
 const seeded=str=>{let h=2166136261;for(let i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),16777619);let a=h>>>0;return ()=>{a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};};
 const nr=n=>n.rng||Math.random,nrnd=(n,a,b)=>a+nr(n)()*(b-a),npick=(n,x)=>x[Math.floor(nr(n)()*x.length)];
 function chat(n,arr,prob=1){const a=nr(n)(),b=nr(n)();if(S.chatCd>0||a>prob||n.sayT>0||n.ff>0)return false;say(n,arr[Math.floor(b*arr.length)]);S.chatCd=3.5;return true;}
@@ -269,6 +269,38 @@ let dutyReady=false;
 function arrive(n){n.present=true;n.leaving=false;n.x=4;n.y=15;n.path=[];n.pose='stand';n.face=1;n.food=null;n.task='Baru datang';n.ff=0;say(n,'Halo, masuk shift!',2.4);idle(n);}
 function leave(n){n.leaving=true;cancel(n);n.busy=false;n.held=0;n.food=null;n.task='Pulang';say(n,'Duluan ya!',2.2);(async()=>{try{await walk(n,[4,15]);}catch(e){if(e!==CANCEL)throw e;}n.present=false;n.leaving=false;n.pose='away';n.sayT=0;if(pickFC()&&S.sel===n.id)S.sel=FC.id;})();}
 function dutyTick(){if(!officeReady){for(const n of [FW,FE]){n.present=false;n.pose='away';n.x=4;n.y=15;}return;}for(const n of [FW,FE]){const want=onShift(n);if(!dutyReady){if(want){n.present=true;n.pose='sit';n.face=1;n.x=n.seat[0];n.y=n.seat[1];}else{n.present=false;n.pose='away';n.x=4;n.y=15;}}else if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!dutyReady){dutyReady=true;pickFC();}}
+// ===== Obrolan interaktif =====
+const SCENE_EVERY=90,DAYS=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],TK={facts:null,at:-99,memo:{},scene:null,k:null,idx:-1,next:0,queue:null};
+function talkFacts(){
+ if(TK.facts&&S.t-TK.at<15)return TK.facts;
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date()),dow=new Date(today+'T00:00:00Z').getUTCDay(),nx=(dow+1)%7;
+ let h={items:[]},snap=null;try{h=window.ForecastWasteLost?.health?.()||h;}catch{}try{snap=window.ForecastDashboard?.todaySnapshot?.()||null;}catch{}
+ const of=c=>h.items.filter(x=>x.cls===c),omzet=snap?{text:'Rp'+(snap.sum/1e6).toLocaleString('id-ID',{maximumFractionDigits:1})+' juta',pct:snap.pct==null?null:Math.round(snap.pct),outlets:snap.outlets}:null;
+ const who=(FC.present&&!FC.leaving?FC.short:'')||'';
+ TK.facts={today,h:hourNow(),date:+today.slice(8),day:DAYS[dow],tomorrow:DAYS[nx],weekendToday:dow===0||dow===6,weekendTomorrow:nx===0||nx===6,weather:S.weather,weatherKnown:!!S.weatherReady,tomorrowW:S.weatherReady?S.weatherTomorrow:null,pull:S.lastPull,status:!!S.statusReady,waste:S.waste,lost:S.lost,wasteTrend:S.statusReady?S.wasteTrend:null,lostTrend:S.statusReady?S.lostTrend:null,wasteOutlets:S.wasteOutlets||[],lostOutlets:S.lostOutlets||[],plan:planCount(),model:!!S.modelReady,omzet,notSell:of('bad').map(x=>({label:x.label,pct:Math.round(x.wasteOfShip||0)})),slow:of('slow').map(x=>x.label),laris:of('win').map(x=>x.label),place:of('place').map(x=>x.label),who};
+ TK.at=S.t;return TK.facts;
+}
+const canTalk=n=>n&&n.pose!=='away'&&n.pose!=='toilet'&&!n.leaving&&(!isF(n)||n.present);
+function sayNow(n,text,sec){n.say=text;n.sayT=sec;n.talkUntil=S.t+sec;}
+function endScene(){if(TK.scene)for(const l of TK.scene.lines){const n=by(l.id);if(n)n.talkUntil=0;}TK.scene=null;TK.idx=-1;}
+function talkState(n){if(n.pose==='nap'||n.pose==='sleepDesk')return 'nap';if(n.pose==='sofa')return 'sofa';if(n.pose==='sip'||n.food?.kind==='cup')return 'coffee';if(n.pose==='eat'||n.food)return 'eat';return null;}
+function talkTo(n){
+ const api=window.ForecastOfficeTalk;if(!api||!canTalk(n))return;if(TK.scene?.lines.some(l=>l.id===n.id))endScene();
+ const r=api.reply(n.id,talkFacts(),{state:talkState(n),task:n.task,asleep:asleep()},TK.memo),sec=api.dur(r.text)+.6;sayNow(n,r.text,sec);if(!n.path.length&&n.pose==='stand')n.face=0;
+ TK.queue=FC!==n&&canTalk(FC)&&!asleep()&&FC.pose!=='nap'&&Math.random()<.5?{at:S.t+sec,text:api.fcReply(r.tag)}:null;
+}
+function talkTick(sl){
+ if(TK.queue&&S.t>=TK.queue.at){const q=TK.queue;TK.queue=null;if(canTalk(FC)&&!TK.scene)sayNow(FC,q.text,window.ForecastOfficeTalk.dur(q.text));}
+ if(S.t<TK.next)return;TK.next=S.t+.2;const api=window.ForecastOfficeTalk;if(!api)return;if(sl){if(TK.scene)endScene();return;}
+ const now=Date.now()/1000,k=Math.floor(now/SCENE_EVERY);
+ if(TK.k!==k){endScene();TK.k=k;const avail=NPC.filter(n=>!isF(n)||(n.present&&!n.leaving)).map(n=>n.id);try{TK.at=-99;TK.scene=api.scene(k,talkFacts(),avail);}catch{TK.scene=null;}TK.idx=-1;}
+ const sc=TK.scene;if(!sc)return;const at=now-k*SCENE_EVERY-sc.offset;if(at<0)return;if(at>=sc.total){endScene();return;}
+ let idx=0,sum=0;while(idx<sc.lines.length-1&&at>=sum+sc.lines[idx].dur){sum+=sc.lines[idx].dur;idx++;}
+ if(idx===TK.idx)return;TK.idx=idx;const l=sc.lines[idx],n=by(l.id),left=l.dur-(at-sum);
+ if(!canTalk(n)||n.pose==='nap'){endScene();return;}
+ for(const x of sc.lines){const m=by(x.id);if(m)m.talkUntil=S.t+sc.total-at;}
+ if(left>.7){n.say=l.text;n.sayT=left-.15;}
+}
 let wasSleep=null;
 function update(dt){
  S.t+=dt;S.chatCd=Math.max(0,S.chatCd-dt);dutyTick();const sl=asleep();if(sl!==wasSleep){wasSleep=sl;sl?goSleep():startDay();}
@@ -277,6 +309,7 @@ function update(dt){
   else if(n.wait&&!n.wait.walk){const w=n.wait;w.left-=dt;w.tick?.(clamp(1-w.left/w.total,0,1));if(w.left<=0){n.wait=null;w.resolve();}}
  }
  if(!sl)slotTick();
+ talkTick(sl);
  for(const F of [FW,FE])if(F.held&&!held(F)&&!F.path.length){F.held=0;if(!sl&&F.present&&!F.leaving)idle(F);}
  for(let i=waiters.length-1;i>=0;i--)if(waiters[i].f()){const w=waiters.splice(i,1)[0];w.r();}
 }
@@ -420,9 +453,10 @@ function tag(n){
  if(isF(n)&&held(n)){const top=n.pose==='nap'?py-104:sit(n)?py-126:py-150,yy=top-(n.p!=null&&n.action!=='break'?22:0)+Math.sin(S.t*5)*3;out.save();out.lineJoin='round';out.strokeStyle='#2b2130';out.lineWidth=5;out.fillStyle='#ffe14d';out.beginPath();out.moveTo(px-10,yy);out.lineTo(px+10,yy);out.lineTo(px,yy+13);out.closePath();out.stroke();out.fill();out.fillStyle='rgba(255,255,255,.75)';out.beginPath();out.moveTo(px-6,yy+2);out.lineTo(px+1,yy+2);out.lineTo(px-2,yy+6);out.closePath();out.fill();out.restore();}
 }
 const sit=n=>['sit','sofa','sleepDesk','nap'].includes(n.pose);
+function wrapSay(s,max){const words=String(s).split(' '),out2=[];let cur='';for(const w of words){const t=cur?cur+' '+w:w;if(cur&&out.measureText(t).width>max){out2.push(cur);cur=w;}else cur=t;}if(cur)out2.push(cur);return out2;}
 function bubble(n){
- const px=(n.x*T+8)*Z,base=(n.pose==='toilet'?(10*T+8)*Z:(n.y*T+14)*Z-(n.pose==='sofa'?32:0))-(isF(n)&&held(n)?180:152);out.font='800 23px ui-rounded,"Segoe UI",system-ui,sans-serif';const w=out.measureText(n.say).width+30,x=clamp(px-w/2,8,view.width-w-8),y=Math.max(8,base-42);
- out.globalAlpha=Math.min(1,n.sayT*4);rr(x,y,w,42,18,'#fffdf8');out.strokeStyle='#3a2d3f';out.lineWidth=3.5;out.stroke();out.fillStyle='#fffdf8';const tx=clamp(px,x+18,x+w-18);out.beginPath();out.moveTo(tx-10,y+40);out.lineTo(tx+10,y+40);out.lineTo(tx,y+54);out.closePath();out.fill();out.strokeStyle='#3a2d3f';out.beginPath();out.moveTo(tx-10,y+41);out.lineTo(tx,y+54);out.lineTo(tx+10,y+41);out.stroke();txt(n.say,x+w/2,y+29,23,'#3a2d3f');out.globalAlpha=1;
+ const px=(n.x*T+8)*Z,base=(n.pose==='toilet'?(10*T+8)*Z:(n.y*T+14)*Z-(n.pose==='sofa'?32:0))-(isF(n)&&held(n)?180:152);out.font='800 23px ui-rounded,"Segoe UI",system-ui,sans-serif';const lines=wrapSay(n.say,Math.min(470,view.width-60)),w=Math.max(...lines.map(l=>out.measureText(l).width))+30,h=14+lines.length*28,x=clamp(px-w/2,8,view.width-w-8),y=Math.max(8,base-h);
+ out.globalAlpha=Math.min(1,n.sayT*4);rr(x,y,w,h,18,'#fffdf8');out.strokeStyle='#3a2d3f';out.lineWidth=3.5;out.stroke();out.fillStyle='#fffdf8';const tx=clamp(px,x+18,x+w-18);out.beginPath();out.moveTo(tx-10,y+h-2);out.lineTo(tx+10,y+h-2);out.lineTo(tx,y+h+12);out.closePath();out.fill();out.strokeStyle='#3a2d3f';out.beginPath();out.moveTo(tx-10,y+h-1);out.lineTo(tx,y+h+12);out.lineTo(tx+10,y+h-1);out.stroke();lines.forEach((l,i)=>txt(l,x+w/2,y+29+i*28,23,'#3a2d3f'));out.globalAlpha=1;
 }
 let lightC=null,lightAt=-9,lightKey='';
 function lighting(){
@@ -447,7 +481,7 @@ function render(){
 
 // ===== Panel =====
 $('roster').innerHTML=NPC.map(n=>`<button type="button" data-id="${n.id}"><span class="dot" style="background:${n.color}"></span><b></b><small></small><span class="bar"><i></i></span></button>`).join('');
-$('roster').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.sel=b.dataset.id;const n=by(b.dataset.id);if(isF(n)&&n.present)FC=n;});
+$('roster').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.sel=b.dataset.id;const n=by(b.dataset.id);talkTo(n);if(isF(n)&&n.present)FC=n;});
 const ACTIONS=[['kopi','☕','Bikin kopi'],['snack','🍩','Ambil snack'],['makan','🍱','Makan'],['sofa','🛋️','Duduk sofa'],['nap','😴','Tidur sofa'],['toilet','🚻','Toilet'],['kerja','💻','Balik kerja']];
 $('dock').innerHTML=ACTIONS.map(([id,ic,l])=>`<button type="button" data-do="${id}"><span aria-hidden="true">${ic}</span>${l}</button>`).join('');
 $('dock').addEventListener('click',e=>{const b=e.target.closest('button');if(b)playerDo(b.dataset.do);});
@@ -455,7 +489,7 @@ const lv=v=>v==='lewat'?['hot','Lewat ambang']:v==='waspada'?['mid','Mulai banya
 function panel(){
  const h=hourNow();$('clock').textContent=hhmm(h);$('phase').textContent=asleep()?'Kantor tidur':h>=19?'Lembur malam':h>=16.5?'Sore':h<11?'Pagi':'Jam kerja';
  [...$('roster').children].forEach((b,i)=>{const n=NPC[i];b.className=S.sel===n.id?'sel':'';b.children[1].textContent=n.name;b.children[2].textContent=n.pose==='away'?shiftText(n):n===FC&&held(n)&&!n.wait?'Sedang diarahkan':n.task;b.querySelector('.bar i').style.width=n.p!=null?n.p*100+'%':'0';});
- const [a,b]=S.statusReady?lv(S.waste):['','Belum ada'],[d,e]=S.statusReady?lv(S.lost):['','Belum ada'],w=S.weatherReady?{cerah:'Cerah',mendung:'Mendung',hujan:'Hujan'}[S.weather]:'Memuat';$('stats').innerHTML=`<div class="stat"><span>Tarikan ESB</span><b>${S.lastPull?S.lastPull+' WIB':'Belum'}</b></div><div class="stat"><span>Cuaca</span><b>${w}</b></div><div class="stat"><span>Waste</span><b class="${a}">${b}</b></div><div class="stat"><span>Lost sales</span><b class="${d}">${e}</b></div><div class="stat" style="grid-column:1/-1"><span>Jadwal forecaster</span><b>${esc(FW.short||'Forecaster 1')}: ${shiftText(FW)}<br>${esc(FE.short||'Forecaster 2')}: ${shiftText(FE)}</b></div>`;const on=[FW,FE].filter(n=>n.present&&!n.leaving);$('dockHint').textContent=on.length?`Mengarahkan ${FC.name}${on.length>1?'. Klik forecaster lain untuk berganti.':'.'}`:'Tidak ada forecaster yang sedang bertugas.';
+ const [a,b]=S.statusReady?lv(S.waste):['','Belum ada'],[d,e]=S.statusReady?lv(S.lost):['','Belum ada'],w=S.weatherReady?{cerah:'Cerah',mendung:'Mendung',hujan:'Hujan'}[S.weather]:'Memuat';$('stats').innerHTML=`<div class="stat"><span>Tarikan ESB</span><b>${S.lastPull?S.lastPull+' WIB':'Belum'}</b></div><div class="stat"><span>Cuaca</span><b>${w}</b></div><div class="stat"><span>Waste</span><b class="${a}">${b}</b></div><div class="stat"><span>Lost sales</span><b class="${d}">${e}</b></div><div class="stat" style="grid-column:1/-1"><span>Jadwal forecaster</span><b>${esc(FW.short||'Forecaster 1')}: ${shiftText(FW)}<br>${esc(FE.short||'Forecaster 2')}: ${shiftText(FE)}</b></div>`;const on=[FW,FE].filter(n=>n.present&&!n.leaving);$('dockHint').textContent=on.length?`Mengarahkan ${FC.name}${on.length>1?'. Klik forecaster lain untuk berganti.':'.'} Klik karakter untuk mengobrol.`:'Tidak ada forecaster yang sedang bertugas.';
  root.querySelectorAll('#kt-dock button').forEach(x=>x.classList.toggle('on',held(FC)&&FC.task===LABEL[x.dataset.do]));
 }
 
@@ -478,7 +512,7 @@ let lastCmd={},stopControl=null;
 function onRemote(c){const f=c.id==='f1'?FW:c.id==='f2'?FE:null;if(!f||c.at<=(lastCmd[c.id]||0))return;lastCmd[c.id]=c.at;if(c.own||Date.now()-c.at>25000||!f.present||f.leaving||asleep())return;if(c.act==='go')goF(f,nearestFree(c.x,c.y));else actF(f,c.act);}
 function cellAt(e){const r=view.getBoundingClientRect();return [(e.clientX-r.left)/r.width*COLS,(e.clientY-r.top)/r.height*ROWS];}
 view.addEventListener('pointerdown',e=>{
- view.focus({preventScroll:true});const [fx,fy]=cellAt(e),hit=NPC.find(n=>n!==FC&&n.pose!=='toilet'&&n.pose!=='away'&&Math.abs(n.x+.5-fx)<.75&&fy>n.y-1.5&&fy<n.y+1.05);if(hit){S.sel=hit.id;if(isF(hit))FC=hit;return;}if(!pickFC())return;
+ view.focus({preventScroll:true});const [fx,fy]=cellAt(e),hit=NPC.find(n=>n!==FC&&n.pose!=='toilet'&&n.pose!=='away'&&Math.abs(n.x+.5-fx)<.75&&fy>n.y-1.5&&fy<n.y+1.05);if(hit){S.sel=hit.id;talkTo(hit);if(isF(hit))FC=hit;return;}if(!pickFC())return;
  if(asleep()){S.sel=FC.id;say(FC,'Zzz...',1.4);return;}const x=Math.floor(fx),y=Math.floor(fy);
  if(y>=1&&y<=5&&x>=18&&x<=19)return playerDo('kopi');if(y>=1&&y<=5&&x>=20&&x<=21)return playerDo('snack');if((y>=1&&y<=5&&x>=22&&x<=24)||(x>=20&&x<=21&&y>=7&&y<=8))return playerDo('makan');
  if(x>=18&&x<=20&&y>=10&&y<=12)return playerDo('sofa');if(x>=22&&x<=24&&y>=10&&y<=15)return playerDo('toilet');if(x>=6&&x<=11&&y>=11&&y<=14)return playerDo('kerja');fcTo(nearestFree(x,y));
