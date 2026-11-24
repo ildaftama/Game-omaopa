@@ -61,3 +61,26 @@ function finalMalam() {
 function uji() {
   picu_('esb-forecast-orders-refresh.yml', null);
 }
+
+// UJI COBA (owner 2026-11-24): tarikan omzet ringan tiap 15 menit, 09.00-20.59 WIB.
+// Menit ke-50 ke atas dilewati karena tiapJam sudah memicu sekitar menit ke-57.
+// Catatan: fungsi "pasang" menghapus SEMUA pemicu, termasuk yang ini.
+function tiap15Menit() {
+  const now = new Date();
+  const jam = Number(Utilities.formatDate(now, 'Asia/Jakarta', 'H'));
+  const mnt = Number(Utilities.formatDate(now, 'Asia/Jakarta', 'm'));
+  if (jam < 9 || jam > 20 || mnt >= 50) return;
+  picu_('esb-intraday-live.yml', null);
+}
+
+// Jalankan SEKALI untuk memulai uji 15 menit (pemicu lain tidak disentuh).
+function pasang15Menit() {
+  hapus15Menit();
+  ScriptApp.newTrigger('tiap15Menit').timeBased().everyMinutes(15).create();
+  console.log('Pemicu tiap 15 menit terpasang.');
+}
+
+// Hentikan uji 15 menit.
+function hapus15Menit() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'tiap15Menit').forEach(t => ScriptApp.deleteTrigger(t));
+}
