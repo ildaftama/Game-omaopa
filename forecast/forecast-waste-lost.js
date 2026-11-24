@@ -10,6 +10,8 @@ window.ForecastWasteLost=(()=>{
  const ORDER=FAMILIES.flatMap(f=>f[1]);
  // Estimasi lost baru untuk 4 produk utama: varian kecil terlalu jarang terjual untuk diukur dari data harian.
  const PRICE_NAME={'Ogura Cheese':'Ogura Cheese','Ogura Choco':'Ogura Chocolate','Malmil Cheese':'Malmil Cheese','Malmil Choco':'Malmil Chocolate'};
+ const SALES_LABEL=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Mini Ogura','Mini Ogura','Mini Ogura','Chiffon Keju','Chiffon Ekstra Keju','Chiffon Butter','Chiffon Lite Ekstra Keju','Chiffon Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Pisang','Roti Coklat Keju','Roti Vanilla','Malmil Cheese Less Sugar','Malmil Choco Less Sugar'];
+ const SOLD_OUT_OFTEN=40;
  const state={period:'mtd',area:null,outlet:null};let selected='__all__',cache=null;
  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
  const limits=()=>({waste:window.ForecastSettings?.get?.().thresholds?.waste||3.5});
@@ -35,18 +37,18 @@ window.ForecastWasteLost=(()=>{
   const map=new Map();for(const [m,a] of raw){if(a.length<4)continue;a.sort((x,y)=>x-y);map.set(m,[quant(a,.75),quant(a,.9)]);}
   cache={key,map};return map;
  }
- const blank=()=>({pcs:0,nom:0,habis:0,low:0,high:0,lowRp:0,highRp:0});
+ const blank=()=>({pcs:0,nom:0,habis:0,low:0,high:0,lowRp:0,highRp:0,omzet:0,days:0});
  const addTo=(a,b)=>{for(const k of Object.keys(a))a[k]+=b[k]||0;return a;};
  function collect(){
   const recap=window.DAILY_RECAP_SUMMARY,stock=window.STOCK_DAILY,items=recap?.wasteItems||{},ds=dates(Object.keys(items).filter(d=>Object.keys(items[d]).length));
-  const ids=selected==='__all__'?window.PcsPanels?.data?.().sales?.outletIds||[]:[selected],gross=new Map(),series=window.ForecastDashboard?.grossSeries?.(),base=baselines(stock),prices=window.FORECAST_REALIZED_PRICES?.outlets||{};
-  if(series)for(const [id,s] of series.byOutlet)for(const pt of s)gross.set(pt.date+'|'+id,pt.gross);
+  const ids=selected==='__all__'?window.PcsPanels?.data?.().sales?.outletIds||[]:[selected],gross=new Map(),grossProduct=new Map(),series=window.ForecastDashboard?.grossSeries?.(),base=baselines(stock),prices=window.FORECAST_REALIZED_PRICES?.outlets||{};
+  if(series)for(const [id,s] of series.byOutlet)for(const pt of s){gross.set(pt.date+'|'+id,pt.gross);grossProduct.set(pt.date+'|'+id,pt.grossProduct);}
   const prod={},out=new Map(ids.map(id=>[id,{id,omzet:0,sum:blank(),items:{}}]));
   const P=l=>prod[l]||(prod[l]=blank()),I=(o,l)=>o.items[l]||(o.items[l]=blank());
-  for(const d of ds)for(const [id,o] of out){o.omzet+=gross.get(d+'|'+id)||0;
+  for(const d of ds)for(const [id,o] of out){o.omzet+=gross.get(d+'|'+id)||0;(grossProduct.get(d+'|'+id)||[]).forEach((v,p)=>{const l=SALES_LABEL[p];if(l&&v)P(l).omzet+=v;});
    for(const [l,[pcs,nom]] of Object.entries(items[d]?.[id]||{}))for(const x of [P(l),I(o,l),o.sum]){x.pcs+=pcs;x.nom+=nom;}
    const day=stock?.days?.[d]?.[id];if(!day)continue;
-   for(const [k,v] of Object.entries(day)){const l=stock.labels[+k];if(!l)continue;const f=flow(v);if(!f.empty)continue;
+   for(const [k,v] of Object.entries(day)){const l=stock.labels[+k];if(!l)continue;const f=flow(v);if(v[5]===1&&f.sell>0)P(l).days++;if(!f.empty)continue;
     const q=PRICE_NAME[l]?base.get(`${id}|${l}|${dayType(d)}`):null,price=PRICE_NAME[l]?prices[id]?.[PRICE_NAME[l]]?.price||0:0,low=q?Math.max(0,q[0]-f.sold):0,high=q?Math.max(0,q[1]-f.sold):0;
     for(const x of [P(l),I(o,l),o.sum]){x.habis++;x.low+=low;x.high+=high;x.lowRp+=low*price;x.highRp+=high*price;}}
   }
@@ -63,10 +65,12 @@ window.ForecastWasteLost=(()=>{
  }
  const lostStat=x=>x.high>0?`<strong>${range(x.low,x.high)}</strong><small>pcs · ${rpRange(x.lowRp,x.highRp)}</small>`:'<strong class="na">—</strong><small>belum diestimasi</small>';
  const stat=(label,body,cls='')=>`<div class="wl-stat ${cls}"><span>${label}</span>${body}</div>`;
- const wasteStat=x=>`<strong>${nf(x.pcs)}</strong><small>pcs · ${rp(x.nom)}</small>`;
- function productView(c){
-  const html=FAMILIES.map(([f,ls])=>{const cards=ls.filter(l=>c.prod[l]&&(c.prod[l].pcs||c.prod[l].habis)).map(l=>`<article class="wl-prod"><h4>${esc(l)}</h4><div class="wl-pair">${stat('Waste',wasteStat(c.prod[l]),'waste')}${stat('Est. lost',lostStat(c.prod[l]),'lost')}</div></article>`).join('');return cards?`<div class="wl-family"><h3>${f}</h3><div class="wl-prods">${cards}</div></div>`:'';}).join('');
-  return `<section class="wl-section"><h2>Per produk</h2>${html||'<p class="wl-note">Belum ada data pada periode ini.</p>'}</section>`;
+
+ function status(p,lim){const wr=p.omzet>0?p.nom/p.omzet*100:null,hr=p.days?p.habis/p.days*100:0;if(wr==null)return ['Belum terbaca','none'];if(wr<=lim)return hr>=SOLD_OUT_OFTEN?['Laris','win']:['Stabil','calm'];return hr>=SOLD_OUT_OFTEN?['Cek penempatan','place']:['Kurang laku','slow'];}
+ function productCard(l,c,lim){const p=c.prod[l],share=c.total.nom>0?p.nom/c.total.nom*100:0,wr=p.omzet>0?p.nom/p.omzet*100:null,[st,cls]=status(p,lim);return `<article class="wl-prod"><header><h4>${esc(l)}</h4><b class="wl-tag ${cls}">${st}</b></header><div class="wl-pair">${stat('Waste',`<strong>${rp(p.nom)}</strong><small>${nf(p.pcs)} pcs</small>`,'waste')}${stat('Est. lost',lostStat(p),'lost')}</div><div class="wl-shares"><div><span><b>${pc(share,1)}</b> dari total waste</span><i><em style="width:${Math.min(100,share).toFixed(1)}%"></em></i></div><div><span><b class="${tone(wr,lim)}">${pc(wr,1)}</b> dari omzet produk</span><small>Omzet ${rp(p.omzet)}</small></div></div></article>`;}
+ function productView(c,L){
+  const html=FAMILIES.map(([f,ls])=>{const cards=ls.filter(l=>c.prod[l]&&(c.prod[l].pcs||c.prod[l].habis)).map(l=>productCard(l,c,L.waste)).join('');return cards?`<div class="wl-family"><h3>${f}</h3><div class="wl-prods">${cards}</div></div>`:'';}).join('');
+  return `<section class="wl-section"><h2>Per produk</h2><p class="wl-legend"><span><b class="wl-tag win">Laris</b> waste rendah, sering habis</span><span><b class="wl-tag place">Cek penempatan</b> waste tinggi, tetapi sering habis juga</span><span><b class="wl-tag slow">Kurang laku</b> waste tinggi, jarang habis</span><span><b class="wl-tag calm">Stabil</b> waste rendah, jarang habis</span></p>${html||'<p class="wl-note">Belum ada data pada periode ini.</p>'}</section>`;
  }
  function outletDetail(r){
   const rows=ORDER.filter(l=>r.items[l]&&(r.items[l].pcs||r.items[l].habis)).map(l=>{const p=r.items[l];return `<li><span>${esc(l)}</span><b>${nf(p.pcs)} pcs</b><em>${p.high>0?`lost ${range(p.low,p.high)}`:p.habis?`habis ${nf(p.habis)} hari`:''}</em></li>`;}).join('');
@@ -90,8 +94,8 @@ window.ForecastWasteLost=(()=>{
   return `<div class="wl-build" role="status"><b>🚧 Sedang dibangun</b><span>Angka masih diperiksa. Untuk keputusan, tetap cocokkan dengan sheet tim.</span></div>
   <div class="wl-bar"><div class="wl-periods" role="group" aria-label="Periode">${per}</div><span>${esc(selected==='__all__'?'Semua outlet':name(selected))} · ${span(c.ds)}</span></div>
   <div class="wl-hero"><div class="waste"><span>Total waste</span><strong>${rp(c.total.nom)}</strong><small>${nf(c.total.pcs)} pcs · <u class="${tone(wp,L.waste)}">${pc(wp)} dari omzet</u></small></div><div class="lost"><span>Estimasi lost sales</span><strong>${c.total.high>0?rpRange(c.total.lowRp,c.total.highRp):'—'}</strong><small>${c.total.high>0?`${range(c.total.low,c.total.high)} pcs · Ogura dan Malmil utama`:'Menunggu data stok terbaru'}</small></div></div>
-  ${productView(c)}${areaView(c,L)}
-  <p class="wl-foot">Estimasi lost membandingkan penjualan di hari stok habis dengan penjualan normal outlet tersebut, jadi berupa rentang, bukan angka pasti. Varian lain belum diestimasi karena penjualannya terlalu kecil untuk diukur dari data harian.</p>`;
+  ${productView(c,L)}${areaView(c,L)}
+  <p class="wl-foot">Estimasi lost membandingkan penjualan di hari stok habis dengan penjualan normal outlet tersebut, jadi berupa rentang, bukan angka pasti. Varian lain belum diestimasi karena penjualannya terlalu kecil untuk diukur dari data harian. Sering habis berarti habis di minimal ${SOLD_OUT_OFTEN}% hari berstok, waste tinggi berarti di atas batas ${pc(L.waste,1)} dari omzet produk. Omzet Roti belum memuat penjualan paket, jadi persennya bisa terlihat lebih tinggi.</p>`;
  }
  function paint(){const el=document.getElementById('wl-root');if(el)el.innerHTML=view();}
  document.addEventListener('click',e=>{if(!e.target.closest?.('#wl-root'))return;const a=e.target.closest('[data-wl-period]'),b=e.target.closest('[data-wl-area]'),o=e.target.closest('[data-wl-outlet]');if(a){state.period=a.dataset.wlPeriod;state.outlet=null;paint();}else if(b){state.area=state.area===b.dataset.wlArea?null:b.dataset.wlArea;state.outlet=null;paint();}else if(o){state.outlet=state.outlet===o.dataset.wlOutlet?null:o.dataset.wlOutlet;paint();}});

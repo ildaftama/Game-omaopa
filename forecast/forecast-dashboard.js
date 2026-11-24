@@ -173,16 +173,16 @@ window.ForecastDashboard=(()=>{
   for(const row of panels.sales.days){
    // "Hari ini" dikecualikan sama seperti di revenueTrend() -- lihat komentar di sana.
    if(!row.complete||row.date>=todayStr)continue;
-   const o=ordersByKey.get(row.date+'|'+row.id),perProduct=new Array(PRODUCT_COUNT).fill(0);let total=0,gross=0;
+   const o=ordersByKey.get(row.date+'|'+row.id),perProduct=new Array(PRODUCT_COUNT).fill(0),grossProduct=new Array(PRODUCT_COUNT).fill(0);let total=0,gross=0;
    for(let p=0;p<PRODUCT_COUNT;p++){
     const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v==null)continue;
-    let qty=row.qty[p]||0;gross+=qty*v;
+    let qty=row.qty[p]||0;gross+=qty*v;grossProduct[p]=qty*v;
     if(PESANAN_PRODUCTS_TREND.includes(p)&&o){const pq=o.qty?.[p];if(Number.isSafeInteger(pq)&&pq>=0)qty=Math.max(0,qty-pq);}
     const val=qty*v;perProduct[p]=val;total+=val;
    }
    // gross = omzet real TERMASUK pesanan -- penyebut waste % (sama seperti PERFORMA OUTLET:
    // waste dibagi total penjualan), beda dari value (tanpa pesanan) yang dipakai untuk tren.
-   (byOutlet.get(row.id)||(byOutlet.set(row.id,[]),byOutlet.get(row.id))).push({date:row.date,value:total,gross,perProduct});
+   (byOutlet.get(row.id)||(byOutlet.set(row.id,[]),byOutlet.get(row.id))).push({date:row.date,value:total,gross,perProduct,grossProduct});
   }
   for(const s of byOutlet.values())s.sort((a,b)=>a.date.localeCompare(b.date));
   const value={byOutlet};
