@@ -7,7 +7,7 @@
 .kantor .kt-steps li.done{color:var(--k-good)}
 .kantor .kt-steps li.now{color:var(--k-ink);border-color:var(--k-accent);background:var(--k-card2)}
 .kantor .kt-steps i{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--k-accent)}
-.kantor .kt-layout{display:grid;grid-template-columns:minmax(0,min(980px,118vh)) 270px;justify-content:center;gap:12px;align-items:start}
+.kantor .kt-layout{display:grid;grid-template-columns:minmax(0,min(1240px,142vh)) 270px;justify-content:center;gap:12px;align-items:start}
 .kantor .kt-stage{background:#3a2d3f;border:3px solid #3a2d3f;border-radius:14px;overflow:hidden;line-height:0}
 .kantor canvas{display:block;width:100%;height:auto;cursor:pointer;touch-action:manipulation;outline:none}
 .kantor canvas:focus-visible{outline:3px solid var(--k-accent);outline-offset:-3px}
