@@ -3,7 +3,7 @@
 // Ordinary staff and old forecast-only grants do not grant access.
 function forecastManager() {
   return request.auth != null
-    && ((exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+    && ((forecastStaffAllowed() && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
       && (get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('super',false) == true
         || get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true))
       || forecastUserIn(['master','factory','spv']));
@@ -17,8 +17,13 @@ function forecastUserIn(roles) {
 }
 // Forecaster: can read/write forecastPlans (plan + fulfillment) only.
 // Never grants the private reference bundle, the old access-grant collection or settings.
+// Owner 2026-11-24: akses nomor HP (staff/{uid}) ditutup, kecuali Master pemilik dan akun
+// sinkronisasi GitHub Actions yang menulis bundle referensi.
+function forecastStaffAllowed() {
+  return request.auth.uid in ['zeSmuwnL7NfllJPKcw1eYhCwpdl1','Lj11LJ0gB7XKzmm041nC29Xqfq43'];
+}
 function staffPlanner() {
-  return request.auth != null && exists(/databases/$(database)/documents/staff/$(request.auth.uid)) && forecastPlannerRole(get(/databases/$(database)/documents/staff/$(request.auth.uid)).data);
+  return request.auth != null && forecastStaffAllowed() && exists(/databases/$(database)/documents/staff/$(request.auth.uid)) && forecastPlannerRole(get(/databases/$(database)/documents/staff/$(request.auth.uid)).data);
 }
 function forecastPlanner() {
   return staffPlanner() || forecastUserIn(['master','factory','spv','forecaster']);
@@ -141,7 +146,7 @@ function forecastOpenDate(date) {
 // dan setiap simpanan terlambat wajib punya entri forecastChangeLog pada tulisan yang sama.
 function forecastLateEditor() {
   return request.auth != null
-    && ((exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+    && ((forecastStaffAllowed() && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
       && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true)
       || forecastUserIn(['master','factory','spv']));
 }
@@ -150,7 +155,7 @@ function forecastLateLogged(key, revision) {
 }
 function forecastMasterUser() {
   return request.auth != null
-    && ((exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+    && ((forecastStaffAllowed() && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
       && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('master',false) == true)
       || forecastUserIn(['master']));
 }

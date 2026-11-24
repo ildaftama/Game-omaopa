@@ -64,3 +64,6 @@
 .fa-pw input{padding-right:96px!important}
 .fa-eye,.forecast-login-card .fa-eye{position:absolute;top:50%;right:6px;transform:translateY(-50%);min-height:28px;padding:3px 10px;border:1px solid #d7e1e8;border-radius:6px;background:#f3f7f9;color:#205f70;font:600 12px inherit;font-family:inherit;cursor:pointer;margin:0}
 .fa-eye[aria-pressed="true"]{background:#205f70;color:#fff;border-color:#205f70}
+
+.forecast-login-card .fg-link{display:block;width:100%;margin-top:4px;padding:6px 0;background:none;color:#205f70;font-size:12px;text-decoration:underline;text-align:center}
+.forecast-login-card .fg-note{margin:18px 0 -8px;padding:8px 10px;border-radius:8px;background:#fff4e5;color:#8a5806;font-size:12px}
