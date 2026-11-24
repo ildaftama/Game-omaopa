@@ -2,7 +2,7 @@
 // Nama staf dan jadwal datang dari dokumen privat, tidak ditulis di file publik ini.
 window.ForecastOffice=(()=>{
 'use strict';
-const TEMPLATE='<div class="kt-top"><span><b id="kt-clock">--.--</b> WIB · <span id="kt-phase"></span></span></div><div class="kt-layout"><div><div class="kt-stage"><canvas id="kt-game" width="1664" height="1088" tabindex="0" aria-label="Kantor mini. Klik lantai untuk menggerakkan forecaster, klik mesin kopi, snack, kulkas, sofa, atau toilet untuk beraktivitas."></canvas></div><div class="kt-dock" id="kt-dock" aria-label="Aksi forecaster"></div><p class="kt-hint" id="kt-dockHint"></p></div><aside><section class="kt-card"><h2>Tim kantor</h2><div class="kt-roster" id="kt-roster"></div></section><section class="kt-card"><h2>Kondisi hari ini</h2><div class="stats" id="kt-stats"></div></section></aside></div>';
+const TEMPLATE='<div class="kt-top"><span><b id="kt-clock">--.--</b> WIB · <span id="kt-phase"></span></span></div><div class="kt-layout"><div><div class="kt-stage"><canvas id="kt-game" width="1664" height="1088" tabindex="0" aria-label="Kantor Agen AI. Klik lantai untuk menggerakkan forecaster, klik mesin kopi, snack, kulkas, sofa, atau toilet untuk beraktivitas."></canvas></div><div class="kt-dock" id="kt-dock" aria-label="Aksi forecaster"></div><p class="kt-hint" id="kt-dockHint"></p></div><aside><section class="kt-card"><h2>Tim kantor</h2><div class="kt-roster" id="kt-roster"></div></section><section class="kt-card"><h2>Kondisi hari ini</h2><div class="stats" id="kt-stats"></div></section></aside></div>';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let api=null;
 function boot(){
@@ -493,5 +493,5 @@ function start(){syncReal();syncWeather();if(!stopControl)stopControl=window.For
 setInterval(()=>{if(root.isConnected){syncReal();syncWeather();}},60000);
 return {root,start};
 }
-return {render:()=>'<div class="focus-intro"><h2>Kantor</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
+return {render:()=>'<div class="focus-intro"><h2>Kantor</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
 })();
