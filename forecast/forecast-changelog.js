@@ -2,7 +2,7 @@
 // perubahan pengaturan. Dikelompokkan per hari agar mudah dibaca; rincian outlet dibuka saat diklik.
 window.ForecastChangeLog=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const ROLE={master:'Master',factory:'Factory Manager',spv:'SPV Logistik',forecaster:'Forecaster',analyst:'Data Analis',super:'Admin Utama',admin:'Admin'};
+ const ROLE={master:'Master',factory:'Factory Manager',spv:'SPV Logistik',forecaster:'Forecaster',analyst:'Data Analis',esbadmin:'Admin ESB',guest:'Tamu',super:'Admin Utama',admin:'Admin'};
  const ms=t=>t?.toMillis?.()??0,wib=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date(ms(t)));
  const hm=t=>new Date(ms(t)).toLocaleTimeString('id-ID',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit'});
  const dlabel=d=>new Date(d+'T12:00:00Z').toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});

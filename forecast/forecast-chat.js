@@ -3,7 +3,7 @@
 window.ForecastChat=(()=>{
  'use strict';
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const ROLE={master:'Master',factory:'Factory Manager',spv:'SPV Logistik',forecaster:'Forecaster',analyst:'Data Analis',super:'Admin Utama',admin:'Admin'};
+ const ROLE={master:'Master',factory:'Factory Manager',spv:'SPV Logistik',forecaster:'Forecaster',analyst:'Data Analis',esbadmin:'Admin ESB',guest:'Tamu',super:'Admin Utama',admin:'Admin'};
  const UNSEND=30e3,ONLINE=150e3,ms=t=>t?.toMillis?.()??(typeof t==='number'?t:0);
  let msgs=[],pres=[],open=false,stopM=null,stopP=null,first=true,unread=0,el=null,tick=null,cleaned=false,audio=null;
  const A=()=>window.ForecastChatAPI,me=()=>A()?.uid?.();

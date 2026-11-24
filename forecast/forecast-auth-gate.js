@@ -37,6 +37,8 @@ const officeClient=Math.random().toString(36).slice(2,12);
 window.ForecastOfficeControl={listen(cb){return onSnapshot(collection(db,'officeState'),snap=>{snap.docChanges().forEach(c=>{if(c.type==='removed'||c.doc.metadata.hasPendingWrites)return;const d=c.doc.data();cb({id:c.doc.id,act:d.act,x:d.x,y:d.y,at:d.at?.toMillis?.()||0,own:d.cid===officeClient});});},()=>{});},send(id,act,x,y){if(!auth.currentUser)return;setDoc(doc(db,'officeState',id),{act,x,y,at:serverTimestamp(),by:auth.currentUser.uid,cid:officeClient}).catch(()=>{});}};
 window.ForecastOfficeSaveLink=async sheetId=>{const cur=window.ForecastOfficeData,uid=auth.currentUser?.uid;if(!cur||!uid||!window.ForecastRolePolicy.manager(window.ForecastAuth?.role))throw Error('role');const raw=new TextEncoder().encode(JSON.stringify({...cur,sheetId,scheduleOk:null,updatedAt:new Date().toISOString()})),gz=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()),sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',raw)),b=>b.toString(16).padStart(2,'0')).join('');let bin='';for(const b of gz)bin+=String.fromCharCode(b);const batch=writeBatch(db);batch.set(doc(collection(db,'forecastChangeLog')),{type:'settings',summary:'Link jadwal forecaster diubah',changes:[],by:uid,byName:myName(),role:myRole(),at:serverTimestamp(),expireAt:Timestamp.fromMillis(Date.now()+90*864e5)});batch.set(privateRef('reference_0000000000000001_0'),{schemaVersion:2,kind:'reference-chunk',payload:btoa(bin),sha256,updatedAt:serverTimestamp(),updatedBy:uid});await batch.commit();};
 async function loadPrivate(role){
+ // Tamu tidak memuat data penjualan/keuangan sama sekali.
+ if(window.ForecastRolePolicy.guestOnly(role)){window.ForecastSecureData={};return;}
  const lean=window.ForecastRolePolicy.forecasterOnly(role),ref=lean?briefRef:privateRef,key=lean?'forecaster_current':'reference_current';
  flStage(1,5,7,'Mengambil daftar data');const manifest=await getDoc(ref(key));if(!manifest.exists())throw Error('missing-private-data');const m=manifest.data();bundleSha=m.sha256;bundleSrc={ref,key};
  let got=0;const total=m.chunks.length;flStage(1,7,7+11/Math.max(total,1),`Bagian 0 dari ${total}`);const chunks=await Promise.all(m.chunks.map(k=>getDoc(ref(k)).then(x=>{got++;flStage(1,7+11*got/total,7+11*Math.min(total,got+1)/total,`Bagian ${got} dari ${total}`);return x;})));if(chunks.some(s=>!s.exists()))throw Error('missing-chunk');flStage(2,18,22,'Memeriksa dan membuka data');await nextPaint();
@@ -82,8 +84,8 @@ onAuthStateChanged(auth,async user=>{const run=++generation;
  if(!user){locked('Masuk untuk membuka perencanaan dan data outlet.',true);return;}
  startLoader();
  try{flStage(0,2,5,'Memeriksa hak akses');if(registering)await registering.catch(()=>{});const r=await resolveRole(user);if(run!==generation)return;const role=r.role;
-  if(!window.ForecastRolePolicy.viewer(role)){locked(deniedText(r));return;}
-  window.ForecastAuth={uid:user.uid,role,source:r.src};roleStop=onSnapshot(doc(db,r.src,user.uid),s=>{const d=s.exists()?s.data():null,next=roleOf(r.src,d);if(!window.ForecastRolePolicy.viewer(next)){root.hidden=true;gate.hidden=false;locked(r.src==='staff'?'Akses akun ini sudah dinonaktifkan.':deniedText({src:r.src,raw:d}));}else if(r.src!=='staff'&&next.fu!==window.ForecastAuth.role?.fu)location.reload();},()=>{root.hidden=true;locked('Akses akun belum dapat diperiksa. Muat ulang halaman.');});
+  if(!window.ForecastRolePolicy.member(role)){locked(deniedText(r));return;}
+  window.ForecastAuth={uid:user.uid,role,source:r.src};roleStop=onSnapshot(doc(db,r.src,user.uid),s=>{const d=s.exists()?s.data():null,next=roleOf(r.src,d);if(!window.ForecastRolePolicy.member(next)){root.hidden=true;gate.hidden=false;locked(r.src==='staff'?'Akses akun ini sudah dinonaktifkan.':deniedText({src:r.src,raw:d}));}else if(r.src!=='staff'&&next.fu!==window.ForecastAuth.role?.fu)location.reload();},()=>{root.hidden=true;locked('Akses akun belum dapat diperiksa. Muat ulang halaman.');});
   preloadApp();await loadPrivate(role);await loadApp();if(run!==generation)return;await finishLoader();if(run!==generation)return;gate.hidden=true;root.hidden=false;watchLive();startPresence();accountButton();
  }catch(e){if(run===generation){locked(e.message==='missing-private-data'?'Akun terverifikasi. Data privat sedang disiapkan.':'Data belum dapat dibuka. Periksa koneksi dan coba lagi.');importer();}}
 });
@@ -177,7 +179,7 @@ window.ForecastLogAPI={
 };
 // Akun saya & ganti password (owner 2026-11-24). Akun ID memasukkan password lama dulu; akun lama
 // (nomor HP + PIN) tidak bisa diganti dari sini.
-const ROLE_NAME={master:'Master',factory:'Factory Manager',spv:'SPV Logistik',forecaster:'Forecaster',analyst:'Data Analis',super:'Admin Utama',admin:'Admin'};
+const ROLE_NAME={master:'Master',factory:'Factory Manager',spv:'SPV Logistik',forecaster:'Forecaster',analyst:'Data Analis',esbadmin:'Admin ESB',guest:'Tamu',super:'Admin Utama',admin:'Admin'};
 function accountButton(){
  const out=document.querySelector('[data-forecast-signout]');if(!out||document.querySelector('[data-account-open]'))return;
  const b=document.createElement('button');b.type='button';b.className=out.className;b.dataset.accountOpen='';b.textContent='Akun saya';out.before(b);

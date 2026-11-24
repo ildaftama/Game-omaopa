@@ -25,7 +25,11 @@ function forecastPlanner() {
 }
 // Data Analis hanya membaca.
 function forecastViewer() {
-  return forecastPlanner() || forecastUserIn(['analyst']);
+  return forecastPlanner() || forecastUserIn(['analyst','esbadmin']);
+}
+// Tamu (pihak luar): hanya chat, status online, daftar nama, dan Kantor. Tanpa data.
+function forecastCommunity() {
+  return forecastViewer() || forecastUserIn(['guest']);
 }
 function forecastPlannerRole(s) {
   return s.get('super',false) == true || s.get('master',false) == true || s.get('admin',false) == true || s.get('forecaster',false) == true;
@@ -35,13 +39,13 @@ function forecastUserValid(d) {
     && d.id is string && d.id.matches('^[a-z0-9][a-z0-9._-]{2,29}$')
     && d.name is string && d.name.size() > 0 && d.name.size() <= 40
     && d.status in ['pending','active','disabled']
-    && d.role in ['','master','factory','spv','forecaster','analyst']
+    && d.role in ['','master','factory','spv','forecaster','analyst','esbadmin','guest']
     && (!('char' in d) || d.char in ['','f1','f2']);
 }
 // Daftar sendiri: hanya akun @forecast.omaopa.fun miliknya, status menunggu, tanpa peran.
 // Peran, status dan penghapusan hanya oleh Master.
 match /forecastUsers/{uid} {
-  allow read: if request.auth != null && (request.auth.uid == uid || forecastViewer() || forecastMasterUser());
+  allow read: if request.auth != null && (request.auth.uid == uid || forecastCommunity() || forecastMasterUser());
   allow create: if (request.auth != null && request.auth.uid == uid
       && request.auth.token.email == request.resource.data.id + '@forecast.omaopa.fun'
       && request.resource.data.keys().hasOnly(['id','name','status','role','createdAt'])
@@ -272,12 +276,14 @@ function forecastOfficeOwner(id) {
       || (forecastUserIn(['forecaster']) && get(/databases/$(database)/documents/forecastUsers/$(request.auth.uid)).data.get('char','') == id)))
     || (id == 'pred' && forecastUserIn(['analyst']))
     || (id == 'mgr' && forecastUserIn(['factory']))
-    || (id == 'spv' && forecastUserIn(['spv']));
+    || (id == 'spv' && forecastUserIn(['spv']))
+    || (id == 'esb' && forecastUserIn(['esbadmin']))
+    || (id == 'guest' && forecastUserIn(['guest']));
 }
 // Kantor Mini: arahan terakhir untuk karakter, supaya gerakannya sama di semua layar.
 match /officeState/{id} {
-  allow read: if forecastViewer();
-  allow create, update: if id in ['f1','f2','pred','mgr','spv','esb','pawang','watch'] && forecastOfficeOwner(id)
+  allow read: if forecastCommunity();
+  allow create, update: if id in ['f1','f2','pred','mgr','spv','esb','pawang','watch','guest'] && forecastOfficeOwner(id)
     && request.resource.data.keys().hasOnly(['act','x','y','at','by','cid'])
     && request.resource.data.act in ['go','kopi','snack','makan','sofa','nap','toilet','kerja']
     && request.resource.data.x is int && request.resource.data.x >= -5 && request.resource.data.x <= 25
@@ -289,8 +295,8 @@ match /officeState/{id} {
 // Chat tim (owner 2026-11-24): dibaca & ditulis semua akun Forecast. Pengirim bisa menarik pesan
 // dalam 30 detik (aturan memberi kelonggaran 35 detik), Master bisa menghapus pesan apa pun.
 match /forecastChat/{id} {
-  allow read: if forecastViewer();
-  allow create: if forecastViewer()
+  allow read: if forecastCommunity();
+  allow create: if forecastCommunity()
     && request.resource.data.keys().hasOnly(['uid','name','text','at','expireAt'])
     && request.resource.data.uid == request.auth.uid
     && request.resource.data.name is string && request.resource.data.name.size() <= 60
@@ -303,8 +309,8 @@ match /forecastChat/{id} {
 }
 // Status online: tiap akun hanya menulis dokumennya sendiri.
 match /forecastPresence/{uid} {
-  allow read: if forecastViewer();
-  allow create, update: if request.auth != null && request.auth.uid == uid && forecastViewer()
+  allow read: if forecastCommunity();
+  allow create, update: if request.auth != null && request.auth.uid == uid && forecastCommunity()
     && request.resource.data.keys().hasOnly(['name','role','char','at','online'])
     && request.resource.data.name is string && request.resource.data.name.size() <= 60
     && request.resource.data.role is string && request.resource.data.role.size() <= 20

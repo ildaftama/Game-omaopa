@@ -143,7 +143,8 @@ const NPC=[
  mk('f2','Forecaster',[10,14],{shirt:'#f8dbe6',shade:'#e8b9cb',inner:'#f8dbe6',skin:'#f3d0b6',skinS:'#dcae92',hair:'#e8809f',iris:'#4a2f2a',color:'#ec6fa6',pants:'#4b4254',shoes:'#c9587c',bw:4.75,tall:0,spd:1}),
  mk('watch','Pemantau Produk',[11,8],{shirt:'#2f6f5e',shade:'#245548',inner:'#f6f1ea',skin:'#f4cfb3',skinS:'#dca98c',hair:'#b5502c',iris:'#2f5a4c',color:'#35b58f',pants:'#2b2732',shoes:'#1f1b22',bw:4.75,tall:.5,spd:1.08}),
  mk('mgr','Factory Manager',[-3,6],{shirt:'#26252b',shade:'#161519',inner:'#26252b',skin:'#d9a682',skinS:'#bd8865',hair:'#1c1716',iris:'#2a1d15',color:'#8a93a6',pants:'#3a3f4d',shoes:'#2a2a2e',bw:5.25,tall:1,spd:1}),
- mk('spv','SPV Logistik',[-3,12],{shirt:'#e3ebf7',shade:'#c4d2e8',inner:'#e3ebf7',skin:'#f2cfb4',skinS:'#daab8e',hair:'#4f8fd9',iris:'#3b2a24',color:'#4f8fd9',pants:'#3f4a5e',shoes:'#2f5f9e',bw:4.75,tall:0,spd:1,hj:['#4f8fd9','#356fb5','#a9cdf3']})
+ mk('spv','SPV Logistik',[-3,12],{shirt:'#e3ebf7',shade:'#c4d2e8',inner:'#e3ebf7',skin:'#f2cfb4',skinS:'#daab8e',hair:'#4f8fd9',iris:'#3b2a24',color:'#4f8fd9',pants:'#3f4a5e',shoes:'#2f5f9e',bw:4.75,tall:0,spd:1,hj:['#4f8fd9','#356fb5','#a9cdf3']}),
+ mk('guest','Tamu',[18,12],{shirt:'#2b2b33',shade:'#1b1b21',inner:'#f4f1ee',skin:'#f0c8a8',skinS:'#d6a483',hair:'#2a1c22',iris:'#2a1d15',color:'#9b8cc4',pants:'#3b4a66',shoes:'#ece6dc',bw:4.75,tall:.25,spd:1})
 ];
 const DESK={esb:[4*T+5,7*T+6],pawang:[14*T+4,7*T+7],pred:[6*T+5,7*T+7],watch:[10*T+5,7*T+7],f1:[8*T+6,13*T+6],f2:[11*T+3,13*T+6],mgr:[-4*T+5,5*T+7],spv:[-4*T+5,11*T+7]};
 const VOICE={
@@ -154,10 +155,11 @@ const VOICE={
  f2:{want:{kopi:['Bikin kopi dulu ya.','Biar makin semangat!'],snack:['Ada camilan apa hari ini?','Ngemil dikit boleh dong.'],makan:['Waktunya makan, yuk!','Istirahat makan dulu.'],sofa:['Duduk sebentar ya.','Kaki pegal nih.'],toilet:['Izin ke belakang ya.','Sebentar ya, teman-teman.']},enjoy:{kopi:['Hmm, pas banget.','Enak, jadi semangat.'],snack:['Enak juga ini.'],makan:['Alhamdulillah, kenyang.'],sofa:['Enaknya istirahat sebentar.']},wc:['Sebentar ya!'],empty:['Yah, sudah habis.']},
  watch:{want:{kopi:['Kopi. Tetap saya pantau.','Saya ambil kopi, jangan curang.'],snack:['Snack satu saja, disiplin.','Saya catat ini sebagai istirahat.'],makan:['Makan tepat waktu, contoh ya.','Istirahat makan, 15 menit.'],sofa:['Saya duduk, bukan santai.','Dari sini juga kelihatan.'],toilet:['Dua menit. Jangan aneh-aneh.','Saya segera kembali.']},enjoy:{kopi:['Boleh juga.','Standarnya cukup.'],snack:['Tidak ada yang terbuang.'],makan:['Porsinya pas, nol waste.'],sofa:['Tetap awas.']},wc:['Sedang inspeksi.'],empty:['Habis. Nol waste.']},
  mgr:{want:{kopi:['Kopi hitam, tanpa gula.','Kopi dulu, laporan nanti.'],snack:['Satu saja.'],makan:['Makan dulu, rapat nanti.'],sofa:['Duduk sebentar.'],toilet:['Sebentar.']},enjoy:{kopi:['Pas.'],snack:['Boleh juga.'],makan:['Cukup.'],sofa:['Lumayan.']},wc:['Sebentar.'],empty:['Habis ya.']},
- spv:{want:{kopi:['Kopi dulu, rute nanti.','Isi tenaga sebelum jam kirim.'],snack:['Ngemil sambil cek rute.'],makan:['Makan dulu ya.'],sofa:['Duduk sebentar.'],toilet:['Izin sebentar.']},enjoy:{kopi:['Segar lagi.'],snack:['Enak.'],makan:['Kenyang.'],sofa:['Enaknya.']},wc:['Sebentar ya.'],empty:['Yah, habis.']}
+ spv:{want:{kopi:['Kopi dulu, rute nanti.','Isi tenaga sebelum jam kirim.'],snack:['Ngemil sambil cek rute.'],makan:['Makan dulu ya.'],sofa:['Duduk sebentar.'],toilet:['Izin sebentar.']},enjoy:{kopi:['Segar lagi.'],snack:['Enak.'],makan:['Kenyang.'],sofa:['Enaknya.']},wc:['Sebentar ya.'],empty:['Yah, habis.']},
+ guest:{want:{kopi:['Boleh minta kopinya?','Kopi dulu, biar melek.'],snack:['Snack-nya kelihatan enak.'],makan:['Numpang makan ya.'],sofa:['Duduk lagi ah.'],toilet:['Permisi, toiletnya di mana?']},enjoy:{kopi:['Enak juga kopi kantor ini.'],snack:['Nyam, mantap.'],makan:['Kenyang.'],sofa:['Sofanya empuk.']},wc:['Sebentar ya.'],empty:['Yah, habis.']}
 };
-const by=id=>NPC.find(n=>n.id===id),ESB=by('esb'),PAW=by('pawang'),PRED=by('pred'),FW=by('f1'),FE=by('f2'),WAT=by('watch'),isF=n=>n===FW||n===FE,MGR=by('mgr'),SPV=by('spv'),comes=n=>isF(n)||n===MGR||n===SPV;let FC=FW;
-for(const n of [MGR,SPV]){n.present=false;n.pose='away';n.x=4;n.y=15;}
+const by=id=>NPC.find(n=>n.id===id),ESB=by('esb'),PAW=by('pawang'),PRED=by('pred'),FW=by('f1'),FE=by('f2'),WAT=by('watch'),isF=n=>n===FW||n===FE,MGR=by('mgr'),SPV=by('spv'),GUEST=by('guest'),comes=n=>isF(n)||n===MGR||n===SPV||n===GUEST;let FC=FW;
+for(const n of [MGR,SPV,GUEST]){n.present=false;n.pose='away';n.x=4;n.y=15;}
 let SCHEDULE={},officeReady=false;const SHIFT={'7:00':[7,16],'10:30':[10.5,21],'12:00':[12,21]};
 const dateNow=()=>S.date||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
 const shiftOf=n=>SCHEDULE[dateNow()]?.[n===FW?0:1]||'';
@@ -165,7 +167,7 @@ const onShift=n=>{const h=SHIFT[shiftOf(n)],t=hourNow();return !!h&&t>=h[0]&&t<h
 const clockText=v=>String(Math.floor(v)).padStart(2,'0')+'.'+(v%1?'30':'00');
 function shiftText(n){if(!isF(n))return 'Tidak online';const v=shiftOf(n),h=SHIFT[v];if(h)return `Shift ${clockText(h[0])}-${clockText(h[1])}`;if(v==='WFH')return 'WFH';if(/CUTI/i.test(v))return 'Cuti';if(/OFF/i.test(v))return 'Libur';if(/SAKIT/i.test(v))return 'Sakit';if(/IZIN/i.test(v))return 'Izin';return v||'Belum ada jadwal';}
 // Setiap akun hanya mengendalikan karakternya sendiri; Master bisa semua (owner 2026-11-24).
-function myChars(){const r=window.ForecastAuth?.role||{};if(r.master)return NPC.map(n=>n.id);if(r.fu==='forecaster')return r.char?[r.char]:[];if(r.fu==='analyst')return ['pred'];if(r.fu==='factory')return ['mgr'];if(r.fu==='spv')return ['spv'];return window.ForecastRolePolicy?.planner?.(r)?['f1','f2']:[];}
+function myChars(){const r=window.ForecastAuth?.role||{};if(r.master)return NPC.map(n=>n.id);if(r.fu==='forecaster')return r.char?[r.char]:[];if(r.fu==='analyst')return ['pred'];if(r.fu==='factory')return ['mgr'];if(r.fu==='spv')return ['spv'];if(r.fu==='esbadmin')return ['esb'];if(r.fu==='guest')return ['guest'];return window.ForecastRolePolicy?.planner?.(r)?['f1','f2']:[];}
 const mine=n=>!!n&&myChars().includes(n.id),ready=n=>n.present!==false&&!n.leaving&&n.pose!=='away';
 function pickFC(){if(FC&&mine(FC)&&ready(FC))return true;const o=[FW,FE,MGR,SPV,PRED,...NPC].find(n=>mine(n)&&ready(n));if(o){FC=o;return true;}return false;}
 const watchLevel=()=>S.waste==='lewat'||S.lost==='lewat'?2:S.waste==='waspada'||S.lost==='waspada'?1:0;
@@ -191,14 +193,16 @@ const timer=(n,sec,tick)=>{const total=sec;if(n.ff>0){const u=Math.min(n.ff,sec)
 const walk=(n,cell,fast=false)=>new Promise((resolve,reject)=>{n.slot=null;n.slot2=null;let p=route([Math.round(n.x),Math.round(n.y)],cell);if(!p.length){resolve();return;}if(n.ff>0){const sp=(fast?5.2:3)*(n.spd||1),used=Math.min(Math.floor(n.ff*sp),p.length);if(used>0){const q=p[used-1];n.x=q[0];n.y=q[1];n.ff=Math.max(0,n.ff-used/sp);p=p.slice(used);}if(!p.length){n.pose='stand';resolve();return;}n.ff=0;}n.path=p;n.fast=fast;n.pose='walk';n.wait={resolve,reject,walk:true};});
 const until=f=>new Promise(r=>waiters.push({f,r}));
 const held=n=>n.held>S.t;const alive=e=>e===epoch;
-async function sitDown(n){await walk(n,n.seat);n.pose='sit';n.face=1;if(n.food?.where==='hand'){n.food.where='desk';n.sipT=0;n.food.cd=4;}}
+// Tamu duduk di sofa, bukan di meja.
+async function sofaSit(n){const c=free(n,SPOT.sofa)||[19,13];await walk(n,c);if(SPOT.sofa.some(s=>s[0]===c[0]&&s[1]===c[1])){n.slot=key(c[0],c[1]);n.pose='sofa';}else n.pose='stand';n.face=0;}
+async function sitDown(n){if(n.id==='guest')return sofaSit(n);await walk(n,n.seat);n.pose='sit';n.face=1;if(n.food?.where==='hand'){n.food.where='desk';n.sipT=0;n.food.cd=4;}}
 function give(n,kind){const left=nrnd(n,36,50);n.food={kind,left,total:left,where:'hand',cd:3};}
 function foodTick(n,dt){const f=n.food;if(!f)return;f.left-=dt;n.sipT=Math.max(0,(n.sipT||0)-dt);if(f.left<=0){n.food=null;n.sipT=0;if(n.pose==='sit'&&f.kind==='cup')chat(n,VOICE[n.id].empty,.3);return;}f.cd-=dt;if(f.cd<=0&&!n.carry&&n.pose!=='toilet'&&(f.where==='hand'||n.pose==='sit')){n.sipT=1.3;f.cd=5+(f.left*7)%4;}}
 async function standAt(n,cell,face=1,fast=false){await walk(n,cell,fast);n.pose='stand';n.face=face;}
 async function doing(n,label,sec,action='type',tick){n.task=label;n.action=action;await timer(n,sec,p=>{n.p=p;tick?.(p);});n.p=null;}
 function assign(n){n.busy=true;cancel(n);}
 function release(n){n.busy=false;n.carry=null;if(!asleep())idle(n);}
-const IDLE={esb:['Memeriksa log server','Merapikan kabel data'],pawang:['Memantau awan','Mencatat suhu'],pred:['Mengecek rumus','Membaca pola penjualan'],f1:['Meninjau rencana besok','Mengecek selisih stok'],f2:['Merapikan rencana kirim','Mengecek stok outlet'],watch:['Memantau layar outlet','Mencatat temuan'],mgr:['Membaca laporan','Meninjau target'],spv:['Mengatur rute kirim','Mengecek jadwal driver']};
+const IDLE={esb:['Memeriksa log server','Merapikan kabel data'],pawang:['Memantau awan','Mencatat suhu'],pred:['Mengecek rumus','Membaca pola penjualan'],f1:['Meninjau rencana besok','Mengecek selisih stok'],f2:['Merapikan rencana kirim','Mengecek stok outlet'],watch:['Memantau layar outlet','Mencatat temuan'],mgr:['Membaca laporan','Meninjau target'],spv:['Mengatur rute kirim','Mengecek jadwal driver'],guest:['Main HP','Menikmati suasana','Membalas pesan']};
 const free=(n,list)=>list.find(s=>!NPC.some(o=>o!==n&&(o.slot===key(s[0],s[1])||o.slot2===key(s[0],s[1]))));
 const WC_Q=[[20,13],[19,13],[18,13]],WC_WAIT=['Buruan dong!','Masih lama nggak?','Tolong, ini darurat.','Jangan tidur di dalam ya!'];
 async function wcVisit(n,sec){
@@ -245,14 +249,16 @@ const WORK={
   async n=>{await standAt(n,PLACE.toFc,0);await doing(n,'Mengecek meja forecaster',5,'point');if(nr(n)()<.3)speak(n,['Rencana besok sudah aman?','Jangan lupa cek cuaca.','Kalau ada kendala, kabari saya.']);await sitDown(n);await doing(n,'Membaca laporan',8);}],
  spv:[async n=>{await sitDown(n);await doing(n,'Mengatur rute kirim',10);if(nr(n)()<.35)speak(n,['Rute pagi sudah siap.','Driver sudah saya kabari.','Jam kirim jangan molor ya.']);await doing(n,'Mengecek jadwal driver',7);},
   async n=>{await standAt(n,PLACE.printer,1);S.printing++;try{await doing(n,'Mencetak rincian kirim',4,'stand');}finally{S.printing=Math.max(0,S.printing-1);}n.carry='paper';n.task='Membawa rincian kirim';await sitDown(n);n.carry=null;await doing(n,'Memeriksa rincian kirim',8);}],
+ guest:[async n=>{await sitDown(n);await doing(n,'Santai di sofa',14,'rest');},
+  async n=>{await standAt(n,npick(n,[[7,10],[12,9],[15,10],[19,7],[4,9],[9,15]]),0);await doing(n,'Melihat-lihat kantor',6,'stand');await sitDown(n);await doing(n,'Main HP',8,'rest');}],
 };
 const forecasterWork=[async n=>{await sitDown(n);n.filled=0;await doing(n,'Menyusun rencana kirim',12,'type',p=>{n.filled=p;});n.filled=1;const c=planCount();speak(n,c==null?realLines(n):`Rencana besok sudah ${c} dari 28 outlet.`);await doing(n,'Mengecek ulang rencana',5);},
  async n=>{await sitDown(n);await doing(n,'Mengecek selisih stok',8);speak(n,realLines(n));await doing(n,'Meninjau rencana besok',6);}];
 async function runSlot(n,g){
  try{
-  const roll=nr(n)(),jobs=isF(n)?forecasterWork:WORK[n.id],job=jobs[Math.floor(nr(n)()*jobs.length)],boss=n===MGR||n===SPV,brk=npick(n,boss?(n.food?['sofa','toilet']:['kopi','kopi','makan','sofa','toilet']):n.food?['sofa','nap','toilet']:['kopi','kopi','snack','makan','sofa','nap','toilet']);
+  const roll=nr(n)(),jobs=isF(n)?forecasterWork:WORK[n.id],job=jobs[Math.floor(nr(n)()*jobs.length)],boss=n===MGR||n===SPV,brk=npick(n,n===GUEST?['kopi','snack','toilet']:boss?(n.food?['sofa','toilet']:['kopi','kopi','makan','sofa','toilet']):n.food?['sofa','nap','toilet']:['kopi','kopi','snack','makan','sofa','nap','toilet']);
   if(roll<(boss?.85:.72))await job(n);else{await activity(n,brk);await sitDown(n);}
-  await sitDown(n);while(g===n.gen)await doing(n,npick(n,IDLE[n.id]),8,'type');
+  await sitDown(n);while(g===n.gen)await doing(n,npick(n,IDLE[n.id]),8,n.id==='guest'?'rest':'type');
  }catch(e){if(e!==CANCEL)throw e;}
 }
 function startSlot(n,k,late,catchUp){cancel(n);n.busy=false;n.task='Kembali ke meja';n.action='walk';n.rng=seeded(`${n.id}|${k}`);n.ff=catchUp&&late>1?late:0;runSlot(n,n.gen);}
@@ -293,11 +299,11 @@ window.addEventListener('forecast-intraday',()=>{const before=S.lastPull;syncRea
 window.addEventListener('forecast-office-data',syncReal);
 window.addEventListener('pcs-data-loaded',()=>{syncReal();syncWeather();});
 let dutyReady=false;
-function arrive(n){n.present=true;n.leaving=false;n.x=4;n.y=15;n.path=[];n.pose='stand';n.face=1;n.food=null;n.task='Baru datang';n.ff=0;say(n,n===MGR?'Pagi, tim.':n===SPV?'Halo semua!':'Halo, masuk shift!',2.4);idle(n);}
+function arrive(n){n.present=true;n.leaving=false;n.x=4;n.y=15;n.path=[];n.pose='stand';n.face=1;n.food=null;n.task='Baru datang';n.ff=0;say(n,n===MGR?'Pagi, tim.':n===SPV?'Halo semua!':n===GUEST?'Halo, permisi!':'Halo, masuk shift!',2.4);idle(n);}
 function leave(n){n.leaving=true;cancel(n);n.busy=false;n.held=0;n.food=null;n.task='Pulang';say(n,'Duluan ya!',2.2);(async()=>{try{await walk(n,[4,15]);}catch(e){if(e!==CANCEL)throw e;}n.present=false;n.leaving=false;n.pose='away';n.sayT=0;if(pickFC()&&S.sel===n.id)S.sel=FC.id;})();}
 // Muncul saat shift (forecaster) atau saat akunnya online. Manajer & SPV hanya saat online.
-function onlineAs(id){const now=Date.now(),role={mgr:'factory',spv:'spv'}[id];return (S.pres||[]).some(p=>p.online!==false&&now-(p.at?.toMillis?.()||0)<150e3&&(role?p.role===role:(p.role==='forecaster'&&p.char===id)));}
-function dutyTick(){for(const n of [MGR,SPV]){const want=onlineAs(n.id)&&!asleep();if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!officeReady){for(const n of [FW,FE]){n.present=false;n.pose='away';n.x=4;n.y=15;}return;}for(const n of [FW,FE]){const want=onShift(n)||(onlineAs(n.id)&&!asleep());if(!dutyReady){if(want){n.present=true;n.pose='sit';n.face=1;n.x=n.seat[0];n.y=n.seat[1];}else{n.present=false;n.pose='away';n.x=4;n.y=15;}}else if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!dutyReady){dutyReady=true;pickFC();}}
+function onlineAs(id){const now=Date.now(),role={mgr:'factory',spv:'spv',guest:'guest'}[id];return (S.pres||[]).some(p=>p.online!==false&&now-(p.at?.toMillis?.()||0)<150e3&&(role?p.role===role:(p.role==='forecaster'&&p.char===id)));}
+function dutyTick(){for(const n of [MGR,SPV,GUEST]){const want=onlineAs(n.id)&&!asleep();if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!officeReady){for(const n of [FW,FE]){const want=onlineAs(n.id)&&!asleep();if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);else if(!want&&!n.present&&!n.leaving){n.present=false;n.pose='away';n.x=4;n.y=15;}}return;}for(const n of [FW,FE]){const want=onShift(n)||(onlineAs(n.id)&&!asleep());if(!dutyReady){if(want){n.present=true;n.pose='sit';n.face=1;n.x=n.seat[0];n.y=n.seat[1];}else{n.present=false;n.pose='away';n.x=4;n.y=15;}}else if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!dutyReady){dutyReady=true;pickFC();}}
 // ===== Obrolan interaktif =====
 // Lawan bicara selalu berdekatan dan saling menghadap. Jadwal obrolan antar-karakter acak tetapi
 // berasal dari seed harian, jadi semua layar melihat obrolan yang sama pada waktu yang sama.
@@ -406,8 +412,8 @@ function eye(n,ex,ey,o){
  if(o.bags)R(ex,ey+h+.5,3.5,.5,'rgba(92,62,84,.5)');
 }
 const brow=(x,y,w,tilt,col,th=.75)=>{R(x,y+(tilt>0?tilt:0),w/2,th,col);R(x+w/2,y+(tilt<0?-tilt:0),w/2,th,col);};
-function mood2(n){const tasty=n.pose==='sip'||n.pose==='eat'||n.sipT>0,rest=n.pose==='sofa',sl=n.pose==='nap'||n.pose==='sleepDesk',talk=n.sayT>0&&!sl,alert=n===WAT&&watchLevel()>0,blink=Math.sin(S.t*1.1+n.bob*3)>.985;const o={...({esb:{wide:1},pawang:{wide:1},pred:{lid:.5},f1:{lid:.5},f2:{},watch:{lid:.5},mgr:{lid:.25},spv:{}}[n.id]),closed:sl||blink||(rest&&Math.sin(S.t*.5+n.bob)>.35)};if(tasty)o.lid=Math.max(o.lid||0,1.25);if(alert||n.fast){o.lid=0;o.wide=1;}return {o,tasty,talk,sl,alert};}
-function mouth(n,mx,my,st){const c1='#7b3f42',osc=Math.floor(S.t*9)%2;if(st.talk){R(mx-1.5,my,3,1.25+osc*.5,'#6b2f36');R(mx-1,my,2,.5,'#fff');}else if(n.pose==='eat'||(n.sipT>0&&n.food?.kind==='snack'))R(mx-1,my+.25,2,.5+osc*.5,c1);else if(st.sl)R(mx-.5,my+.25,1,.75,c1);else if(st.tasty||n===ESB||n===PAW||n===FE||n===SPV){R(mx-1.5,my,.5,.5,c1);R(mx-1,my+.5,2.25,.5,c1);R(mx+1.25,my,.5,.5,c1);if(n===ESB)R(mx-1,my,2.25,.5,'#fff');}else if(n===PRED){R(mx-1,my+.5,2,.5,c1);R(mx+1,my,.75,.5,c1);}else if(n===FW){R(mx-1,my+.5,2,.5,c1);R(mx+1,my+.25,.5,.5,c1);}else R(mx-1,my+.5,2.5,.5,c1);}
+function mood2(n){const tasty=n.pose==='sip'||n.pose==='eat'||n.sipT>0,rest=n.pose==='sofa',sl=n.pose==='nap'||n.pose==='sleepDesk',talk=n.sayT>0&&!sl,alert=n===WAT&&watchLevel()>0,blink=Math.sin(S.t*1.1+n.bob*3)>.985;const o={...({esb:{wide:1},pawang:{wide:1},pred:{lid:.5},f1:{lid:.5},f2:{},watch:{lid:.5},mgr:{lid:.25},spv:{},guest:{}}[n.id]),closed:sl||blink||(rest&&Math.sin(S.t*.5+n.bob)>.35)};if(tasty)o.lid=Math.max(o.lid||0,1.25);if(alert||n.fast){o.lid=0;o.wide=1;}return {o,tasty,talk,sl,alert};}
+function mouth(n,mx,my,st){const c1='#7b3f42',osc=Math.floor(S.t*9)%2;if(st.talk){R(mx-1.5,my,3,1.25+osc*.5,'#6b2f36');R(mx-1,my,2,.5,'#fff');}else if(n.pose==='eat'||(n.sipT>0&&n.food?.kind==='snack'))R(mx-1,my+.25,2,.5+osc*.5,c1);else if(st.sl)R(mx-.5,my+.25,1,.75,c1);else if(st.tasty||n===ESB||n===PAW||n===FE||n===SPV){R(mx-1.5,my,.5,.5,c1);R(mx-1,my+.5,2.25,.5,c1);R(mx+1.25,my,.5,.5,c1);if(n===ESB)R(mx-1,my,2.25,.5,'#fff');}else if(n===PRED||n===GUEST){R(mx-1,my+.5,2,.5,c1);R(mx+1,my,.75,.5,c1);}else if(n===FW){R(mx-1,my+.5,2,.5,c1);R(mx+1,my+.25,.5,.5,c1);}else R(mx-1,my+.5,2.5,.5,c1);}
 function face(n,x,hy){
  const ey=hy-.5,st=mood2(n),o={...st.o,look:Math.sin(S.t*.6+n.bob)*.55},lx=x-5,rx=x+1.5,by=ey-2,bc=n===PAW?'#8fa8c8':n===WAT?'#7a3519':n===PRED?'#4c3a86':n.hair;
  eye(n,lx,ey,o);eye(n,rx,ey,o);
@@ -419,6 +425,8 @@ function face(n,x,hy){
  if(n===FE){brow(lx,by-.25,3.5,.25,'#5b4036',.5);brow(rx,by-.25,3.5,-.25,'#5b4036',.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
  if(n===SPV){brow(lx,by-.25,3.5,.25,'#4a3a33',.5);brow(rx,by-.25,3.5,-.25,'#4a3a33',.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
  if(n===MGR){brow(lx,by,3.5,0,'#1c1716',1);brow(rx,by,3.5,0,'#1c1716',1);}
+ // Tamu: kacamata hitam
+ if(n===GUEST){brow(lx,by-.75,3.5,-.25,'#2a1c22',.5);brow(rx,by-.75,3.5,.25,'#2a1c22',.5);R(lx-1.25,ey-1,6,4.75,OL);R(rx-1.25,ey-1,6,4.75,OL);R(lx-.75,ey-.5,5,3.75,'#14141a');R(rx-.75,ey-.5,5,3.75,'#14141a');R(lx+4.75,ey,1.5,.75,OL);R(lx-.25,ey,1.75,.75,'rgba(255,255,255,.55)');R(rx-.25,ey,1.75,.75,'rgba(255,255,255,.55)');}
  R(x-.25,hy+1.5,.75,1.5,n.skinS);R(x-6,hy+2.5,2,.75,'rgba(214,120,110,.26)');R(x+4,hy+2.5,2,.75,'rgba(214,120,110,.26)');mouth(n,x,hy+4.25,st);
  if(n===PRED){c.strokeStyle=OL;c.lineWidth=.5;c.beginPath();c.arc(lx+1.75,ey+1.5,3,0,7);c.stroke();c.beginPath();c.arc(rx+1.75,ey+1.5,3,0,7);c.stroke();R(lx+4.5,ey+1,1.25,.5,OL);R(lx,ey-.75,1,.5,'rgba(255,255,255,.75)');}
  if(n===WAT){R(x+6,hy+3.5,.75,.75,'#ffd166');}
@@ -455,6 +463,7 @@ function hair(n,x,hy,f){
   if(n===FE)hijab(x,hy,false);
   if(n===SPV)hijab(x,hy,false,n.hj);
   if(n===MGR){R(x-7,hy-6,14,3,h);R(x-8,hy-2,16,6,h);}
+  if(n===GUEST){R(x-8,hy-1,16,14,h);R(x-8,hy+12,16,1,'#3e2a32');R(x-4,hy-5,3,.75,hl);}
   return;
  }
  if(n===ESB){fe(x,hy-4,11.5,6,h,true);R(x-11,hy-5,22,2,h);fe(x-7.5,hy-3,3.5,2.5,h);fe(x+7.5,hy-3,3.5,2.5,h);fe(x-2.5,hy-4,3,2,h);fe(x+3,hy-4,3,2,h);curls(x,hy-6,11,6,'#3b2b2c','#171113');}
@@ -464,6 +473,7 @@ function hair(n,x,hy,f){
  if(n===FW){fe(x,hy-1.5,7.5,6,h,true);R(x-7.5,hy-2,1.75,3.5,h);R(x+5.75,hy-2,1.75,3.5,h);for(const [a,b] of [[-6.5,-8],[-3,-8.75],[1,-8.5],[4.5,-7]])R(x+a,hy+b,2,2.25,h);R(x-5.5,hy-3.25,2.5,1.75,h);R(x-2.25,hy-3,3,1.25,h);R(x+1.5,hy-3.25,3.5,1.75,h);R(x-2,hy-6,3,.75,hl);}
  if(n===FE)hijab(x,hy,true);
  if(n===SPV)hijab(x,hy,true,n.hj);
+ if(n===GUEST){fe(x,hy-1.5,7.5,6,h,true);R(x-8.5,hy-2,2.5,13,h);R(x+6,hy-2,2.5,13,h);R(x-6.5,hy-3.5,10,2,h);R(x+2.5,hy-3,3.5,1.25,h);R(x-4,hy-6,3,.75,hl);}
  if(n===MGR){fe(x,hy-1.5,7.5,6,h,true);R(x-7.5,hy-2,1.5,3,h);R(x+6,hy-2,1.5,3,h);R(x-6.5,hy-3.25,13,1.75,h);R(x+1,hy-6.5,.75,4,'rgba(255,255,255,.22)');R(x-5,hy-5.5,4,.75,hl);}
 }
 function torso(n,x,by,f){
@@ -473,6 +483,7 @@ function torso(n,x,by,f){
  if(n===PAW){if(f===0){R(x-.25,t+2,.5,10,n.inner);R(x-b+1,t+7,2.5,1.5,n.shade);R(x+b-3.5,t+7,2.5,1.5,n.shade);}R(x-b,t+6,2*b,.75,n.inner);fe(x,t+2,5.5,2.25,OL);fe(x,t+2,5,1.75,'#ff7b6e');R(x-5,t+2,10,.75,'#e85f54');}
  if(n===WAT){if(f===0){R(x-2,t+1.5,4,4.5,n.inner);R(x-.5,t+2,1,4,'#2b2732');R(x+b-3.5,t+5,2,1,'#e6c35c');}else R(x-.25,t+3,.5,9,n.shade);}
  if(n===FW){for(let i=0;i<4;i++)R(x-b,t+3+i*2.75,2*b,.5,'#6c8cc8');for(let i=-1;i<2;i++)R(x+i*3.25,t+2,.5,10,'#6c8cc8');for(let i=0;i<3;i++)R(x-b,t+4.5+i*2.75,2*b,.25,'#c9554f');if(f===0){R(x-2.25,t+2,4.5,10,n.inner);R(x-.25,t+2,.5,10,'#c9cdd2');R(x-3,t+1.5,1.75,2,n.shade);R(x+1.25,t+1.5,1.75,2,n.shade);}else R(x-3.5,t+1.5,7,1.5,n.shade);}
+ if(n===GUEST){if(f===0){R(x-2.25,t+2,4.5,10,n.inner);R(x-2.75,t+2,.75,10,'#45454f');R(x+2,t+2,.75,10,'#45454f');R(x-.5,t+3,1,1,'#c9b26a');}else R(x-b,t+5,2*b,.5,'#45454f');}
  if(n===MGR){if(f===0){fe(x,t+2,2.75,1.25,n.skinS);R(x+1.5,t+5,2.5,2,'#3d3d46');}else R(x-.25,t+3,.5,9,n.shade);}
  if(n===FE||n===SPV){const ac=n===SPV?n.hj[0]:'#e8809f',ac2=n===SPV?n.hj[2]:'#d9a4b8';R(x-b-.75,by-1.5,2*b+1.5,3.5,OL);R(x-b-.25,by-1.5,2*b+.5,3,n.shirt);R(x+b-1,by-1.5,1,3,n.shade);if(f===0){R(x-.25,t+5,.5,8,ac2);for(let i=0;i<3;i++)R(x-.5,t+6+i*2,1,.75,ac);}R(x-b,by+.75,2*b,.5,ac);}
 }

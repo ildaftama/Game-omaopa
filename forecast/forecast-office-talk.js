@@ -86,6 +86,13 @@ function dataLines(id,f){
   ...on(bd.label,`${bd.label} kita evaluasi minggu ini.`),
   ...on(f.areaW,`Area ${f.areaW?.name} waste-nya paling tinggi. Saya minta laporannya.`),
  ];
+ if(id==='guest')return [
+  ...on(f.laris[0],`Katanya ${f.laris[0]} lagi laris ya? Pantas sering habis.`),
+  ...on(f.weatherKnown&&f.weather==='hujan','Di luar lagi hujan, untung sudah di dalam.'),
+  ...on(f.weatherKnown&&f.weather==='cerah','Cuaca cerah, enak buat jalan-jalan.'),
+  ...on(f.h>=11&&f.h<14,'Jam makan siang, kantinnya di mana ya?'),
+  'Kantornya lucu juga ya.','Santai banget suasananya di sini.','Saya cuma mampir sebentar kok.','Timnya kelihatan solid.',
+ ];
  if(id==='spv')return [
   ...on(f.plan===28,'Rincian kirim besok sudah bisa saya cetak.'),
   ...on(f.plan!=null&&f.plan<28,`Saya tunggu rencana lengkap, baru ${f.plan} outlet.`),
@@ -112,6 +119,7 @@ const TIPS={
  pawang:['Cek cuaca sebelum finalin kiriman, jangan feeling doang.','Hujan sore beda dampaknya sama hujan pagi.','Bawa payung, aku nggak tanggung jawab kalau basah.','Peluang hujan itu peluang, bukan janji.','Jangan salahkan awan kalau omzet turun. Cek dulu datanya.','Minum air putih, badan juga butuh hujan lokal.'],
  pred:['Jangan lihat satu hari saja, lihat polanya.','Bandingkan dengan hari yang sama minggu lalu.','Rata-rata bisa menipu, median lebih jujur.','Satu outlier jangan langsung jadi kesimpulan.','Kalau ragu, cek 4 minggu terakhir dulu.','Prediksi itu alat bantu. Keputusan tetap di kamu.','Tanggal merah dan gajian bisa mengubah pola, dicek ya.'],
  watch:['Waste kecil tiap hari kalau dikumpulin jadi besar.','Cek outlet yang sisanya berulang, bukan yang sekali saja.','Kirim lebih bukan solusi kalau outletnya memang sepi.','Jangan cuma kejar waste rendah, lost juga kerugian.','Produk tidak laku jangan ditambah karena kasihan.','Stok akhir nol belum tentu bagus, cek jam habisnya.'],
+ guest:['Jangan lupa istirahat ya, kerja terus nanti capek.','Minum air putih juga, jangan kopi terus.'],
  mgr:['Keputusan pakai data, bukan perasaan.','Laporkan kendala lebih awal.','Waste dan lost sama-sama biaya.'],
  spv:['Rincian kirim dicek dua kali sebelum dicetak.','Konfirmasi jam berangkat ke driver.','Transfer antar outlet diatur sebelum sore.'],
  f:['Cek ulang angka sebelum klik simpan.','Mulai dari outlet besar dulu, biar cepat kelihatan.','Catat alasan kalau ubah angka, besok pasti lupa.','Lihat Rincian kirim sebelum dibagikan ke dapur.','Kalau pusing, tutup sheet dua menit.'],
@@ -142,6 +150,7 @@ const FUN={
  pawang:['Awan ini sudah kuanggap peliharaan.','Aku bisa ramal cuaca, tapi nggak bisa ramal jodoh.','Tadi aku geser awan dikit, jangan bilang-bilang.','Kalau aku bersin, Semarang gerimis.','Hari ini mood-ku berawan sebagian.'],
  pred:['Peluang saya ngopi lagi: 94 persen.','Secara statistik, kamu butuh istirahat.','Rambut ungu ini tidak memengaruhi akurasi.','Saya tidak menebak. Saya menghitung, lalu berharap.','Korelasi saya dengan kopi sangat kuat.'],
  watch:['Saya melihat semuanya. Termasuk snack kedua kamu.','Remah di meja itu juga waste.','Saya tidak galak, standar saya saja tinggi.','Donat itu dihabiskan ya. Nol waste.','Jangan tatap saya begitu, tatap datanya.'],
+ guest:['Kacamata ini bukan gaya, silau aja.','Saya tamu, tapi berasa kayak di rumah.'],
  mgr:['Kopi ketiga hari ini, jangan tanya kenapa.','Rapat lima menit itu cuma mitos.'],
  spv:['Rute terpendek belum tentu tercepat, kata macet.','Driver saya lebih hafal jalan daripada peta.'],
  f:['Kalau ada revisi lagi, aku pura-pura offline.','Sheet ini lama-lama muncul di mimpi.','Aku bisa hitung 28 outlet, tapi nggak bisa hitung utang kopi.','Hidup ini cuma simpan, revisi, simpan lagi.','Tolong jangan tambah kolom baru.'],
@@ -223,13 +232,15 @@ const SCENES=[
  S(['spv','f'],()=>true,(f,P)=>[['spv','Rincian kirim besok kapan siap?'],['f',f.plan===28?'Sudah, tinggal dicetak.':'Sebentar lagi, masih saya cek.'],['spv',P('Oke, driver saya kabari.','Siap, saya tunggu.')]]),
  S(['mgr','spv'],()=>true,(f,P)=>[['mgr','Pengiriman pagi tadi lancar?'],['spv',P('Lancar, semua tepat waktu.','Ada satu yang telat sedikit, sudah saya catat.')],['mgr','Bagus. Pertahankan.']]),
  S(['mgr','pred'],f=>f.trend,(f)=>[['mgr','Tren omzet minggu ini?'],['pred',f.trend.dir==='naik'?`Naik ${f.trend.pct}%.`:f.trend.dir==='turun'?`Turun ${f.trend.pct}%.`:'Stabil.'],['mgr','Saran kamu?'],['pred',f.trend.dir==='turun'?'Tahan kiriman dulu.':'Jaga stok outlet yang sering habis.'],['mgr','Oke, jalankan.']]),
+ S(['guest','f'],()=>true,(f,P)=>[['guest',P('Halo, lagi sibuk ya?','Permisi, numpang duduk ya.')],['f',P('Iya nih, lagi susun rencana besok.','Silakan, santai aja.')],['guest','Semangat ya, kuenya selalu enak.'],['f','Makasih!']]),
+ S(['guest','esb'],()=>true,(f,P)=>[['esb','Ada yang bisa dibantu?'],['guest','Cuma lihat-lihat kok.'],['esb',P('Silakan, jangan sentuh kabelnya ya.','Oke, kopi ada di pantry.')],['guest','Siap, aman.']]),
  S(['spv','watch'],f=>f.lostOutlets[0],(f)=>[['watch',`${f.lostOutlets[0]} sering kehabisan.`],['spv','Saya siapkan transfer lebih awal ke sana.'],['watch','Bagus, saya pantau hasilnya.']]),
 ];
 function scene(k,f,avail){
  const rng=seeded(`scene|${f.today}|${k}`),P=(...a)=>a[Math.floor(rng()*a.length)];
  if(rng()>.82)return null;
  const fa=avail.find(x=>x==='f1'||x==='f2'),fb=avail.find(x=>(x==='f1'||x==='f2')&&x!==fa),real=w=>w==='f'?fa:w==='g'?fb:w;
- const list=SCENES.map((s,i)=>({s,i,o:seeded(`order|${f.today}|${i}`)()})).sort((a,b)=>a.o-b.o).filter(({s})=>s.need.every(w=>real(w)&&avail.includes(real(w)))&&s.when(f)).filter(({s})=>!s.need.some(w=>w==='mgr'||w==='spv')||rng()<.25);
+ const list=SCENES.map((s,i)=>({s,i,o:seeded(`order|${f.today}|${i}`)()})).sort((a,b)=>a.o-b.o).filter(({s})=>s.need.every(w=>real(w)&&avail.includes(real(w)))&&s.when(f)).filter(({s})=>!s.need.some(w=>w==='mgr'||w==='spv'||w==='guest')||rng()<.25);
  if(!list.length)return null;
  const data=list.filter(x=>x.s.when.length>0&&x.s.when.toString()!=='()=>true'),pool=data.length&&rng()<.7?data:list,sc=pool[k%pool.length].s;
  const lines=sc.lines(f,P).map(([w,text])=>({id:real(w),text,dur:dur(text)+.5}));
