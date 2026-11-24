@@ -55,6 +55,16 @@ window.ForecastSettings=(()=>{
  let prodBase='',newCat=3;
  function prodDraft(){if(!prod){const c=P().core(),x=P().extra();const sp=get().products||{};prod={categories:[...P().CATS],core:c.map((r,p)=>({label:r.label,ship:r.ship,color:P().hex(sp.core?.[p]?.color)||'',hpp:String(P().hpp()[p])})),extra:x.map(r=>({name:r.name,cat:r.cat,aliases:[...r.aliases],orig:r.name,removed:false,color:P().hex((sp.extra||[]).find(e=>String(e?.name||'').trim()===r.name)?.color)||''})),routes:{...(sp.routes||{})},batch:{...(window.ForecastProduction?.sizes?.()||{})},areas:(window.ForecastProduction?.areas?.()||[]).map(a=>({name:a.name,time:a.time||'',round:a.round||'up',routes:[...(a.routes||[])]})),areaThr:String(window.ForecastProduction?.areaThreshold?.()??0.8)};prodBase=JSON.stringify(prod);}return prod;}
  const prodDirty=()=>!!prod&&JSON.stringify(prod)!==prodBase;
+ // Rekan tim menyimpan pengaturan saat halaman ini terbuka (owner 2026-11-24): pakai versi
+ // terbaru, kecuali ada perubahan produk yang belum disimpan di sini -- itu tidak ditimpa,
+ // cukup diberi peringatan. Form tidak digambar ulang saat sedang mengetik.
+ window.addEventListener('forecast-sources-loaded',e=>{
+  if(!e.detail?.remote)return;
+  if(prodDirty())status='Rekan tim baru saja menyimpan pengaturan. Perubahan produk Anda di sini belum disimpan; kalau disimpan, versi rekan akan tertimpa.';
+  else{prod=null;status='Pengaturan terbaru dari tim sudah dimuat.';}
+  const a=document.activeElement,f=document.getElementById('forecast-settings-form');
+  if(!(a&&f&&f.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)))rerender();
+ });
  function syncProd(form){if(!prod||!form)return;
   form.querySelectorAll('[data-prod-cat-name]').forEach(el=>{prod.categories[+el.dataset.prodCatName]=el.value;});
   form.querySelectorAll('[data-prod-core-label]').forEach(el=>{prod.core[+el.dataset.prodCoreLabel].label=el.value;});

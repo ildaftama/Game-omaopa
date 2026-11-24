@@ -47,6 +47,7 @@ window.ForecastTopdown=(()=>{
  function describe(r,W){const parts=[];if(r?.wastePct!=null)parts.push(`waste ${pct1(r.wastePct)}% (ambang ${pct1(W)}%)`);if(r?.lostPerDay!=null)parts.push(`habis stok ±${Math.round(r.lostPerDay)} mnt/hari`);return parts.join(', ');}
  let date=null,cache=null,draft=null,message='',saving=false;
  window.addEventListener?.('forecast-data-refreshed',()=>{cache=null;});
+ window.addEventListener?.('forecast-sources-loaded',()=>{cache=null;});
  // ---- Saran buffer HUJAN per outlet (owner 2026-11-12) ----
  // Ramalan peluang hujan (Open-Meteo, rata-rata harian) untuk tanggal kiriman. Outlet berpeluang
  // hujan tinggi diberi SARAN penurunan kiriman; forecaster yang memutuskan (klik per outlet atau

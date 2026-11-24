@@ -145,7 +145,15 @@ window.addEventListener('forecast-perf-render',()=>{if(focus==='perf')schedule()
 window.addEventListener('pcs-data-loaded',()=>{if(['pcs','orders','forecast','dashboard','wastelost','perf'].includes(focus))schedule();});
 window.addEventListener('forecast-operations-changed',()=>{if(['forecast','access','dashboard'].includes(focus))schedule();});
 window.addEventListener('forecast-plans-changed',()=>{if(focus==='access'||focus==='dashboard'||focus==='perf'||(focus==='forecast'&&window.ForecastWorkspace.cloudChanged()))schedule();});
-window.addEventListener('forecast-sources-loaded',()=>{if(focus==='sources')schedule();});
+// Pengaturan tim termuat / diubah rekan (owner 2026-11-24): semua halaman ikut digambar ulang
+// supaya produk baru langsung tampil. Pengaturan sendiri diurus forecast-settings.js (draf yang
+// sedang diketik tidak ditimpa); kalau sedang mengetik di tabel, tunggu sampai kolom ditinggalkan.
+window.addEventListener('forecast-sources-loaded',()=>{
+ if(focus==='settings')return;
+ const box=$('#workspace-content'),a=document.activeElement;
+ if(a&&box.contains(a)&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){box.addEventListener('focusout',()=>setTimeout(schedule,0),{once:true});return;}
+ schedule();
+});
 $('#sources-open').addEventListener('click',()=>{document.getElementById('source-dialog').close();focus='settings';render();});
 // Data pendukung dibuka dari Pengaturan (tab utamanya disembunyikan atas permintaan owner).
 function openSupport(view){focus=view;if(selected==='__all__'&&['events','swot','area'].includes(focus)){selected=lastOutlet;$('#workspace-outlet').value=selected;sync();}render();}

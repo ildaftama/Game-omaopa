@@ -4,12 +4,25 @@
 window.ForecastSourceCloud={status:'Memuat pengaturan tim…',save:async()=>{throw Error('Koneksi penyimpanan belum siap. Coba kembali.');}};
 (async()=>{
  try{
-  const [{getApps,getApp,initializeApp},{getAuth,onAuthStateChanged},{getFirestore,doc,getDoc,setDoc,serverTimestamp,writeBatch,collection,Timestamp}]=await Promise.all([
+  const [{getApps,getApp,initializeApp},{getAuth,onAuthStateChanged},{getFirestore,doc,getDoc,setDoc,onSnapshot,serverTimestamp,writeBatch,collection,Timestamp}]=await Promise.all([
    import('https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js'),import('https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js'),import('https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js')]);
   const app=getApps().some(a=>a.name==='[DEFAULT]')?getApp():initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
   const db=getFirestore(app),auth=getAuth(app);await new Promise(resolve=>{const off=onAuthStateChanged(auth,()=>{off();resolve();});});
   const ref=doc(db,'settings','forecastSources');
-  try{const s=await getDoc(ref);if(s.exists()){const d=s.data().config;if(d?.schemaVersion===1&&Array.isArray(d.sources)&&d.sources.every(s=>window.SourceSettings.validLink(s.url)))window.DATA_SOURCES={...d,sources:window.DATA_SOURCES.sources.map(s=>d.sources.find(x=>x.key===s.key)||s)};}}catch{/* Original configuration remains usable offline or if settings reads are restricted. */}
+  // Sinkron langsung (owner 2026-11-24): pengaturan (produk, ambang, warna, HPP) didengarkan
+  // terus, bukan dibaca sekali saat halaman dibuka. Simpanan rekan tim langsung tampil di
+  // semua akun yang sedang membuka web, dan pembacaan awal yang selesai setelah halaman
+  // tergambar ikut menggambar ulang halaman (sebelumnya akun yang memuat cepat, seperti
+  // forecaster, bisa tertinggal di daftar produk bawaan).
+  const apply=s=>{if(!s.exists())return false;const d=s.data().config;if(!(d?.schemaVersion===1&&Array.isArray(d.sources)&&d.sources.every(x=>window.SourceSettings.validLink(x.url))))return false;
+   const base=window.DATA_SOURCES?.sources||[];window.DATA_SOURCES={...d,sources:base.map(x=>d.sources.find(y=>y.key===x.key)||x)};return true;};
+  await new Promise(resolve=>{let first=true;const done=()=>{if(first){first=false;resolve();}};setTimeout(done,10000);
+   try{onSnapshot(ref,s=>{
+     if(first){try{apply(s);}catch{}done();return;}
+     // Simpanan sendiri sudah dipakai langsung oleh forecast-settings.js; yang didengar hanya versi dari server.
+     if(s.metadata.hasPendingWrites)return;
+     try{if(apply(s))window.dispatchEvent(new CustomEvent('forecast-sources-loaded',{detail:{remote:true}}));}catch{}
+    },()=>done());}catch{done();}});
   window.ForecastSourceCloud.status=auth.currentUser?'Memakai sesi pengelola website. Izin penyimpanan diperiksa saat menyimpan.':'Untuk menyimpan bagi tim, masuk sebagai pengelola di website utama, lalu buka kembali halaman ini.';
   window.ForecastSourceCloud.save=async(config,changes=[])=>{
    if(!auth.currentUser)throw Error('Masuk sebagai pengelola di omaopa.fun terlebih dahulu, lalu buka kembali halaman ini. Halaman Forecast memerlukan akun pengelola.');

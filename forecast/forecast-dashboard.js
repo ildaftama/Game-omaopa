@@ -162,7 +162,7 @@ window.ForecastDashboard=(()=>{
  // "Omzet murni/pesanan" yang tetap pakai estimatedPartition() di revenueTrend() (metodologi
  // lama, sudah teruji, tidak disentuh di sini).
  const PESANAN_PRODUCTS_TREND=[0,1,2,3,7,8,9];
- window.addEventListener?.('forecast-data-refreshed',()=>{dailySeriesCache=null;trendExtremesCache=null;wasteLostTrendCache=null;wasteLostCache=null;opSummaryCache=null;for(const f of [()=>yoyGrowthCache.clear(),()=>perfCache.clear(),()=>fulfillmentCache.clear()])try{f();}catch{}});
+ for(const ev of ['forecast-data-refreshed','forecast-sources-loaded'])window.addEventListener?.(ev,()=>{dailySeriesCache=null;trendExtremesCache=null;wasteLostTrendCache=null;wasteLostCache=null;opSummaryCache=null;for(const f of [()=>yoyGrowthCache.clear(),()=>perfCache.clear(),()=>fulfillmentCache.clear()])try{f();}catch{}});
  let dailySeriesCache=null;
  function dailyOutletProductSeries(){
   const panels=window.PcsPanels.data();
