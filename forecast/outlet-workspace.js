@@ -13,7 +13,7 @@ let selected='nusa-indah',focus='dashboard',period='3',lastOutlet='nusa-indah';t
 // Kembali ke tab & posisi scroll yang sama setelah muat ulang otomatis.
 let restore=null;try{const r=JSON.parse(sessionStorage.getItem('forecast-restore')||'null');sessionStorage.removeItem('forecast-restore');if(r&&Date.now()-r.at<180000)restore=r;}catch{}
 if(restore?.focus&&document.querySelector(`[data-focus="${restore.focus}"]`))focus=restore.focus;
-if(restore?.scroll)window.addEventListener('pcs-data-loaded',()=>setTimeout(()=>scrollTo(0,restore.scroll),600),{once:true});
+if(restore?.scroll){let tries=0;const go=()=>{if(document.documentElement.scrollHeight>=restore.scroll+innerHeight*.5&&document.querySelector('#workspace-content')?.children.length){scrollTo(0,restore.scroll);if(++tries<3)setTimeout(go,700);}else if(++tries<30)setTimeout(go,400);};setTimeout(go,400);}
 window.ForecastFocus=()=>focus;
 const outlet=()=>data.outlets[selected==='__all__'?lastOutlet:selected],periodData=()=>analysis.periods[period];
 const events=()=>periodData().events.filter(e=>e.outletIds.includes(selected)&&e.scope!=='agenda-wilayah');
