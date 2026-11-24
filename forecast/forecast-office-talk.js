@@ -8,6 +8,7 @@ const dur=t=>Math.min(7.5,Math.max(2.8,1.7+String(t).length*.062));
 const on=(c,...x)=>c?x:[];
 const call=f=>f.who?`${f.who}, `:'';
 const low=s=>String(s||'').toLowerCase();
+const roti=a=>a.length&&a.every(x=>/^Roti/.test(x))?'roti manis':join(a,3);
 
 // ===== Data per peran =====
 function dataLines(id,f){
@@ -32,33 +33,48 @@ function dataLines(id,f){
   ...on(f.tomorrowW==='hujan'&&f.weekendTomorrow,'Akhir pekan hujan itu tricky. Jangan asal naikin.'),
   ...on(f.tomorrowW==='cerah'&&f.weekendTomorrow,'Akhir pekan cerah biasanya ramai. Siap-siap!'),
  ];
- if(id==='pred')return [
-  ...on(f.model,'Model semalam sudah update, prediksi besok siap dipakai.','Pembagian per outlet untuk besok sudah kuhitung.'),
-  ...on(!f.model,'Model besok belum selesai. Sementara pakai metode cadangan.'),
-  ...on(o?.pct!=null&&f.h>=19&&o.pct>=100,`Omzet sudah ${o?.pct}% dari prediksi. Hari ini di atas ekspektasi!`),
-  ...on(o?.pct!=null&&f.h>=19&&o.pct<100,`Sekarang ${o?.pct}% dari prediksi, angka final masih bisa naik.`),
-  ...on(o?.pct!=null&&f.h<19,`Omzet sementara ${o?.pct}% dari prediksi harian. Hari masih panjang.`),
-  ...on(hit,`${hit} lagi konsisten laris. Datanya cantik.`,`Kalau lihat 28 hari, ${join(f.laris)} paling sehat.`),
-  ...on(move,`${move} waste-nya tinggi tapi juga sering habis. Itu masalah pembagian.`),
+ if(id==='pred'){const stop=f.notSell.map(x=>x.label),add=f.laris.filter(l=>f.soldOut.some(s=>s.label===l)),tr=f.trend;return [
+  ...on(stop.length,`Saran saya: hentikan dulu ${roti(stop)}. Lebih banyak terbuang daripada laku.`,`Kalau belum mau berhenti, kurangi drastis ${roti(stop)}.`,`${roti(stop)} sebaiknya diganti produk yang lebih laku.`),
+  ...on(f.slow.length,`Kurangi ${join(f.slow)} pelan-pelan, jangan sekaligus.`),
+  ...on(add.length,`Tambah ${join(add)}, sering habis duluan.`,`${join(add)} masih bisa dinaikkan, permintaannya belum terpenuhi.`),
+  ...on(!add.length&&f.laris.length,`${join(f.laris)} sehat, pertahankan jumlahnya.`),
+  ...on(f.place.length,`${join(f.place)}: totalnya cukup, pembagian antar-outlet yang perlu dibenahi.`),
+  ...on(f.status&&f.waste==='lewat',`Performa waste buruk. Kurangi kiriman di outlet yang sisanya berulang${f.outletW?', mulai dari '+f.outletW.name:''}.`),
+  ...on(f.status&&f.waste==='aman','Performa waste aman. Fokus berikutnya mengurangi kehabisan.'),
+  ...on(f.outletL,`Tambah kiriman ${f.outletL?.name}, paling sering kehabisan.`),
+  ...on(tr?.dir==='naik',`Tren omzet cenderung naik, ${tr?.pct}% dibanding minggu sebelumnya.`,`Omzet seminggu terakhir naik ${tr?.pct}%. Stok outlet ramai jangan sampai kurang.`),
+  ...on(tr?.dir==='turun',`Tren omzet cenderung turun, ${tr?.pct}% dibanding minggu sebelumnya.`,`Omzet melemah ${tr?.pct}%. Tahan kiriman, jangan ikut angka minggu lalu.`),
+  ...on(tr?.dir==='stabil','Tren omzet stabil. Rencana bisa mengikuti pola minggu lalu.'),
+  ...on(stop.length&&add.length,`Kesimpulan saya: kurangi ${roti(stop)}, alihkan ke ${join(add)}.`),
+  ...on(f.model,'Model semalam sudah update, prediksi besok siap dipakai.'),
+  ...on(!f.model,'Model besok belum selesai, sementara pakai metode cadangan.'),
+  ...on(o?.pct!=null&&f.h>=19,`Omzet hari ini ${o?.pct}% dari prediksi.`),
   ...on(f.weekendTomorrow,`Besok ${f.tomorrow}, polanya biasanya beda dari hari kerja.`),
-  ...on(f.tomorrow==='Senin','Senin sering turun setelah akhir pekan. Jangan terbawa angka Minggu.'),
- ];
+  ...on(f.tomorrow==='Senin','Besok Senin, biasanya turun setelah akhir pekan. Jangan ikut angka Minggu.'),
+ ];}
  if(id==='watch')return [
-  ...on(wOut,`Hati-hati, waste ${wOut} lagi tinggi.`,`${wOut} masuk daftar pantauan waste saya.`,`Tolong cek kiriman ${wOut}, sisanya sering banyak.`),
-  ...on(wOut2,`Selain ${wOut}, ${wOut2} juga perlu dilihat.`),
-  ...on(lOut,`${lOut} sering kehabisan. Jangan sampai lost lagi.`,`Lost sales ${lOut} perlu perhatian.`),
-  ...on(lOut2,`${lOut} dan ${lOut2} paling sering lost belakangan ini.`),
-  ...on(bad,`${bd.label}: ${bd.pct}% kirimannya jadi waste. Yakin masih mau kirim?`,`Saya masih keberatan sama ${bd.label}. Lakunya jauh di bawah kiriman.`),
-  ...on(f.notSell.length>1,`${join(f.notSell.map(x=>x.label),3)} masih masuk status tidak laku.`),
-  ...on(f.slow[0],`${f.slow[0]} kurang laku. Jumlahnya bisa dikurangi.`),
-  ...on(move,`${move} perlu dicek penempatannya, jangan numpuk di satu outlet.`),
-  ...on(f.status&&f.waste==='lewat','Waste bulan ini sudah lewat batas. Kita perlu lebih ketat.'),
+  ...on(f.wasteProd,`Produk paling boros 28 hari terakhir: ${f.wasteProd?.label}, waste ${f.wasteProd?.rp}.`),
+  ...on(f.lostProd,`Lost terbesar ada di ${f.lostProd?.label}, kira-kira ${f.lostProd?.pcs} pcs dalam 28 hari.`),
+  ...on(f.soldOut[0],`${f.soldOut[0]?.label} habis di ${f.soldOut[0]?.rate}% hari berstok.`),
+  ...on(bd.label,`${bd.label}: ${bd.pct}% kirimannya jadi waste.`,`${bd.label} masih berstatus tidak laku.`),
+  ...on(f.slow[0],`${f.slow[0]} kurang laku, sisanya sering banyak.`),
+  ...on(f.place[0],`${f.place[0]} sisa di satu outlet, habis di outlet lain.`),
+  ...on(f.areaW,`Area ${f.areaW?.name} waste-nya paling tinggi, ${f.areaW?.pct}% dari omzet.`),
+  ...on(f.areaBest&&f.areaW&&f.areaBest.name!==f.areaW.name,`Area paling rapi: ${f.areaBest?.name}, waste ${f.areaBest?.pct}% dari omzet.`),
+  ...on(f.areaL,`Area ${f.areaL?.name} paling banyak kehilangan penjualan.`),
+  ...on(f.outletW,`Outlet dengan waste tertinggi: ${f.outletW?.name}, ${f.outletW?.pct}% dari omzet.`),
+  ...on(f.outletL,`${f.outletL?.name} paling sering kehabisan stok.`),
+  ...on(wOut,`Hati-hati, waste ${wOut} lagi tinggi.`,`Tolong cek kiriman ${wOut}, sisanya sering banyak.`),
+  ...on(lOut,`${lOut} sering kehabisan. Jangan sampai lost lagi.`),
+  ...on(f.status&&f.waste==='lewat','Waste bulan ini sudah lewat batas.'),
   ...on(f.status&&f.waste==='waspada','Waste mulai mendekati batas, jangan lengah.'),
   ...on(f.status&&f.waste==='aman','Waste masih aman. Pertahankan.'),
-  ...on(f.status&&f.lost==='lewat','Lost sales sudah lewat batas. Stok outlet ramai harus dijaga.'),
-  ...on(f.wasteTrend==='naik','Tren waste lagi naik. Saya tidak suka grafik ini.'),
-  ...on(f.wasteTrend==='turun','Waste mulai turun. Akhirnya ada kabar baik.'),
+  ...on(f.status&&f.lost==='lewat','Lost sales sudah lewat batas.'),
+  ...on(f.status&&f.lost==='waspada','Lost sales mulai banyak.'),
+  ...on(f.wasteTrend==='naik','Tren waste lagi naik.'),
+  ...on(f.wasteTrend==='turun','Waste mulai turun. Kabar baik.'),
   ...on(f.lostTrend==='naik','Lost sales juga naik, jadi jangan asal potong kiriman.'),
+  ...on(f.lostTrend==='turun','Lost sales mulai turun.'),
  ];
  return [
   ...on(f.plan!=null&&f.plan<28&&f.plan>0,`Rencana besok baru ${f.plan} dari 28 outlet.`,`Masih ada ${28-(f.plan||0)} outlet yang belum kusimpan.`),
@@ -177,6 +193,11 @@ const SCENES=[
  S(['pred','f'],f=>f.weekendTomorrow,(f)=>[['f',`Besok ${f.tomorrow}, stok dinaikin nggak?`],['pred','Akhir pekan memang lebih tinggi, tapi tiap outlet beda.'],['f','Outlet kampus biasanya malah sepi ya.'],['pred','Nah, itu pengamatan bagus.'],['f','Akhirnya kamu mengakui aku.']]),
  S(['pred','f'],f=>f.tomorrow==='Senin',()=>[['f','Senin kok suka turun ya?'],['pred','Efek setelah akhir pekan.'],['f','Jadi kirimannya jangan ikut Minggu?'],['pred','Betul, pakai pola Senin.'],['f','Oke, catat.']]),
  S(['esb','watch'],f=>f.h>=19&&f.h<22,()=>[['watch','Angka final sudah masuk?'],['esb','Sebentar, outlet baru tutup.'],['watch','Saya tunggu.'],['esb','Tolong jangan berdiri di belakangku.'],['watch','Saya cuma memantau.']]),
+ S(['watch','pred'],f=>f.areaW&&f.outletW,(f)=>[['watch',`Area ${f.areaW.name} waste-nya ${f.areaW.pct}% dari omzet, paling tinggi.`],['pred','Merata satu area, atau satu-dua outlet saja?'],['watch',`Paling besar di ${f.outletW.name}.`],['pred',`Berarti kurangi kiriman ${f.outletW.name} dulu, jangan potong satu area.`],['watch','Masuk akal. Saya pantau dua hari.']]),
+ S(['pred','f'],f=>f.trend,(f)=>[['pred',f.trend.dir==='naik'?`Tren omzet seminggu ini naik ${f.trend.pct}%.`:f.trend.dir==='turun'?`Tren omzet seminggu ini turun ${f.trend.pct}%.`:'Omzet seminggu ini stabil.'],['f','Terus rencana besok gimana?'],['pred',f.trend.dir==='naik'?'Naikkan sedikit di outlet yang sering habis, bukan semua.':f.trend.dir==='turun'?'Tahan dulu. Jangan kirim seperti minggu lalu.':'Ikuti pola minggu lalu, sesuaikan cuaca.'],['f','Oke, kucatat.']]),
+ S(['pred','f'],f=>f.notSell.length,(f)=>[['pred',`Saran saya, ${roti(f.notSell.map(x=>x.label))} dihentikan dulu.`],['f','Serius? Nanti outlet protes nggak?'],['pred',`${f.notSell[0].label} ${f.notSell[0].pct}% kirimannya jadi waste. Datanya jelas.`],['f','Oke, kubahas dulu sama owner.'],['pred','Bawa datanya, biar diskusinya cepat.']]),
+ S(['watch','f'],f=>f.lostProd,(f)=>[['watch',`${f.lostProd.label} paling banyak lost, kira-kira ${f.lostProd.pcs} pcs.`],['f','Waduh, sebanyak itu?'],['watch','Itu perkiraan, tapi arahnya jelas.'],['f','Berarti outlet yang sering habis kutambah ya.'],['watch','Tambah di outlet yang habis, bukan semua.']]),
+ S(['watch','pred'],f=>f.areaL,(f)=>[['pred','Area mana yang paling sering kehabisan?'],['watch',`${f.areaL.name}.`],['pred','Waste-nya di sana gimana?'],['watch',f.areaW&&f.areaW.name===f.areaL.name?'Tinggi juga. Pembagiannya berantakan.':'Masih wajar.'],['pred',f.areaW&&f.areaW.name===f.areaL.name?'Berarti masalahnya penempatan, bukan jumlah.':'Berarti area itu bisa ditambah sedikit.']]),
 ];
 function scene(k,f,avail){
  const rng=seeded(`scene|${f.today}|${k}`),P=(...a)=>a[Math.floor(rng()*a.length)];

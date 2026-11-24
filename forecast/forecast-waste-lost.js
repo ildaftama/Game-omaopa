@@ -107,8 +107,9 @@ window.ForecastWasteLost=(()=>{
  function health(){
   const L=limits(),key=[window.STOCK_DAILY?.updatedAt,today(),L.waste].join('|');if(healthCache?.key===key)return healthCache.value;
   const c=collect({all:true,dates:a=>a.filter(d=>d<today()).sort().slice(-HEALTH_DAYS)});
-  const items=ORDER.filter(l=>c.prod[l]&&(c.prod[l].pcs||c.prod[l].kirim)).map(l=>{const p=c.prod[l],[st,cls]=status(p,L.waste);return {label:l,status:st,cls,critical:cls==='bad',pcs:p.pcs,nom:p.nom,kirim:p.kirim,wasteOfShip:p.kirim?p.pcs/p.kirim*100:null,wasteOfOmzet:p.omzet>0?p.nom/p.omzet*100:null};});
-  const value={from:c.ds[0],to:c.ds.at(-1),items};if(c.ds.length)healthCache={key,value};return value;
+  const items=ORDER.filter(l=>c.prod[l]&&(c.prod[l].pcs||c.prod[l].kirim)).map(l=>{const p=c.prod[l],[st,cls]=status(p,L.waste);return {label:l,status:st,cls,critical:cls==='bad',pcs:p.pcs,nom:p.nom,kirim:p.kirim,wasteOfShip:p.kirim?p.pcs/p.kirim*100:null,wasteOfOmzet:p.omzet>0?p.nom/p.omzet*100:null,habisRate:p.days?p.habis/p.days*100:null,lostLow:p.low,lostHigh:p.high,lostRp:(p.lowRp+p.highRp)/2};});
+  const mid=s=>({wasteRp:s.sum.nom,lostPcs:(s.sum.low+s.sum.high)/2,lostRp:(s.sum.lowRp+s.sum.highRp)/2,habis:s.sum.habis,wastePct:s.omzet>0?s.sum.nom/s.omzet*100:null});
+  const value={from:c.ds[0],to:c.ds.at(-1),items,outlets:c.rows.map(r=>({id:r.id,name:name(r.id),...mid(r)})),areas:areaGroups(c).filter(a=>a.key!=='Lainnya').map(a=>({name:a.title,...mid(a)}))};if(c.ds.length)healthCache={key,value};return value;
  }
  function noticeHtml(){
   try{
