@@ -21,7 +21,7 @@
 .cl-day h3 small{color:#6d7d8d;font-size:12px;font-weight:600}
 .cl-list{margin:0;padding:0;list-style:none}
 .cl-row{border-top:1px solid #edf1f4}
-.cl-row>button{display:grid;grid-template-columns:minmax(140px,.9fr) minmax(0,2fr) auto 16px;gap:10px;align-items:baseline;width:100%;padding:9px 4px;border:0;background:none;color:#22313f;font:inherit;font-size:13.5px;text-align:left;cursor:pointer}
+.cl-row>button{display:grid;grid-template-columns:minmax(120px,210px) minmax(0,1fr) auto 16px;gap:10px;align-items:baseline;width:100%;padding:9px 4px;border:0;background:none;color:#22313f;font:inherit;font-size:13.5px;text-align:left;cursor:pointer}
 .cl-row>button:hover{background:#f6f9fb}
 .cl-who{color:#172b42;font-weight:700}
 .cl-who small{display:block;color:#6d7d8d;font-size:11px;font-weight:500}
