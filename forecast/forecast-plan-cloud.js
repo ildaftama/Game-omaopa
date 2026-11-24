@@ -78,6 +78,7 @@ window.ForecastPlanCloud={state:'loading',message:'Menyambungkan akun staf…',r
   const names=new Map();
   cloud.staffName=uid=>{if(!uid)return '';if(uid===cloud.uid)return staffName||'Anda';if(names.has(uid))return names.get(uid);names.set(uid,null);
    dbSDK.getDoc(dbSDK.doc(db,'staff',uid)).then(s=>s.exists()?s:dbSDK.getDoc(dbSDK.doc(db,'forecastUsers',uid))).then(s=>{const d=s.exists()?s.data():{};names.set(uid,String(d.name||d.nama||d.displayName||'').slice(0,60)||'Akun staf');emit();}).catch(()=>{names.set(uid,'Akun staf');emit();});return null;};
+  cloud.revisionAuthor=async key=>{const s=await dbSDK.getDoc(dbSDK.doc(db,'forecastPlans',key,'revisions','1'));return s.exists()?s.data().savedBy||null:null;};
   cloud.getRevisions=async key=>{const s=await dbSDK.getDocs(dbSDK.collection(db,'forecastPlans',key,'revisions'));return s.docs.map(d=>d.data()).sort((a,b)=>a.revision-b.revision);};
   // Hapus rencana: dokumen & semua revisinya TETAP ada; hanya diberi tanda "deleted" + entri
   // log permanen (alasan wajib) dalam satu tulisan. Satu outlet per tulisan.

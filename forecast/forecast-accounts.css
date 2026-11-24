@@ -35,3 +35,27 @@
 @media(max-width:640px){.cl-row>button{grid-template-columns:minmax(0,1fr) auto}.cl-what{grid-column:1/-1}.cl-detail li{grid-template-columns:minmax(0,1fr) auto}.cl-detail span{grid-column:1/-1}}
 .cl-row>button>span,.cl-row>button>time{justify-self:start;text-align:left}
 .cl-row>button>time{justify-self:end}
+
+.fa-modal{position:fixed;inset:0;z-index:6000;display:grid;place-items:center;padding:16px;background:rgba(15,30,42,.5)}
+.fa-modal-card{width:100%;max-width:420px;padding:22px;border-radius:14px;background:#fff;box-shadow:0 24px 60px rgba(10,25,40,.35)}
+.fa-modal-card h3{margin:0 0 10px;color:#172b42;font-size:19px}
+.fa-modal-card dl{display:grid;grid-template-columns:80px 1fr;gap:4px 10px;margin:0 0 14px;font-size:13px}
+.fa-modal-card dt{color:#6d7d8d}.fa-modal-card dd{margin:0;color:#172b42;font-weight:600}
+.fa-pass{display:grid;gap:10px}
+.fa-pass label{display:grid;gap:5px;font-size:12px;color:#4a5a69}
+.fa-pass input{box-sizing:border-box;width:100%;min-height:38px;padding:8px 10px;border:1px solid #d7e1e8;border-radius:8px;font:inherit;font-size:14px}
+.fa-note{margin:0;color:#6d7d8d;font-size:12px}
+.fa-msg{margin:0;color:#985924;font-size:12.5px}.fa-msg:empty{display:none}
+.fa-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.fpf-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-start}
+.fpf-periods{display:flex;gap:4px;padding:4px;border:1px solid #e0e7ed;border-radius:9px;background:#fff}
+.fpf-periods button{min-height:30px;padding:3px 11px;border:0;border-radius:6px;background:transparent;color:#62717f;font:600 13px inherit;font-family:inherit;cursor:pointer}
+.fpf-periods button.on{background:#172b42;color:#fff}
+.fpf-scroll{overflow-x:auto;margin:8px 0}
+.fpf-table{width:100%;border-collapse:collapse;font-size:13.5px;font-variant-numeric:tabular-nums}
+.fpf-table th,.fpf-table td{padding:8px 10px;border-bottom:1px solid #edf1f4;text-align:right;white-space:nowrap}
+.fpf-table th:first-child{text-align:left}
+.fpf-table thead th{color:#6d7d8d;font-size:12px;font-weight:600}
+.fpf-table td small{display:block;color:#7a8896;font-size:11px}
+.fpf-table b.ok{color:#23835a}.fpf-table b.mid{color:#b8730f}.fpf-table b.hot{color:#c9423a}
+.fpf-team th,.fpf-team td{background:#f5f7fa;font-weight:700}

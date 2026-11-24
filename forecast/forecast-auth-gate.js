@@ -1,6 +1,6 @@
 'use strict';
 import {getApps,getApp,initializeApp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,EmailAuthProvider,reauthenticateWithCredential,updatePassword} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
 import {getFirestore,doc,getDoc,getDocs,setDoc,deleteDoc,collection,onSnapshot,writeBatch,serverTimestamp,query,where,orderBy,limit,Timestamp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 const app=getApps().some(a=>a.name==='[DEFAULT]')?getApp():initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
 const auth=getAuth(app),db=getFirestore(app),gate=document.getElementById('forecast-access-gate'),root=document.getElementById('forecast-app');
@@ -82,7 +82,7 @@ onAuthStateChanged(auth,async user=>{const run=++generation;
  try{flStage(0,2,5,'Memeriksa hak akses');if(registering)await registering.catch(()=>{});const r=await resolveRole(user);if(run!==generation)return;const role=r.role;
   if(!window.ForecastRolePolicy.viewer(role)){locked(deniedText(r));return;}
   window.ForecastAuth={uid:user.uid,role,source:r.src};roleStop=onSnapshot(doc(db,r.src,user.uid),s=>{const d=s.exists()?s.data():null,next=roleOf(r.src,d);if(!window.ForecastRolePolicy.viewer(next)){root.hidden=true;gate.hidden=false;locked(r.src==='staff'?'Akses akun ini sudah dinonaktifkan.':deniedText({src:r.src,raw:d}));}else if(r.src!=='staff'&&next.fu!==window.ForecastAuth.role?.fu)location.reload();},()=>{root.hidden=true;locked('Akses akun belum dapat diperiksa. Muat ulang halaman.');});
-  preloadApp();await loadPrivate(role);await loadApp();if(run!==generation)return;await finishLoader();if(run!==generation)return;gate.hidden=true;root.hidden=false;watchLive();startPresence();
+  preloadApp();await loadPrivate(role);await loadApp();if(run!==generation)return;await finishLoader();if(run!==generation)return;gate.hidden=true;root.hidden=false;watchLive();startPresence();accountButton();
  }catch(e){if(run===generation){locked(e.message==='missing-private-data'?'Akun terverifikasi. Data privat sedang disiapkan.':'Data belum dapat dibuka. Periksa koneksi dan coba lagi.');importer();}}
 });
 gate.addEventListener('submit',async e=>{const form=e.target;if(!['forecast-login','forecast-login-id','forecast-register'].includes(form.id))return;e.preventDefault();const button=form.querySelector('button[type=submit]'),status=document.getElementById('forecast-login-status'),say=m=>{status.textContent=m;};
@@ -173,3 +173,28 @@ window.ForecastLogAPI={
  },
  async cleanup(){if(!window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role))return;const s=await getDocs(query(collection(db,'forecastChangeLog'),where('expireAt','<',Timestamp.now()),limit(200)));await Promise.all(s.docs.map(d=>deleteDoc(d.ref).catch(()=>{})));},
 };
+// Akun saya & ganti password (owner 2026-11-24). Akun ID memasukkan password lama dulu; akun lama
+// (nomor HP + PIN) tidak bisa diganti dari sini.
+const ROLE_NAME={master:'Master',factory:'Factory Manager',spv:'SPV Logistik',forecaster:'Forecaster',analyst:'Data Analis',super:'Admin Utama',admin:'Admin'};
+function accountButton(){
+ const out=document.querySelector('[data-forecast-signout]');if(!out||document.querySelector('[data-account-open]'))return;
+ const b=document.createElement('button');b.type='button';b.className=out.className;b.dataset.accountOpen='';b.textContent='Akun saya';out.before(b);
+}
+function accountDialog(){
+ const u=auth.currentUser;if(!u)return;const isId=String(u.email||'').endsWith('@'+FU_DOMAIN),r=window.ForecastAuth?.role||{},back=document.activeElement;
+ const el=document.createElement('div');el.className='fa-modal';
+ el.innerHTML=`<div class="fa-modal-card" role="dialog" aria-modal="true" aria-labelledby="fa-modal-title"><h3 id="fa-modal-title">Akun saya</h3><dl><dt>Nama</dt><dd>${esc(myName())}</dd><dt>Login</dt><dd>${isId?'ID '+esc(u.email.split('@')[0]):'Nomor HP + PIN (akun lama)'}</dd><dt>Peran</dt><dd>${esc(ROLE_NAME[myRole()]||'-')}</dd></dl>${isId?`<form class="fa-pass"><label>Password lama<input name="old" type="password" autocomplete="current-password" maxlength="64" required></label><label>Password baru<input name="pw" type="password" autocomplete="new-password" maxlength="64" required></label><label>Ulangi password baru<input name="pw2" type="password" autocomplete="new-password" maxlength="64" required></label><p class="fa-note">Minimal 8 karakter, campuran huruf dan angka.</p><p role="status" class="fa-msg"></p><div class="fa-modal-actions"><button type="button" class="button quiet" data-fa-close>Tutup</button><button type="submit" class="button fp-primary">Ganti password</button></div></form>`:`<p class="fa-note">Akun ini memakai nomor HP + PIN, jadi password tidak bisa diganti dari sini.</p><div class="fa-modal-actions"><button type="button" class="button" data-fa-close>Tutup</button></div>`}</div>`;
+ const close=()=>{el.remove();document.removeEventListener('keydown',key,true);back?.focus?.();};
+ const key=e=>{if(e.key==='Escape'){e.preventDefault();close();}};
+ el.addEventListener('click',e=>{if(e.target===el||e.target.closest('[data-fa-close]'))close();});
+ el.querySelector('.fa-pass')?.addEventListener('submit',async e=>{e.preventDefault();const f=e.target,msg=f.querySelector('.fa-msg'),btn=f.querySelector('[type=submit]'),pw=f.elements.pw.value;
+  if(!passOk(pw)){msg.textContent='Password baru minimal 8 karakter dan harus berisi huruf dan angka.';return;}
+  if(pw!==f.elements.pw2.value){msg.textContent='Ulangi password baru belum sama.';return;}
+  if(pw===f.elements.old.value){msg.textContent='Password baru harus berbeda dari yang lama.';return;}
+  btn.disabled=true;msg.textContent='Menyimpan…';
+  try{await reauthenticateWithCredential(u,EmailAuthProvider.credential(u.email,f.elements.old.value));await updatePassword(u,pw);f.reset();msg.textContent='Password sudah diganti. Pakai password baru saat masuk berikutnya.';}
+  catch(err){msg.textContent=/wrong-password|invalid-credential/.test(err?.code||'')?'Password lama tidak cocok.':err?.code==='auth/too-many-requests'?'Terlalu banyak percobaan. Coba lagi beberapa menit lagi.':'Password belum berhasil diganti. Periksa koneksi lalu coba lagi.';}
+  finally{btn.disabled=false;}});
+ document.addEventListener('keydown',key,true);document.body.appendChild(el);el.querySelector('input,button')?.focus();
+}
+document.addEventListener('click',e=>{if(e.target.closest('[data-account-open]'))accountDialog();});

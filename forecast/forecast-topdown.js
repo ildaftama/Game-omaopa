@@ -374,6 +374,8 @@ window.ForecastTopdown=(()=>{
  // Format sama dengan gambar Rincian kirim: outlet ke samping, produk ke bawah, satu kartu per
  // area. Tiap area punya 3 tabel: Stok outlet (reguler, diisi), Pesanan (diisi), Total kirim
  // (stok + pesanan, otomatis). Garis tipis antar sel supaya mudah dibaca forecaster & packing.
+ // Siapa yang terakhir menyimpan rencana tanggal ini (owner 2026-11-24), untuk memantau forecaster.
+ function savers(c){const m=new Map();for(const id of c.ids){const u=record(id)?.savedBy;if(u)m.set(u,(m.get(u)||0)+1);}if(!m.size)return '';const nm=u=>cloud().staffName?.(u)||'…';return ` Terakhir disimpan oleh: ${[...m.entries()].sort((a,b)=>b[1]-a[1]).map(([u,n])=>`${esc(nm(u))} ${n} outlet`).join(', ')}.`;}
  function prodRows(){
   const core=PR().core(),rows=[];
   PR().CATS.forEach((cat,ci)=>{
@@ -488,7 +490,7 @@ window.ForecastTopdown=(()=>{
    ${(()=>{const rows=prodRows();return c.groups.filter(g=>(draft.area||AREA_ALL)===AREA_ALL||draft.area===g.name).map(g=>areaCard(c,g,rows)).join('')+((draft.view||'reg')!=='reg'?factoryCard(c):'');})()}
    <div id="ft-prod">${productionBlock(c)}</div>
    <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
-   <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}. Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>
+   <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}.${savers(c)} Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>
   </div>`;
  }
  // Peringatan pola hari (owner 2026-11-13): kalau 12 minggu terakhir prediksi untuk hari yang sama
