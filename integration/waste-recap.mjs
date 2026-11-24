@@ -127,7 +127,7 @@ function wasteItemColumns(header, nominalCol) {
  const cols = []; let label = null;
  for (let i = 2; i < nominalCol; i++) {
   const h = String(header[i] || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (/^h-[23]$/.test(h)) { if (label) cols.push([i, label]); continue; }
+  if (!h || /^h-[23]$/.test(h)) { if (label) cols.push([i, label]); continue; }
   label = WASTE_ITEM_LABELS.find(([re]) => re.test(h))?.[1] || null;
   if (label) cols.push([i, label]);
  }

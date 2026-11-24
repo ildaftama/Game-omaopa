@@ -24,7 +24,7 @@ window.ForecastWasteLost=(()=>{
   for(const d of dates)for(const [id,o] of out){o.omzet+=gross.get(d+'|'+id)||0;
    for(const [l,[pcs,nom]] of Object.entries(items[d]?.[id]||{})){o.pcs+=pcs;o.nom+=nom;const a=cell(o,l),b=P(l);a.pcs+=pcs;a.nom+=nom;b.pcs+=pcs;b.nom+=nom;}
    const m=recap?.lostSalesMinutes?.[d]?.[id];if(Number.isFinite(m)){o.lostM+=m;o.lostD++;}
-   const day=stock?.days?.[d]?.[id];if(day)for(const [k,v] of Object.entries(day)){const l=stock.labels[+k];if(!l)continue;const a=cell(o,l),b=P(l),closed=v[5]===1,empty=closed&&v[0]>0&&v[4]<=0;for(const x of [a,b]){x.kirim+=v[1];x.tfIn+=v[2];x.tfOut+=v[3];if(closed&&v[0]>0)x.days++;if(empty)x.habis++;}o.kirim+=v[1];if(empty)o.habis++;}
+   const day=stock?.days?.[d]?.[id];if(day)for(const [k,v] of Object.entries(day)){const l=stock.labels[+k];if(!l)continue;const a=cell(o,l),b=P(l),closed=v[5]===1,empty=closed&&v[0]>0&&v[4]<=0&&!v[3];for(const x of [a,b]){x.kirim+=v[1];x.tfIn+=v[2];x.tfOut+=v[3];if(closed&&v[0]>0)x.days++;if(empty)x.habis++;}o.kirim+=v[1];if(empty)o.habis++;}
   }
   const rows=[...out.values()],sum=k=>rows.reduce((s,r)=>s+r[k],0);
   return {dates,rows,prod,pcs:sum('pcs'),nom:sum('nom'),omzet:sum('omzet'),habis:sum('habis'),lostM:sum('lostM'),lostD:sum('lostD'),hasStock:!!stock,hasItems:Object.keys(items).length>0};
@@ -41,7 +41,7 @@ window.ForecastWasteLost=(()=>{
   const labels=ORDER.filter(l=>c.prod[l]?.days);
   const body=GROUPS.map(([g,re])=>{const ls=labels.filter(l=>re.test(l));if(!ls.length)return '';const a=ls.reduce((s,l)=>({h:s.h+c.prod[l].habis,d:s.d+c.prod[l].days,i:s.i+c.prod[l].tfIn}),{h:0,d:0,i:0});
    return `<tr class="wl-group"><th scope="row">${g}</th><td>${nf(a.h)}</td><td>${pc(a.d?a.h/a.d*100:null,1)}</td><td>${nf(a.i)}</td></tr>`+ls.map(l=>{const p=c.prod[l];return `<tr><th scope="row">${esc(l)}</th><td>${nf(p.habis)}</td><td>${pc(p.days?p.habis/p.days*100:null,1)}</td><td>${nf(p.tfIn)}</td></tr>`;}).join('');}).join('');
-  return `<article class="workspace-card wl-card"><h3>Lost sales per produk</h3><p class="wl-note">Sementara memakai jumlah hari stok akhir 0. Estimasi pcs dan rupiah menyusul setelah jam habis dipastikan.</p><div class="wl-scroll"><table class="wl-table"><thead><tr><th>Produk</th><th>Outlet-hari habis</th><th>Dari hari berstok</th><th>Transfer masuk</th></tr></thead><tbody>${body||'<tr><td colspan="4">Data stok Daily Report belum masuk.</td></tr>'}</tbody></table></div></article>`;
+  return `<article class="workspace-card wl-card"><h3>Lost sales per produk</h3><p class="wl-note">Sementara memakai jumlah hari stok akhir 0 tanpa transfer keluar. Estimasi pcs dan rupiah menyusul setelah jam habis dipastikan.</p><div class="wl-scroll"><table class="wl-table"><thead><tr><th>Produk</th><th>Outlet-hari habis</th><th>Dari hari berstok</th><th>Transfer masuk</th></tr></thead><tbody>${body||'<tr><td colspan="4">Data stok Daily Report belum masuk.</td></tr>'}</tbody></table></div></article>`;
  }
  function outletTable(c){
   const L=limits(),m=r=>({...r,wp:r.omzet>0?r.nom/r.omzet*100:null,lp:r.lostD?r.lostM/r.lostD/L.open*100:null}),rows=c.rows.map(m),key={nom:'nom',pcs:'pcs',wp:'wp',lp:'lp',habis:'habis'}[state.sort]||'nom';rows.sort((a,b)=>(b[key]??-1)-(a[key]??-1));
