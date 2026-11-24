@@ -120,6 +120,48 @@ export function parseWasteTab(input, getId) {
  return byDate;
 }
 
+// Waste per produk: pcs dari kolom produk, nominal dipecah dari kolom Nominal tim. Harga per produk
+// dihitung dari baris terbaru (sheet memakai pcs x HPP), jadi total tetap sama persis dengan sheet.
+const WASTE_ITEM_LABELS = [[/^ochis/, 'Ogura Cheese'], [/^ocho/, 'Ogura Choco'], [/^mchis less/, 'Malmil Cheese Less Sugar'], [/^mcho less/, 'Malmil Choco Less Sugar'], [/^mchis/, 'Malmil Cheese'], [/^mcho/, 'Malmil Choco'], [/^mini/, 'Mini Ogura'], [/^cisfon lite ekstra/, 'Chiffon Lite Ekstra Keju'], [/^cisfon lite keju/, 'Chiffon Lite Keju'], [/^cisfon ekstra/, 'Chiffon Ekstra Keju'], [/^cisfon butter/, 'Chiffon Butter'], [/^cisfon keju/, 'Chiffon Keju'], [/^cisfon kurma/, 'Chiffon Kurma'], [/^roti manis sosis/, 'Roti Sosis'], [/^roti manis abon/, 'Roti Abon'], [/^roti manis coklat meses/, 'Roti Coklat'], [/^roti manis coklat keju/, 'Roti Coklat Keju'], [/^roti manis coklat pisang/, 'Roti Coklat Pisang'], [/^roti manis vanilla/, 'Roti Vanilla']];
+function wasteItemColumns(header, nominalCol) {
+ const cols = []; let label = null;
+ for (let i = 2; i < nominalCol; i++) {
+  const h = String(header[i] || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (/^h-[23]$/.test(h)) { if (label) cols.push([i, label]); continue; }
+  label = WASTE_ITEM_LABELS.find(([re]) => re.test(h))?.[1] || null;
+  if (label) cols.push([i, label]);
+ }
+ return cols;
+}
+function solveUnits(rows, labels) {
+ const n = labels.length, A = Array.from({ length: n }, (_, i) => Array.from({ length: n + 1 }, (_, j) => (i === j ? 1e-6 : 0)));
+ for (const [pcs, y] of rows) for (let i = 0; i < n; i++) { if (!pcs[i]) continue; A[i][n] += pcs[i] * y; for (let j = 0; j < n; j++) A[i][j] += pcs[i] * pcs[j]; }
+ for (let c = 0; c < n; c++) {
+  let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+  [A[c], A[p]] = [A[p], A[c]];
+  for (let r = 0; r < n; r++) { if (r === c || !A[r][c]) continue; const f = A[r][c] / A[c][c]; for (let k = c; k <= n; k++) A[r][k] -= f * A[c][k]; }
+ }
+ return Object.fromEntries(labels.map((l, i) => [l, Math.max(0, Math.round(A[i][n] / A[i][i]))]));
+}
+export function parseWasteItems(input, getId) {
+ const rows = toRows(input), nominalCol = wasteNominalColumn(rows), cols = wasteItemColumns(rows[0] || [], nominalCol), labels = [...new Set(cols.map(c => c[1]))], at = new Map(labels.map((l, i) => [l, i]));
+ const parsed = [];
+ for (let i = 1; i < rows.length; i++) {
+  const r = rows[i]; if (!r[0] || !r[1]) continue;
+  const date = parseIsoDate(r[0]), id = getId(r[1]); if (!date || !id) continue;
+  const pcs = labels.map(() => 0); for (const [c, l] of cols) pcs[at.get(l)] += num(r[c]) || 0;
+  parsed.push({ date, id, pcs, nominal: num(r[nominalCol]) || 0 });
+ }
+ const units = solveUnits(parsed.filter(x => x.nominal > 0 && x.pcs.some(Boolean)).slice(-1500).map(x => [x.pcs, x.nominal]), labels), out = {};
+ for (const x of parsed) {
+  if (!x.pcs.some(Boolean)) continue;
+  const raw = labels.map((l, i) => x.pcs[i] * (units[l] || 0)), sum = raw.reduce((a, b) => a + b, 0), count = x.pcs.reduce((a, b) => a + b, 0);
+  const day = out[x.date] || (out[x.date] = {}), entry = day[x.id] || (day[x.id] = {});
+  labels.forEach((l, i) => { if (!x.pcs[i]) return; const nom = sum > 0 ? raw[i] * (x.nominal > 0 ? x.nominal / sum : 1) : x.nominal * x.pcs[i] / count; const e = entry[l] || (entry[l] = [0, 0]); e[0] += x.pcs[i]; e[1] = Math.round((e[1] + nom) * 100) / 100; });
+ }
+ return out;
+}
+
 // Format lebar: baris tanggal (kolom 1, 11, 21, ... = awal blok 10 kolom per tanggal),
 // data outlet mulai baris ke-4 (indeks 3). Kolom terakhir tiap blok (offset+9) = menit
 // kehabisan -- posisi ini sudah dipakai & terverifikasi oleh performance-summary.mjs versi
@@ -191,9 +233,9 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
  // Template bulan berjalan sudah berisi 0 untuk tanggal yang BELUM terjadi (bukan data real
  // "tidak ada lost sales") -- buang tanggal setelah hari ini supaya tidak jadi angka palsu.
  for (const date of Object.keys(lostSales)) if (date > today) delete lostSales[date];
- let waste = { ...(previous?.waste || {}) }, wasteFresh = false;
+ let waste = { ...(previous?.waste || {}) }, wasteItems = { ...(previous?.wasteItems || {}) }, wasteFresh = false;
  const wasteResult = await wastePromise;
- if (wasteResult.rows) { Object.assign(waste, parseWasteTab(wasteResult.rows, getId)); wasteFresh = true; }
+ if (wasteResult.rows) { Object.assign(waste, parseWasteTab(wasteResult.rows, getId)); Object.assign(wasteItems, parseWasteItems(wasteResult.rows, getId)); wasteFresh = true; }
  else console.log('Tab WASTE belum terbaca (' + wasteResult.error.message + '); pakai waste tersimpan.');
  console.log(`Rekap sheet: waste ${wasteFresh ? 'baru' : 'tersimpan'}, lost sales dari ${monthsUsed.length ? monthsUsed.join(', ') : 'data tersimpan'} (via ${process.env.GOOGLE_SHEETS_API_KEY ? 'Sheets API' : 'gviz'}).`);
  if (!wasteFresh && !monthsUsed.length && previous) throw Error('Sheet rekap tidak terbaca sama sekali di run ini.');
@@ -206,6 +248,7 @@ export async function pull(sheetId, profiles, { now = new Date(), previous = nul
   lossMethod: 'Menit kehabisan dari sheet / hari / 12 jam buka -- asumsi penjualan merata.',
   lostSalesMonthTabsUsed: monthsUsed,
   waste,
+  wasteItems,
   lostSalesMinutes: lostSales,
  };
 }

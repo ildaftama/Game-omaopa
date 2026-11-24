@@ -97,7 +97,7 @@ export async function refreshOffice({ read, write, data }) {
   schedule = Object.fromEntries(Object.entries(schedule).filter(([d]) => d >= floor).sort());
   let status = cur.status || null;
   if (data?.recap) status = computeStatus({ ...data, thresholds: await readThresholds() });
-  const next = { schemaVersion: 1, kind: 'office', sheetId: cur.sheetId, people: cur.people, schedule, status, scheduleOk, scheduleAt: scheduleOk ? new Date().toISOString() : cur.scheduleAt || null };
+  const next = { schemaVersion: 1, kind: 'office', ...(cur.dailyFolder ? { dailyFolder: cur.dailyFolder } : {}), sheetId: cur.sheetId, people: cur.people, schedule, status, scheduleOk, scheduleAt: scheduleOk ? new Date().toISOString() : cur.scheduleAt || null };
   await write(OFFICE_KEY, { ...next, updatedAt: new Date().toISOString() });
   console.log('Data Kantor Mini diperiksa: ' + Object.keys(schedule).length + ' hari jadwal.');
   return true;

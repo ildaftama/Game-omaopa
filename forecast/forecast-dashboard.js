@@ -1473,5 +1473,5 @@ window.ForecastDashboard=(()=>{
   const net={wastePct:all.wd>=MIN_RECAP_DAYS&&all.wr>0?all.wn/all.wr*100:null,lostPct:all.ld>0&&lDates.length>=MIN_RECAP_DAYS?all.lm/all.ld/OPEN_MINUTES*100:null,lostPerDay:all.ld>0&&lDates.length>=MIN_RECAP_DAYS?all.lm/all.ld:null};
   return {net,byOutlet:new Map([...by].map(([id,r])=>[id,pctOf(r)])),wasteThreshold:WASTE_THRESHOLD,lostThreshold:LOST_SALES_THRESHOLD,wasteFrom:wDates[0]||null,wasteTo:wDates.at(-1)||null,lostFrom:lDates[0]||null,lostTo:lDates.at(-1)||null};
  }
- return {render,inspect,change,mount,click,predict,insight,recentWasteLost};
+ return {render,inspect,change,mount,click,predict,insight,recentWasteLost,grossSeries:()=>dailyOutletProductSeries()};
 })();

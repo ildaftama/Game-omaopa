@@ -4,7 +4,8 @@ import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { pull as pullDailyRecap, recapSource } from './waste-recap.mjs';
 import { buildDemographics } from './customer-demographics.mjs';
-import { refreshOffice } from './office-status.mjs';
+import { refreshOffice, OFFICE_KEY } from './office-status.mjs';
+import { pullDailyStock } from './daily-stock.mjs';
 
 // Nightly ESB -> private reference bundle sync (feature: otomasi ESB malam hari).
 //
@@ -178,7 +179,10 @@ export async function run(env = process.env, salesPath = 'forecast/pcs-sales.jso
   const dailyRecap = await fetchDailyRecap(current.globals?.OUTLET_INTELLIGENCE, current.globals?.DAILY_RECAP_SUMMARY) || current.globals?.DAILY_RECAP_SUMMARY || null;
   const demographics = await fetchDemographics(env, current.globals?.CUSTOMER_DEMOGRAPHICS);
   const modelSplit = readModelSplit();
-  const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}), ...(demographics ? { CUSTOMER_DEMOGRAPHICS: demographics } : {}), ...(modelSplit ? { FORECAST_MODEL_SPLIT: modelSplit } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders } };
+  let stockDaily = current.globals?.STOCK_DAILY || null;
+  try { const office = await readSmallDoc(OFFICE_KEY, idToken); if (office?.dailyFolder) stockDaily = await pullDailyStock(office.dailyFolder, stockDaily); }
+  catch { console.log('Daily Report belum terbaca, memakai data tersimpan.'); }
+  const full = { ...current, globals: { ...current.globals, ...(dailyRecap ? { DAILY_RECAP_SUMMARY: dailyRecap } : {}), ...(demographics ? { CUSTOMER_DEMOGRAPHICS: demographics } : {}), ...(modelSplit ? { FORECAST_MODEL_SPLIT: modelSplit } : {}), ...(stockDaily ? { STOCK_DAILY: stockDaily } : {}) }, files: { ...current.files, 'pcs-sales.json': sales, 'pcs-orders.json': orders } };
   const packedFull = packBundle(full);
   await writeBundle('forecastPlans', 'reference', 'reference-manifest', 'reference-chunk', packedFull, idToken, uid);
   console.log('Bundle referensi penuh tersimpan: ' + packedFull.chunks.length + ' chunk.');
