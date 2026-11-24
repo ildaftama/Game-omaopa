@@ -25,9 +25,9 @@ function forecastPlanner() {
 }
 // Data Analis hanya membaca.
 function forecastViewer() {
-  return forecastPlanner() || forecastUserIn(['analyst','esbadmin']);
+  return forecastPlanner() || forecastUserIn(['analyst','esbadmin','guest']);
 }
-// Tamu (pihak luar): hanya chat, status online, daftar nama, dan Kantor. Tanpa data.
+// Chat, status online, daftar nama, dan Kantor (tamu kini juga melihat data lewat forecastViewer).
 function forecastCommunity() {
   return forecastViewer() || forecastUserIn(['guest']);
 }

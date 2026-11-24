@@ -141,7 +141,6 @@ $('#workspace-content').addEventListener('touchmove',touchInspect,{passive:true}
 window.addEventListener('pcs-selection-changed',()=>{if(['pcs','orders'].includes(focus))schedule();});
 // Performa forecaster (owner 2026-11-24): tab utama paling kanan, khusus Master, Factory Manager, SPV.
 if(!window.ForecastRolePolicy?.fullSettings?.(window.ForecastAuth?.role)){const pf=document.querySelector('[data-focus="perf"]');if(pf)pf.hidden=true;}
-if(window.ForecastRolePolicy?.guestOnly?.(window.ForecastAuth?.role)){document.querySelectorAll('[data-focus]').forEach(b=>{if(b.dataset.focus!=='office')b.hidden=true;});focus='office';schedule();}
 window.addEventListener('forecast-perf-render',()=>{if(focus==='perf')schedule();});
 window.addEventListener('pcs-data-loaded',()=>{if(['pcs','orders','forecast','dashboard','wastelost','perf'].includes(focus))schedule();});
 window.addEventListener('forecast-operations-changed',()=>{if(['forecast','access','dashboard'].includes(focus))schedule();});

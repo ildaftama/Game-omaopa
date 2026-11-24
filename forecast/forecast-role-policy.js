@@ -9,10 +9,10 @@
   planner:r=>!!r&&(r.admin===true||r.super===true||r.master===true||r.forecaster===true),
   forecasterOnly:r=>!!r&&r.forecaster===true&&r.admin!==true&&r.super!==true&&r.master!==true,
   // Boleh membuka web Forecast. Data Analis hanya melihat.
-  viewer:r=>api.planner(r)||(!!r&&(r.analyst===true||r.esbadmin===true)),
-  // Boleh masuk web. Tamu (pihak luar) hanya Kantor Agen AI dan chat, tanpa data.
-  member:r=>api.viewer(r)||(!!r&&r.guest===true),
-  guestOnly:r=>!!r&&r.guest===true&&!api.viewer(r),
+  // Data Analis, Admin ESB, dan Tamu (pihak outlet, owner 2026-11-24) melihat semua data tanpa mengubah.
+  viewer:r=>api.planner(r)||(!!r&&(r.analyst===true||r.esbadmin===true||r.guest===true)),
+  member:r=>api.viewer(r),
+  guestOnly:()=>false,
   // Boleh mengubah pengaturan (ambang batas, produk, tampilan, sumber data).
   settingsEditor:r=>api.planner(r)&&r.noSettings!==true,
   // Boleh membuka bagian yang dulu khusus Master (Data pendukung, Eksperimen).
