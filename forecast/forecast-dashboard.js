@@ -600,7 +600,7 @@ window.ForecastDashboard=(()=>{
    const e=byDate.get(row.date)||{sum:0,known:0,net:0,netKnown:0};
    if(row.complete){
     for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
-    e.known++;if(Number.isFinite(row.netSales)){e.net+=row.netSales;e.netKnown++;}
+    e.known++;if(row.netVersion===2&&Number.isFinite(row.netSales)){e.net+=row.netSales;e.netKnown++;}
    }
    byDate.set(row.date,e);
   }
@@ -761,13 +761,14 @@ window.ForecastDashboard=(()=>{
   // - real hari yang semua outletnya punya netSales = net sales ESB persis (pesanan/reguler dibagi
   //   proporsional);
   // - prediksi & rencana tim TIDAK diubah (owner 2026-11-25: "prediksinya gk usah kamu ubah").
-  // - rasio net/kotor 28 hari (netRatio) hanya dipakai untuk omzet sementara hari ini kalau tarikan
-  //   belum membawa netSales, dan untuk hari real tanpa netSales.
+  // - Koreksi 2026-11-25 sore: netSales lama (sales-menu-cogs tanpa paket) ~20% terlalu rendah, jadi
+  //   hanya baris netVersion 2 (ringkasan pembayaran = Net Sales ESB asli) yang dipakai. Hari tanpa
+  //   itu tetap PCS x harga apa adanya (24 Nov: Rp41,03 jt vs Net Sales ESB Rp41,05 jt).
   // Rasio terukur 10-24 Nov: 0,77-0,81 (diskon + menu di luar 12 produk inti).
   const netDays=[...byDate.entries()].filter(([d,e])=>d<todayStr&&e.known>0&&e.netKnown===e.known&&e.sum>0).map(([d,e])=>({d,net:e.net,gross:e.sum})).sort((a,b)=>a.d.localeCompare(b.d));
   const dayRatio=new Map(netDays.map(x=>[x.d,x.net/x.gross])),ratioCache=new Map();
   const ratioBefore=date=>{if(ratioCache.has(date))return ratioCache.get(date);const prev=netDays.filter(x=>x.d<date).slice(-28),src=prev.length>=7?prev:netDays.slice(0,28);let n=0,g=0;for(const x of src){n+=x.net;g+=x.gross;}const k=g>0?n/g:1;ratioCache.set(date,k);return k;};
-  const kA=date=>dayRatio.has(date)?dayRatio.get(date):ratioBefore(date);
+  const kA=date=>dayRatio.has(date)?dayRatio.get(date):1;
   const kF=date=>ratioBefore(lastActual&&date>lastActual?planner.shift(lastActual,1):date);
   const conv=(v,k)=>v==null?null:v*k;
   const rows=rowsGross.map(r=>{const a=kA(r.date);return {...r,actualPure:conv(r.actualPure,a),actualTotal:conv(r.actualTotal,a),actualPesanan:conv(r.actualPesanan,a),};});
@@ -1380,9 +1381,9 @@ window.ForecastDashboard=(()=>{
  // Omzet sementara hari ini = net sales ESB kalau semua outlet tarikan membawa netSales (sejak
  // 2026-11-25); tarikan lama tanpa netSales: PCS x harga x rasio net/kotor terkini.
  function liveNet(rows,trend){
-  if(rows.length&&rows.every(r=>Number.isFinite(r.netSales)))return rows.reduce((s,r)=>s+r.netSales,0);
+  if(rows.length&&rows.every(r=>r.netVersion===2&&Number.isFinite(r.netSales)))return rows.reduce((s,r)=>s+r.netSales,0);
   let sum=0;for(const r of rows)for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,r.id,p);if(v!=null)sum+=(r.qty?.[p]||0)*v;}
-  return sum*(trend?.netRatio||1);
+  return sum;
  }
  function todaySnapshot(){const it=intradayNow();if(!it)return null;const all=revenueTrend('__all__'),sum=liveNet(it.rows,all);const pred=all?.rows.find(x=>x.date===it.date)?.forecastTotal;return {sum,pct:pred>0?sum/pred*100:null,outlets:it.rows.length,asOf:it.asOf};}
  function render(outletId){

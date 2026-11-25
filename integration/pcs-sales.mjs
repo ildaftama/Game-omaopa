@@ -104,6 +104,12 @@ export async function collectJobs(jobs,client){
    if(report.count!==0||!await verifiedZero(job))throw Error('Laporan kosong belum terkonfirmasi.');
    results.push({date:job.date,id:job.id,qty:PRODUCTS.map(()=>0),free:PRODUCTS.map(()=>0),mappingVersion:MAPPING_VERSION,netSales:0,complete:true,verifiedZero:'empty-menu-and-zero-sales-ledger'});
   }else results.push({date:job.date,id:job.id,...summarize(report.rows,job),complete:true});
+  // Net Sales ESB yang dilihat owner (owner 2026-11-25) = total laporan ringkasan pembayaran per
+  // outlet-hari. Terukur sama persis dengan sales-menu-cogs showMenuPackage=1 (25 Nov s.d. 17.39:
+  // Rp41.492.800, 28/28 outlet); netSales dari summarize() (showMenuPackage=0) tidak memuat
+  // penjualan paket (~20% lebih rendah). netVersion 2 = angka yang benar; gagal -> tanpa netVersion.
+  if(job.branchCode){try{const pay=await client.report('sales-payment-summary',{salesDate:job.date,branchCode:String(job.branchCode)});
+   if(Array.isArray(pay)){let n=0;for(const x of pay)for(const p of x?.payments||[])if(Number.isFinite(p?.paymentAmount))n+=p.paymentAmount;const last=results.at(-1);if(last?.complete){last.netSales=n;last.netVersion=2;}}}catch{}}
  }catch(error){results.push({date:job.date,id:job.id,complete:false,reason:/menu kue baru/.test(error.message)?'unmapped-menu':/kosong/.test(error.message)?'empty-unverified':String(error.message).match(/HTTP \d{3}/)?.[0]||'unavailable',...(error.unmappedMenus?{unmappedMenus:error.unmappedMenus}:{})});}
  if(results.length%28===0)console.log('Laporan outlet diperiksa: '+results.length+'/'+jobs.length);
  if(results.at(-1)?.unmappedMenus?.length)console.log('::warning::MENU_BELUM_DIPETAKAN '+job.date+' '+job.id+' '+JSON.stringify(results.at(-1).unmappedMenus));
@@ -129,7 +135,7 @@ export function keepIntraday(previous,map){
  return out;
 }
 export function mergeIntraday(previous,results,date,asOf){
- const rows=results.filter(r=>r.complete).map(r=>({id:r.id,qty:r.qty,netSales:r.netSales}));
+ const rows=results.filter(r=>r.complete).map(r=>({id:r.id,qty:r.qty,netSales:r.netSales,...(r.netVersion?{netVersion:r.netVersion}:{})}));
  const log=[...(previous?.intradayLog||[]),{date,asOf,net:Object.fromEntries(rows.map(r=>[r.id,r.netSales]))}];
  const floor=new Date(Date.parse(date+'T00:00:00Z')-60*86400000).toISOString().slice(0,10);
  return {...previous,intraday:{date,asOf,rows,expected:results.length},intradayLog:log.filter(x=>x.date>=floor)};
