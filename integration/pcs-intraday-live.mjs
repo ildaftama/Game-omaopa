@@ -12,7 +12,7 @@ import {refreshOffice} from './office-status.mjs';
 // Outlet yang gagal terbaca kali ini tetap memakai angka tarikan sebelumnya pada hari yang sama.
 export function mergeLive(previous,results,date,asOf){
  const rows=new Map(previous?.date===date&&Array.isArray(previous.rows)?previous.rows.map(r=>[r.id,r]):[]);
- for(const r of results)if(r.complete)rows.set(r.id,{id:r.id,qty:r.qty});
+ for(const r of results)if(r.complete)rows.set(r.id,{id:r.id,qty:r.qty,...(Number.isFinite(r.netSales)?{netSales:r.netSales}:{})});
  return {schemaVersion:1,kind:'intraday-live',date,asOf,expected:results.length,rows:[...rows.values()].sort((a,b)=>a.id.localeCompare(b.id))};
 }
 export function inWindow(now=new Date()){

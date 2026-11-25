@@ -597,10 +597,10 @@ window.ForecastDashboard=(()=>{
   const byDate=new Map();
   for(const row of panels.sales.days){
    if(!list.includes(row.id))continue;
-   const e=byDate.get(row.date)||{sum:0,known:0};
+   const e=byDate.get(row.date)||{sum:0,known:0,net:0,netKnown:0};
    if(row.complete){
     for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
-    e.known++;
+    e.known++;if(Number.isFinite(row.netSales)){e.net+=row.netSales;e.netKnown++;}
    }
    byDate.set(row.date,e);
   }
@@ -753,7 +753,25 @@ window.ForecastDashboard=(()=>{
    return date=>byPlanDate.has(date)?byPlanDate.get(date):null;
   })();
   const t=today(),ym=t.slice(0,7),ymNext=addMonth(ym),dates=[...monthDates(ym),...monthDates(ymNext)];
-  const rows=dates.map(date=>({date,actualPure:actualPureByDate.has(date)?actualPureByDate.get(date):null,actualTotal:actualAt(date),actualPesanan:actualPesananByDate.has(date)?actualPesananByDate.get(date):null,forecastPure:forecastPureAt(date),forecastTotal:forecastTotalAt(date),plan:planAt(date)}));
+  const rowsGross=dates.map(date=>({date,actualPure:actualPureByDate.has(date)?actualPureByDate.get(date):null,actualTotal:actualAt(date),actualPesanan:actualPesananByDate.has(date)?actualPesananByDate.get(date):null,forecastPure:forecastPureAt(date),forecastTotal:forecastTotalAt(date),plan:planAt(date)}));
+  // ---- Omzet = NET SALES ESB (owner 2026-11-25: "omzet itu ada di net sales, patokannya sana") ----
+  // Mesin prediksi tetap belajar dari PCS x harga (net sales ESB baru tersimpan sejak ~22 Okt 2026,
+  // riwayat 2025 untuk pola tahun lalu hanya ada PCS x harga) dan predict() untuk pembagian target
+  // di Buat forecast tetap memakai skala itu (rowsGross). Yang DITAMPILKAN dikonversi ke net sales:
+  // - real hari yang semua outletnya punya netSales = net sales ESB persis (pesanan/reguler dibagi
+  //   proporsional);
+  // - prediksi & rencana tim = skala PCS x harga x rasio net/kotor 28 hari ber-net-sales sebelum
+  //   tanggal itu (min 7 hari; tanggal mendatang memakai rasio s.d. hari real terakhir), jadi
+  //   prediksi tanggal lewat tidak ikut melihat real hari itu.
+  // Rasio terukur 10-24 Nov: 0,77-0,81 (diskon + menu di luar 12 produk inti).
+  const netDays=[...byDate.entries()].filter(([d,e])=>d<todayStr&&e.known>0&&e.netKnown===e.known&&e.sum>0).map(([d,e])=>({d,net:e.net,gross:e.sum})).sort((a,b)=>a.d.localeCompare(b.d));
+  const dayRatio=new Map(netDays.map(x=>[x.d,x.net/x.gross])),ratioCache=new Map();
+  const ratioBefore=date=>{if(ratioCache.has(date))return ratioCache.get(date);const prev=netDays.filter(x=>x.d<date).slice(-28),src=prev.length>=7?prev:netDays.slice(0,28);let n=0,g=0;for(const x of src){n+=x.net;g+=x.gross;}const k=g>0?n/g:1;ratioCache.set(date,k);return k;};
+  const kA=date=>dayRatio.has(date)?dayRatio.get(date):ratioBefore(date);
+  const kF=date=>ratioBefore(lastActual&&date>lastActual?planner.shift(lastActual,1):date);
+  const conv=(v,k)=>v==null?null:v*k;
+  const rows=rowsGross.map(r=>{const a=kA(r.date),f=kF(r.date);return {...r,actualPure:conv(r.actualPure,a),actualTotal:conv(r.actualTotal,a),actualPesanan:conv(r.actualPesanan,a),forecastPure:conv(r.forecastPure,f),forecastTotal:conv(r.forecastTotal,f),plan:conv(r.plan,f)};});
+  const netRatio=kF(t);
   // Satu angka ringkas pengganti paragraf metodologi: berapa persen pesanan biasanya menambah
   // omzet murni, dipakai sebagai catatan singkat di bawah grafik.
   const pesananUpliftPct=pureEngine.baselineLevel>0&&pesananEngine.baselineLevel!=null?pesananEngine.baselineLevel/pureEngine.baselineLevel*100:null;
@@ -764,7 +782,7 @@ window.ForecastDashboard=(()=>{
    for(let k=1;k<=84;k++){const d=planner.shift(end,-k);if(new Date(d+'T12:00:00Z').getUTCDay()!==wd)continue;const a=pureVal.get(d),f=frozenAt(d).pure;if(a==null||f==null||!(a>0))continue;A+=a;F+=f;n++;if(f>a)over++;}
    return n?{wd,n,over,biasPct:(F/A-1)*100,calibPct:(calib(date)-1)*100}:null;
   }
-  return {weekdayBias,rows,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct,yoyGrowth:pureEngine.yoyGrowth,trendNow,trendDriver,trendContext};
+  return {weekdayBias,rows,rowsGross,netRatio,ym,ymNext,today:t,lastActual,hasHistory:totalSeries.length>=14,hasPlan:rows.some(r=>r.plan!=null),pesananUpliftPct,yoyGrowth:pureEngine.yoyGrowth,trendNow,trendDriver,trendContext};
  }
 
  // actualTotal/forecastTotal/plan = garis utama (tebal, warna pekat, selalu tampil default).
@@ -1323,7 +1341,7 @@ window.ForecastDashboard=(()=>{
     plan.F+=pf;plan.A+=pa;plan.E+=pe;plan.n++;
     if(c.hasShipped){ship.F+=sf;ship.A+=pa;ship.E+=se;ship.n++;}
    }
-   const add=(o,label,verb,empty)=>rows.push(o.n&&o.A>0?{label,sub:`${o.n} rencana`,acc:Math.max(0,100-o.E/o.A*100),bias:(o.F-o.A)/o.A*100,F:o.F,A:o.A,verb}:{label,empty});
+   const add=(o,label,verb,empty)=>rows.push(o.n&&o.A>0?{label,sub:`${o.n} rencana`,acc:Math.max(0,100-o.E/o.A*100),bias:(o.F-o.A)/o.A*100,F:o.F*(trend.netRatio||1),A:o.A*(trend.netRatio||1),verb}:{label,empty});
    add(plan,'Rencana forecaster (awal)','rencana','Belum ada rencana bulan ini');
    add(ship,'Pengiriman real','kiriman','Jumlah kiriman real belum dicatat');
   }
@@ -1354,12 +1372,19 @@ window.ForecastDashboard=(()=>{
  function intradayInner(trend,outletId){
   const it=intradayNow();if(!it)return '';
   const ids=outletIds(outletId,window.PcsPanels.data().sales),rows=it.rows.filter(r=>ids.includes(r.id));if(!rows.length)return '';
-  let sum=0;for(const r of rows)for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,r.id,p);if(v!=null)sum+=(r.qty?.[p]||0)*v;}
+  const sum=liveNet(rows,trend);
   const pred=trend.rows.find(x=>x.date===it.date)?.forecastTotal,jam=new Date(it.asOf).toLocaleTimeString('id-ID',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit'});
   const pct=pred>0?sum/pred*100:null;
   return `<div class="fd-today"><div><span>Omzet real hari ini · sementara s.d. ${esc(jam)} WIB</span><strong>Rp${Math.round(sum).toLocaleString('id-ID')}</strong></div><div><span>Prediksi hari ini</span><strong>${pred?'Rp'+Math.round(pred).toLocaleString('id-ID'):'—'}</strong></div><div><span>Tercapai</span><strong>${pct==null?'—':pct.toLocaleString('id-ID',{maximumFractionDigits:0})+'%'}</strong></div><small>${rows.length}/${ids.length} outlet terbaca. Outlet umumnya tutup 20.00 — diperbarui tiap jam, angka final masuk mulai 19.00 s.d. 22.00.</small></div>`;
  }
- function todaySnapshot(){const it=intradayNow();if(!it)return null;const trend=lastTrend||revenueTrend('__all__');let sum=0;for(const r of it.rows)for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,r.id,p);if(v!=null)sum+=(r.qty?.[p]||0)*v;}const pred=revenueTrend('__all__')?.rows.find(x=>x.date===it.date)?.forecastTotal;return {sum,pct:pred>0?sum/pred*100:null,outlets:it.rows.length,asOf:it.asOf};}
+ // Omzet sementara hari ini = net sales ESB kalau semua outlet tarikan membawa netSales (sejak
+ // 2026-11-25); tarikan lama tanpa netSales: PCS x harga x rasio net/kotor terkini.
+ function liveNet(rows,trend){
+  if(rows.length&&rows.every(r=>Number.isFinite(r.netSales)))return rows.reduce((s,r)=>s+r.netSales,0);
+  let sum=0;for(const r of rows)for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,r.id,p);if(v!=null)sum+=(r.qty?.[p]||0)*v;}
+  return sum*(trend?.netRatio||1);
+ }
+ function todaySnapshot(){const it=intradayNow();if(!it)return null;const all=revenueTrend('__all__'),sum=liveNet(it.rows,all);const pred=all?.rows.find(x=>x.date===it.date)?.forecastTotal;return {sum,pct:pred>0?sum/pred*100:null,outlets:it.rows.length,asOf:it.asOf};}
  function render(outletId){
   applySettings();
   const show=window.ForecastSettings?.get().display||{trend:true,wasteLost:true,accuracy:true,weather:true,events:true,operations:true};
@@ -1456,7 +1481,7 @@ window.ForecastDashboard=(()=>{
   return `<article class="workspace-card fd-brief"><div class="fd-brief-head"><span class="micro-label">RINGKASAN${outletId==='__all__'?' · SEMUA OUTLET':''}</span><button type="button" class="button fp-primary" data-go="forecast" data-fp-mode="topdown">Buat forecast →</button></div><div class="fd-kpis">${kpis}</div>${outletId==='__all__'?att:''}</article>`;
  }
  function insight(date){try{return revenueTrend('__all__')?.weekdayBias?.(date)||null;}catch{return null;}}
- function predict(date){try{const r=revenueTrend('__all__')?.rows.find(x=>x.date===date);return r?{pure:r.forecastPure,total:r.forecastTotal}:null;}catch{return null;}}
+ function predict(date){try{const r=revenueTrend('__all__')?.rowsGross.find(x=>x.date===date);return r?{pure:r.forecastPure,total:r.forecastTotal}:null;}catch{return null;}}
  // Dipakai saran buffer "Forecast dari omzet": waste (sheet WASTE, nominal / omzet ESB) dan
  // menit habis stok (sheet rekap) untuk N TANGGAL TERAKHIR YANG SUDAH DIISI tim (bukan N hari
  // kalender -- sheet sering telat 1-3 hari), jaringan & per outlet. Sama aturannya dengan kartu
