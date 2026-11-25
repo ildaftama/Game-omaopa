@@ -30,3 +30,12 @@
 .fc-err{margin:0;padding:0 14px 8px;color:#b3402f;font-size:12px}
 .fc-err:empty{display:none}
 @media(max-width:640px){.fc{right:12px;bottom:12px}.fc-panel{position:fixed;right:8px;left:8px;bottom:78px;width:auto;height:calc(100vh - 100px)}}
+/* Edit pesan (owner 2026-11-25) */
+.fc-meta button.fc-edit{color:#2f6f86}
+.fc-meta em{font-style:normal;color:#8a97a5}
+.fc-editbox{margin-top:5px;display:flex;flex-direction:column;gap:5px}
+.fc-editbox textarea{width:100%;box-sizing:border-box;min-height:52px;resize:vertical;border:1px solid #9cc3cf;border-radius:8px;padding:6px 8px;font:inherit;font-size:13.5px}
+.fc-editbox div{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px;color:#6d7d8d}
+.fc-editbox button{border:0;border-radius:7px;padding:5px 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;background:#e7edf1;color:#22313f}
+.fc-editbox button[data-fc-save]{background:#2f6f86;color:#fff}
+.fc-editbox button:disabled{opacity:.5;cursor:default}

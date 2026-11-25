@@ -1,7 +1,7 @@
 'use strict';
 import {getApps,getApp,initializeApp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,EmailAuthProvider,reauthenticateWithCredential,updatePassword} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
-import {getFirestore,doc,getDoc,getDocs,setDoc,deleteDoc,collection,onSnapshot,writeBatch,serverTimestamp,query,where,orderBy,limit,Timestamp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+import {getFirestore,doc,getDoc,getDocs,setDoc,updateDoc,deleteDoc,collection,onSnapshot,writeBatch,serverTimestamp,query,where,orderBy,limit,Timestamp} from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
 const app=getApps().some(a=>a.name==='[DEFAULT]')?getApp():initializeApp({apiKey:'AIzaSyAJ8gae4YgP8FOk1VAA6EC2dFlwhzhV9wg',authDomain:'oma-opa-game.firebaseapp.com',projectId:'oma-opa-game',appId:'1:737187594894:web:07e8fdd4dbb2e5fa903fdf'});
 if(/[?&](password|pin|id|loginid)=/.test(location.search))history.replaceState(null,'',location.pathname+location.hash);
 const auth=getAuth(app),db=getFirestore(app),gate=document.getElementById('forecast-access-gate'),root=document.getElementById('forecast-app');
@@ -160,6 +160,7 @@ window.ForecastChatAPI={
  listen(cb){return onSnapshot(query(chatCol,where('at','>=',Timestamp.fromMillis(Date.now()-30*DAY)),orderBy('at','desc'),limit(300)),s=>cb(s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})).reverse()),()=>cb(null));},
  send(text){const t=String(text).trim().slice(0,1000);if(!t||!auth.currentUser)return Promise.resolve();return setDoc(doc(chatCol),{uid:auth.currentUser.uid,name:myName(),text:t,at:serverTimestamp(),expireAt:Timestamp.fromMillis(Date.now()+30*DAY)});},
  remove(id){return deleteDoc(doc(db,'forecastChat',id));},
+ edit(id,text){const t=String(text).trim().slice(0,1000);if(!t)return Promise.reject(Error('kosong'));return updateDoc(doc(db,'forecastChat',id),{text:t,editedAt:serverTimestamp()});},
  async cleanup(){const s=await getDocs(query(chatCol,where('expireAt','<',Timestamp.now()),limit(100)));await Promise.all(s.docs.map(d=>deleteDoc(d.ref).catch(()=>{})));},
  listenPresence(cb){return onSnapshot(collection(db,'forecastPresence'),s=>cb(s.docs.map(d=>({uid:d.id,...d.data({serverTimestamps:'estimate'})}))),()=>cb(null));},
 };
