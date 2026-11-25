@@ -760,9 +760,9 @@ window.ForecastDashboard=(()=>{
   // di Buat forecast tetap memakai skala itu (rowsGross). Yang DITAMPILKAN dikonversi ke net sales:
   // - real hari yang semua outletnya punya netSales = net sales ESB persis (pesanan/reguler dibagi
   //   proporsional);
-  // - prediksi & rencana tim = skala PCS x harga x rasio net/kotor 28 hari ber-net-sales sebelum
-  //   tanggal itu (min 7 hari; tanggal mendatang memakai rasio s.d. hari real terakhir), jadi
-  //   prediksi tanggal lewat tidak ikut melihat real hari itu.
+  // - prediksi & rencana tim TIDAK diubah (owner 2026-11-25: "prediksinya gk usah kamu ubah").
+  // - rasio net/kotor 28 hari (netRatio) hanya dipakai untuk omzet sementara hari ini kalau tarikan
+  //   belum membawa netSales, dan untuk hari real tanpa netSales.
   // Rasio terukur 10-24 Nov: 0,77-0,81 (diskon + menu di luar 12 produk inti).
   const netDays=[...byDate.entries()].filter(([d,e])=>d<todayStr&&e.known>0&&e.netKnown===e.known&&e.sum>0).map(([d,e])=>({d,net:e.net,gross:e.sum})).sort((a,b)=>a.d.localeCompare(b.d));
   const dayRatio=new Map(netDays.map(x=>[x.d,x.net/x.gross])),ratioCache=new Map();
@@ -770,7 +770,7 @@ window.ForecastDashboard=(()=>{
   const kA=date=>dayRatio.has(date)?dayRatio.get(date):ratioBefore(date);
   const kF=date=>ratioBefore(lastActual&&date>lastActual?planner.shift(lastActual,1):date);
   const conv=(v,k)=>v==null?null:v*k;
-  const rows=rowsGross.map(r=>{const a=kA(r.date),f=kF(r.date);return {...r,actualPure:conv(r.actualPure,a),actualTotal:conv(r.actualTotal,a),actualPesanan:conv(r.actualPesanan,a),forecastPure:conv(r.forecastPure,f),forecastTotal:conv(r.forecastTotal,f),plan:conv(r.plan,f)};});
+  const rows=rowsGross.map(r=>{const a=kA(r.date);return {...r,actualPure:conv(r.actualPure,a),actualTotal:conv(r.actualTotal,a),actualPesanan:conv(r.actualPesanan,a),};});
   const netRatio=kF(t);
   // Satu angka ringkas pengganti paragraf metodologi: berapa persen pesanan biasanya menambah
   // omzet murni, dipakai sebagai catatan singkat di bawah grafik.
@@ -1341,7 +1341,7 @@ window.ForecastDashboard=(()=>{
     plan.F+=pf;plan.A+=pa;plan.E+=pe;plan.n++;
     if(c.hasShipped){ship.F+=sf;ship.A+=pa;ship.E+=se;ship.n++;}
    }
-   const add=(o,label,verb,empty)=>rows.push(o.n&&o.A>0?{label,sub:`${o.n} rencana`,acc:Math.max(0,100-o.E/o.A*100),bias:(o.F-o.A)/o.A*100,F:o.F*(trend.netRatio||1),A:o.A*(trend.netRatio||1),verb}:{label,empty});
+   const add=(o,label,verb,empty)=>rows.push(o.n&&o.A>0?{label,sub:`${o.n} rencana`,acc:Math.max(0,100-o.E/o.A*100),bias:(o.F-o.A)/o.A*100,F:o.F,A:o.A,verb}:{label,empty});
    add(plan,'Rencana forecaster (awal)','rencana','Belum ada rencana bulan ini');
    add(ship,'Pengiriman real','kiriman','Jumlah kiriman real belum dicatat');
   }
