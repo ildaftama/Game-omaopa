@@ -108,8 +108,12 @@ export async function collectJobs(jobs,client){
   // outlet-hari. Terukur sama persis dengan sales-menu-cogs showMenuPackage=1 (25 Nov s.d. 17.39:
   // Rp41.492.800, 28/28 outlet); netSales dari summarize() (showMenuPackage=0) tidak memuat
   // penjualan paket (~20% lebih rendah). netVersion 2 = angka yang benar; gagal -> tanpa netVersion.
-  if(job.branchCode){try{const pay=await client.report('sales-payment-summary',{salesDate:job.date,branchCode:String(job.branchCode)});
-   if(Array.isArray(pay)){let n=0;for(const x of pay)for(const p of x?.payments||[])if(Number.isFinite(p?.paymentAmount))n+=p.paymentAmount;const last=results.at(-1);if(last?.complete){last.netSales=n;last.netVersion=2;}}}catch{}}
+  // Dicoba sampai 4x dengan jeda (backfill 1-24 Nov pertama: ~13% gagal acak karena sesi ESB
+  // tertendang tarikan lain / dibatasi sesaat).
+  const last=results.at(-1);
+  if(job.branchCode&&last?.complete)for(let attempt=0;attempt<4;attempt++){try{const pay=await client.report('sales-payment-summary',{salesDate:job.date,branchCode:String(job.branchCode)});
+   if(Array.isArray(pay)){let n=0;for(const x of pay)for(const p of x?.payments||[])if(Number.isFinite(p?.paymentAmount))n+=p.paymentAmount;last.netSales=n;last.netVersion=2;break;}}catch{}
+   await (client.pause||(ms=>new Promise(r=>setTimeout(r,ms))))(1000*(attempt+1));}
  }catch(error){results.push({date:job.date,id:job.id,complete:false,reason:/menu kue baru/.test(error.message)?'unmapped-menu':/kosong/.test(error.message)?'empty-unverified':String(error.message).match(/HTTP \d{3}/)?.[0]||'unavailable',...(error.unmappedMenus?{unmappedMenus:error.unmappedMenus}:{})});}
  if(results.length%28===0)console.log('Laporan outlet diperiksa: '+results.length+'/'+jobs.length);
  if(results.at(-1)?.unmappedMenus?.length)console.log('::warning::MENU_BELUM_DIPETAKAN '+job.date+' '+job.id+' '+JSON.stringify(results.at(-1).unmappedMenus));
@@ -119,7 +123,9 @@ export async function collectJobs(jobs,client){
 export async function collect(branches,dates,client){return collectJobs(dates.flatMap(date=>branches.map(b=>({...b,date}))),client);}
 export function mergeSales(previous,results){
  const map=new Map((previous?.days||[]).map(r=>[r.date+'|'+r.id,r]));
- for(const r of results)if(r.complete){const key=r.date+'|'+r.id,old=map.get(key);if(!old||(r.mappingVersion||1)>=(old.mappingVersion||1))map.set(key,r);}
+ for(const r of results)if(r.complete){const key=r.date+'|'+r.id,old=map.get(key);if(!old||(r.mappingVersion||1)>=(old.mappingVersion||1)){
+  // Net Sales ESB asli (netVersion 2) yang sudah tersimpan tidak boleh tertimpa tarikan yang gagal mengambilnya.
+  map.set(key,r.netVersion!==2&&old?.netVersion===2&&Number.isFinite(old.netSales)?{...r,netSales:old.netSales,netVersion:2}:r);}}
  const failed=[...new Map([...(previous?.failed||[]),...results.filter(r=>!r.complete)].filter(r=>!map.has(r.date+'|'+r.id)).map(r=>[r.date+'|'+r.id,{date:r.date,id:r.id,...(r.reason?{reason:r.reason}:{}),...(r.unmappedMenus?.length?{unmappedMenus:r.unmappedMenus}:{})}])).values()];
  return {schemaVersion:1,products:PRODUCTS,labels:LABELS,outletIds:[...new Set([...(previous?.outletIds||[]),...results.map(r=>r.id)])].sort(),updatedAt:new Date().toISOString(),days:[...map.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id)),failed,...(previous?.history?{history:previous.history}:{}),...keepIntraday(previous,map)};
 }
