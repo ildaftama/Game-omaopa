@@ -600,7 +600,7 @@ window.ForecastDashboard=(()=>{
    const e=byDate.get(row.date)||{sum:0,known:0,net:0,netKnown:0};
    if(row.complete){
     for(let p=0;p<PRODUCT_COUNT;p++){const v=actualPrice(window.FORECAST_REALIZED_PRICES,row.id,p);if(v!=null)e.sum+=(row.qty[p]||0)*v;}
-    e.known++;if(row.netVersion===2&&Number.isFinite(row.netSales)){e.net+=row.netSales;e.netKnown++;}
+    e.known++;if(row.netVersion===2&&Number.isFinite(row.netSales)){e.net+=row.netSales;e.netKnown++;}else if(row.verifiedZero){e.netKnown++;} // hari tanpa penjualan terverifikasi = Net Sales 0 (ringkasan pembayaran ESB kosong/null)
    }
    byDate.set(row.date,e);
   }

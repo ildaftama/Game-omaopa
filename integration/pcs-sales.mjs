@@ -102,7 +102,7 @@ export async function collectJobs(jobs,client){
   if(!report.complete)throw Error('Laporan belum lengkap.');
   if(!report.rows.length){
    if(report.count!==0||!await verifiedZero(job))throw Error('Laporan kosong belum terkonfirmasi.');
-   results.push({date:job.date,id:job.id,qty:PRODUCTS.map(()=>0),free:PRODUCTS.map(()=>0),mappingVersion:MAPPING_VERSION,netSales:0,complete:true,verifiedZero:'empty-menu-and-zero-sales-ledger'});
+   results.push({date:job.date,id:job.id,qty:PRODUCTS.map(()=>0),free:PRODUCTS.map(()=>0),mappingVersion:MAPPING_VERSION,netSales:0,netVersion:2,complete:true,verifiedZero:'empty-menu-and-zero-sales-ledger'});
   }else results.push({date:job.date,id:job.id,...summarize(report.rows,job),complete:true});
   // Net Sales ESB yang dilihat owner (owner 2026-11-25) = total laporan ringkasan pembayaran per
   // outlet-hari. Terukur sama persis dengan sales-menu-cogs showMenuPackage=1 (25 Nov s.d. 17.39:
