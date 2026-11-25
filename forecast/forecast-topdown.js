@@ -45,7 +45,7 @@ window.ForecastTopdown=(()=>{
   return {pct:0,kind:wHigh&&lHigh?'mix':'ok'};
  }
  function describe(r,W){const parts=[];if(r?.wastePct!=null)parts.push(`waste ${pct1(r.wastePct)}% (ambang ${pct1(W)}%)`);if(r?.lostPerDay!=null)parts.push(`habis stok ±${Math.round(r.lostPerDay)} mnt/hari`);return parts.join(', ');}
- let date=null,cache=null,draft=null,message='',saving=false;
+ let date=null,cache=null,draft=null,message='',saving=false,prog=null;
  window.addEventListener?.('forecast-data-refreshed',()=>{cache=null;});
  window.addEventListener?.('forecast-sources-loaded',()=>{cache=null;});
  // ---- Saran buffer HUJAN per outlet (owner 2026-11-12) ----
@@ -368,7 +368,7 @@ window.ForecastTopdown=(()=>{
   const stat=done?`<div class="fpp-status done"><b>✓ Semua ${c.ids.length} outlet tersimpan</b><span>Rencana produksi final, siap diunduh untuk dapur.</span></div>`:`<div class="fpp-status draft"><b>Draft · ${[i.n?`${i.n} outlet`:'',i.fac?'pesanan pabrik':''].filter(Boolean).join(' + ')} belum tersimpan</b><span>Angka di bawah sudah mengikuti forecast yang sedang disusun. Simpan semua outlet untuk membuka unduhan.${i.areas?` (${esc(i.areas)})`:''}</span></div>`;
   const acts=done?`${canShare?'<button type="button" class="button fp-primary" data-ft-prod-share>Bagikan ke WA</button>':''}<button type="button" class="button ${canShare?'':'fp-primary'}" data-ft-prod-download>Unduh gambar</button>`:`<button type="button" class="button" data-fp-mode="topdown">← Kembali ke Buat forecast</button><button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!i.any||locked()?'disabled':''}>${saving?'Menyimpan…':saveText(i)}</button>`;
   return `<div class="ft-wrap"><div class="fpp-top"><label class="ft-date">Tanggal kiriman<input type="date" id="ft-date" value="${date}"></label>${stat}<div class="fpp-actions">${acts}</div></div>
-   <p class="fs-ship-sub fs-ship-status ft-msg" role="status" ${message?'':'hidden'}>${esc(message)}</p>
+   ${progHtml()}<p class="fs-ship-sub fs-ship-status ft-msg" role="status" ${message?'':'hidden'}>${esc(message)}</p>
    <div id="ft-prod">${productionBlock(c)}</div></div>`;
  }
  // ---- Tabel per AREA (feedback forecaster 2026-11-13) ----
@@ -490,7 +490,7 @@ window.ForecastTopdown=(()=>{
    </div>
    ${(()=>{const rows=prodRows();return c.groups.filter(g=>(draft.area||AREA_ALL)===AREA_ALL||draft.area===g.name).map(g=>areaCard(c,g,rows)).join('')+((draft.view||'reg')!=='reg'?factoryCard(c):'');})()}
    <div id="ft-prod">${productionBlock(c)}</div>
-   <div class="ft-save"><span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
+   <div class="ft-save">${progHtml()}<span role="status" class="ft-msg">${esc(message||pendingMsg(pendingInfo(c)))}</span><span class="ft-save-actions">${existing&&!locked()?`<button type="button" class="button quiet" data-ft-delete-all ${saving?'disabled':''}>Hapus rencana tanggal ini</button>`:''}<button type="button" class="button fp-primary" data-ft-save ${saving||cloud().state!=='ready'||!changedN||locked()?'disabled':''} ${!changedN&&existing&&!saving?'hidden':''}>${saving?'Menyimpan…':saveText(pendingInfo(c))}</button><button type="button" class="button fp-primary" data-fp-mode="shipping" data-ft-next ${changedN||!existing||saving?'hidden':''}>Lanjut ke Rincian kirim →</button></span></div>
    <p class="ft-foot">${c.ids.length} outlet · ${existing?`${existing} sudah punya rencana tim`:'belum ada yang disimpan'}.${savers(c)} Rencana yang disimpan dari sini sama persis dengan simpan per outlet, jadi langsung muncul di detail outlet dan Rincian kirim.</p>
   </div>`;
  }
@@ -538,6 +538,7 @@ window.ForecastTopdown=(()=>{
  const split=s=>{const i=s.lastIndexOf(':');return [s.slice(0,i),+s.slice(i+1)];};
  function input(e){
   const t=e.target;if(!draft)return null;
+  if(prog&&prog.state!=='run'&&t.closest?.('.ft-wrap')&&t.id!=='ft-date'){prog=null;progPaint();}
   if(t.classList?.contains('ft-cell'))t.classList.toggle('z',!qtyOf(t.value));
   if(t.dataset.ftCell){const [id,p]=split(t.dataset.ftCell);draft.cells[id][p]=t.value;persist();const auto=draft.auto?.[id]?.[p];t.classList.toggle('ft-edited',auto!=null&&String(auto)!==String(t.value));refreshTotals(id);return false;}
   if(t.dataset.ftXr){const [id,i]=split(t.dataset.ftXr);draft.extra[id][draft.names[i]].r=t.value;persist();refreshTotals(id);return false;}
@@ -552,7 +553,7 @@ window.ForecastTopdown=(()=>{
  }
  function change(e){
   const t=e.target;
-  if(t.id==='ft-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){date=t.value;draft=null;message='';proposal=null;return true;}
+  if(t.id==='ft-date'&&/^\d{4}-\d{2}-\d{2}$/.test(t.value)){date=t.value;draft=null;message='';proposal=null;if(!saving)prog=null;return true;}
   if(t.id==='ft-target'){input(e);return true;}
   if(t.id==='ft-per-outlet'){draft.perOutlet=t.checked;const edited=hasEdits();if(!edited){draft.auto=allocate(draft.target,draft.perOutlet);draft.cells=JSON.parse(JSON.stringify(draft.auto));message='Pembagian diperbarui.';}else message='Klik "Bagi otomatis" untuk menerapkan pengaturan ini.';persist();return true;}
   if(t.dataset.ftCell||t.dataset.ftXr||t.dataset.ftXo||t.dataset.ftOrd||t.dataset.ftNote!==undefined){input(e);return false;}
@@ -624,6 +625,18 @@ window.ForecastTopdown=(()=>{
  // = puluhan render penuh dalam beberapa detik -> layar berkedip). Pesan progres diperbarui di
  // tempat; render penuh sekali di akhir.
  const say=t=>{message=t;const m=q('.ft-msg');if(m){m.textContent=t;m.hidden=false;}};
+ // Bar progres simpan (owner 2026-11-25): forecaster harus tahu pasti rencana sudah tersimpan
+ // sebelum mengunduh. Tampil selama menyimpan; setelah selesai jadi hijau (semua tersimpan + jam)
+ // atau merah (ada yang gagal). Hilang begitu angka diubah lagi.
+ function progHtml(){
+  if(!prog)return '<div class="ft-prog" data-ft-prog hidden></div>';
+  const n=prog.done+prog.fail,pct=prog.total?Math.round(n/prog.total*100):100;
+  const label=prog.state==='run'?`Menyimpan ke tim… ${n} dari ${prog.total} selesai${prog.fail?` · ${prog.fail} gagal`:''}`
+   :prog.state==='ok'?`✓ Tersimpan semua (${prog.total} dari ${prog.total}) · pukul ${prog.at}. File yang diunduh sekarang sudah sesuai rencana tersimpan.`
+   :`✕ ${prog.fail} dari ${prog.total} GAGAL tersimpan · pukul ${prog.at}. Jangan unduh dulu; simpan ulang sampai bar hijau.`;
+  return `<div class="ft-prog ${prog.state}" data-ft-prog role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><div class="ft-prog-track"><div class="ft-prog-fill" style="width:${pct}%"></div></div><span class="ft-prog-label">${esc(label)}</span></div>`;
+ }
+ function progPaint(){const h=progHtml();for(const el of document.querySelectorAll('[data-ft-prog]'))el.outerHTML=h;}
  // Owner 2026-11-24: produk reguler berstatus Tidak laku perlu konfirmasi sebelum disimpan. Pesanan tidak dihitung.
  let askingSave=false;
  function requestSave(){
@@ -642,6 +655,7 @@ window.ForecastTopdown=(()=>{
    if(customItemsOf(id).length>20){message=`${name(id)}: maksimal 20 produk lain.`;rerender();return;}
   }
   saving=true;let ok=0,failWhy='';const fail=[];
+  prog={state:'run',done:0,fail:0,total:todo.length+(facTodo?1:0),at:''};progPaint();
   const btn=q('[data-ft-save]');if(btn){btn.disabled=true;btn.textContent='Menyimpan…';}
   const saveOne=async id=>{
 
@@ -649,6 +663,7 @@ window.ForecastTopdown=(()=>{
    const plan={date,outlet:id,active:regular.map((v,p)=>v>0||orders[p]>0),regular,orders,note:String(draft.notes[id]||'').trim()||`Dibagi otomatis dari target omzet reguler ${rp(draft.target)}.`,prices:o.prices,recommendations:o.recs,method:o.recs.find(x=>x.method)?.method||'weekday-median-trend-v1',cutoff:o.recs.map(x=>x.through).filter(Boolean).sort().at(-1)||null,...(items.length?{customItems:items}:{})};
    if(!plan.active.some(Boolean))plan.active[2]=true;
    try{await cloud().save(plan,r?.revision||0);ok++;if(!draft.notes[id])draft.notes[id]=plan.note;}catch(err){fail.push(name(id)+(String(err.message).includes('diubah rekan')?' (diubah rekan, muat ulang)':''));failWhy=failWhy||String(err.message);}
+   prog.done=ok;prog.fail=fail.length;progPaint();
    say(`Menyimpan… ${ok+fail.length}/${todo.length} outlet selesai`);
   };
   // 5 outlet sekaligus; tiap outlet tetap satu transaksi sendiri (cek konflik versi per outlet).
@@ -659,6 +674,7 @@ window.ForecastTopdown=(()=>{
    if(!plan.active.some(Boolean))plan.active[2]=true;
    try{await cloud().save(plan,r?.revision||0);ok++;}catch(err){fail.push('Pabrik'+(/permission|insufficient/i.test(String(err.message))?' (aturan Firestore belum mengizinkan "pabrik")':''));failWhy=failWhy||String(err.message);}
   }
+  prog.done=ok;prog.fail=fail.length;prog.state=fail.length?'err':'ok';prog.at=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
   persist();saving=false;const facOk=facTodo&&!fail.some(f=>f.startsWith('Pabrik')),outOk=ok-(facOk?1:0);message=fail.length?`${outOk} outlet${facOk?' + pesanan pabrik':''} tersimpan. Gagal ${fail.length}: ${fail.join(', ')}. Penyebab: ${failWhy}`:`${[outOk?`${outOk} outlet`:'',facOk?'pesanan pabrik':''].filter(Boolean).join(' + ')} tersimpan ke tim. Rincian kirim sudah bisa diunduh.`;rerender();
  }
  // Dipakai tab detail outlet: angka hasil bagi untuk outlet+tanggal ini (kalau belum ada rencana

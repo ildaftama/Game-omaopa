@@ -1222,3 +1222,14 @@ input,select,textarea{transition:border-color .2s,box-shadow .2s}
 @media (prefers-reduced-motion:reduce){.method-notice,.mn-ic,.mn-big,.method-gate,.method-gate-card{animation:none!important}}
 .fa-new{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:900px){.fa-new{grid-template-columns:1fr}}
+/* Bar progres simpan rencana (owner 2026-11-25) */
+.ft-prog{flex:1 1 100%;display:flex;flex-direction:column;gap:5px;padding:8px 10px;border-radius:10px;background:#eef4fa;border:1px solid #d3e1ee;margin:0 0 8px}
+.ft-prog[hidden]{display:none}
+.ft-prog-track{height:10px;border-radius:999px;background:#dbe6f0;overflow:hidden}
+.ft-prog-fill{height:100%;border-radius:999px;background:#2f6f86;transition:width .25s ease}
+.ft-prog.run .ft-prog-fill{background-image:linear-gradient(45deg,rgba(255,255,255,.25) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.25) 50%,rgba(255,255,255,.25) 75%,transparent 75%);background-size:16px 16px;animation:ftProg 0.8s linear infinite}
+@keyframes ftProg{to{background-position:16px 0}}
+.ft-prog-label{font-size:13px;font-weight:600;color:#24465a}
+.ft-prog.ok{background:#e8f6ec;border-color:#b6e0c2}.ft-prog.ok .ft-prog-fill{background:#2e8b57}.ft-prog.ok .ft-prog-label{color:#1f6b40}
+.ft-prog.err{background:#fdecec;border-color:#f2c0c0}.ft-prog.err .ft-prog-fill{background:#c0392b}.ft-prog.err .ft-prog-label{color:#9b2c22}
+@media (prefers-reduced-motion:reduce){.ft-prog-fill{transition:none}.ft-prog.run .ft-prog-fill{animation:none}}
