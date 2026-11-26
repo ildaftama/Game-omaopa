@@ -177,6 +177,19 @@ window.ForecastNoticeAPI={
  remove(id){return deleteDoc(doc(db,'forecastNotice',id));},
  async cleanup(){const s=await getDocs(query(noticeCol,where('expireAt','<',Timestamp.now()),limit(100)));await Promise.all(s.docs.map(d=>deleteDoc(d.ref).catch(()=>{})));},
 };
+// Catatan transfer antar-outlet (owner 2026-11-26): forecaster wajib mencatat setiap transfer di web.
+// Jumlah akhirnya mengikuti Daily Report bila sudah terisi; jam transfer mengikuti catatan web.
+const tfCol=collection(db,'forecastTransfer');
+const tfClean=t=>{const items={};for(const [k,v] of Object.entries(t.items||{})){const q=Math.round(+v);if(/^\d{1,2}$/.test(k)&&q>0&&q<=500)items[k]=q;}return {date:String(t.date).slice(0,10),time:String(t.time).slice(0,5),from:String(t.from).slice(0,40),to:String(t.to).slice(0,40),items,note:String(t.note||'').trim().slice(0,200)};};
+window.ForecastTransferAPI={
+ uid:()=>auth.currentUser?.uid||null,
+ canWrite:()=>window.ForecastRolePolicy.planner(window.ForecastAuth?.role),
+ isMaster:()=>window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role),
+ listen(fromDate,cb){return onSnapshot(query(tfCol,where('date','>=',fromDate),orderBy('date','desc'),limit(400)),s=>cb(s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})}))),()=>cb(null));},
+ add(t){if(!auth.currentUser)return Promise.reject(Error('belum masuk'));return setDoc(doc(tfCol),{...tfClean(t),by:auth.currentUser.uid,name:myName(),at:serverTimestamp()});},
+ update(id,t){return updateDoc(doc(db,'forecastTransfer',id),{...tfClean(t),editedAt:serverTimestamp()});},
+ remove(id){return deleteDoc(doc(db,'forecastTransfer',id));},
+};
 window.ForecastWhoAmI=()=>({name:myName(),role:myRole()});
 let beatT=null;
 // merge:true supaya tanda baca (chatRead/noticeRead) tidak terhapus oleh detak status online.

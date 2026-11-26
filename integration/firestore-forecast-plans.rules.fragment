@@ -333,6 +333,25 @@ match /forecastNotice/{id} {
   allow update: if false;
   allow delete: if forecastMasterUser();
 }
+// Catatan transfer antar-outlet (owner 2026-11-26): dibaca semua akun Forecast, dicatat oleh
+// forecaster/manager/master. Pencatat boleh mengubah/menghapus catatannya sendiri; Master semuanya.
+function forecastTransferValid(d) {
+  return d.keys().hasOnly(['date','time','from','to','items','note','by','name','at','editedAt'])
+    && d.date is string && d.date.size() == 10 && d.time is string && d.time.size() == 5
+    && d.from is string && d.from.size() <= 40 && d.to is string && d.to.size() <= 40 && d.from != d.to
+    && d.items is map && d.items.size() > 0 && d.items.size() <= 21
+    && d.note is string && d.note.size() <= 200 && d.name is string && d.name.size() <= 60;
+}
+match /forecastTransfer/{id} {
+  allow read: if forecastCommunity();
+  allow create: if forecastPlanner() && forecastTransferValid(request.resource.data)
+    && request.resource.data.by == request.auth.uid && request.resource.data.at == request.time;
+  allow update: if forecastTransferValid(request.resource.data)
+    && request.resource.data.by == resource.data.by && request.resource.data.at == resource.data.at
+    && request.resource.data.editedAt == request.time
+    && ((resource.data.by == request.auth.uid && forecastPlanner()) || forecastMasterUser());
+  allow delete: if (resource.data.by == request.auth.uid && forecastPlanner()) || forecastMasterUser();
+}
 // Status online: tiap akun hanya menulis dokumennya sendiri.
 match /forecastPresence/{uid} {
   allow read: if forecastCommunity();

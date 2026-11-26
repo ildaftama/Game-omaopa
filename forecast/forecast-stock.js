@@ -1,4 +1,5 @@
-// Tab Stok & Transfer (owner 2026-11-26). Tahap 1: stok berjalan per 15 menit, belum ada input transfer.
+// Tab Stok & Transfer (owner 2026-11-26). Tahap 1: stok berjalan per 15 menit. Tahap 2: catatan transfer
+// dari web (forecast-transfer.js) langsung masuk ke stok sesuai jamnya; jumlah mengikuti Daily Report bila terisi.
 // Stok jual hari ini (Daily Report) = sisa kemarin - waste + kiriman +/- transfer; stok sekarang = stok
 // jual - terjual ESB kumulatif. Kecepatan jual mengikuti pola per jam outlet x produk (transaksi ESB
 // 1 Okt-22 Nov, dihitung sampai jam kue habis), jadi pagi/siang/sore punya bobot berbeda.
@@ -48,28 +49,51 @@ window.ForecastStock=(()=>{
   baseCache={key,map};return map;
  }
  function prior(id,lab,d,sell){const b=baselines(),x=b.get(`${id}|${lab}|${weekend(d)}`),y=b.get(`${id}|${lab}|*`);if(x&&x.n>=3)return x.mean;if(y&&y.n>=3)return y.mean;return null;}
+ // Gabungan transfer Daily Report (tanpa jam) dan catatan web (berjam). Owner 2026-11-26: jumlah mengikuti
+ // Daily Report bila sudah terisi, jam mengikuti web. Tanpa catatan web, transfer Daily Report dianggap pagi.
+ function mergeTf(W,tin,tout){
+  const out=[];
+  for(const [dr,sg] of [[tin,1],[tout,-1]]){
+   const w=W.filter(e=>Math.sign(e.d)===sg),ws=w.reduce((s,e)=>s+Math.abs(e.d),0);
+   if(dr>0&&!ws)out.push({h:OPEN,d:sg*dr,src:'daily'});
+   else if(dr>0)w.forEach(e=>out.push({h:e.h,d:e.d*dr/ws,src:'both'}));
+   else w.forEach(e=>out.push({h:e.h,d:e.d,src:'web'}));
+  }
+  return out.sort((a,b)=>a.h-b.h);
+ }
  function compute(){
   const L=window.ForecastStockLive,d=today();
   if(!L||L.date!==d)return {ok:false,reason:L?'Belum ada tarikan hari ini.':'Data stok berjalan belum tersedia.'};
   const snaps=(L.snaps||[]).map(s=>({h:toH(s.t),s:s.s})).sort((a,b)=>a.h-b.h),last=snaps.at(-1),now=Math.min(Math.max(nowHour(),OPEN),CLOSE),prices=window.FORECAST_REALIZED_PRICES?.outlets||{};
+  const webEv=new Map(),addEv=(id,lab,h,q)=>{const k=id+'|'+lab;if(!webEv.has(k))webEv.set(k,[]);webEv.get(k).push({h,d:q});};
+  for(const t of (window.ForecastTransferLog?.list?.()||[]))if(t.date===d){const h=Math.min(Math.max(toH(t.time),OPEN),now);for(const [k,q] of Object.entries(t.items||{})){addEv(t.from,+k,h,-q);addEv(t.to,+k,h,+q);}}
   const ids=new Set([...Object.keys(L.daily||{}),...snaps.flatMap(s=>Object.keys(s.s))]),outlets=[];
   for(const id of ids){
    const day=L.daily?.[id]||null,soldNow=[...snaps].reverse().find(s=>s.s[id])?.s[id]||null,wasteIn=!!day&&Object.values(day).some(x=>x[4]>0||x[5]!=null),items=[];
    for(let lab=0;lab<LABELS.length;lab++){
-    const x=day?.[lab],S=soldNow?.[lab]||0;if(!x&&!S)continue;
-    const [awal,kirim,tfIn,tfOut,waste]=x||[0,0,0,0,0],old=wasteIn?Math.max(0,awal-waste):MALMIL.has(lab)?0:awal,sell=old+kirim+tfIn-tfOut;
+    const x=day?.[lab],S=soldNow?.[lab]||0,W=webEv.get(id+'|'+lab)||[];if(!x&&!S&&!W.length)continue;
+    const [awal,kirim,tfIn,tfOut,waste]=x||[0,0,0,0,0],old=wasteIn?Math.max(0,awal-waste):MALMIL.has(lab)?0:awal,ev=mergeTf(W,tfIn,tfOut),base=old+kirim,sell=base+ev.reduce((s,e)=>s+e.d,0);
     if(sell<=0&&!S)continue;
-    const p=profile(id,lab,d),D0=prior(id,lab,d,sell),it={lab,sell,old,oldPending:!wasteIn&&!MALMIL.has(lab)&&awal>0,kirim,tf:tfIn-tfOut,sold:S,left:sell-S,noSales:NO_SALES.has(lab),noDaily:!x};
+    const p=profile(id,lab,d),D0=prior(id,lab,d,sell),it={lab,sell,old,oldPending:!wasteIn&&!MALMIL.has(lab)&&awal>0,kirim,tf:sell-base,ev,sold:S,left:sell-S,noSales:NO_SALES.has(lab),noDaily:!x};
     // Jam habis: tarikan pertama dengan stok <= 0, diambil titik tengah dari tarikan sebelumnya.
     if(it.noSales||it.noDaily||!p||!D0){it.st=it.noSales||it.noDaily?'na':'baru';it.price=priceOf(prices,id,lab);items.push(it);continue;}
-    let hAt=null;if(it.left<=0&&sell>0){let prev=OPEN;for(const s of snaps){const v=s.s[id]?.[lab];if(v==null)continue;if(sell-v<=0){hAt=(prev+s.h)/2;if(prev===OPEN)it.before=s.h;break;}prev=s.h;}if(hAt==null)hAt=last?.h||now;}
-    const cAt=hAt!=null?cum(p,hAt):cum(p,now),a=PRIOR_W*D0,Dd=(Math.min(S,Math.max(sell,0))+a)/(cAt+a/D0);
+    // Owner 2026-11-26: stok bisa habis lalu terisi lagi oleh transfer. Lost hanya dihitung selama stok kosong.
+    const stockAt=(h,v)=>base+ev.reduce((s,e)=>s+(e.h<=h?e.d:0),0)-v,gaps=[];let hAt=null,start=null,first=null,prev=OPEN;
+    for(const s of snaps){const v=s.s[id]?.[lab];if(v==null)continue;const st=stockAt(s.h,v);
+     if(st<=0&&start==null){start=(prev+s.h)/2;first=prev===OPEN?s.h:null;}
+     else if(st>0&&start!=null){const inn=ev.find(e=>e.d>0&&e.h>prev-1e-9&&e.h<=s.h);gaps.push([start,Math.max(start,inn?inn.h:(prev+s.h)/2)]);start=null;first=null;}
+     prev=s.h;}
+    if(it.left<=0&&sell>0){hAt=start??(last?.h||now);if(start!=null&&first)it.before=first;}
+    else if(start!=null){const inn=ev.find(e=>e.d>0&&e.h>prev-1e-9);gaps.push([start,Math.max(start,inn?inn.h:now)]);}
+    const gapSh=gaps.reduce((s,[g0,g1])=>s+cum(p,g1)-cum(p,g0),0);it.gaps=gaps;
+    const cAt=Math.max(0,(hAt!=null?cum(p,hAt):cum(p,now))-gapSh),a=PRIOR_W*D0,Dd=(Math.min(S,Math.max(sell,0))+a)/(cAt+a/D0),gapLost=Dd*gapSh;
     it.demand=Dd;it.rate=Dd*(p[Math.min(p.length-1,Math.max(0,Math.floor(now-OPEN)))]||0);it.price=priceOf(prices,id,lab);
     const rest=Dd*(1-cum(p,now));it.rest=rest;
-    if(it.left<=0){it.st='habis';it.at=hAt;it.lostNow=Math.max(0,Dd*(cum(p,now)-cum(p,hAt)));it.lostDay=Math.max(0,Dd*(1-cum(p,hAt)));it.over=it.left<0?-it.left:0;}
+    if(it.left<=0){it.st='habis';it.at=hAt;it.lostNow=gapLost+Math.max(0,Dd*(cum(p,now)-cum(p,hAt)));it.lostDay=gapLost+Math.max(0,Dd*(1-cum(p,hAt)));it.over=it.left<0?-it.left:0;}
     else if(it.left<rest*KURANG&&rest-it.left>=1){it.st='kurang';it.at=atShare(p,cum(p,now)+it.left/Dd);it.short=rest-it.left;}
     else if(it.left-rest>=Math.max(3,rest*.3)){it.st='over';it.extra=it.left-rest;}
     else it.st='normal';
+    if(it.st!=='habis'&&gapLost>0){it.lostNow=gapLost;it.lostDay=gapLost;}
     items.push(it);
    }
    if(items.length)outlets.push({id,items,day:!!day,wasteIn});
@@ -93,8 +117,11 @@ window.ForecastStock=(()=>{
   return `<strong>${nf(it.left)}</strong><small>cukup</small>`;
  }
  function detail(o){
-  const rows=o.items.filter(it=>inGroup(it.lab)).map(it=>{const why=it.st==='habis'?`${it.before?`Sudah habis saat tarikan pertama ${hm(it.before)}; jam pastinya belum terekam, diperkirakan ±${hm(it.at)}.`:`Habis sekitar ${hm(it.at)}.`} Lost sejauh ini ±${nf(it.lostNow)} pcs${it.price?` (${rp(it.lostNow*it.price)})`:''}, sampai tutup ±${nf(it.lostDay)} pcs.${it.over?` Terjual ${nf(it.over)} pcs melebihi stok di Daily Report: cek transfer masuk.`:''}`:it.st==='kurang'?`Diperkirakan habis sekitar ${hm(it.at)}, kurang ±${nf(it.short)} pcs sampai tutup.`:it.st==='over'?`Diperkirakan sisa ±${nf(it.extra)} pcs saat tutup.`:it.st==='baru'?'Produk baru di outlet ini, menunggu data untuk estimasi penjualan. Sementara hanya ditampilkan stoknya.':it.st==='na'?(it.noSales?'Penjualan produk ini belum terbaca dari ESB.':'Belum ada di Daily Report hari ini.'):'Stok cukup sampai tutup.';
-   return `<tr><th scope="row">${esc(LABELS[it.lab])}</th><td>${pill(it.st)}</td><td>${nf(it.sell)}${it.old?`<small>${it.oldPending?'termasuk ':''}${nf(it.old)} kemarin</small>`:''}</td><td>${nf(it.sold)}</td><td><b>${nf(Math.max(0,it.left))}</b></td><td>${it.st==='habis'||it.st==='baru'?'—':`${(it.rate||0).toLocaleString('id-ID',{maximumFractionDigits:1})}/jam`}</td><td>${it.st==='baru'?'—':nf(it.rest)}</td><td class="st-why">${why}</td></tr>`;}).join('');
+  const rows=o.items.filter(it=>inGroup(it.lab)).map(it=>{const why=it.st==='habis'?`${it.before?`Sudah habis saat tarikan pertama ${hm(it.before)}; jam pastinya belum terekam, diperkirakan ±${hm(it.at)}.`:`Habis sekitar ${hm(it.at)}.`} Lost sejauh ini ±${nf(it.lostNow)} pcs${it.price?` (${rp(it.lostNow*it.price)})`:''}, sampai tutup ±${nf(it.lostDay)} pcs.${it.over?` Terjual ${nf(it.over)} pcs melebihi stok tercatat: cek transfer masuk yang belum dicatat.`:''}`:it.st==='kurang'?`Diperkirakan habis sekitar ${hm(it.at)}, kurang ±${nf(it.short)} pcs sampai tutup.`:it.st==='over'?`Diperkirakan sisa ±${nf(it.extra)} pcs saat tutup.`:it.st==='baru'?'Produk baru di outlet ini, menunggu data untuk estimasi penjualan. Sementara hanya ditampilkan stoknya.':it.st==='na'?(it.noSales?'Penjualan produk ini belum terbaca dari ESB.':'Belum ada di Daily Report hari ini.'):'Stok cukup sampai tutup.';
+   const tfTxt=it.ev?.length?` Transfer hari ini: ${it.ev.map(e=>`${e.d>0?'+':'−'}${nf(Math.abs(e.d))}${e.src==='daily'?' (Daily Report)':` jam ${hm(e.h)}`}`).join(', ')}.`:'';
+   const gapTxt=it.gaps?.length?` Sempat kosong ${it.gaps.map(([a,b])=>`±${hm(a)}–${hm(b)}`).join(', ')} sebelum transfer masuk.`:'';
+   const why2=why+gapTxt+tfTxt+(it.st!=='habis'&&it.lostNow>0?` Lost saat kosong ±${nf(it.lostNow)} pcs${it.price?` (${rp(it.lostNow*it.price)})`:''}.`:'');
+   return `<tr><th scope="row">${esc(LABELS[it.lab])}</th><td>${pill(it.st)}</td><td>${nf(it.sell)}${it.old?`<small>${it.oldPending?'termasuk ':''}${nf(it.old)} kemarin</small>`:''}</td><td>${nf(it.sold)}</td><td><b>${nf(Math.max(0,it.left))}</b></td><td>${it.st==='habis'||it.st==='baru'?'—':`${(it.rate||0).toLocaleString('id-ID',{maximumFractionDigits:1})}/jam`}</td><td>${it.st==='baru'?'—':nf(it.rest)}</td><td class="st-why">${why2}</td></tr>`;}).join('');
   return `<div class="st-detail"><table><thead><tr><th>Produk</th><th>Status</th><th>Stok jual hari ini</th><th>Terjual</th><th>Sisa</th><th>Laju sekarang</th><th>Perkiraan laku s.d. tutup</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table>${o.wasteIn?'':'<p class="st-note">Kolom waste hari ini belum diisi. Sisa kemarin Malmil dianggap dibuang; sisa kemarin produk lain masih dihitung bisa dijual.</p>'}</div>`;
  }
  // ---------- Rekomendasi transfer (owner 2026-11-26) ----------
@@ -136,7 +163,7 @@ window.ForecastStock=(()=>{
  const tripText=t=>`${name(t.from)} → ${name(t.to)}: ${t.items.map(i=>`${LABELS[i.lab]} ${nf(i.qty)}`).join(', ')}`;
  function tripCard(t,i){
   const lines=t.items.map(x=>`<li><div><b>${esc(LABELS[x.lab])}</b><strong>${nf(x.qty)} pcs</strong></div><span>${esc(name(t.to))} ${x.recv.st==='habis'?'sudah habis':`diperkirakan habis ±${hm(x.recv.at)}`} · ${esc(name(t.from))} sisa ${nf(x.give.left)}, perkiraan laku ${nf(x.give.rest)} s.d. tutup</span></li>`).join('');
-  return `<article class="st-trip"><header><div class="st-route"><b>${esc(name(t.from))}</b><i aria-hidden="true">→</i><b>${esc(name(t.to))}</b></div><span>${t.km.toLocaleString('id-ID',{maximumFractionDigits:1})} km · tiba ±${hm(t.arr)}</span></header><ul>${lines}</ul><footer><span>Menyelamatkan ±${nf(t.pcs)} pcs${t.rp?` · ${rp(t.rp)}`:''}</span><button type="button" class="st-copy" data-st-copy="${i}">Salin pesan</button></footer></article>`;
+  return `<article class="st-trip"><header><div class="st-route"><b>${esc(name(t.from))}</b><i aria-hidden="true">→</i><b>${esc(name(t.to))}</b></div><span>${t.km.toLocaleString('id-ID',{maximumFractionDigits:1})} km · tiba ±${hm(t.arr)}</span></header><ul>${lines}</ul><footer><span>Menyelamatkan ±${nf(t.pcs)} pcs${t.rp?` · ${rp(t.rp)}`:''}</span><span class="st-trip-acts">${window.ForecastTransferAPI?.canWrite?.()?`<button type="button" class="st-copy st-rec" data-st-record="${i}" title="Catat transfer ini setelah dikirim">Catat</button>`:''}<button type="button" class="st-copy" data-st-copy="${i}">Salin pesan</button></span></footer></article>`;
  }
  function transferView(c,ids){
   const T=transfers(c),inSel=t=>!ids||ids.has(t.from)||ids.has(t.to),trips=T.trips.filter(t=>inSel(t)&&t.items.some(x=>inGroup(x.lab))).map(t=>{const items=t.items.filter(x=>inGroup(x.lab));return {...t,items,pcs:items.reduce((s,x)=>s+x.qty,0),rp:items.reduce((s,x)=>s+x.qty*(x.recv.price||0),0)};}),gaps=T.gaps.filter(g=>(!ids||ids.has(g.id))&&inGroup(g.lab));
@@ -146,7 +173,7 @@ window.ForecastStock=(()=>{
   const head=`<div class="st-thead"><div><strong>${nf(trips.length)} transfer disarankan</strong><span>${trips.length?`menyelamatkan ±${nf(pcs)} pcs${val?` · ${rp(val)}`:''} dari lost sales`:'Belum ada pasangan outlet yang cocok saat ini.'}</span></div>${trips.length?'<button type="button" class="st-copy" data-st-copy="all">Salin semua</button>':''}</div>`;
   const cards=trips.length?`<div class="st-trips">${trips.map((t,i)=>tripCard(t,i)).join('')}</div>`:'';
   const gapList=gaps.length?`<section class="st-gaps"><h3>Kurang, tapi tidak ada pengirim <small>${nf(gaps.length)} outlet-produk</small></h3><p>Tidak ada outlet satu area dengan kelebihan yang cukup. Catat untuk rencana kirim besok.</p><ul>${gaps.slice(0,12).map(g=>`<li><b>${esc(name(g.id))}</b><span>${esc(LABELS[g.lab])}</span><em>kurang ±${nf(g.need)} pcs</em></li>`).join('')}</ul>${gaps.length>12?`<small>+${nf(gaps.length-12)} lainnya</small>`:''}</section>`:'';
-  return head+cards+gapList+`<p class="wl-foot">Transfer hanya antar-outlet satu area (Center area itu ikut menjadi pengirim); Stand Alone tidak diikutkan. Pengirim selalu menyisakan perkiraan lakunya sendiri sampai tutup +15%, jadi tidak ikut kehabisan. Jarak dari koordinat outlet (×1,35 untuk jalan), 25 km/jam + 15 menit persiapan. Produk baru tidak direkomendasikan karena belum ada estimasinya. <b>Penting:</b> transfer yang sudah dikirim hari ini belum terbaca sampai tercatat di Daily Report, jadi cek dulu sebelum mengirim.</p>`;
+  return head+cards+gapList+`<p class="wl-foot">Transfer hanya antar-outlet satu area (Center area itu ikut menjadi pengirim); Stand Alone tidak diikutkan. Pengirim selalu menyisakan perkiraan lakunya sendiri sampai tutup +15%, jadi tidak ikut kehabisan. Jarak dari koordinat outlet (×1,35 untuk jalan), 25 km/jam + 15 menit persiapan. Produk baru tidak direkomendasikan karena belum ada estimasinya. Transfer yang sudah <b>dicatat di web</b> langsung mengurangi stok pengirim dan menambah stok penerima, jadi saran ikut berubah. Klik <b>Catat</b> setelah kue benar-benar dikirim.</p>`;
  }
  // ---------- Tampilan ----------
  let lastTrips=[];
@@ -165,12 +192,15 @@ window.ForecastStock=(()=>{
   const all=pick.flatMap(a=>a.rows),ids=selected!=='__all__'||state.area!=='all'?new Set(all.map(o=>o.id)):null,its=all.flatMap(o=>o.items.filter(it=>inGroup(it.lab)));
   const count=k=>its.filter(it=>it.st===k).length,sum0=k=>its.reduce((s,it)=>s+(it[k]||0),0),lostRp=its.reduce((s,it)=>s+(it.lostNow||0)*(it.price||0),0),lostDayRp=its.reduce((s,it)=>s+(it.lostDay||0)*(it.price||0),0);
   const age=c.lastH!=null?(c.now-c.lastH)*60:null,stale=age!=null&&age>STALE_MIN&&c.now<CLOSE,daily=c.dailyAt?hm(toH(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(c.dailyAt)))):'—';
+  const nLog=(window.ForecastTransferLog?.list?.()||[]).filter(t=>t.date===today()).length;
+  if(!['stok','transfer','log'].includes(state.view))state.view='stok';
   const nTrips=transfers(c).trips.filter(t=>(!ids||ids.has(t.from)||ids.has(t.to))&&t.items.some(x=>inGroup(x.lab))).length;
-  const seg=`<div class="st-seg" role="tablist" aria-label="Tampilan">${[['stok','Stok'],['transfer','Rekomendasi transfer']].map(([k,t])=>`<button type="button" role="tab" data-st-view="${k}" aria-selected="${state.view===k}" class="${state.view===k?'on':''}">${t}${k==='transfer'&&nTrips?` <em>${nTrips}</em>`:''}</button>`).join('')}</div>`;
+  const seg=`<div class="st-seg" role="tablist" aria-label="Tampilan">${[['stok','Stok'],['transfer','Rekomendasi transfer'],['log','Catatan transfer']].map(([k,t])=>`<button type="button" role="tab" data-st-view="${k}" aria-selected="${state.view===k}" class="${state.view===k?'on':''}">${t}${k==='transfer'&&nTrips?` <em>${nTrips}</em>`:''}${k==='log'&&nLog?` <em class="n">${nLog}</em>`:''}</button>`).join('')}</div>${window.ForecastTransferAPI?.canWrite?.()?'<button type="button" class="st-add" data-st-add>+ Catat transfer</button>':''}`;
   const fresh=`<div class="st-fresh${stale?' stale':''}"><i aria-hidden="true"></i><span>Data ${c.lastH!=null?hm(c.lastH):'—'}${stale?` · ${nf(age)} mnt belum berubah`:''}</span><small>Daily Report ${daily}</small></div>`;
-  const filters=`<div class="st-tools">${selected==='__all__'?sel('area',[['all','Semua area'],...[...byArea.values()].map(a=>[a.key,a.title])],state.area,'Area'):`<span class="st-one"><small>Outlet</small>${esc(name(selected))}</span>`}${sel('group',GROUPS.map(([k,t])=>[k,t]),state.group,'Produk')}${state.view==='stok'?sel('status',STATUS_OPTS,state.status||'all','Status'):''}</div>`;
+  const filters=`<div class="st-tools">${selected==='__all__'?sel('area',[['all','Semua area'],...[...byArea.values()].map(a=>[a.key,a.title])],state.area,'Area'):`<span class="st-one"><small>Outlet</small>${esc(name(selected))}</span>`}${state.view==='log'?'':sel('group',GROUPS.map(([k,t])=>[k,t]),state.group,'Produk')}${state.view==='stok'?sel('status',STATUS_OPTS,state.status||'all','Status'):''}</div>`;
   let body;
   if(state.view==='transfer')body=transferView(c,ids);
+  else if(state.view==='log')body=window.ForecastTransferLog?.view?.(c,ids)||'<div class="st-empty"><b>Catatan transfer belum termuat.</b></div>';
   else{
    const cards=[['habis',`lost ±${nf(sum0('lostNow'))} pcs`],['kurang',`kurang ±${nf(sum0('short'))} pcs`],['over',`sisa ±${nf(sum0('extra'))} pcs`],['normal','stok cukup']].map(([k,sub])=>`<button type="button" class="st-sum ${ST[k][1]}${state.status===k?' on':''}" data-st-status="${k}" aria-pressed="${state.status===k}"><span>${ST[k][0]}</span><strong>${nf(count(k))}</strong><small>${sub}</small></button>`).join('');
    const lost=`<div class="st-sum lost"><span>Lost sales hari ini</span><strong>${lostRp?rp(lostRp):nf(sum0('lostNow'))+' pcs'}</strong><small>s.d. tutup ±${lostDayRp?rp(lostDayRp):nf(sum0('lostDay'))+' pcs'}</small></div>`;
@@ -184,19 +214,22 @@ window.ForecastStock=(()=>{
     return `<section class="st-area"><h3>${esc(a.title)}<small>${a.rows.length} outlet${a.centers.length?` · Center ${esc(a.centers.map(name).join(', '))}`:''}</small></h3><div class="st-scroll"><table class="st-grid"><thead><tr><th>Outlet</th>${cols.map(l=>`<th title="${esc(LABELS[l])}">${esc(SHORT[l])}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div></section>`;}).join('');
    const legend=`<div class="st-legend">${['habis','kurang','normal','over','baru'].map(k=>pill(k)).join('')}<span class="st-hint">Angka = sisa stok sekarang · klik nama outlet untuk rincian</span></div>`;
    body=`<div class="st-sums">${cards}${lost}</div>${legend}${sections||'<div class="st-empty"><b>Tidak ada yang cocok dengan filter ini.</b><span>Ubah pilihan status atau produk.</span></div>'}
-   <p class="wl-foot"><b>Kurang stok</b>: sisa kurang dari 80% perkiraan laku sampai tutup. <b>Over stok</b>: perkiraan sisa saat tutup minimal 3 pcs dan 30%. Perkiraan laku memakai pola jual per jam outlet itu sendiri (pagi, siang, sore berbeda) dan kecepatan jual hari ini. Lost sales = perkiraan penjualan pada jam-jam setelah kue habis. <b>Produk baru</b> (riwayat di outlet itu kurang dari 20 hari) hanya ditampilkan stoknya. Transfer hari ini baru terhitung setelah tercatat di Daily Report.</p>`;
+   <p class="wl-foot"><b>Kurang stok</b>: sisa kurang dari 80% perkiraan laku sampai tutup. <b>Over stok</b>: perkiraan sisa saat tutup minimal 3 pcs dan 30%. Perkiraan laku memakai pola jual per jam outlet itu sendiri (pagi, siang, sore berbeda) dan kecepatan jual hari ini. Lost sales = perkiraan penjualan pada jam-jam setelah kue habis. <b>Produk baru</b> (riwayat di outlet itu kurang dari 20 hari) hanya ditampilkan stoknya. Transfer yang dicatat di web langsung terhitung sesuai jamnya; bila Daily Report sudah terisi, jumlahnya mengikuti Daily Report.</p>`;
   }
-  return `<div class="st-top">${seg}${fresh}</div>${filters}<div class="st-body">${body}</div><p class="st-build">🚧 Sedang dibangun · input transfer menyusul</p>`;
+  return `<div class="st-top">${seg}${fresh}</div>${filters}<div class="st-body">${body}</div><p class="st-build">🚧 Sedang dibangun</p>`;
  }
  function copy(text,btn){const done=()=>{const t=btn.textContent;btn.textContent='Tersalin ✓';btn.classList.add('ok');setTimeout(()=>{btn.textContent=t;btn.classList.remove('ok');},1800);};
   const fallback=()=>{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}catch{}ta.remove();};
   try{navigator.clipboard.writeText(text).then(done,fallback);}catch{fallback();}}
  function paint(){const el=document.getElementById('st-root');if(!el)return;const f=document.activeElement;if(f&&el.contains(f)&&f.tagName==='SELECT')return;el.innerHTML=view();}
  document.addEventListener('click',e=>{if(!e.target.closest?.('#st-root'))return;const v=e.target.closest('[data-st-view]'),s=e.target.closest('[data-st-status]'),o=e.target.closest('[data-st-outlet]'),cp=e.target.closest('[data-st-copy]');
+  const rec=e.target.closest('[data-st-record]'),add=e.target.closest('[data-st-add]');
+  if(add){window.ForecastTransferLog?.open?.();return;}
+  if(rec){const t=lastTrips[+rec.dataset.stRecord];if(t)window.ForecastTransferLog?.open?.({from:t.from,to:t.to,items:Object.fromEntries(t.items.map(x=>[String(x.lab),x.qty]))});return;}
   if(cp){const k=cp.dataset.stCopy,list=k==='all'?lastTrips:[lastTrips[+k]].filter(Boolean);if(list.length)copy(`Transfer ${hm(Math.min(Math.max(nowHour(),OPEN),CLOSE))}:\n`+list.map(tripText).join('\n'),cp);return;}
   if(v){state.view=v.dataset.stView;remember();}else if(s){state.status=state.status===s.dataset.stStatus?null:s.dataset.stStatus;}else if(o){state.outlet=state.outlet===o.dataset.stOutlet?null:o.dataset.stOutlet;}else return;paint();});
  document.addEventListener('change',e=>{const t=e.target.closest?.('#st-root [data-st-sel]');if(!t)return;const k=t.dataset.stSel;if(k==='status')state.status=t.value==='all'?null:t.value;else{state[k]=t.value;state.outlet=null;remember();}t.blur();paint();});
- for(const ev of ['forecast-stock-live','forecast-data-refreshed'])window.addEventListener(ev,()=>{if(ev==='forecast-data-refreshed')baseCache=null;paint();});
+ for(const ev of ['forecast-stock-live','forecast-data-refreshed','forecast-transfer'])window.addEventListener(ev,()=>{if(ev==='forecast-data-refreshed')baseCache=null;paint();});
  setInterval(()=>{if(!document.hidden)paint();},60000);
- return {compute,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Stok & Transfer</h2><span>Stok real time dan saran transfer antar-outlet</span></div><div id="st-root">${view()}</div>`;},transfers,setView(v){state.view=v==='transfer'?'transfer':'stok';state.status=null;state.outlet=null;remember();}};
+ return {compute,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Stok & Transfer</h2><span>Stok real time dan saran transfer antar-outlet</span></div><div id="st-root">${view()}</div>`;},transfers,paint,areaList,LABELS,SHORT,name,today,nowHour,hm,setView(v){state.view=['transfer','log'].includes(v)?v:'stok';state.status=null;state.outlet=null;remember();}};
 })();
