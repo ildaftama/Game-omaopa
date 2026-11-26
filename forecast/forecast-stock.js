@@ -60,13 +60,12 @@ window.ForecastStock=(()=>{
     if(sell<=0&&!S)continue;
     const p=profile(id,lab,d),D0=prior(id,lab,d,sell),it={lab,sell,old,oldPending:!wasteIn&&!MALMIL.has(lab)&&awal>0,kirim,tf:tfIn-tfOut,sold:S,left:sell-S,noSales:NO_SALES.has(lab),noDaily:!x};
     // Jam habis: tarikan pertama dengan stok <= 0, diambil titik tengah dari tarikan sebelumnya.
-    if(!it.noSales&&!it.noDaily&&(!p||!D0)){it.st='baru';it.price=priceOf(prices,id,lab);items.push(it);continue;}
+    if(it.noSales||it.noDaily||!p||!D0){it.st=it.noSales||it.noDaily?'na':'baru';it.price=priceOf(prices,id,lab);items.push(it);continue;}
     let hAt=null;if(it.left<=0&&sell>0){let prev=OPEN;for(const s of snaps){const v=s.s[id]?.[lab];if(v==null)continue;if(sell-v<=0){hAt=(prev+s.h)/2;if(prev===OPEN)it.before=s.h;break;}prev=s.h;}if(hAt==null)hAt=last?.h||now;}
     const cAt=hAt!=null?cum(p,hAt):cum(p,now),a=PRIOR_W*D0,Dd=(Math.min(S,Math.max(sell,0))+a)/(cAt+a/D0);
     it.demand=Dd;it.rate=Dd*(p[Math.min(p.length-1,Math.max(0,Math.floor(now-OPEN)))]||0);it.price=priceOf(prices,id,lab);
     const rest=Dd*(1-cum(p,now));it.rest=rest;
-    if(it.noSales||it.noDaily){it.st='na';}
-    else if(it.left<=0){it.st='habis';it.at=hAt;it.lostNow=Math.max(0,Dd*(cum(p,now)-cum(p,hAt)));it.lostDay=Math.max(0,Dd*(1-cum(p,hAt)));it.over=it.left<0?-it.left:0;}
+    if(it.left<=0){it.st='habis';it.at=hAt;it.lostNow=Math.max(0,Dd*(cum(p,now)-cum(p,hAt)));it.lostDay=Math.max(0,Dd*(1-cum(p,hAt)));it.over=it.left<0?-it.left:0;}
     else if(it.left<rest*KURANG&&rest-it.left>=1){it.st='kurang';it.at=atShare(p,cum(p,now)+it.left/Dd);it.short=rest-it.left;}
     else if(it.left-rest>=Math.max(3,rest*.3)){it.st='over';it.extra=it.left-rest;}
     else it.st='normal';
