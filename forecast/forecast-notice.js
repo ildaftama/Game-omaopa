@@ -14,6 +14,7 @@ window.ForecastNotice=(()=>{
   ['perf','Performa Forecaster'],['settings','Pengaturan'],
  ];
  const linkLabel=k=>(LINKS.find(l=>l[0]===k)||[])[1]||'';
+ const shortLabel=k=>linkLabel(k).split(' · ').pop();
  // Teks aman (sudah di-escape) dengan alamat web dijadikan tautan.
  const rich=t=>esc(t).replace(/\bhttps?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]/g,u=>`<a href="${u}" target="_blank" rel="noopener noreferrer">${u}</a>`);
  const A=()=>window.ForecastNoticeAPI,me=()=>A()?.uid?.();
@@ -41,7 +42,7 @@ window.ForecastNotice=(()=>{
   setTimeout(()=>document.querySelector('.workspace-heading')?.scrollIntoView({behavior:'smooth',block:'start'}),30);
   return true;
  }
- const goBtn=(link,cls)=>link&&linkLabel(link)?`<button type="button" class="${cls}" data-fn-go="${esc(link)}">Buka ${esc(linkLabel(link))} →</button>`:'';
+ const goBtn=(link,cls)=>link&&linkLabel(link)?`<button type="button" class="${cls}" data-fn-go="${esc(link)}">Buka ${esc(shortLabel(link))} →</button>`:'';
 
  // ---------- Lonceng di kanan atas ----------
  function badge(){
@@ -101,7 +102,7 @@ window.ForecastNotice=(()=>{
   document.body.appendChild(m);
   const f=m.querySelector('form'),msg=m.querySelector('.fn-msg'),close=()=>{m.remove();back?.focus?.();};
   const prev=()=>{const t=f.ntitle.value.trim(),x=f.ntext.value.trim(),l=f.nlink.value;f.querySelector('.fn-count').textContent=f.ntext.value.length+'/1000';
-   m.querySelector('.fn-prev').innerHTML=`<div class="fc-sys"><div class="fc-sys-head"><b>System</b><span>Pengumuman</span></div>${t?`<strong>${esc(t)}</strong>`:''}<p>${x?rich(x):'<i>Isi pesan…</i>'}</p>${l?`<span class="fc-go">Buka ${esc(linkLabel(l))} →</span>`:''}</div>`;};
+   m.querySelector('.fn-prev').innerHTML=`<div class="fc-sys"><div class="fc-sys-head"><b>System</b><span>Pengumuman</span></div>${t?`<strong>${esc(t)}</strong>`:''}<p>${x?rich(x):'<i>Isi pesan…</i>'}</p>${l?`<span class="fc-go">Buka ${esc(shortLabel(l))} →</span>`:''}</div>`;};
   f.addEventListener('input',prev);f.addEventListener('change',prev);prev();
   m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-fn-close]'))close();});
   m.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();close();}});
@@ -127,5 +128,5 @@ window.ForecastNotice=(()=>{
   });
  }
  const wait=setInterval(()=>{if(window.ForecastNoticeAPI&&window.ForecastAuth&&!document.getElementById('forecast-app')?.hidden){clearInterval(wait);start();}},1000);
- return {goTo,compose,rich,linkLabel,items:()=>items,LINKS};
+ return {goTo,compose,rich,linkLabel:shortLabel,items:()=>items,LINKS};
 })();
