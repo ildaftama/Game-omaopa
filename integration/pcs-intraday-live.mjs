@@ -7,7 +7,8 @@ import {pathToFileURL} from 'node:url';
 import {createEsbClient} from './esb-client.mjs';
 import {collect} from './pcs-sales.mjs';
 import {signIn,readLiveIntraday,writeLiveIntraday,readSmallDoc,writeSmallDoc} from './pack-forecast-reference.mjs';
-import {refreshOffice} from './office-status.mjs';
+import {refreshOffice,OFFICE_KEY} from './office-status.mjs';
+import {STOCK_LIVE_KEY,mergeStockLive,pullDailyToday} from './stock-live.mjs';
 
 // Outlet yang gagal terbaca kali ini tetap memakai angka tarikan sebelumnya pada hari yang sama.
 export function mergeLive(previous,results,date,asOf){
@@ -31,6 +32,15 @@ async function main(){
  const {idToken,uid}=await signIn(process.env);
  await writeLiveIntraday(mergeLive(await readLiveIntraday(idToken),results,today,new Date().toISOString()),idToken,uid);
  console.log('Omzet sementara tersimpan.');
+ // Stok berjalan: Daily Report hari ini + penjualan kumulatif tarikan ini. Gagal tidak menggagalkan omzet.
+ try{
+  let daily=null,dailyAt=null;
+  try{const office=await readSmallDoc(OFFICE_KEY,idToken);if(office?.dailyFolder){const d=await pullDailyToday(office.dailyFolder);daily=d.daily;dailyAt=new Date().toISOString();console.log('Daily Report hari ini terbaca: '+d.read+'/'+d.tabs+' tab, '+Object.keys(d.daily).length+' outlet berisi.');}}
+  catch{console.log('Daily Report hari ini belum terbaca, memakai data tarikan sebelumnya.');}
+  const prev=await readSmallDoc(STOCK_LIVE_KEY,idToken);
+  await writeSmallDoc(STOCK_LIVE_KEY,mergeStockLive(prev,{date:today,asOf:new Date().toISOString(),results,daily,dailyAt}),idToken,uid);
+  console.log('Stok berjalan tersimpan.');
+ }catch{console.log('::warning::Stok berjalan belum tersimpan.');}
  try{await refreshOffice({read:k=>readSmallDoc(k,idToken),write:(k,v)=>writeSmallDoc(k,v,idToken,uid)});}catch{console.log('Data Kantor Mini belum diperbarui.');}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(()=>{console.error('Tarikan omzet sementara belum berhasil. Isi laporan dan akses tidak dicetak.');process.exitCode=1;});

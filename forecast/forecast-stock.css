@@ -1,0 +1,46 @@
+/* Tab Stok & Transfer (owner 2026-11-26). Warna status mengikuti tab Waste & Lost Sales. */
+.st-bar{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:0 0 12px;color:#62717f;font-size:13px}
+.st-bar b{color:#172b42}
+.st-stale{padding:3px 9px;border-radius:6px;background:#fdecea;color:#a3322b;font-weight:700}
+.st-sums{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.st-sum{min-width:0;padding:12px 14px;text-align:left;background:#fff;border:1px solid #e0e7ed;border-left:5px solid #9aa8b5;border-radius:10px;font-family:inherit;cursor:pointer}
+.st-sum span{display:block;color:#62717f;font-size:13px;font-weight:700}
+.st-sum strong{display:block;margin:2px 0;color:#172b42;font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums}
+.st-sum small{color:#6d7d8d;font-size:12px}
+.st-sum.on{box-shadow:0 0 0 2px #172b42 inset}
+.st-sum.habis{border-left-color:#c9423a}.st-sum.kurang{border-left-color:#d99a2b}.st-sum.normal{border-left-color:#23835a}.st-sum.over{border-left-color:#3a6fc9}
+.st-lost{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;margin-bottom:14px;padding:10px 14px;background:#fff7e6;border:1px solid #f0d9ae;border-radius:10px;color:#694509;font-size:13px}
+.st-lost strong{color:#172b42;font-size:18px}
+.st-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.st-area{margin-bottom:18px}
+.st-area>h3{margin:0 0 6px;color:#172b42;font-size:16px}
+.st-area>h3 small{color:#6d7d8d;font-size:12px;font-weight:500}
+.st-scroll{overflow-x:auto;background:#fff;border:1px solid #e0e7ed;border-radius:10px}
+.st-grid{width:100%;border-collapse:collapse;font-size:12px}
+.st-grid th,.st-grid td{padding:5px 6px;border-bottom:1px solid #eef2f5;text-align:center;white-space:nowrap}
+.st-grid thead th{position:sticky;top:0;background:#f6f8fa;color:#62717f;font-weight:700}
+.st-grid tbody th{position:sticky;left:0;z-index:1;background:#fff;text-align:left}
+.st-grid thead th:first-child{left:0;z-index:2}
+.st-grid tbody th button{padding:2px 0;border:0;background:none;color:#172b42;font:600 13px inherit;font-family:inherit;text-align:left;cursor:pointer}
+.st-grid tbody th i{margin-left:3px;padding:1px 5px;border-radius:5px;background:#172b42;color:#fff;font-size:10px;font-style:normal}
+.st-grid tbody th em{color:#a3322b;font-size:11px;font-style:normal}
+.st-c strong{display:block;font-size:15px;font-variant-numeric:tabular-nums}
+.st-c small{display:block;font-size:10.5px;opacity:.85}
+.st-c.habis{background:#fdecea;color:#a3322b}
+.st-c.kurang{background:#fff3dc;color:#8a5a07}
+.st-c.normal{background:#eaf6ef;color:#1c6b49}
+.st-c.over{background:#e8effb;color:#2c55a0}
+.st-c.na{background:#f3f5f7;color:#6d7d8d}
+.st-c.empty{color:#c4ccd4}
+.st-c.dim{opacity:.3}
+.st-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px}
+.st-pill.habis{background:#fdecea;color:#a3322b}.st-pill.kurang{background:#fff3dc;color:#8a5a07}.st-pill.normal{background:#eaf6ef;color:#1c6b49}.st-pill.over{background:#e8effb;color:#2c55a0}.st-pill.na{background:#f3f5f7;color:#6d7d8d}
+.st-open>td{padding:0;background:#fbfcfd;text-align:left;white-space:normal}
+.st-detail{padding:10px 12px}
+.st-detail table{width:100%;border-collapse:collapse;font-size:12.5px}
+.st-detail th,.st-detail td{padding:5px 7px;border-bottom:1px solid #eef2f5;text-align:left;vertical-align:top}
+.st-detail thead th{color:#62717f}
+.st-detail td small{display:block;color:#6d7d8d;font-size:11px}
+.st-detail .st-why{min-width:220px;white-space:normal;color:#3d4b58}
+.st-note{margin:8px 0 0;color:#8a5a07;font-size:12px}
+@media (max-width:720px){.st-sums{grid-template-columns:repeat(2,minmax(0,1fr))}.st-sum strong{font-size:22px}.st-detail{overflow-x:auto}}
