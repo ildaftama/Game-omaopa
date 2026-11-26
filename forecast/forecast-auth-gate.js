@@ -166,6 +166,17 @@ window.ForecastChatAPI={
  async cleanup(){const s=await getDocs(query(chatCol,where('expireAt','<',Timestamp.now()),limit(100)));await Promise.all(s.docs.map(d=>deleteDoc(d.ref).catch(()=>{})));},
  listenPresence(cb){return onSnapshot(collection(db,'forecastPresence'),s=>cb(s.docs.map(d=>({uid:d.id,...d.data({serverTimestamps:'estimate'})}))),()=>cb(null));},
 };
+// Pengumuman System & notifikasi (owner 2026-11-26): hanya Master yang menulis, semua akun membaca.
+// chat=true tampil di chat tim sebagai "System", notif=true masuk lonceng di kanan atas. Disimpan 30 hari.
+const noticeCol=collection(db,'forecastNotice');
+window.ForecastNoticeAPI={
+ uid:()=>auth.currentUser?.uid||null,
+ isMaster:()=>window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role),
+ listen(cb){return onSnapshot(query(noticeCol,where('at','>=',Timestamp.fromMillis(Date.now()-30*DAY)),orderBy('at','desc'),limit(100)),s=>cb(s.docs.map(d=>({id:d.id,...d.data({serverTimestamps:'estimate'})})).reverse()),()=>cb(null));},
+ send(n){const text=String(n.text||'').trim().slice(0,1000);if(!text||!auth.currentUser)return Promise.reject(Error('kosong'));return setDoc(doc(noticeCol),{title:String(n.title||'').trim().slice(0,80),text,link:String(n.link||'').slice(0,30),chat:!!n.chat,notif:!!n.notif,at:serverTimestamp(),by:auth.currentUser.uid,expireAt:Timestamp.fromMillis(Date.now()+30*DAY)});},
+ remove(id){return deleteDoc(doc(db,'forecastNotice',id));},
+ async cleanup(){const s=await getDocs(query(noticeCol,where('expireAt','<',Timestamp.now()),limit(100)));await Promise.all(s.docs.map(d=>deleteDoc(d.ref).catch(()=>{})));},
+};
 window.ForecastWhoAmI=()=>({name:myName(),role:myRole()});
 let beatT=null;
 function beat(online=true){if(!auth.currentUser||!window.ForecastAuth)return Promise.resolve();return setDoc(presRef(auth.currentUser.uid),{name:myName(),role:myRole(),char:String(window.ForecastAuth.role?.char||''),at:serverTimestamp(),online}).catch(()=>{});}

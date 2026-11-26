@@ -198,5 +198,5 @@ window.ForecastStock=(()=>{
  document.addEventListener('change',e=>{const t=e.target.closest?.('#st-root [data-st-sel]');if(!t)return;const k=t.dataset.stSel;if(k==='status')state.status=t.value==='all'?null:t.value;else{state[k]=t.value;state.outlet=null;remember();}t.blur();paint();});
  for(const ev of ['forecast-stock-live','forecast-data-refreshed'])window.addEventListener(ev,()=>{if(ev==='forecast-data-refreshed')baseCache=null;paint();});
  setInterval(()=>{if(!document.hidden)paint();},60000);
- return {compute,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Stok & Transfer</h2><span>Stok real time dan saran transfer antar-outlet</span></div><div id="st-root">${view()}</div>`;},transfers};
+ return {compute,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Stok & Transfer</h2><span>Stok real time dan saran transfer antar-outlet</span></div><div id="st-root">${view()}</div>`;},transfers,setView(v){state.view=v==='transfer'?'transfer':'stok';state.status=null;state.outlet=null;remember();}};
 })();

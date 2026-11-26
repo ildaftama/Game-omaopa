@@ -318,6 +318,21 @@ match /forecastChat/{id} {
   allow delete: if forecastMasterUser()
     || (request.auth != null && resource.data.uid == request.auth.uid && request.time < resource.data.at + duration.value(125, 's'));
 }
+// Pengumuman System & notifikasi (owner 2026-11-26): dibaca semua akun Forecast, hanya Master
+// yang membuat dan menghapus. Isi tidak bisa diubah; kirim ulang bila perlu koreksi.
+match /forecastNotice/{id} {
+  allow read: if forecastCommunity();
+  allow create: if forecastMasterUser()
+    && request.resource.data.keys().hasOnly(['title','text','link','chat','notif','at','by','expireAt'])
+    && request.resource.data.title is string && request.resource.data.title.size() <= 80
+    && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+    && request.resource.data.link is string && request.resource.data.link.size() <= 30
+    && request.resource.data.chat is bool && request.resource.data.notif is bool
+    && request.resource.data.at == request.time && request.resource.data.by == request.auth.uid
+    && request.resource.data.expireAt is timestamp;
+  allow update: if false;
+  allow delete: if forecastMasterUser();
+}
 // Status online: tiap akun hanya menulis dokumennya sendiri.
 match /forecastPresence/{uid} {
   allow read: if forecastCommunity();
