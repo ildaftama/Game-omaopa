@@ -21,7 +21,8 @@ window.ForecastStock=(()=>{
  const priceOf=(prices,id,lab)=>(lab<6?prices[id]?.[PRICE[SAME[lab]]]?.price:0)||REF[lab]||0;
  const OPEN=8,CLOSE=20,PRIOR_W=.3,KURANG=.8,STALE_MIN=40;
  const ST={habis:['Habis','habis'],kurang:['Kurang stok','kurang'],normal:['Normal','normal'],over:['Over stok','over'],na:['Belum terbaca','na'],baru:['Produk baru','baru']};
- const state={area:'all',group:'all',status:null,outlet:null};let selected='__all__',baseCache=null;
+ const state={view:'stok',area:'all',group:'all',status:null,outlet:null};try{const v=JSON.parse(localStorage.getItem('omaopa-stock-ui')||'{}');for(const k of ['view','area','group'])if(typeof v[k]==='string')state[k]=v[k];}catch{}
+ const remember=()=>{try{localStorage.setItem('omaopa-stock-ui',JSON.stringify({view:state.view,area:state.area,group:state.group}));}catch{}};let selected='__all__',baseCache=null;
  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
  const weekend=d=>{const w=new Date(d+'T00:00:00Z').getUTCDay();return w===0||w===6;};
  // Pola per jam: 12 slot 08-19. Fallback pola jaringan per keluarga produk, lalu rata.
@@ -96,39 +97,106 @@ window.ForecastStock=(()=>{
    return `<tr><th scope="row">${esc(LABELS[it.lab])}</th><td>${pill(it.st)}</td><td>${nf(it.sell)}${it.old?`<small>${it.oldPending?'termasuk ':''}${nf(it.old)} kemarin</small>`:''}</td><td>${nf(it.sold)}</td><td><b>${nf(Math.max(0,it.left))}</b></td><td>${it.st==='habis'||it.st==='baru'?'—':`${(it.rate||0).toLocaleString('id-ID',{maximumFractionDigits:1})}/jam`}</td><td>${it.st==='baru'?'—':nf(it.rest)}</td><td class="st-why">${why}</td></tr>`;}).join('');
   return `<div class="st-detail"><table><thead><tr><th>Produk</th><th>Status</th><th>Stok jual hari ini</th><th>Terjual</th><th>Sisa</th><th>Laju sekarang</th><th>Perkiraan laku s.d. tutup</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table>${o.wasteIn?'':'<p class="st-note">Kolom waste hari ini belum diisi. Sisa kemarin Malmil dianggap dibuang; sisa kemarin produk lain masih dihitung bisa dijual.</p>'}</div>`;
  }
+ // ---------- Rekomendasi transfer (owner 2026-11-26) ----------
+ // Hanya di dalam satu area (anggota + Center area itu, termasuk Center di luar area seperti UMS untuk
+ // Klaten). Stand Alone tidak ikut. Lama perjalanan = 15 menit persiapan + jarak jalan (garis lurus x1,35)
+ // pada 25 km/jam. Penerima: kebutuhan SETELAH kue tiba = laku sisa hari (pola jam outlet penerima)
+ // dikurangi stok yang masih ada saat tiba. Pengirim hanya memberi kelebihan setelah menyisakan
+ // perkiraan lakunya sendiri sampai tutup +15% +1 pcs, jadi pengirim tidak ikut kehabisan.
+ const SPEED=25,PREP=.25,ROAD=1.35,MIN_QTY=2,LAST_ARRIVE=CLOSE-.75,KEEP=1.15;
+ function coords(){const m=new Map(),O=window.OUTLET_DATA?.outlets;for(const o of (Array.isArray(O)?O:Object.values(O||{})))if(o?.id&&Number.isFinite(o.lat)&&Number.isFinite(o.lon))m.set(o.id,[o.lat,o.lon]);return m;}
+ function km(C,a,b){const x=C.get(a),y=C.get(b);if(!x||!y)return null;const r=Math.PI/180,dl=(y[0]-x[0])*r,dn=(y[1]-x[1])*r,h=Math.sin(dl/2)**2+Math.cos(x[0]*r)*Math.cos(y[0]*r)*Math.sin(dn/2)**2;return 2*6371*Math.asin(Math.sqrt(h))*ROAD;}
+ function transfers(c){
+  const C=coords(),d=today(),now=c.now,byId=new Map(c.outlets.map(o=>[o.id,o])),trips=[],gaps=[];
+  if(now>=LAST_ARRIVE-PREP)return {trips,gaps,late:true};
+  for(const a of areaList()){
+   if(a.key==='Stand Alone')continue;
+   const pool=[...new Set([...a.ids,...a.centers])].filter(id=>byId.has(id));
+   for(let lab=0;lab<LABELS.length;lab++){
+    const it=id=>byId.get(id).items.find(x=>x.lab===lab&&x.demand&&x.st!=='baru'&&x.st!=='na');
+    const giv=pool.map(id=>{const x=it(id);if(!x)return null;const sur=Math.floor(x.left-(x.rest*KEEP+1));return sur>=MIN_QTY?{id,x,sur}:null;}).filter(Boolean);
+    const rec=a.ids.filter(id=>byId.has(id)).map(id=>{const x=it(id);return x&&(x.st==='habis'||x.st==='kurang')?{id,x}:null;}).filter(Boolean);
+    for(const r of rec){
+     const pr=profile(r.id,lab,d);if(!pr)continue;
+     const needAt=h=>{const left=Math.max(0,r.x.left-r.x.demand*(cum(pr,h)-cum(pr,now)));return r.x.demand*(1-cum(pr,h))-left;};
+     const opts=giv.filter(g=>g.id!==r.id).map(g=>{const k=km(C,g.id,r.id);if(k==null)return null;const arr=now+PREP+k/SPEED;if(arr>LAST_ARRIVE)return null;const n=Math.floor(needAt(arr));return n>=MIN_QTY?{g,k,arr,n}:null;}).filter(Boolean).sort((p,q)=>p.k-q.k);
+     let left=opts.length?Math.max(...opts.map(o=>o.n)):null;
+     for(const o of opts){if(left<MIN_QTY)break;const q=Math.min(left,o.n,o.g.sur);if(q<MIN_QTY)continue;
+      o.g.sur-=q;left-=q;
+      let t=trips.find(t=>t.from===o.g.id&&t.to===r.id);if(!t){t={area:a.title,from:o.g.id,to:r.id,km:o.k,arr:o.arr,items:[],pcs:0,rp:0};trips.push(t);}
+      t.items.push({lab,qty:q,recv:r.x,give:o.g.x});t.pcs+=q;t.rp+=q*(r.x.price||0);}
+     const rem=left==null?Math.floor(needAt(Math.min(now+PREP+.5,LAST_ARRIVE))):left;
+     if(rem>=MIN_QTY)gaps.push({area:a.title,id:r.id,lab,need:rem,x:r.x});
+    }
+   }
+  }
+  trips.sort((p,q)=>q.rp-p.rp);gaps.sort((p,q)=>q.need*(q.x.price||0)-p.need*(p.x.price||0));
+  return {trips,gaps,late:false};
+ }
+ const tripText=t=>`${name(t.from)} → ${name(t.to)}: ${t.items.map(i=>`${LABELS[i.lab]} ${nf(i.qty)}`).join(', ')}`;
+ function tripCard(t,i){
+  const lines=t.items.map(x=>`<li><div><b>${esc(LABELS[x.lab])}</b><strong>${nf(x.qty)} pcs</strong></div><span>${esc(name(t.to))} ${x.recv.st==='habis'?'sudah habis':`diperkirakan habis ±${hm(x.recv.at)}`} · ${esc(name(t.from))} sisa ${nf(x.give.left)}, perkiraan laku ${nf(x.give.rest)} s.d. tutup</span></li>`).join('');
+  return `<article class="st-trip"><header><div class="st-route"><b>${esc(name(t.from))}</b><i aria-hidden="true">→</i><b>${esc(name(t.to))}</b></div><span>${t.km.toLocaleString('id-ID',{maximumFractionDigits:1})} km · tiba ±${hm(t.arr)}</span></header><ul>${lines}</ul><footer><span>Menyelamatkan ±${nf(t.pcs)} pcs${t.rp?` · ${rp(t.rp)}`:''}</span><button type="button" class="st-copy" data-st-copy="${i}">Salin pesan</button></footer></article>`;
+ }
+ function transferView(c,ids){
+  const T=transfers(c),inSel=t=>!ids||ids.has(t.from)||ids.has(t.to),trips=T.trips.filter(t=>inSel(t)&&t.items.some(x=>inGroup(x.lab))).map(t=>{const items=t.items.filter(x=>inGroup(x.lab));return {...t,items,pcs:items.reduce((s,x)=>s+x.qty,0),rp:items.reduce((s,x)=>s+x.qty*(x.recv.price||0),0)};}),gaps=T.gaps.filter(g=>(!ids||ids.has(g.id))&&inGroup(g.lab));
+  lastTrips=trips;
+  if(T.late)return `<div class="st-empty"><b>Sudah terlalu sore untuk transfer.</b><span>Kue tidak akan tiba cukup awal sebelum tutup 20.00. Rekomendasi muncul lagi besok pagi.</span></div>`;
+  const pcs=trips.reduce((s,t)=>s+t.pcs,0),val=trips.reduce((s,t)=>s+t.rp,0);
+  const head=`<div class="st-thead"><div><strong>${nf(trips.length)} transfer disarankan</strong><span>${trips.length?`menyelamatkan ±${nf(pcs)} pcs${val?` · ${rp(val)}`:''} dari lost sales`:'Belum ada pasangan outlet yang cocok saat ini.'}</span></div>${trips.length?'<button type="button" class="st-copy" data-st-copy="all">Salin semua</button>':''}</div>`;
+  const cards=trips.length?`<div class="st-trips">${trips.map((t,i)=>tripCard(t,i)).join('')}</div>`:'';
+  const gapList=gaps.length?`<section class="st-gaps"><h3>Kurang, tapi tidak ada pengirim <small>${nf(gaps.length)} outlet-produk</small></h3><p>Tidak ada outlet satu area dengan kelebihan yang cukup. Catat untuk rencana kirim besok.</p><ul>${gaps.slice(0,12).map(g=>`<li><b>${esc(name(g.id))}</b><span>${esc(LABELS[g.lab])}</span><em>kurang ±${nf(g.need)} pcs</em></li>`).join('')}</ul>${gaps.length>12?`<small>+${nf(gaps.length-12)} lainnya</small>`:''}</section>`:'';
+  return head+cards+gapList+`<p class="wl-foot">Transfer hanya antar-outlet satu area (Center area itu ikut menjadi pengirim); Stand Alone tidak diikutkan. Pengirim selalu menyisakan perkiraan lakunya sendiri sampai tutup +15%, jadi tidak ikut kehabisan. Jarak dari koordinat outlet (×1,35 untuk jalan), 25 km/jam + 15 menit persiapan. Produk baru tidak direkomendasikan karena belum ada estimasinya. <b>Penting:</b> transfer yang sudah dikirim hari ini belum terbaca sampai tercatat di Daily Report, jadi cek dulu sebelum mengirim.</p>`;
+ }
+ // ---------- Tampilan ----------
+ let lastTrips=[];
+ const STATUS_OPTS=[['all','Semua status'],['act','Perlu tindakan'],['habis','Habis'],['kurang','Kurang stok'],['over','Over stok'],['normal','Normal'],['baru','Produk baru']];
+ const okStatus=st=>!state.status||state.status==='all'?true:state.status==='act'?['habis','kurang','over'].includes(st):st===state.status;
+ const sel=(key,opts,val,label)=>`<label class="st-sel"><span>${label}</span><select data-st-sel="${key}">${opts.map(([k,t])=>`<option value="${esc(k)}"${k===val?' selected':''}>${esc(t)}</option>`).join('')}</select></label>`;
  function view(){
   const c=compute();
-  if(!c.ok)return `<div class="wl-build" role="status"><b>🚧 Sedang dibangun</b><span>Tahap 1: stok berjalan. Input transfer menyusul.</span></div><div class="workspace-empty">${esc(c.reason)} Data diperbarui tiap 15 menit pukul 09.00–20.45.</div>`;
+  if(!c.ok)return `<div class="st-empty"><b>${esc(c.reason)}</b><span>Data diperbarui tiap 15 menit pukul 09.00–20.45.</span></div>`;
   const areas=areaList(),byArea=new Map(),seen=new Set();
   for(const a of areas){const rows=c.outlets.filter(o=>a.ids.includes(o.id)&&!seen.has(o.id));rows.forEach(o=>seen.add(o.id));if(rows.length)byArea.set(a.key,{...a,rows});}
   const rest=c.outlets.filter(o=>!seen.has(o.id));if(rest.length)byArea.set('Lainnya',{key:'Lainnya',title:'Lainnya',ids:rest.map(o=>o.id),centers:[],rows:rest});
+  if(state.area!=='all'&&!byArea.has(state.area))state.area='all';
+  if(!GROUPS.some(g=>g[0]===state.group))state.group='all';
   const pick=selected!=='__all__'?[...byArea.values()].filter(a=>a.rows.some(o=>o.id===selected)).map(a=>({...a,rows:a.rows.filter(o=>o.id===selected)})):state.area==='all'?[...byArea.values()]:[byArea.get(state.area)].filter(Boolean);
-  const all=pick.flatMap(a=>a.rows),its=all.flatMap(o=>o.items.filter(it=>inGroup(it.lab)));
-  const count=k=>its.filter(it=>it.st===k).length,lostNow=its.reduce((s,it)=>s+(it.lostNow||0),0),lostDay=its.reduce((s,it)=>s+(it.lostDay||0),0),lostRp=its.reduce((s,it)=>s+(it.lostNow||0)*(it.price||0),0),lostDayRp=its.reduce((s,it)=>s+(it.lostDay||0)*(it.price||0),0),over=its.reduce((s,it)=>s+(it.extra||0),0),short=its.reduce((s,it)=>s+(it.short||0),0);
-  const age=c.lastH!=null?(c.now-c.lastH)*60:null,stale=age!=null&&age>STALE_MIN&&c.now<CLOSE;
-  const sum=[['habis',`${nf(lostNow)} pcs lost sejauh ini`],['kurang',`kurang ±${nf(short)} pcs s.d. tutup`],['normal','stok cukup'],['over',`sisa ±${nf(over)} pcs saat tutup`]].map(([k,sub])=>`<button type="button" class="st-sum ${ST[k][1]} ${state.status===k?'on':''}" data-st-status="${k}" aria-pressed="${state.status===k}"><span>${ST[k][0]}</span><strong>${nf(count(k))}</strong><small>${sub}</small></button>`).join('');
-  const areaBtns=[['all','Semua area'],...[...byArea.values()].map(a=>[a.key,a.title])].map(([k,t])=>`<button type="button" data-st-area="${esc(k)}" class="${state.area===k?'on':''}" aria-pressed="${state.area===k}">${esc(t)}</button>`).join('');
-  const groupBtns=GROUPS.map(([k,t])=>`<button type="button" data-st-group="${k}" class="${state.group===k?'on':''}" aria-pressed="${state.group===k}">${t}</button>`).join('');
-  const cols=LABELS.map((_,lab)=>lab).filter(lab=>inGroup(lab)&&all.some(o=>o.items.some(it=>it.lab===lab)));
-  const sections=pick.map(a=>{
-   const rows=a.rows.filter(o=>!state.status||o.items.some(it=>it.st===state.status&&inGroup(it.lab))).sort((x,y)=>(a.centers.includes(y.id)-a.centers.includes(x.id))||name(x.id).localeCompare(name(y.id))).map(o=>{
-    const map=new Map(o.items.map(it=>[it.lab,it])),open=state.outlet===o.id;
-    const cells=cols.map(lab=>{const it=map.get(lab);if(!it)return '<td class="st-c empty">—</td>';const dim=state.status&&it.st!==state.status;return `<td class="st-c ${ST[it.st][1]}${dim?' dim':''}" title="${esc(LABELS[lab])}: ${ST[it.st][0]}">${cellText(it)}</td>`;}).join('');
-    return `<tr class="${open?'open':''}"><th scope="row"><button type="button" data-st-outlet="${esc(o.id)}" aria-expanded="${open}">${open?'▾':'▸'} ${esc(name(o.id))}${a.centers.includes(o.id)?' <i>Center</i>':''}${o.day?'':' <em>tanpa Daily Report</em>'}</button></th>${cells}</tr>${open?`<tr class="st-open"><td colspan="${cols.length+1}">${detail(o)}</td></tr>`:''}`;}).join('');
-   if(!rows)return '';
-   return `<section class="st-area"><h3>${esc(a.title)} <small>${a.rows.length} outlet${a.centers.length?` · Center: ${esc(a.centers.map(name).join(', '))}`:''}</small></h3><div class="st-scroll"><table class="st-grid"><thead><tr><th>Outlet</th>${cols.map(l=>`<th title="${esc(LABELS[l])}">${esc(SHORT[l])}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div></section>`;}).join('');
-  return `<div class="wl-build" role="status"><b>🚧 Sedang dibangun</b><span>Tahap 1: stok berjalan per 15 menit. Input transfer menyusul, jadi transfer hari ini baru terhitung setelah tercatat di Daily Report.</span></div>
-  <div class="st-bar"><span>Penjualan ESB terakhir <b>${c.lastH!=null?hm(c.lastH):'—'}</b> · Daily Report <b>${c.dailyAt?hm(toH(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(c.dailyAt)))):'belum terbaca'}</b></span>${stale?`<span class="st-stale">⚠ Data ${nf(age)} menit belum berubah</span>`:''}</div>
-  <div class="st-sums">${sum}</div>
-  <div class="st-lost"><span>Estimasi lost sales hari ini</span><strong>${nf(lostNow)} pcs${lostRp?` · ${rp(lostRp)}`:''}</strong><small>sampai tutup ±${nf(lostDay)} pcs${lostDayRp?` · ${rp(lostDayRp)}`:''}, dihitung per jam sejak kue habis</small></div>
-  <div class="st-filters"><div class="wl-periods" role="group" aria-label="Area">${areaBtns}</div><div class="wl-periods" role="group" aria-label="Produk">${groupBtns}</div></div>
-  ${sections||'<p class="wl-note">Tidak ada outlet dengan status ini.</p>'}
-  <p class="wl-foot">Angka di kotak = sisa stok sekarang. <b>Kurang stok</b>: sisa kurang dari 80% perkiraan laku sampai tutup. <b>Over stok</b>: perkiraan sisa saat tutup minimal 3 pcs dan 30%. Perkiraan laku memakai pola jual per jam outlet itu (pagi, siang, sore berbeda) dan kecepatan jual hari ini. Lost sales = perkiraan penjualan pada jam-jam setelah kue habis. Transfer yang belum tercatat di Daily Report belum terhitung. Pola per jam unik tiap outlet; <b>Produk baru</b> (riwayat di outlet itu kurang dari 20 hari) hanya ditampilkan stoknya sampai datanya cukup.</p>`;
+  const all=pick.flatMap(a=>a.rows),ids=selected!=='__all__'||state.area!=='all'?new Set(all.map(o=>o.id)):null,its=all.flatMap(o=>o.items.filter(it=>inGroup(it.lab)));
+  const count=k=>its.filter(it=>it.st===k).length,sum0=k=>its.reduce((s,it)=>s+(it[k]||0),0),lostRp=its.reduce((s,it)=>s+(it.lostNow||0)*(it.price||0),0),lostDayRp=its.reduce((s,it)=>s+(it.lostDay||0)*(it.price||0),0);
+  const age=c.lastH!=null?(c.now-c.lastH)*60:null,stale=age!=null&&age>STALE_MIN&&c.now<CLOSE,daily=c.dailyAt?hm(toH(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(c.dailyAt)))):'—';
+  const nTrips=transfers(c).trips.filter(t=>(!ids||ids.has(t.from)||ids.has(t.to))&&t.items.some(x=>inGroup(x.lab))).length;
+  const seg=`<div class="st-seg" role="tablist" aria-label="Tampilan">${[['stok','Stok'],['transfer','Rekomendasi transfer']].map(([k,t])=>`<button type="button" role="tab" data-st-view="${k}" aria-selected="${state.view===k}" class="${state.view===k?'on':''}">${t}${k==='transfer'&&nTrips?` <em>${nTrips}</em>`:''}</button>`).join('')}</div>`;
+  const fresh=`<div class="st-fresh${stale?' stale':''}"><i aria-hidden="true"></i><span>Data ${c.lastH!=null?hm(c.lastH):'—'}${stale?` · ${nf(age)} mnt belum berubah`:''}</span><small>Daily Report ${daily}</small></div>`;
+  const filters=`<div class="st-tools">${selected==='__all__'?sel('area',[['all','Semua area'],...[...byArea.values()].map(a=>[a.key,a.title])],state.area,'Area'):`<span class="st-one"><small>Outlet</small>${esc(name(selected))}</span>`}${sel('group',GROUPS.map(([k,t])=>[k,t]),state.group,'Produk')}${state.view==='stok'?sel('status',STATUS_OPTS,state.status||'all','Status'):''}</div>`;
+  let body;
+  if(state.view==='transfer')body=transferView(c,ids);
+  else{
+   const cards=[['habis',`lost ±${nf(sum0('lostNow'))} pcs`],['kurang',`kurang ±${nf(sum0('short'))} pcs`],['over',`sisa ±${nf(sum0('extra'))} pcs`],['normal','stok cukup']].map(([k,sub])=>`<button type="button" class="st-sum ${ST[k][1]}${state.status===k?' on':''}" data-st-status="${k}" aria-pressed="${state.status===k}"><span>${ST[k][0]}</span><strong>${nf(count(k))}</strong><small>${sub}</small></button>`).join('');
+   const lost=`<div class="st-sum lost"><span>Lost sales hari ini</span><strong>${lostRp?rp(lostRp):nf(sum0('lostNow'))+' pcs'}</strong><small>s.d. tutup ±${lostDayRp?rp(lostDayRp):nf(sum0('lostDay'))+' pcs'}</small></div>`;
+   const cols=LABELS.map((_,lab)=>lab).filter(lab=>inGroup(lab)&&all.some(o=>o.items.some(it=>it.lab===lab&&okStatus(it.st))));
+   const sections=pick.map(a=>{
+    const rows=a.rows.filter(o=>o.items.some(it=>inGroup(it.lab)&&okStatus(it.st))).sort((x,y)=>(a.centers.includes(y.id)-a.centers.includes(x.id))||name(x.id).localeCompare(name(y.id))).map(o=>{
+     const map=new Map(o.items.map(it=>[it.lab,it])),open=state.outlet===o.id;
+     const cells=cols.map(lab=>{const it=map.get(lab);if(!it)return '<td class="st-c empty">·</td>';return `<td class="st-c ${ST[it.st][1]}${okStatus(it.st)?'':' dim'}" title="${esc(LABELS[lab])}: ${ST[it.st][0]}">${cellText(it)}</td>`;}).join('');
+     return `<tr class="${open?'open':''}"><th scope="row"><button type="button" data-st-outlet="${esc(o.id)}" aria-expanded="${open}"><span class="st-caret">${open?'▾':'▸'}</span>${esc(name(o.id))}${a.centers.includes(o.id)?' <i>Center</i>':''}${o.day?'':' <em>tanpa Daily Report</em>'}</button></th>${cells}</tr>${open?`<tr class="st-open"><td colspan="${cols.length+1}">${detail(o)}</td></tr>`:''}`;}).join('');
+    if(!rows)return '';
+    return `<section class="st-area"><h3>${esc(a.title)}<small>${a.rows.length} outlet${a.centers.length?` · Center ${esc(a.centers.map(name).join(', '))}`:''}</small></h3><div class="st-scroll"><table class="st-grid"><thead><tr><th>Outlet</th>${cols.map(l=>`<th title="${esc(LABELS[l])}">${esc(SHORT[l])}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div></section>`;}).join('');
+   const legend=`<div class="st-legend">${['habis','kurang','normal','over','baru'].map(k=>pill(k)).join('')}<span class="st-hint">Angka = sisa stok sekarang · klik nama outlet untuk rincian</span></div>`;
+   body=`<div class="st-sums">${cards}${lost}</div>${legend}${sections||'<div class="st-empty"><b>Tidak ada yang cocok dengan filter ini.</b><span>Ubah pilihan status atau produk.</span></div>'}
+   <p class="wl-foot"><b>Kurang stok</b>: sisa kurang dari 80% perkiraan laku sampai tutup. <b>Over stok</b>: perkiraan sisa saat tutup minimal 3 pcs dan 30%. Perkiraan laku memakai pola jual per jam outlet itu sendiri (pagi, siang, sore berbeda) dan kecepatan jual hari ini. Lost sales = perkiraan penjualan pada jam-jam setelah kue habis. <b>Produk baru</b> (riwayat di outlet itu kurang dari 20 hari) hanya ditampilkan stoknya. Transfer hari ini baru terhitung setelah tercatat di Daily Report.</p>`;
+  }
+  return `<div class="st-top">${seg}${fresh}</div>${filters}<div class="st-body">${body}</div><p class="st-build">🚧 Sedang dibangun · input transfer menyusul</p>`;
  }
- function paint(){const el=document.getElementById('st-root');if(el)el.innerHTML=view();}
- document.addEventListener('click',e=>{if(!e.target.closest?.('#st-root'))return;const a=e.target.closest('[data-st-area]'),g=e.target.closest('[data-st-group]'),s=e.target.closest('[data-st-status]'),o=e.target.closest('[data-st-outlet]');
-  if(a){state.area=a.dataset.stArea;state.outlet=null;}else if(g)state.group=g.dataset.stGroup;else if(s)state.status=state.status===s.dataset.stStatus?null:s.dataset.stStatus;else if(o)state.outlet=state.outlet===o.dataset.stOutlet?null:o.dataset.stOutlet;else return;paint();});
+ function copy(text,btn){const done=()=>{const t=btn.textContent;btn.textContent='Tersalin ✓';btn.classList.add('ok');setTimeout(()=>{btn.textContent=t;btn.classList.remove('ok');},1800);};
+  const fallback=()=>{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}catch{}ta.remove();};
+  try{navigator.clipboard.writeText(text).then(done,fallback);}catch{fallback();}}
+ function paint(){const el=document.getElementById('st-root');if(!el)return;const f=document.activeElement;if(f&&el.contains(f)&&f.tagName==='SELECT')return;el.innerHTML=view();}
+ document.addEventListener('click',e=>{if(!e.target.closest?.('#st-root'))return;const v=e.target.closest('[data-st-view]'),s=e.target.closest('[data-st-status]'),o=e.target.closest('[data-st-outlet]'),cp=e.target.closest('[data-st-copy]');
+  if(cp){const k=cp.dataset.stCopy,list=k==='all'?lastTrips:[lastTrips[+k]].filter(Boolean);if(list.length)copy(`Transfer ${hm(Math.min(Math.max(nowHour(),OPEN),CLOSE))}:\n`+list.map(tripText).join('\n'),cp);return;}
+  if(v){state.view=v.dataset.stView;remember();}else if(s){state.status=state.status===s.dataset.stStatus?null:s.dataset.stStatus;}else if(o){state.outlet=state.outlet===o.dataset.stOutlet?null:o.dataset.stOutlet;}else return;paint();});
+ document.addEventListener('change',e=>{const t=e.target.closest?.('#st-root [data-st-sel]');if(!t)return;const k=t.dataset.stSel;if(k==='status')state.status=t.value==='all'?null:t.value;else{state[k]=t.value;state.outlet=null;remember();}t.blur();paint();});
  for(const ev of ['forecast-stock-live','forecast-data-refreshed'])window.addEventListener(ev,()=>{if(ev==='forecast-data-refreshed')baseCache=null;paint();});
  setInterval(()=>{if(!document.hidden)paint();},60000);
- return {compute,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Stok & Transfer</h2><span>Stok real time seluruh outlet</span></div><div id="st-root">${view()}</div>`;}};
+ return {compute,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Stok & Transfer</h2><span>Stok real time dan saran transfer antar-outlet</span></div><div id="st-root">${view()}</div>`;},transfers};
 })();
