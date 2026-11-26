@@ -14,7 +14,7 @@
 .st-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
 .st-area{margin-bottom:18px}
 .st-area>h3{margin:0 0 6px;color:#172b42;font-size:16px}
-.st-area>h3 small{color:#6d7d8d;font-size:12px;font-weight:500}
+.st-area>h3 small{margin-left:8px;color:#6d7d8d;font-size:12px;font-weight:500}
 .st-scroll{overflow-x:auto;background:#fff;border:1px solid #e0e7ed;border-radius:10px}
 .st-grid{width:100%;border-collapse:collapse;font-size:12px}
 .st-grid th,.st-grid td{padding:5px 6px;border-bottom:1px solid #eef2f5;text-align:center;white-space:nowrap}

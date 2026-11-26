@@ -89,7 +89,7 @@ window.ForecastStock=(()=>{
   if(it.st==='kurang')return `<strong>${nf(it.left)}</strong><small>habis ±${hm(it.at)}</small>`;
   if(it.st==='over')return `<strong>${nf(it.left)}</strong><small>sisa ±${nf(it.extra)}</small>`;
   if(it.st==='baru')return `<strong>${nf(Math.max(0,it.left))}</strong><small>produk baru</small>`;
-  if(it.st==='na')return `<strong>${nf(it.left)}</strong><small>${it.noSales?'jual tdk terbaca':'tanpa Daily'}</small>`;
+  if(it.st==='na')return `<strong>${nf(Math.max(0,it.left))}</strong><small>${it.noSales?'jual tdk terbaca':'tanpa Daily'}</small>`;
   return `<strong>${nf(it.left)}</strong><small>cukup</small>`;
  }
  function detail(o){
