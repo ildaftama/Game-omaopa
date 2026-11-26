@@ -92,9 +92,9 @@ window.ForecastNotice=(()=>{
   if(!A()?.isMaster?.())return;document.querySelector('.fn-modal')?.remove();const back=document.activeElement;
   const m=document.createElement('div');m.className='fn-modal';
   m.innerHTML=`<form class="fn-card" role="dialog" aria-modal="true" aria-labelledby="fn-title" action="javascript:void 0"><h3 id="fn-title">Kirim pengumuman System</h3><p class="fn-sub">Dikirim atas nama <b>System</b>, bukan nama Anda.</p>
-<label>Judul <small>(opsional, tampil tebal)</small><input name="ntitle" maxlength="80" placeholder="mis. Update: Rekomendasi transfer"></label>
+<label><span>Judul <small>(opsional, tampil tebal)</small></span><input name="ntitle" maxlength="80" placeholder="mis. Update: Rekomendasi transfer"></label>
 <label>Pesan<textarea name="ntext" maxlength="1000" rows="4" required placeholder="Tulis isi pengumuman. Alamat web (https://…) otomatis bisa diklik."></textarea><small class="fn-count">0/1000</small></label>
-<label>Tautan ke tab <small>(pembaca tinggal klik untuk membuka tab ini)</small><select name="nlink">${LINKS.map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join('')}</select></label>
+<label><span>Tautan ke tab <small>(pembaca tinggal klik untuk membuka tab ini)</small></span><select name="nlink">${LINKS.map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join('')}</select></label>
 <fieldset><legend>Kirim ke</legend><label class="fn-check"><input type="checkbox" name="nchat" ${def.chat?'checked':''}> Chat tim <small>tampil sebagai pesan System</small></label><label class="fn-check"><input type="checkbox" name="nnotif" ${def.notif?'checked':''}> Notifikasi 🔔 <small>lonceng di kanan atas + pemberitahuan singkat</small></label></fieldset>
 <div class="fn-prev-wrap"><span>Pratinjau</span><div class="fn-prev"></div></div>
 <p class="fn-msg" role="status"></p><div class="fn-actions"><button type="button" class="button quiet" data-fn-close>Batal</button><button type="submit" class="button fp-primary">Kirim</button></div></form>`;
