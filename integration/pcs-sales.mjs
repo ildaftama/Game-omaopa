@@ -35,7 +35,7 @@ export function sku(name){
 }
 export function summarize(rows,{date,branchName}){
  if(!Array.isArray(rows))throw Error('Format rincian ESB tidak sesuai.');
- const qty=PRODUCTS.map(()=>0),free=PRODUCTS.map(()=>0);let unknownCake=0,netSales=0;const unmappedMenus=new Set();
+ const qty=PRODUCTS.map(()=>0),free=PRODUCTS.map(()=>0),layer=[0,0];let unknownCake=0,netSales=0;const unmappedMenus=new Set();
  for(const r of rows){
   if(r.salesDate!==date||r.branchName!==branchName)throw Error('Tanggal atau outlet ESB berbeda.');
   if(r.salesType!=='Sales')continue;
@@ -49,6 +49,9 @@ export function summarize(rows,{date,branchName}){
   if(r.rowType==='PACKAGE_COMPONENT')continue;
   if(!['ALACARTE','PACKAGE_HEADER'].includes(r.rowType))throw Error('Jenis baris ESB belum dikenali.');
   const p=sku(r.menuName),box=String(r.menuName).trim().toLowerCase(),miniBoxes={'mini ogura filling mix':[[4,3],[5,3],[6,3]],'mini ogura filling chocolate':[[5,9]],'mini ogura filling choco & cheese':[[4,4],[5,5]]},parts=miniBoxes[box]||(p===null?null:[[p,1]]);
+  // Sweet Layer (owner 2026-11-26): belum masuk 20 produk PCS, dicatat terpisah untuk stok berjalan.
+  const lm=box.match(/^sweet layer\b.*?(150|300)\s*ml/);
+  if(lm&&Number.isSafeInteger(r.qty)&&r.qty>0){layer[lm[1]==='150'?0:1]+=r.qty;continue;}
   if(!parts){
    // Toppings, packaging and add-ons never create an additional cake. Same net for any "roti"
    // family name (termasuk rasa baru yang belum ditambahkan) yang belum cocok pola di sku() --
@@ -64,7 +67,7 @@ export function summarize(rows,{date,branchName}){
   for(const [index,multiplier]of parts)(r.total-r.discountTotal<=0?free:qty)[index]+=r.qty*multiplier;
  }
  if(unknownCake)throw Object.assign(Error('Ada nama menu kue baru yang perlu dipetakan.'),{unmappedMenus:[...unmappedMenus]});
- return {qty,free,mappingVersion:MAPPING_VERSION,netSales};
+ return {qty,free,mappingVersion:MAPPING_VERSION,netSales,...(layer[0]||layer[1]?{layer}:{})};
 }
 export function range(from,to){
  const dates=[];

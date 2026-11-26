@@ -2,14 +2,14 @@
 // Sheet hanya dibaca. ID folder ada di dokumen privat, dan log tidak boleh berisi angka outlet.
 import { parseCsv } from './waste-recap.mjs';
 
-export const STOCK_LABELS = ['Ogura Cheese', 'Ogura Choco', 'Malmil Cheese', 'Malmil Choco', 'Malmil Cheese Less Sugar', 'Malmil Choco Less Sugar', 'Mini Ogura', 'Chiffon Keju', 'Chiffon Ekstra Keju', 'Chiffon Butter', 'Chiffon Kurma', 'Chiffon Lite Ekstra Keju', 'Chiffon Lite Keju', 'Roti Sosis', 'Roti Abon', 'Roti Coklat', 'Roti Coklat Keju', 'Roti Coklat Pisang', 'Roti Vanilla'];
+export const STOCK_LABELS = ['Ogura Cheese', 'Ogura Choco', 'Malmil Cheese', 'Malmil Choco', 'Malmil Cheese Less Sugar', 'Malmil Choco Less Sugar', 'Mini Ogura', 'Chiffon Keju', 'Chiffon Ekstra Keju', 'Chiffon Butter', 'Chiffon Kurma', 'Chiffon Lite Ekstra Keju', 'Chiffon Lite Keju', 'Roti Sosis', 'Roti Abon', 'Roti Coklat', 'Roti Coklat Keju', 'Roti Coklat Pisang', 'Roti Vanilla', 'Sweet Layer 150 ml', 'Sweet Layer 300 ml'];
 export const TAB_ID = { JAKAL: 'jakal-uii', TAJEM: 'tajem', 'NUSA INDAH': 'nusa-indah', UMY: 'umy', GODEAN: 'godean', MERBABU: 'merbabu', RAJAWALI: 'rajawali', MAGELANG: 'pemuda-magelang', MUNTILAN: 'muntilann', TEMANGGUNG: 'temanggung', NGALIYAN: 'ngaliyan', SAMPANGAN: 'sampangan', UNNES: 'unnes', AMBARAWA: 'ambarawa', UKSW: 'uksw', UNDIP: 'undip', UNIMUS: 'unimus', GAJAH: 'gajah-raya', UDINUS: 'udinus', SRAGEN: 'sragen', KARANGANYAR: 'karanganyar', JEBRES: 'uns', NUSUKAN: 'nusukan', BOYOLALI: 'boyolali', SUKOHARJO: 'sukoharjo', LAWEYAN: 'laweyan', 'MAKAM HAJI': 'makamhaji', UMS: 'ums' };
 const MONTHS = ['JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI', 'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'];
 const KEEP_DAYS = 75;
 
 export function stockLabel(item) {
   const s = String(item).toLowerCase().replace(/\s+/g, ' ').trim();
-  const rules = [[/^ogura cheese/, 0], [/^ogura choc/, 1], [/^malmil cheese less/, 4], [/^malmil choc\w* less/, 5], [/^malmil cheese/, 2], [/^malmil choc/, 3], [/^mini ogura - /, 6], [/^cisfon lite - ekstra/, 11], [/^cisfon lite - keju/, 12], [/^cisfon - ekstra/, 8], [/^cisfon - keju/, 7], [/^cisfon - butter/, 9], [/^cisfon - kurma/, 10], [/^roti manis sosis/, 13], [/^roti manis abon/, 14], [/^roti manis coklat meses/, 15], [/^roti manis coklat keju/, 16], [/^roti manis (coklat pisang|pisang coklat)/, 17], [/^roti manis vanilla/, 18]];
+  const rules = [[/^ogura cheese/, 0], [/^ogura choc/, 1], [/^malmil cheese less/, 4], [/^malmil choc\w* less/, 5], [/^malmil cheese/, 2], [/^malmil choc/, 3], [/^mini ogura - /, 6], [/^cisfon lite - ekstra/, 11], [/^cisfon lite - keju/, 12], [/^cisfon - ekstra/, 8], [/^cisfon - keju/, 7], [/^cisfon - butter/, 9], [/^cisfon - kurma/, 10], [/^roti manis sosis/, 13], [/^roti manis abon/, 14], [/^roti manis coklat meses/, 15], [/^roti manis coklat keju/, 16], [/^roti manis (coklat pisang|pisang coklat)/, 17], [/^roti manis vanilla/, 18], [/^(ogura|sweet) layer\b.*150/, 19], [/^(ogura|sweet) layer\b.*300/, 20]];
   const hit = rules.find(([re]) => re.test(s));
   return hit ? hit[1] : null;
 }

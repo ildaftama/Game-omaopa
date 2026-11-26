@@ -15,6 +15,7 @@ const MAX_SNAPS = 70;
 export function soldVector(result) {
   const v = STOCK_LABELS.map(() => 0);
   PCS_TO_STOCK.forEach((s, p) => { v[s] += (result.qty?.[p] || 0) + (result.free?.[p] || 0); });
+  if (result.layer) { v[19] += result.layer[0] || 0; v[20] += result.layer[1] || 0; }
   return v;
 }
 const hhmm = iso => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));

@@ -10,14 +10,14 @@ window.ForecastStock=(()=>{
  const nowHour=()=>{const p=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date()).split(':').map(Number);return p[0]%24+p[1]/60;};
  const hm=h=>{const m=Math.round(h*60);return `${String(Math.floor(m/60)).padStart(2,'0')}.${String(m%60).padStart(2,'0')}`;};
  const toH=t=>{const [a,b]=String(t).split(':').map(Number);return a+b/60;};
- const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Malmil Cheese Less Sugar','Malmil Choco Less Sugar','Mini Ogura','Chiffon Keju','Chiffon Ekstra Keju','Chiffon Butter','Chiffon Kurma','Chiffon Lite Ekstra Keju','Chiffon Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Keju','Roti Coklat Pisang','Roti Vanilla'];
- const SHORT=['Ogura Ch','Ogura Co','Malmil Ch','Malmil Co','Malmil Ch LS','Malmil Co LS','Mini','Chif Keju','Chif EK','Chif Butter','Chif Kurma','Lite EK','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti C.Keju','Roti C.Pisang','Roti Vanilla'];
- const FAM=[0,0,1,1,1,1,2,3,3,3,3,4,4,5,5,5,5,5,5],FAMS=['Ogura','Malmil','Mini','Chiffon','Lite','Roti'],FAM_NET=['Ogura','Malmil','Mini','Chiffon','Lite','Roti'];
- const GROUPS=[['all','Semua produk',null],['ogura','Ogura',[0]],['malmil','Malmil',[1]],['mini','Mini',[2]],['chiffon','Chiffon',[3,4]],['roti','Roti',[5]]];
+ const LABELS=['Ogura Cheese','Ogura Choco','Malmil Cheese','Malmil Choco','Malmil Cheese Less Sugar','Malmil Choco Less Sugar','Mini Ogura','Chiffon Keju','Chiffon Ekstra Keju','Chiffon Butter','Chiffon Kurma','Chiffon Lite Ekstra Keju','Chiffon Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Keju','Roti Coklat Pisang','Roti Vanilla','Sweet Layer 150 ml','Sweet Layer 300 ml'];
+ const SHORT=['Ogura Ch','Ogura Co','Malmil Ch','Malmil Co','Malmil Ch LS','Malmil Co LS','Mini','Chif Keju','Chif EK','Chif Butter','Chif Kurma','Lite EK','Lite Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti C.Keju','Roti C.Pisang','Roti Vanilla','Layer 150','Layer 300'];
+ const FAM=[0,0,1,1,1,1,2,3,3,3,3,4,4,5,5,5,5,5,5,6,6],FAMS=['Ogura','Malmil','Mini','Chiffon','Lite','Roti','Sweet Layer'],FAM_NET=['Ogura','Malmil','Mini','Chiffon','Lite','Roti','Ogura'];
+ const GROUPS=[['all','Semua produk',null],['ogura','Ogura',[0]],['malmil','Malmil',[1]],['mini','Mini',[2]],['chiffon','Chiffon',[3,4]],['roti','Roti',[5]],['layer','Sweet Layer',[6]]];
  const MALMIL=new Set([2,3,4,5]),NO_SALES=new Set([10]);
- const PRICE=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Malmil Cheese Less Sugar','Malmil Chocolate Less Sugar','Mini Ogura - Cheese','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter',null,'Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Keju','Roti Pisang Coklat','Roti Vanilla'];
+ const PRICE=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Malmil Cheese Less Sugar','Malmil Chocolate Less Sugar','Mini Ogura - Cheese','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter',null,'Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Keju','Roti Pisang Coklat','Roti Vanilla',null,null];
  // Harga jual: harga realisasi outlet (4 produk utama), selain itu harga acuan Dashboard (PRICE_REFS).
- const REF=[0,0,0,0,0,0,57000/9,33000,34000,34000,0,19000,18000,6500,7000,6000,6000,6000,6000],SAME=[0,1,2,3,2,3];
+ const REF=[0,0,0,0,0,0,57000/9,33000,34000,34000,0,19000,18000,6500,7000,6000,6000,6000,6000,14000,25000],SAME=[0,1,2,3,2,3];
  const priceOf=(prices,id,lab)=>(lab<6?prices[id]?.[PRICE[SAME[lab]]]?.price:0)||REF[lab]||0;
  const OPEN=8,CLOSE=20,PRIOR_W=.3,KURANG=.8,STALE_MIN=40;
  const ST={habis:['Habis','habis'],kurang:['Kurang stok','kurang'],normal:['Normal','normal'],over:['Over stok','over'],na:['Belum terbaca','na']};
