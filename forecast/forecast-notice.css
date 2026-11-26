@@ -72,3 +72,13 @@
 .fn-msg:empty{display:none}
 .fn-actions{display:flex;justify-content:flex-end;gap:8px}
 @media (max-width:650px){.fn-btn{width:36px;height:36px}.fn-panel{position:fixed;top:70px;right:12px}.fn-toast{top:70px;right:12px}}
+
+/* Tanda dibaca (owner 2026-11-26): pengirim & Master melihat siapa saja yang sudah/belum membaca. */
+.fc-rcpt{display:flex;align-items:center;gap:4px;margin:4px 0 0 auto;padding:1px 2px;border:0;background:none;color:#8494a3;font:11.5px inherit;font-family:inherit;cursor:pointer}
+.fc-rcpt i{font-style:normal;font-weight:700;letter-spacing:-2px;margin-right:2px}
+.fc-rcpt.some{color:#5b7a8a}
+.fc-rcpt.all{color:#1f7fb8}
+.fc-rcpt:hover{text-decoration:underline}
+.fc-rcpt-det{display:flex;flex-direction:column;gap:2px;margin-top:4px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.75);color:#33434f;font-size:11.5px;line-height:1.4}
+.fc-rcpt-det b{color:#172b42}
+.fn-list .fc-rcpt{margin-left:0}

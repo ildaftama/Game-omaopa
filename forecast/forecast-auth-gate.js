@@ -179,7 +179,11 @@ window.ForecastNoticeAPI={
 };
 window.ForecastWhoAmI=()=>({name:myName(),role:myRole()});
 let beatT=null;
-function beat(online=true){if(!auth.currentUser||!window.ForecastAuth)return Promise.resolve();return setDoc(presRef(auth.currentUser.uid),{name:myName(),role:myRole(),char:String(window.ForecastAuth.role?.char||''),at:serverTimestamp(),online}).catch(()=>{});}
+// merge:true supaya tanda baca (chatRead/noticeRead) tidak terhapus oleh detak status online.
+function beat(online=true,extra){if(!auth.currentUser||!window.ForecastAuth)return Promise.resolve();return setDoc(presRef(auth.currentUser.uid),{name:myName(),role:myRole(),char:String(window.ForecastAuth.role?.char||''),at:serverTimestamp(),online,...(extra||{})},{merge:true}).catch(()=>{});}
+// Tanda sudah dibaca (owner 2026-11-26): waktu pesan/pengumuman terakhir yang sudah dilihat akun ini.
+const seenSent={};
+window.ForecastMarkSeen=(field,t)=>{if(!['chatRead','noticeRead'].includes(field)||!(t>0)||t<=(seenSent[field]||0))return Promise.resolve();seenSent[field]=t;return beat(true,{[field]:Timestamp.fromMillis(Math.floor(t))});};
 function startPresence(){clearInterval(beatT);beat(true);beatT=setInterval(()=>beat(true),60e3);}
 window.addEventListener('pagehide',()=>{beat(false);});
 // Log perubahan (owner 2026-11-24): dibaca Master & Factory Manager, disimpan 90 hari.

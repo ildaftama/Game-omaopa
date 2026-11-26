@@ -1,6 +1,7 @@
 // Chat tim (owner 2026-11-24): satu grup untuk semua akun Forecast, titik hijau untuk yang sedang
 // membuka web, bunyi "ting" untuk pesan baru, Master bisa hapus pesan.
 // Owner 2026-11-25: pesan sendiri bisa DIEDIT dalam 10 menit (tanda "diedit") dan DITARIK dalam 2 menit.
+// Owner 2026-11-26: tanda dibaca — pengirim & Master melihat siapa saja yang sudah/belum membaca.
 // Owner 2026-11-26: pengumuman System dari Master (forecast-notice.js) ikut tampil di sini dengan tautan ke tab.
 window.ForecastChat=(()=>{
  'use strict';
@@ -10,10 +11,20 @@ window.ForecastChat=(()=>{
  let notes=[],notesFirst=true,msgs=[],pres=[],open=false,stopM=null,stopP=null,first=true,unread=0,el=null,tick=null,cleaned=false,audio=null,editing=null,busy=false;
  const A=()=>window.ForecastChatAPI,me=()=>A()?.uid?.();
  const readKey=()=>'forecast-chat-read-'+me();
- const lastRead=()=>{try{return +localStorage.getItem(readKey())||0;}catch{return 0;}};
+ const myPres=()=>pres.find(p=>p.uid===me());
+ const lastRead=()=>{let l=0;try{l=+localStorage.getItem(readKey())||0;}catch{}return Math.max(l,ms(myPres()?.chatRead));};
  const lastAt=()=>Math.max(msgs.length?ms(msgs.at(-1).at):0,notes.length?ms(notes.at(-1).at):0)||Date.now();
  const N=()=>window.ForecastNotice,rich=t=>N()?.rich?N().rich(t):esc(t);
- const markRead=()=>{const t=lastAt();try{localStorage.setItem(readKey(),String(t));}catch{}unread=0;badge();};
+ const markRead=()=>{const t=lastAt();try{localStorage.setItem(readKey(),String(t));}catch{}window.ForecastMarkSeen?.('chatRead',t);unread=0;badge();};
+ // Penerima = akun yang aktif 30 hari terakhir selain pengirim. Sudah baca bila tanda bacanya >= waktu pesan.
+ let rcptOpen=null;
+ const audience=by=>pres.filter(p=>p.uid!==by&&(isOnline(p)||Date.now()-ms(p.at)<30*864e5));
+ function receipt(id,by,at,isRead){
+  const all=audience(by);if(!all.length)return '';const done=all.filter(isRead),wait=all.filter(p=>!isRead(p)),full=done.length===all.length;
+  const label=full?'Dibaca semua':done.length?`Dibaca ${done.length} dari ${all.length}`:'Terkirim, belum dibaca';
+  const det=rcptOpen===id?`<div class="fc-rcpt-det">${done.length?`<span><b>Sudah:</b> ${done.map(p=>esc(p.name)).join(', ')}</span>`:''}${wait.length?`<span><b>Belum:</b> ${wait.map(p=>esc(p.name)).join(', ')}</span>`:''}</div>`:'';
+  return `<button type="button" class="fc-rcpt ${full?'all':done.length?'some':''}" data-fc-rcpt="${esc(id)}" aria-expanded="${rcptOpen===id}" title="Klik untuk lihat siapa saja"><i aria-hidden="true">${done.length?'✓✓':'✓'}</i>${label}</button>${det}`;
+ }
  function ting(){
   try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();const t0=audio.currentTime;
    [[1318.5,0],[1760,.11]].forEach(([f,d])=>{const o=audio.createOscillator(),g=audio.createGain();o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t0+d);g.gain.linearRampToValueAtTime(.16,t0+d+.012);g.gain.exponentialRampToValueAtTime(.0001,t0+d+.32);o.connect(g).connect(audio.destination);o.start(t0+d);o.stop(t0+d+.34);});
@@ -32,8 +43,8 @@ window.ForecastChat=(()=>{
   return `<div class="fc-people"><span class="fc-count">${on} online</span>${list.map(p=>`<span class="fc-person ${isOnline(p)?'on':''}" title="${esc(isOnline(p)?'Sedang membuka web':'Terakhir '+ago(p.at))}"><i></i>${esc(p.name)}${p.uid===me()?' (Anda)':''}<small>${esc(ROLE[p.role]||'')}</small></span>`).join('')}</div>`;
  }
  function sysMsg(n,master){
-  const lab=N()?.linkLabel?.(n.link);
-  return `<div class="fc-sys"><div class="fc-sys-head"><b>System</b><span>Pengumuman</span><time>${hhmm(n.at)}</time>${master?`<button type="button" data-fc-ndel="${esc(n.id)}">Hapus</button>`:''}</div>${n.title?`<strong>${esc(n.title)}</strong>`:''}<p>${rich(n.text)}</p>${lab?`<button type="button" class="fc-go" data-fn-go="${esc(n.link)}">Buka ${esc(lab)} →</button>`:''}</div>`;
+  const lab=N()?.linkLabel?.(n.link),t=ms(n.at),rc=master||n.by===me()?receipt('n:'+n.id,n.by,n.at,p=>(n.chat&&ms(p.chatRead)>=t)||(n.notif&&ms(p.noticeRead)>=t)):'';
+  return `<div class="fc-sys"><div class="fc-sys-head"><b>System</b><span>Pengumuman</span><time>${hhmm(n.at)}</time>${master?`<button type="button" data-fc-ndel="${esc(n.id)}">Hapus</button>`:''}</div>${n.title?`<strong>${esc(n.title)}</strong>`:''}<p>${rich(n.text)}</p>${lab?`<button type="button" class="fc-go" data-fn-go="${esc(n.link)}">Buka ${esc(lab)} →</button>`:''}${rc}</div>`;
  }
  function list(){
   if(!msgs.length&&!notes.length)return '<p class="fc-empty">Belum ada pesan. Sapa tim di sini.</p>';
@@ -45,7 +56,7 @@ window.ForecastChat=(()=>{
    const act=(mine&&eLeft>0&&!ed?`<button type="button" class="fc-edit" data-fc-edit="${esc(m.id)}" title="Bisa diedit sampai 10 menit setelah dikirim">Edit (${mmss(eLeft)})</button>`:'')
     +(mine&&left>0?`<button type="button" data-fc-unsend="${esc(m.id)}" title="Bisa ditarik sampai 2 menit setelah dikirim">Tarik (${mmss(left)})</button>`:master?`<button type="button" data-fc-del="${esc(m.id)}">Hapus</button>`:'');
    const body=ed?`<div class="fc-editbox"><textarea data-fc-edit-text maxlength="1000" aria-label="Edit pesan">${esc(m.text)}</textarea><div><button type="button" data-fc-save="${esc(m.id)}" ${eLeft>0&&!busy?'':'disabled'}>${busy?'Menyimpan…':'Simpan'}</button><button type="button" data-fc-cancel>Batal</button><span>${eLeft>0?`sisa waktu edit ${mmss(eLeft)} · Enter simpan, Esc batal`:'Waktu edit 10 menit sudah habis.'}</span></div></div>`:`<p>${rich(m.text)}</p>`;
-   out+=`<div class="fc-msg ${mine?'mine':''}"><div class="fc-meta"><b>${esc(mine?'Anda':m.name)}</b>${role&&!mine?`<span>${esc(role)}</span>`:''}<time>${hhmm(m.at)}</time>${m.editedAt?'<em>(diedit)</em>':''}${act}</div>${body}</div>`;}
+   out+=`<div class="fc-msg ${mine?'mine':''}"><div class="fc-meta"><b>${esc(mine?'Anda':m.name)}</b>${role&&!mine?`<span>${esc(role)}</span>`:''}<time>${hhmm(m.at)}</time>${m.editedAt?'<em>(diedit)</em>':''}${act}</div>${body}${mine||master?receipt(m.id,m.uid,m.at,p=>ms(p.chatRead)>=ms(m.at)):''}</div>`;}
   return out;
  }
  function paint(keepScroll){
@@ -79,6 +90,7 @@ window.ForecastChat=(()=>{
    busy=true;paint(true);try{await A().edit(id,v);err.textContent='';stopEdit();}catch{busy=false;paint(true);err.textContent='Pesan belum terubah. Waktu edit (10 menit) mungkin sudah lewat, atau koneksi terputus.';}
   }
   listEl.addEventListener('click',async e=>{
+   const rc=e.target.closest('[data-fc-rcpt]');if(rc){rcptOpen=rcptOpen===rc.dataset.fcRcpt?null:rc.dataset.fcRcpt;paint(true);return;}
    const go=e.target.closest('[data-fn-go]');if(go){setOpen(false);N()?.goTo?.(go.dataset.fnGo);return;}
    const nd=e.target.closest('[data-fc-ndel]');if(nd){if(!confirm('Hapus pengumuman ini? Pengumuman hilang dari chat dan notifikasi semua akun.'))return;try{await window.ForecastNoticeAPI.remove(nd.dataset.fcNdel);}catch{err.textContent='Pengumuman belum terhapus.';}return;}
    const ed=e.target.closest('[data-fc-edit]');if(ed){startEdit(ed.dataset.fcEdit);return;}
@@ -100,7 +112,7 @@ window.ForecastChat=(()=>{
    badge();if(open)paint(true);
    if(!cleaned&&A().isMaster?.()){cleaned=true;A().cleanup?.().catch(()=>{});}
   });
-  stopP=A().listenPresence(list=>{if(list){pres=list;if(open)el.querySelector('.fc-people-wrap').innerHTML=people();}});
+  stopP=A().listenPresence(list=>{if(list){pres=list;if(open)paint(true);}});
   const onNotes=all=>{const list=(all||[]).filter(n=>n.chat),prev=new Set(notes.map(n=>n.id)),fresh=list.filter(n=>!prev.has(n.id)&&n.by!==me());notes=list;
    if(notesFirst){notesFirst=false;const lr=lastRead();unread+=notes.filter(n=>n.by!==me()&&ms(n.at)>lr).length;}
    else if(fresh.length){ting();if(open&&!document.hidden)markRead();else unread+=fresh.length;}

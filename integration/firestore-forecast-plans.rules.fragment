@@ -337,7 +337,9 @@ match /forecastNotice/{id} {
 match /forecastPresence/{uid} {
   allow read: if forecastCommunity();
   allow create, update: if request.auth != null && request.auth.uid == uid && forecastCommunity()
-    && request.resource.data.keys().hasOnly(['name','role','char','at','online'])
+    && request.resource.data.keys().hasOnly(['name','role','char','at','online','chatRead','noticeRead'])
+    && request.resource.data.get('chatRead', request.time) is timestamp
+    && request.resource.data.get('noticeRead', request.time) is timestamp
     && request.resource.data.name is string && request.resource.data.name.size() <= 60
     && request.resource.data.role is string && request.resource.data.role.size() <= 20
     && request.resource.data.char is string && request.resource.data.char.size() <= 4

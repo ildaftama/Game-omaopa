@@ -20,8 +20,15 @@ window.ForecastNotice=(()=>{
  const A=()=>window.ForecastNoticeAPI,me=()=>A()?.uid?.();
  let items=[],first=true,el=null,open=false,seenBefore=0,toastT=null,audio=null,cleaned=false;
  const readKey=()=>'forecast-notice-read-'+me();
- const lastRead=()=>{try{return +localStorage.getItem(readKey())||0;}catch{return 0;}};
- const setRead=t=>{try{localStorage.setItem(readKey(),String(t));}catch{}};
+ let pres=[],rcptOpen=null;
+ const lastRead=()=>{let l=0;try{l=+localStorage.getItem(readKey())||0;}catch{}return Math.max(l,ms(pres.find(p=>p.uid===me())?.noticeRead));};
+ const setRead=t=>{try{localStorage.setItem(readKey(),String(t));}catch{}window.ForecastMarkSeen?.('noticeRead',t);};
+ // Tanda dibaca untuk Master: akun aktif 30 hari terakhir; dibaca lewat lonceng atau lewat chat.
+ function receipt(n){
+  const t=ms(n.at),all=pres.filter(p=>p.uid!==n.by&&Date.now()-ms(p.at)<30*864e5);if(!all.length)return '';
+  const ok=p=>(n.notif&&ms(p.noticeRead)>=t)||(n.chat&&ms(p.chatRead)>=t),done=all.filter(ok),wait=all.filter(p=>!ok(p)),full=done.length===all.length;
+  return `<button type="button" class="fc-rcpt ${full?'all':done.length?'some':''}" data-fn-rcpt="${esc(n.id)}" aria-expanded="${rcptOpen===n.id}"><i aria-hidden="true">${done.length?'✓✓':'✓'}</i>${full?'Dibaca semua':done.length?`Dibaca ${done.length} dari ${all.length}`:'Belum dibaca'}</button>${rcptOpen===n.id?`<div class="fc-rcpt-det">${done.length?`<span><b>Sudah:</b> ${done.map(p=>esc(p.name)).join(', ')}</span>`:''}${wait.length?`<span><b>Belum:</b> ${wait.map(p=>esc(p.name)).join(', ')}</span>`:''}</div>`:''}`;
+ }
  const notifs=()=>items.filter(n=>n.notif);
  const unread=()=>{const lr=lastRead();return notifs().filter(n=>ms(n.at)>lr&&n.by!==me()).length;};
  const ago=t=>{const m=Math.round((Date.now()-ms(t))/60e3);return m<1?'baru saja':m<60?m+' menit lalu':m<1440?Math.round(m/60)+' jam lalu':Math.round(m/1440)+' hari lalu';};
@@ -53,7 +60,7 @@ window.ForecastNotice=(()=>{
   const list=notifs().slice().reverse(),master=A()?.isMaster?.();
   const head=`<header><h2>Notifikasi</h2>${master?'<button type="button" class="fn-new" data-fn-compose>+ Buat notifikasi</button>':''}</header>`;
   if(!list.length)return head+`<p class="fn-empty">Belum ada notifikasi.${master?' Kirim pengumuman pertama lewat tombol di atas.':''}</p>`;
-  return head+`<ul class="fn-list">${list.map(n=>`<li class="${ms(n.at)>seenBefore&&n.by!==me()?'new':''}"><div class="fn-top"><b>${esc(n.title||'Update dari System')}</b><time title="${esc(new Date(ms(n.at)).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'}))}">${ago(n.at)}</time></div><p>${rich(n.text)}</p><div class="fn-acts">${goBtn(n.link,'fn-go')}${master?`<button type="button" class="fn-del" data-fn-del="${esc(n.id)}">Hapus</button>`:''}</div></li>`).join('')}</ul><p class="fn-foot">Notifikasi disimpan 30 hari.</p>`;
+  return head+`<ul class="fn-list">${list.map(n=>`<li class="${ms(n.at)>seenBefore&&n.by!==me()?'new':''}"><div class="fn-top"><b>${esc(n.title||'Update dari System')}</b><time title="${esc(new Date(ms(n.at)).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'}))}">${ago(n.at)}</time></div><p>${rich(n.text)}</p><div class="fn-acts">${goBtn(n.link,'fn-go')}${master?`<button type="button" class="fn-del" data-fn-del="${esc(n.id)}">Hapus</button>`:''}</div>${master||n.by===me()?receipt(n):''}</li>`).join('')}</ul><p class="fn-foot">Notifikasi disimpan 30 hari.</p>`;
  }
  function paint(){if(el&&open)el.querySelector('.fn-panel').innerHTML=panelHtml();badge();}
  function setOpen(v){
@@ -68,7 +75,8 @@ window.ForecastNotice=(()=>{
   anchor?anchor.before(el):document.querySelector('.header-right').prepend(el);
   el.querySelector('.fn-btn').addEventListener('click',e=>{e.stopPropagation();setOpen(!open);});
   el.querySelector('.fn-panel').addEventListener('click',async e=>{
-   const go=e.target.closest('[data-fn-go]'),del=e.target.closest('[data-fn-del]');
+   const go=e.target.closest('[data-fn-go]'),del=e.target.closest('[data-fn-del]'),rc=e.target.closest('[data-fn-rcpt]');
+   if(rc){e.stopPropagation();rcptOpen=rcptOpen===rc.dataset.fnRcpt?null:rc.dataset.fnRcpt;paint();return;}
    if(e.target.closest('[data-fn-compose]')){setOpen(false);compose({chat:false,notif:true});return;}
    if(go){setOpen(false);goTo(go.dataset.fnGo);return;}
    if(del){if(!confirm('Hapus pengumuman ini? Pengumuman hilang dari notifikasi dan chat semua akun.'))return;try{await A().remove(del.dataset.fnDel);}catch{alert('Pengumuman belum terhapus. Periksa koneksi lalu coba lagi.');}}
@@ -118,6 +126,7 @@ window.ForecastNotice=(()=>{
 
  function start(){
   if(!A()||!window.ForecastAuth)return;mount();
+  window.ForecastChatAPI?.listenPresence?.(l=>{if(l){pres=l;paint();}});
   A().listen(list=>{
    if(list==null){window.dispatchEvent(new CustomEvent('forecast-notice',{detail:{items:[],error:true}}));return;}
    const prev=new Set(items.map(n=>n.id)),fresh=list.filter(n=>!prev.has(n.id)&&n.by!==me());items=list;
