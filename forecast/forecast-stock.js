@@ -20,14 +20,16 @@ window.ForecastStock=(()=>{
  const REF=[0,0,0,0,0,0,57000/9,33000,34000,34000,0,19000,18000,6500,7000,6000,6000,6000,6000,14000,25000],SAME=[0,1,2,3,2,3];
  const priceOf=(prices,id,lab)=>(lab<6?prices[id]?.[PRICE[SAME[lab]]]?.price:0)||REF[lab]||0;
  const OPEN=8,CLOSE=20,PRIOR_W=.3,KURANG=.8,STALE_MIN=40;
- const ST={habis:['Habis','habis'],kurang:['Kurang stok','kurang'],normal:['Normal','normal'],over:['Over stok','over'],na:['Belum terbaca','na']};
+ const ST={habis:['Habis','habis'],kurang:['Kurang stok','kurang'],normal:['Normal','normal'],over:['Over stok','over'],na:['Belum terbaca','na'],baru:['Produk baru','baru']};
  const state={area:'all',group:'all',status:null,outlet:null};let selected='__all__',baseCache=null;
  const name=id=>window.OUTLET_INTELLIGENCE?.outlets?.[id]?.name||id;
  const weekend=d=>{const w=new Date(d+'T00:00:00Z').getUTCDay();return w===0||w===6;};
  // Pola per jam: 12 slot 08-19. Fallback pola jaringan per keluarga produk, lalu rata.
  function profile(id,lab,d){
-  const P=window.ForecastHourProfile,ty=weekend(d)?1:0,p=P?.outlets?.[id]?.[lab]?.[ty]||P?.network?.[FAM_NET[FAM[lab]]]?.[ty];
-  return Array.isArray(p)&&p.length===CLOSE-OPEN?p:Array(CLOSE-OPEN).fill(1/(CLOSE-OPEN));
+  // Owner 2026-11-26: pola harus unik per outlet, tanpa meminjam data outlet lain atau dipukul rata.
+  // Outlet x produk tanpa riwayat cukup (< 20 hari) = produk baru: tampilkan stok saja.
+  const P=window.ForecastHourProfile,ty=weekend(d)?1:0,p=P?.outlets?.[id]?.[lab]?.[ty];
+  return Array.isArray(p)&&p.length===CLOSE-OPEN?p:null;
  }
  const cum=(p,h)=>{if(h<=OPEN)return 0;if(h>=CLOSE)return 1;let s=0;const i=Math.floor(h-OPEN);for(let k=0;k<i;k++)s+=p[k];return Math.min(1,s+p[i]*(h-OPEN-i));};
  // Jam ketika penjualan kumulatif mencapai bagian `target` dari permintaan sehari.
@@ -44,7 +46,7 @@ window.ForecastStock=(()=>{
   const map=new Map();for(const [m,a] of raw)map.set(m,{mean:a.reduce((x,y)=>x+y,0)/a.length,n:a.length});
   baseCache={key,map};return map;
  }
- function prior(id,lab,d,sell){const b=baselines(),x=b.get(`${id}|${lab}|${weekend(d)}`),y=b.get(`${id}|${lab}|*`);if(x&&x.n>=3)return x.mean;if(y&&y.n>=3)return y.mean;return Math.max(sell,1);}
+ function prior(id,lab,d,sell){const b=baselines(),x=b.get(`${id}|${lab}|${weekend(d)}`),y=b.get(`${id}|${lab}|*`);if(x&&x.n>=3)return x.mean;if(y&&y.n>=3)return y.mean;return null;}
  function compute(){
   const L=window.ForecastStockLive,d=today();
   if(!L||L.date!==d)return {ok:false,reason:L?'Belum ada tarikan hari ini.':'Data stok berjalan belum tersedia.'};
@@ -58,6 +60,7 @@ window.ForecastStock=(()=>{
     if(sell<=0&&!S)continue;
     const p=profile(id,lab,d),D0=prior(id,lab,d,sell),it={lab,sell,old,oldPending:!wasteIn&&!MALMIL.has(lab)&&awal>0,kirim,tf:tfIn-tfOut,sold:S,left:sell-S,noSales:NO_SALES.has(lab),noDaily:!x};
     // Jam habis: tarikan pertama dengan stok <= 0, diambil titik tengah dari tarikan sebelumnya.
+    if(!it.noSales&&!it.noDaily&&(!p||!D0)){it.st='baru';it.price=priceOf(prices,id,lab);items.push(it);continue;}
     let hAt=null;if(it.left<=0&&sell>0){let prev=OPEN;for(const s of snaps){const v=s.s[id]?.[lab];if(v==null)continue;if(sell-v<=0){hAt=(prev+s.h)/2;if(prev===OPEN)it.before=s.h;break;}prev=s.h;}if(hAt==null)hAt=last?.h||now;}
     const cAt=hAt!=null?cum(p,hAt):cum(p,now),a=PRIOR_W*D0,Dd=(Math.min(S,Math.max(sell,0))+a)/(cAt+a/D0);
     it.demand=Dd;it.rate=Dd*(p[Math.min(p.length-1,Math.max(0,Math.floor(now-OPEN)))]||0);it.price=priceOf(prices,id,lab);
@@ -85,12 +88,13 @@ window.ForecastStock=(()=>{
   if(it.st==='habis')return `<strong>0</strong><small>habis ${it.before?'< '+hm(it.before):hm(it.at)}</small>`;
   if(it.st==='kurang')return `<strong>${nf(it.left)}</strong><small>habis ±${hm(it.at)}</small>`;
   if(it.st==='over')return `<strong>${nf(it.left)}</strong><small>sisa ±${nf(it.extra)}</small>`;
+  if(it.st==='baru')return `<strong>${nf(Math.max(0,it.left))}</strong><small>produk baru</small>`;
   if(it.st==='na')return `<strong>${nf(it.left)}</strong><small>${it.noSales?'jual tdk terbaca':'tanpa Daily'}</small>`;
   return `<strong>${nf(it.left)}</strong><small>cukup</small>`;
  }
  function detail(o){
-  const rows=o.items.filter(it=>inGroup(it.lab)).map(it=>{const why=it.st==='habis'?`${it.before?`Sudah habis saat tarikan pertama ${hm(it.before)}; jam pastinya belum terekam, diperkirakan ±${hm(it.at)}.`:`Habis sekitar ${hm(it.at)}.`} Lost sejauh ini ±${nf(it.lostNow)} pcs${it.price?` (${rp(it.lostNow*it.price)})`:''}, sampai tutup ±${nf(it.lostDay)} pcs.${it.over?` Terjual ${nf(it.over)} pcs melebihi stok di Daily Report: cek transfer masuk.`:''}`:it.st==='kurang'?`Diperkirakan habis sekitar ${hm(it.at)}, kurang ±${nf(it.short)} pcs sampai tutup.`:it.st==='over'?`Diperkirakan sisa ±${nf(it.extra)} pcs saat tutup.`:it.st==='na'?(it.noSales?'Penjualan produk ini belum terbaca dari ESB.':'Belum ada di Daily Report hari ini.'):'Stok cukup sampai tutup.';
-   return `<tr><th scope="row">${esc(LABELS[it.lab])}</th><td>${pill(it.st)}</td><td>${nf(it.sell)}${it.old?`<small>${it.oldPending?'termasuk ':''}${nf(it.old)} kemarin</small>`:''}</td><td>${nf(it.sold)}</td><td><b>${nf(Math.max(0,it.left))}</b></td><td>${it.st==='habis'?'—':`${(it.rate||0).toLocaleString('id-ID',{maximumFractionDigits:1})}/jam`}</td><td>${nf(it.rest)}</td><td class="st-why">${why}</td></tr>`;}).join('');
+  const rows=o.items.filter(it=>inGroup(it.lab)).map(it=>{const why=it.st==='habis'?`${it.before?`Sudah habis saat tarikan pertama ${hm(it.before)}; jam pastinya belum terekam, diperkirakan ±${hm(it.at)}.`:`Habis sekitar ${hm(it.at)}.`} Lost sejauh ini ±${nf(it.lostNow)} pcs${it.price?` (${rp(it.lostNow*it.price)})`:''}, sampai tutup ±${nf(it.lostDay)} pcs.${it.over?` Terjual ${nf(it.over)} pcs melebihi stok di Daily Report: cek transfer masuk.`:''}`:it.st==='kurang'?`Diperkirakan habis sekitar ${hm(it.at)}, kurang ±${nf(it.short)} pcs sampai tutup.`:it.st==='over'?`Diperkirakan sisa ±${nf(it.extra)} pcs saat tutup.`:it.st==='baru'?'Produk baru di outlet ini, menunggu data untuk estimasi penjualan. Sementara hanya ditampilkan stoknya.':it.st==='na'?(it.noSales?'Penjualan produk ini belum terbaca dari ESB.':'Belum ada di Daily Report hari ini.'):'Stok cukup sampai tutup.';
+   return `<tr><th scope="row">${esc(LABELS[it.lab])}</th><td>${pill(it.st)}</td><td>${nf(it.sell)}${it.old?`<small>${it.oldPending?'termasuk ':''}${nf(it.old)} kemarin</small>`:''}</td><td>${nf(it.sold)}</td><td><b>${nf(Math.max(0,it.left))}</b></td><td>${it.st==='habis'||it.st==='baru'?'—':`${(it.rate||0).toLocaleString('id-ID',{maximumFractionDigits:1})}/jam`}</td><td>${it.st==='baru'?'—':nf(it.rest)}</td><td class="st-why">${why}</td></tr>`;}).join('');
   return `<div class="st-detail"><table><thead><tr><th>Produk</th><th>Status</th><th>Stok jual hari ini</th><th>Terjual</th><th>Sisa</th><th>Laju sekarang</th><th>Perkiraan laku s.d. tutup</th><th>Keterangan</th></tr></thead><tbody>${rows}</tbody></table>${o.wasteIn?'':'<p class="st-note">Kolom waste hari ini belum diisi. Sisa kemarin Malmil dianggap dibuang; sisa kemarin produk lain masih dihitung bisa dijual.</p>'}</div>`;
  }
  function view(){
@@ -120,7 +124,7 @@ window.ForecastStock=(()=>{
   <div class="st-lost"><span>Estimasi lost sales hari ini</span><strong>${nf(lostNow)} pcs${lostRp?` · ${rp(lostRp)}`:''}</strong><small>sampai tutup ±${nf(lostDay)} pcs${lostDayRp?` · ${rp(lostDayRp)}`:''}, dihitung per jam sejak kue habis</small></div>
   <div class="st-filters"><div class="wl-periods" role="group" aria-label="Area">${areaBtns}</div><div class="wl-periods" role="group" aria-label="Produk">${groupBtns}</div></div>
   ${sections||'<p class="wl-note">Tidak ada outlet dengan status ini.</p>'}
-  <p class="wl-foot">Angka di kotak = sisa stok sekarang. <b>Kurang stok</b>: sisa kurang dari 80% perkiraan laku sampai tutup. <b>Over stok</b>: perkiraan sisa saat tutup minimal 3 pcs dan 30%. Perkiraan laku memakai pola jual per jam outlet itu (pagi, siang, sore berbeda) dan kecepatan jual hari ini. Lost sales = perkiraan penjualan pada jam-jam setelah kue habis. Transfer yang belum tercatat di Daily Report belum terhitung.</p>`;
+  <p class="wl-foot">Angka di kotak = sisa stok sekarang. <b>Kurang stok</b>: sisa kurang dari 80% perkiraan laku sampai tutup. <b>Over stok</b>: perkiraan sisa saat tutup minimal 3 pcs dan 30%. Perkiraan laku memakai pola jual per jam outlet itu (pagi, siang, sore berbeda) dan kecepatan jual hari ini. Lost sales = perkiraan penjualan pada jam-jam setelah kue habis. Transfer yang belum tercatat di Daily Report belum terhitung. Pola per jam unik tiap outlet; <b>Produk baru</b> (riwayat di outlet itu kurang dari 20 hari) hanya ditampilkan stoknya sampai datanya cukup.</p>`;
  }
  function paint(){const el=document.getElementById('st-root');if(el)el.innerHTML=view();}
  document.addEventListener('click',e=>{if(!e.target.closest?.('#st-root'))return;const a=e.target.closest('[data-st-area]'),g=e.target.closest('[data-st-group]'),s=e.target.closest('[data-st-status]'),o=e.target.closest('[data-st-outlet]');

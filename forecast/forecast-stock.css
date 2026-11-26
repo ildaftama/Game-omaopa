@@ -44,3 +44,5 @@
 .st-detail .st-why{min-width:220px;white-space:normal;color:#3d4b58}
 .st-note{margin:8px 0 0;color:#8a5a07;font-size:12px}
 @media (max-width:720px){.st-sums{grid-template-columns:repeat(2,minmax(0,1fr))}.st-sum strong{font-size:22px}.st-detail{overflow-x:auto}}
+.st-c.baru{background:#f1eefb;color:#5b4a9a}
+.st-pill.baru{background:#f1eefb;color:#5b4a9a}
