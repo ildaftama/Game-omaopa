@@ -16,6 +16,9 @@ window.ForecastStock=(()=>{
  const GROUPS=[['all','Semua produk',null],['ogura','Ogura',[0]],['malmil','Malmil',[1]],['mini','Mini',[2]],['chiffon','Chiffon',[3,4]],['roti','Roti',[5]]];
  const MALMIL=new Set([2,3,4,5]),NO_SALES=new Set([10]);
  const PRICE=['Ogura Cheese','Ogura Chocolate','Malmil Cheese','Malmil Chocolate','Malmil Cheese Less Sugar','Malmil Chocolate Less Sugar','Mini Ogura - Cheese','Cisfon - Keju','Cisfon - Ekstra Keju','Cisfon - Butter',null,'Cisfon Lite - Ekstra Keju','Cisfon Lite - Keju','Roti Sosis','Roti Abon','Roti Coklat','Roti Coklat Keju','Roti Pisang Coklat','Roti Vanilla'];
+ // Harga jual: harga realisasi outlet (4 produk utama), selain itu harga acuan Dashboard (PRICE_REFS).
+ const REF=[0,0,0,0,0,0,57000/9,33000,34000,34000,0,19000,18000,6500,7000,6000,6000,6000,6000],SAME=[0,1,2,3,2,3];
+ const priceOf=(prices,id,lab)=>(lab<6?prices[id]?.[PRICE[SAME[lab]]]?.price:0)||REF[lab]||0;
  const OPEN=8,CLOSE=20,PRIOR_W=.3,KURANG=.8,STALE_MIN=40;
  const ST={habis:['Habis','habis'],kurang:['Kurang stok','kurang'],normal:['Normal','normal'],over:['Over stok','over'],na:['Belum terbaca','na']};
  const state={area:'all',group:'all',status:null,outlet:null};let selected='__all__',baseCache=null;
@@ -57,7 +60,7 @@ window.ForecastStock=(()=>{
     // Jam habis: tarikan pertama dengan stok <= 0, diambil titik tengah dari tarikan sebelumnya.
     let hAt=null;if(it.left<=0&&sell>0){let prev=OPEN;for(const s of snaps){const v=s.s[id]?.[lab];if(v==null)continue;if(sell-v<=0){hAt=(prev+s.h)/2;if(prev===OPEN)it.before=s.h;break;}prev=s.h;}if(hAt==null)hAt=last?.h||now;}
     const cAt=hAt!=null?cum(p,hAt):cum(p,now),a=PRIOR_W*D0,Dd=(Math.min(S,Math.max(sell,0))+a)/(cAt+a/D0);
-    it.demand=Dd;it.rate=Dd*(p[Math.min(p.length-1,Math.max(0,Math.floor(now-OPEN)))]||0);it.price=PRICE[lab]?prices[id]?.[PRICE[lab]]?.price||0:0;
+    it.demand=Dd;it.rate=Dd*(p[Math.min(p.length-1,Math.max(0,Math.floor(now-OPEN)))]||0);it.price=priceOf(prices,id,lab);
     const rest=Dd*(1-cum(p,now));it.rest=rest;
     if(it.noSales||it.noDaily){it.st='na';}
     else if(it.left<=0){it.st='habis';it.at=hAt;it.lostNow=Math.max(0,Dd*(cum(p,now)-cum(p,hAt)));it.lostDay=Math.max(0,Dd*(1-cum(p,hAt)));it.over=it.left<0?-it.left:0;}
