@@ -159,5 +159,5 @@ $('#sources-open').addEventListener('click',()=>{document.getElementById('source
 function openSupport(view){focus=view;if(selected==='__all__'&&['events','swot','area'].includes(focus)){selected=lastOutlet;$('#workspace-outlet').value=selected;sync();}render();}
 window.addEventListener('forecast-settings-render',()=>{if(focus==='settings')schedule();});
 window.addEventListener('forecast-settings-changed',()=>{if(['dashboard','settings'].includes(focus))schedule();});
-if(selected!=='__all__')sync();render();
+if(selected!=='__all__')sync();{const t=performance.now();render();(window.__loadT||(window.__loadT={})).firstRender=Math.round(performance.now()-t);}
 })();

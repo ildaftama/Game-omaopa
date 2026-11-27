@@ -1403,7 +1403,7 @@ window.ForecastDashboard=(()=>{
  }
  function todaySnapshot(){const it=intradayNow();if(!it)return null;const all=revenueTrend('__all__'),sum=liveNet(it.rows,all);const pred=all?.rows.find(x=>x.date===it.date)?.forecastTotal;return {sum,pct:pred>0?sum/pred*100:null,outlets:it.rows.length,asOf:it.asOf};}
  // Pengukur waktu render per bagian (window.__dashT), untuk audit performa. Biayanya hanya beberapa pemanggilan performance.now().
- const __tm=(k,f)=>{const t=performance.now(),r=f();(window.__dashT||(window.__dashT={}))[k]=Math.round(performance.now()-t);return r;};
+ const __tm=(k,f)=>{const t=performance.now(),r=f(),v=Math.round(performance.now()-t);(window.__dashT||(window.__dashT={}))[k]=v;const f0=window.__dashT0||(window.__dashT0={});if(f0[k]==null)f0[k]=v;return r;};
  function render(outletId){
   applySettings();
   const show=window.ForecastSettings?.get().display||{trend:true,wasteLost:true,accuracy:true,weather:true,events:true,operations:true};
