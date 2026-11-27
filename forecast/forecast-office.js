@@ -144,7 +144,15 @@ const NPC=[
  mk('watch','Pemantau Produk',[11,8],{shirt:'#2f6f5e',shade:'#245548',inner:'#f6f1ea',skin:'#f4cfb3',skinS:'#dca98c',hair:'#b5502c',iris:'#2f5a4c',color:'#35b58f',pants:'#2b2732',shoes:'#1f1b22',bw:4.75,tall:.5,spd:1.08}),
  mk('mgr','Factory Manager',[-3,6],{shirt:'#26252b',shade:'#161519',inner:'#26252b',skin:'#d9a682',skinS:'#bd8865',hair:'#1c1716',iris:'#2a1d15',color:'#8a93a6',pants:'#3a3f4d',shoes:'#2a2a2e',bw:5.25,tall:1,spd:1}),
  mk('spv','SPV Logistik',[-3,12],{shirt:'#e3ebf7',shade:'#c4d2e8',inner:'#e3ebf7',skin:'#f2cfb4',skinS:'#daab8e',hair:'#4f8fd9',iris:'#3b2a24',color:'#4f8fd9',pants:'#3f4a5e',shoes:'#2f5f9e',bw:4.75,tall:0,spd:1,hj:['#4f8fd9','#356fb5','#a9cdf3']}),
- mk('guest','Tamu',[18,12],{shirt:'#2b2b33',shade:'#1b1b21',inner:'#f4f1ee',skin:'#f0c8a8',skinS:'#d6a483',hair:'#2a1c22',iris:'#2a1d15',color:'#9b8cc4',pants:'#3b4a66',shoes:'#ece6dc',bw:4.75,tall:.25,spd:1})
+ mk('guest','Tamu',[18,12],{shirt:'#2b2b33',shade:'#1b1b21',inner:'#f4f1ee',skin:'#f0c8a8',skinS:'#d6a483',hair:'#2a1c22',iris:'#2a1d15',color:'#9b8cc4',pants:'#3b4a66',shoes:'#ece6dc',bw:4.75,tall:.25,spd:1}),
+ // Tamu per bagian (owner 2026-11-27). look: gaya rambut/jilbab, kacamata, jenis atasan.
+ mk('ga1','Tamu Area 1',[18,13],{shirt:'#6f9a7a',shade:'#557d61',inner:'#6f9a7a',skin:'#f2cfb4',skinS:'#daab8e',hair:'#3a2a22',iris:'#3b2a24',color:'#e2b52e',pants:'#4a4f5e',shoes:'#7a5a3c',bw:4.75,tall:0,spd:1,hj:['#f2c230','#cf9a12','#ffe38a'],look:{hijab:1,top:'tunic'}}),
+ mk('ga2','Tamu Area 2',[19,13],{shirt:'#cfe0f5',shade:'#a9c2e2',inner:'#cfe0f5',skin:'#e0b08c',skinS:'#c4906c',hair:'#1d1a1c',iris:'#2a1d15',color:'#7fa6d8',pants:'#2f3a52',shoes:'#3a2f2a',bw:5,tall:.75,spd:1,look:{crew:1,glasses:1,top:'kemeja'}}),
+ mk('ga3','Tamu Area 3',[20,13],{shirt:'#b08a56',shade:'#8e6c3e',inner:'#f4f1ea',skin:'#c98f68',skinS:'#ab7350',hair:'#221c1a',iris:'#2a1d15',color:'#b08a56',pants:'#3b3f47',shoes:'#d9d2c4',bw:5.25,tall:.75,spd:1,look:{crew:1,top:'canvas'}}),
+ mk('gmk','Tamu Marketing',[18,14],{shirt:'#b6403a',shade:'#8f2e2a',inner:'#1f1f24',skin:'#edc19f',skinS:'#d3a07c',hair:'#2b2120',iris:'#2a1d15',color:'#b6403a',pants:'#2e3c5c',shoes:'#f2efe8',bw:5,tall:.5,spd:1.05,look:{mid:1,top:'flannel'}}),
+ mk('ghr','Tamu HRD',[19,14],{shirt:'#6d5a9c',shade:'#54447d',inner:'#f6f3ee',skin:'#f4d3ba',skinS:'#dcae92',hair:'#4a2e26',iris:'#3b2a24',color:'#8f7cc4',pants:'#3a3542',shoes:'#2b2530',bw:4.75,tall:0,spd:1,hj:['#9b3b52','#7a2a3e','#d07a8e'],look:{hijab:1,top:'blazer'}}),
+ mk('gbd','Tamu BD',[20,14],{shirt:'#3e5c4b',shade:'#2d4537',inner:'#e9e4da',skin:'#d6a07a',skinS:'#b9835e',hair:'#1a1617',iris:'#2a1d15',color:'#4f8a69',pants:'#2a2d33',shoes:'#efe9df',bw:5.25,tall:1,spd:1,look:{crew:1,top:'jacket'}}),
+ mk('gout','Tamu Outlet',[18,15],{shirt:'#f3e7cf',shade:'#dcc9a7',inner:'#f3e7cf',skin:'#e9bd99',skinS:'#cf9f7b',hair:'#2a1f1c',iris:'#3b2a24',color:'#8a5a3b',pants:'#3d3530',shoes:'#2a2224',bw:4.75,tall:0,spd:1,hj:['#2a2a31','#141419','#5c5c68'],look:{hijab:1,top:'apron'}})
 ];
 const DESK={esb:[4*T+5,7*T+6],pawang:[14*T+4,7*T+7],pred:[6*T+5,7*T+7],watch:[10*T+5,7*T+7],f1:[8*T+6,13*T+6],f2:[11*T+3,13*T+6],mgr:[-4*T+5,5*T+7],spv:[-4*T+5,11*T+7]};
 const VOICE={
@@ -158,8 +166,8 @@ const VOICE={
  spv:{want:{kopi:['Kopi dulu, rute nanti.','Isi tenaga sebelum jam kirim.'],snack:['Ngemil sambil cek rute.'],makan:['Makan dulu ya.'],sofa:['Duduk sebentar.'],toilet:['Izin sebentar.']},enjoy:{kopi:['Segar lagi.'],snack:['Enak.'],makan:['Kenyang.'],sofa:['Enaknya.']},wc:['Sebentar ya.'],empty:['Yah, habis.']},
  guest:{want:{kopi:['Boleh minta kopinya?','Kopi dulu, biar melek.'],snack:['Snack-nya kelihatan enak.'],makan:['Numpang makan ya.'],sofa:['Duduk lagi ah.'],toilet:['Permisi, toiletnya di mana?']},enjoy:{kopi:['Enak juga kopi kantor ini.'],snack:['Nyam, mantap.'],makan:['Kenyang.'],sofa:['Sofanya empuk.']},wc:['Sebentar ya.'],empty:['Yah, habis.']}
 };
-const by=id=>NPC.find(n=>n.id===id),ESB=by('esb'),PAW=by('pawang'),PRED=by('pred'),FW=by('f1'),FE=by('f2'),WAT=by('watch'),isF=n=>n===FW||n===FE,MGR=by('mgr'),SPV=by('spv'),GUEST=by('guest'),comes=n=>isF(n)||n===MGR||n===SPV||n===GUEST;let FC=FW;
-for(const n of [MGR,SPV,GUEST]){n.present=false;n.pose='away';n.x=4;n.y=15;}
+const by=id=>NPC.find(n=>n.id===id),ESB=by('esb'),PAW=by('pawang'),PRED=by('pred'),FW=by('f1'),FE=by('f2'),WAT=by('watch'),isF=n=>n===FW||n===FE,MGR=by('mgr'),SPV=by('spv'),GUEST=by('guest'),GIDS=['ga1','ga2','ga3','gmk','ghr','gbd','gout'],GUESTS=GIDS.map(by),isGuest=n=>n===GUEST||GUESTS.includes(n),comes=n=>isF(n)||n===MGR||n===SPV||isGuest(n);let FC=FW;
+for(const n of [MGR,SPV,GUEST,...GUESTS]){n.present=false;n.pose='away';n.x=4;n.y=15;}
 let SCHEDULE={},officeReady=false;const SHIFT={'7:00':[7,16],'10:30':[10.5,21],'12:00':[12,21]};
 const dateNow=()=>S.date||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
 const shiftOf=n=>SCHEDULE[dateNow()]?.[n===FW?0:1]||'';
@@ -167,7 +175,7 @@ const onShift=n=>{const h=SHIFT[shiftOf(n)],t=hourNow();return !!h&&t>=h[0]&&t<h
 const clockText=v=>String(Math.floor(v)).padStart(2,'0')+'.'+(v%1?'30':'00');
 function shiftText(n){if(!isF(n))return 'Tidak online';const v=shiftOf(n),h=SHIFT[v];if(h)return `Shift ${clockText(h[0])}-${clockText(h[1])}`;if(v==='WFH')return 'WFH';if(/CUTI/i.test(v))return 'Cuti';if(/OFF/i.test(v))return 'Libur';if(/SAKIT/i.test(v))return 'Sakit';if(/IZIN/i.test(v))return 'Izin';return v||'Belum ada jadwal';}
 // Setiap akun hanya mengendalikan karakternya sendiri; Master bisa semua (owner 2026-11-24).
-function myChars(){const r=window.ForecastAuth?.role||{};if(r.master)return NPC.map(n=>n.id);if(r.fu==='forecaster')return r.char?[r.char]:[];if(r.fu==='analyst')return ['pred'];if(r.fu==='factory')return ['mgr'];if(r.fu==='spv')return ['spv'];if(r.fu==='esbadmin')return ['esb'];if(r.fu==='guest')return ['guest'];return window.ForecastRolePolicy?.planner?.(r)?['f1','f2']:[];}
+function myChars(){const r=window.ForecastAuth?.role||{};if(r.master)return NPC.map(n=>n.id);if(r.fu==='forecaster')return r.char?[r.char]:[];if(r.fu==='analyst')return ['pred'];if(r.fu==='factory')return ['mgr'];if(r.fu==='spv')return ['spv'];if(r.fu==='esbadmin')return ['esb'];if(r.fu==='guest')return GIDS.includes(r.char)?[r.char]:['guest'];return window.ForecastRolePolicy?.planner?.(r)?['f1','f2']:[];}
 const mine=n=>!!n&&myChars().includes(n.id),ready=n=>n.present!==false&&!n.leaving&&n.pose!=='away';
 function pickFC(){if(FC&&mine(FC)&&ready(FC))return true;const o=[FW,FE,MGR,SPV,PRED,...NPC].find(n=>mine(n)&&ready(n));if(o){FC=o;return true;}return false;}
 const watchLevel=()=>S.waste==='lewat'||S.lost==='lewat'?2:S.waste==='waspada'||S.lost==='waspada'?1:0;
@@ -195,7 +203,7 @@ const until=f=>new Promise(r=>waiters.push({f,r}));
 const held=n=>n.held>S.t;const alive=e=>e===epoch;
 // Tamu duduk di sofa, bukan di meja.
 async function sofaSit(n){const c=free(n,SPOT.sofa)||[19,13];await walk(n,c);if(SPOT.sofa.some(s=>s[0]===c[0]&&s[1]===c[1])){n.slot=key(c[0],c[1]);n.pose='sofa';}else n.pose='stand';n.face=0;}
-async function sitDown(n){if(n.id==='guest')return sofaSit(n);await walk(n,n.seat);n.pose='sit';n.face=1;if(n.food?.where==='hand'){n.food.where='desk';n.sipT=0;n.food.cd=4;}}
+async function sitDown(n){if(isGuest(n))return sofaSit(n);await walk(n,n.seat);n.pose='sit';n.face=1;if(n.food?.where==='hand'){n.food.where='desk';n.sipT=0;n.food.cd=4;}}
 function give(n,kind){const left=nrnd(n,36,50);n.food={kind,left,total:left,where:'hand',cd:3};}
 function foodTick(n,dt){const f=n.food;if(!f)return;f.left-=dt;n.sipT=Math.max(0,(n.sipT||0)-dt);if(f.left<=0){n.food=null;n.sipT=0;if(n.pose==='sit'&&f.kind==='cup')chat(n,VOICE[n.id].empty,.3);return;}f.cd-=dt;if(f.cd<=0&&!n.carry&&n.pose!=='toilet'&&(f.where==='hand'||n.pose==='sit')){n.sipT=1.3;f.cd=5+(f.left*7)%4;}}
 async function standAt(n,cell,face=1,fast=false){await walk(n,cell,fast);n.pose='stand';n.face=face;}
@@ -256,7 +264,7 @@ const forecasterWork=[async n=>{await sitDown(n);n.filled=0;await doing(n,'Menyu
  async n=>{await sitDown(n);await doing(n,'Mengecek selisih stok',8);speak(n,realLines(n));await doing(n,'Meninjau rencana besok',6);}];
 async function runSlot(n,g){
  try{
-  const roll=nr(n)(),jobs=isF(n)?forecasterWork:WORK[n.id],job=jobs[Math.floor(nr(n)()*jobs.length)],boss=n===MGR||n===SPV,brk=npick(n,n===GUEST?['kopi','snack','toilet']:boss?(n.food?['sofa','toilet']:['kopi','kopi','makan','sofa','toilet']):n.food?['sofa','nap','toilet']:['kopi','kopi','snack','makan','sofa','nap','toilet']);
+  const roll=nr(n)(),jobs=isF(n)?forecasterWork:WORK[n.id],job=jobs[Math.floor(nr(n)()*jobs.length)],boss=n===MGR||n===SPV,brk=npick(n,isGuest(n)?['kopi','snack','toilet']:boss?(n.food?['sofa','toilet']:['kopi','kopi','makan','sofa','toilet']):n.food?['sofa','nap','toilet']:['kopi','kopi','snack','makan','sofa','nap','toilet']);
   if(roll<(boss?.85:.72))await job(n);else{await activity(n,brk);await sitDown(n);}
   await sitDown(n);while(g===n.gen)await doing(n,npick(n,IDLE[n.id]),8,n.id==='guest'?'rest':'type');
  }catch(e){if(e!==CANCEL)throw e;}
@@ -302,8 +310,10 @@ let dutyReady=false;
 function arrive(n){n.present=true;n.leaving=false;n.x=4;n.y=15;n.path=[];n.pose='stand';n.face=1;n.food=null;n.task='Baru datang';n.ff=0;say(n,n===MGR?'Pagi, tim.':n===SPV?'Halo semua!':n===GUEST?'Halo, permisi!':'Halo, masuk shift!',2.4);idle(n);}
 function leave(n){n.leaving=true;cancel(n);n.busy=false;n.held=0;n.food=null;n.task='Pulang';say(n,'Duluan ya!',2.2);(async()=>{try{await walk(n,[4,15]);}catch(e){if(e!==CANCEL)throw e;}n.present=false;n.leaving=false;n.pose='away';n.sayT=0;if(pickFC()&&S.sel===n.id)S.sel=FC.id;})();}
 // Muncul saat shift (forecaster) atau saat akunnya online. Manajer & SPV hanya saat online.
-function onlineAs(id){const now=Date.now(),role={mgr:'factory',spv:'spv',guest:'guest'}[id];return (S.pres||[]).some(p=>p.online!==false&&now-(p.at?.toMillis?.()||0)<150e3&&(role?p.role===role:(p.role==='forecaster'&&p.char===id)));}
-function dutyTick(){for(const n of [MGR,SPV,GUEST]){const want=onlineAs(n.id)&&!asleep();if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!officeReady){for(const n of [FW,FE]){const want=onlineAs(n.id)&&!asleep();if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);else if(!want&&!n.present&&!n.leaving){n.present=false;n.pose='away';n.x=4;n.y=15;}}return;}for(const n of [FW,FE]){const want=onShift(n)||(onlineAs(n.id)&&!asleep());if(!dutyReady){if(want){n.present=true;n.pose='sit';n.face=1;n.x=n.seat[0];n.y=n.seat[1];}else{n.present=false;n.pose='away';n.x=4;n.y=15;}}else if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!dutyReady){dutyReady=true;pickFC();}}
+// Tamu per bagian (owner 2026-11-27): ikut kebiasaan Tamu; muncul bila akun tamu dengan karakter itu online.
+for(const id of GIDS){IDLE[id]=IDLE.guest;WORK[id]=WORK.guest;VOICE[id]=VOICE.guest;}
+function onlineAs(id){const now=Date.now(),role={mgr:'factory',spv:'spv',guest:'guest'}[id];return (S.pres||[]).some(p=>p.online!==false&&now-(p.at?.toMillis?.()||0)<150e3&&(GIDS.includes(id)?p.role==='guest'&&p.char===id:id==='guest'?p.role==='guest'&&!GIDS.includes(p.char):role?p.role===role:(p.role==='forecaster'&&p.char===id)));}
+function dutyTick(){for(const n of [MGR,SPV,GUEST,...GUESTS]){const want=onlineAs(n.id)&&!asleep();if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!officeReady){for(const n of [FW,FE]){const want=onlineAs(n.id)&&!asleep();if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);else if(!want&&!n.present&&!n.leaving){n.present=false;n.pose='away';n.x=4;n.y=15;}}return;}for(const n of [FW,FE]){const want=onShift(n)||(onlineAs(n.id)&&!asleep());if(!dutyReady){if(want){n.present=true;n.pose='sit';n.face=1;n.x=n.seat[0];n.y=n.seat[1];}else{n.present=false;n.pose='away';n.x=4;n.y=15;}}else if(want&&!n.present)arrive(n);else if(!want&&n.present&&!n.leaving)leave(n);}if(!dutyReady){dutyReady=true;pickFC();}}
 // ===== Obrolan interaktif =====
 // Lawan bicara selalu berdekatan dan saling menghadap. Jadwal obrolan antar-karakter acak tetapi
 // berasal dari seed harian, jadi semua layar melihat obrolan yang sama pada waktu yang sama.
@@ -421,6 +431,9 @@ function face(n,x,hy){
  if(n===PAW){brow(lx,by-.25,3.5,.25,bc,.5);brow(rx,by-.75,3.5,-.5,bc,.5);}
  if(n===PRED){brow(lx,by+.25,3.5,0,bc,.5);brow(rx,by-.25,3.5,-.25,bc,.5);}
  if(n===WAT){brow(lx,by,3.5,st.alert?-.75:-.5,bc);brow(rx,by,3.5,st.alert?.75:.5,bc);}
+ if(n.look?.hijab||n.look?.bob){const bw=n.look.bob?n.hair:'#4a3a33';brow(lx,by-.25,3.5,.25,bw,.5);brow(rx,by-.25,3.5,-.25,bw,.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
+ if(n.look?.crew||n.look?.mid){brow(lx,by,3.5,0,n.hair,.75);brow(rx,by,3.5,0,n.hair,.75);}
+ if(n.look?.glasses){c.strokeStyle='#17202f';c.lineWidth=.6;c.strokeRect(lx-.75,ey-.75,5,4.5);c.strokeRect(rx-.75,ey-.75,5,4.5);R(lx+4.25,ey+.75,1.5,.5,'#17202f');R(lx,ey-.5,1,.5,'rgba(255,255,255,.75)');R(rx,ey-.5,1,.5,'rgba(255,255,255,.75)');}
  if(n===FW){brow(lx,by,3.5,.25,bc);brow(rx,by,3.5,-.25,bc);c.strokeStyle='#17202f';c.lineWidth=.6;c.strokeRect(lx-.75,ey-.75,5,4.5);c.strokeRect(rx-.75,ey-.75,5,4.5);R(lx+4.25,ey+.75,1.5,.5,'#17202f');R(lx,ey-.5,1,.5,'rgba(255,255,255,.75)');}
  if(n===FE){brow(lx,by-.25,3.5,.25,'#5b4036',.5);brow(rx,by-.25,3.5,-.25,'#5b4036',.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
  if(n===SPV){brow(lx,by-.25,3.5,.25,'#4a3a33',.5);brow(rx,by-.25,3.5,-.25,'#4a3a33',.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
@@ -464,6 +477,10 @@ function hair(n,x,hy,f){
   if(n===SPV)hijab(x,hy,false,n.hj);
   if(n===MGR){R(x-7,hy-6,14,3,h);R(x-8,hy-2,16,6,h);}
   if(n===GUEST){R(x-8,hy-1,16,14,h);R(x-8,hy+12,16,1,'#3e2a32');R(x-4,hy-5,3,.75,hl);}
+  if(n.look?.hijab)hijab(x,hy,false,n.hj);
+  if(n.look?.crew){R(x-7.5,hy-5,15,7,h);for(let i=-6;i<7;i+=2)R(x+i,hy-4,.5,5,'rgba(255,255,255,.1)');}
+  if(n.look?.mid){R(x-7.75,hy-6,15.5,9.5,h);for(const [a,b2] of [[-5,-8.25],[-1.5,-8.75],[2.5,-8.25]])R(x+a,hy+b2,3,2.5,h);R(x-7.75,hy+3,15.5,.75,'rgba(0,0,0,.2)');R(x-4,hy-5,3,.75,hl);}
+  if(n.look?.bob){R(x-8,hy-1,16,9,h);R(x-8,hy+7.5,16,1,'rgba(0,0,0,.18)');R(x-4,hy-5,3,.75,hl);}
   return;
  }
  if(n===ESB){fe(x,hy-4,11.5,6,h,true);R(x-11,hy-5,22,2,h);fe(x-7.5,hy-3,3.5,2.5,h);fe(x+7.5,hy-3,3.5,2.5,h);fe(x-2.5,hy-4,3,2,h);fe(x+3,hy-4,3,2,h);curls(x,hy-6,11,6,'#3b2b2c','#171113');}
@@ -473,19 +490,30 @@ function hair(n,x,hy,f){
  if(n===FW){fe(x,hy-1.5,7.5,6,h,true);R(x-7.5,hy-2,1.75,3.5,h);R(x+5.75,hy-2,1.75,3.5,h);for(const [a,b] of [[-6.5,-8],[-3,-8.75],[1,-8.5],[4.5,-7]])R(x+a,hy+b,2,2.25,h);R(x-5.5,hy-3.25,2.5,1.75,h);R(x-2.25,hy-3,3,1.25,h);R(x+1.5,hy-3.25,3.5,1.75,h);R(x-2,hy-6,3,.75,hl);}
  if(n===FE)hijab(x,hy,true);
  if(n===SPV)hijab(x,hy,true,n.hj);
+ if(n.look?.hijab)hijab(x,hy,true,n.hj);
+ if(n.look?.crew){fe(x,hy-2,7.5,5.5,h,true);R(x-7.25,hy-2.75,1.25,2.5,h);R(x+6,hy-2.75,1.25,2.5,h);R(x-6,hy-3.5,12,1,h);for(let i=-5;i<6;i+=2)R(x+i,hy-6.5,.5,1.5,'rgba(255,255,255,.14)');}
+ if(n.look?.mid){fe(x,hy-2,7.75,6,h,true);for(const [a,b2,w] of [[-5.5,-8.75,3],[-2,-9.25,3.5],[2,-8.75,3],[4.5,-7.5,2.5]])R(x+a,hy+b2,w,2.5,h);R(x-7.75,hy-3,1.75,3.5,h);R(x+6,hy-3,1.75,3,h);R(x-6.75,hy-4,6.5,2,h);R(x-1,hy-3.5,3.5,1.25,h);R(x-6.75,hy-2.25,1.25,1.25,h);R(x-2.5,hy-7.75,3,.75,hl);R(x+2.5,hy-7,2,.75,hl);}
+ if(n.look?.bob){fe(x,hy-1.5,7.5,6,h,true);R(x-8.5,hy-2,2.5,9.5,h);R(x+6,hy-2,2.5,9.5,h);R(x-7,hy-3.5,7.5,2.25,h);R(x+.5,hy-3.25,5.5,1.5,h);R(x-4,hy-6,3,.75,hl);}
  if(n===GUEST){fe(x,hy-1.5,7.5,6,h,true);R(x-8.5,hy-2,2.5,13,h);R(x+6,hy-2,2.5,13,h);R(x-6.5,hy-3.5,10,2,h);R(x+2.5,hy-3,3.5,1.25,h);R(x-4,hy-6,3,.75,hl);}
  if(n===MGR){fe(x,hy-1.5,7.5,6,h,true);R(x-7.5,hy-2,1.5,3,h);R(x+6,hy-2,1.5,3,h);R(x-6.5,hy-3.25,13,1.75,h);R(x+1,hy-6.5,.75,4,'rgba(255,255,255,.22)');R(x-5,hy-5.5,4,.75,hl);}
 }
 function torso(n,x,by,f){
- const b=n.bw,t=by-12;R(x-b-.5,t+1,2*b+1,12,OL);fe(x,t+2,b+.5,2.5,OL,true);R(x-b,t+1.5,2*b,11,n.shirt);fe(x,t+2,b,2,n.shirt,true);R(x+b-1.5,t+1.5,1.5,11,n.shade);R(x-b,by-1,2*b,1,n.shade);
+ const b=n.bw,t=by-12,tp=n.look?.top;R(x-b-.5,t+1,2*b+1,12,OL);fe(x,t+2,b+.5,2.5,OL,true);R(x-b,t+1.5,2*b,11,n.shirt);fe(x,t+2,b,2,n.shirt,true);R(x+b-1.5,t+1.5,1.5,11,n.shade);R(x-b,by-1,2*b,1,n.shade);
  if(n===ESB){R(x-b,by-1.5,2*b,1.5,'#26222a');if(f===0){R(x-2.5,t+2,5,10,n.inner);R(x-.25,t+2,.5,10,'#c9c4b8');fe(x,t+6,2.5,2.5,'#ffd166');R(x-b,t+2,2,1,'#26222a');R(x+b-2,t+2,2,1,'#26222a');}else{R(x-3,t+5,6,3,'#26222a');R(x-2,t+6,4,1,'#ffd166');}}
  if(n===PRED){for(let i=0;i<3;i++)R(x-b,t+4+i*3,2*b,.75,n.inner);if(f===0){R(x-2.5,t+1.5,5,1.5,'#d8cbb0');}}
  if(n===PAW){if(f===0){R(x-.25,t+2,.5,10,n.inner);R(x-b+1,t+7,2.5,1.5,n.shade);R(x+b-3.5,t+7,2.5,1.5,n.shade);}R(x-b,t+6,2*b,.75,n.inner);fe(x,t+2,5.5,2.25,OL);fe(x,t+2,5,1.75,'#ff7b6e');R(x-5,t+2,10,.75,'#e85f54');}
  if(n===WAT){if(f===0){R(x-2,t+1.5,4,4.5,n.inner);R(x-.5,t+2,1,4,'#2b2732');R(x+b-3.5,t+5,2,1,'#e6c35c');}else R(x-.25,t+3,.5,9,n.shade);}
  if(n===FW){for(let i=0;i<4;i++)R(x-b,t+3+i*2.75,2*b,.5,'#6c8cc8');for(let i=-1;i<2;i++)R(x+i*3.25,t+2,.5,10,'#6c8cc8');for(let i=0;i<3;i++)R(x-b,t+4.5+i*2.75,2*b,.25,'#c9554f');if(f===0){R(x-2.25,t+2,4.5,10,n.inner);R(x-.25,t+2,.5,10,'#c9cdd2');R(x-3,t+1.5,1.75,2,n.shade);R(x+1.25,t+1.5,1.75,2,n.shade);}else R(x-3.5,t+1.5,7,1.5,n.shade);}
  if(n===GUEST){if(f===0){R(x-2.25,t+2,4.5,10,n.inner);R(x-2.75,t+2,.75,10,'#45454f');R(x+2,t+2,.75,10,'#45454f');R(x-.5,t+3,1,1,'#c9b26a');}else R(x-b,t+5,2*b,.5,'#45454f');}
+ if(tp==='apron'){if(f===0){R(x-b+1,t+5,2*b-2,8,'#8a5a3b');R(x-b+1,t+5,2*b-2,.75,'#6e4529');R(x-2,t+8.5,4,2.5,'#a8744f');R(x-b+1.5,t+1.5,1,3.5,'#8a5a3b');R(x+b-2.5,t+1.5,1,3.5,'#8a5a3b');R(x-1,t+9,2,.5,'#f3e7cf');}else{R(x-b,t+7,2*b,.75,'#8a5a3b');R(x-1,t+7.5,2,1.5,'#8a5a3b');}}
  if(n===MGR){if(f===0){fe(x,t+2,2.75,1.25,n.skinS);R(x+1.5,t+5,2.5,2,'#3d3d46');}else R(x-.25,t+3,.5,9,n.shade);}
- if(n===FE||n===SPV){const ac=n===SPV?n.hj[0]:'#e8809f',ac2=n===SPV?n.hj[2]:'#d9a4b8';R(x-b-.75,by-1.5,2*b+1.5,3.5,OL);R(x-b-.25,by-1.5,2*b+.5,3,n.shirt);R(x+b-1,by-1.5,1,3,n.shade);if(f===0){R(x-.25,t+5,.5,8,ac2);for(let i=0;i<3;i++)R(x-.5,t+6+i*2,1,.75,ac);}R(x-b,by+.75,2*b,.5,ac);}
+ if(tp==='kemeja'){if(f===0){R(x-3,t+1.5,2.5,1.75,'#ffffff');R(x+.5,t+1.5,2.5,1.75,'#ffffff');R(x-.25,t+3,.5,9,n.shade);for(let i=0;i<3;i++)R(x-.25,t+4.5+i*2.5,.5,.5,'#5d7290');R(x-b+1.25,t+5,2.5,2,n.shade);}else R(x-3.5,t+1.5,7,1.25,'#ffffff');}
+ if(tp==='canvas'){if(f===0){R(x-2.25,t+2,4.5,10,n.inner);R(x-2.75,t+2,.75,10,n.shade);R(x+2,t+2,.75,10,n.shade);R(x-b+.75,t+6.5,2.5,2.5,n.shade);R(x+b-3.25,t+6.5,2.5,2.5,n.shade);R(x-b+.75,t+6.5,2.5,.5,'#6d532f');R(x+b-3.25,t+6.5,2.5,.5,'#6d532f');R(x-b,t+1.5,2.25,1.25,'#8e6c3e');R(x+b-2.25,t+1.5,2.25,1.25,'#8e6c3e');}else{R(x-b,t+1.5,2*b,1.25,n.shade);R(x-.25,t+3,.5,9,n.shade);}R(x-b,by-1.5,2*b,1,'#6d532f');}
+ if(tp==='flannel'){for(let i=0;i<4;i++)R(x-b,t+3+i*2.75,2*b,.5,'#6e1f1f');for(let j=0;j<4;j++)R(x-b+1+j*2.75,t+1.5,.5,11,'#6e1f1f');for(let i=0;i<3;i++)R(x-b,t+4.25+i*2.75,2*b,.25,'#e0a080');if(f===0){R(x-2.25,t+2,4.5,10,n.inner);R(x-2.75,t+2,.75,10,'#6e1f1f');R(x+2,t+2,.75,10,'#6e1f1f');fe(x,t+2,2.25,1,n.skinS);}}
+ if(tp==='tee'){if(f===0){fe(x,t+2,2.75,1.25,n.skinS);R(x-1.75,t+5,3.5,3,'#fff3d6');R(x-1.25,t+5.5,2.5,2,'#c9473f');R(x-.5,t+6,1,1,'#fff3d6');}}
+ if(tp==='jacket'){R(x-b,t+1.5,2*b,1.25,'#243429');R(x-b,by-1.75,2*b,1.75,'#243429');if(f===0){fe(x,t+2,2,1.25,n.inner);R(x-.25,t+3,.5,9,'#c9c2b0');R(x-b+1.5,t+6.5,.5,3,n.shade);R(x+b-2,t+6.5,.5,3,n.shade);R(x+b-3,t+3,2,.75,'#c9473f');}else R(x-.25,t+3,.5,8,n.shade);}
+ if(tp==='blazer'){if(f===0){R(x-2.5,t+2,5,10,n.inner);R(x-3,t+2,1,5.5,n.shade);R(x+2,t+2,1,5.5,n.shade);R(x-.5,t+8.5,1,1,'#e8d9a0');R(x-1.25,t+2.5,2.5,.75,'#d8b26a');}else R(x-.25,t+3,.5,9,n.shade);}
+ if(n===FE||n===SPV||tp==='tunic'||tp==='apron'){const ac=n.hj?n.hj[0]:'#e8809f',ac2=n.hj?n.hj[2]:'#d9a4b8';R(x-b-.75,by-1.5,2*b+1.5,3.5,OL);R(x-b-.25,by-1.5,2*b+.5,3,n.shirt);R(x+b-1,by-1.5,1,3,n.shade);if(f===0){R(x-.25,t+5,.5,8,ac2);for(let i=0;i<3;i++)R(x-.5,t+6+i*2,1,.75,ac);}R(x-b,by+.75,2*b,.5,ac);}
 }
 function cloud(x,y,front=false){
  const col=S.weather==='hujan'?'#98a4b8':S.weather==='mendung'?'#d3d9e2':'#ffffff',sh=S.weather==='hujan'?'#76839a':S.weather==='mendung'?'#b4bdca':'#d7e8f6',pts=front?[[-8,1,4,2.5],[0,2,5,2.5],[8,1,4,2.5]]:[[-10,0,5,3.5],[-4,-2,6,4.5],[4,-2,6,4.5],[10,0,5,3.5],[0,1,10,3.5]];
@@ -616,7 +644,8 @@ update(0);panel();
 let stopPres=null;function watchPresence(){if(stopPres||!window.ForecastChatAPI?.listenPresence)return;stopPres=window.ForecastChatAPI.listenPresence(list=>{if(list)S.pres=list;});}
 function start(){watchPresence();syncReal();syncWeather();if(!stopControl)stopControl=window.ForecastOfficeControl?.listen(onRemote)||null;if(running)return;running=true;NPC.forEach(n=>{if(n.slotK!==null&&!held(n))n.slotK=undefined;});last=performance.now();requestAnimationFrame(frame);}
 setInterval(()=>{if(root.isConnected){syncReal();syncWeather();}},60000);
-return {root,start,sim:l=>{S.pres=l;},debug:()=>NPC.map(n=>({id:n.id,x:+n.x.toFixed(2),y:+n.y.toFixed(2),pose:n.pose,face:n.face,task:n.task,scene:!!n.inScene,say:n.sayT>0?n.say:''}))};
+function portrait(ctx,id,px,py,scale,f=0){const n=by(id);if(!n)return;const save=c,keep={pose:n.pose,path:n.path,wait:n.wait,carry:n.carry,food:n.food,sipT:n.sipT,sayT:n.sayT};c=ctx;ctx.save();ctx.setTransform(scale,0,0,scale,0,0);n.pose='stand';n.path=[];n.wait=null;n.carry=null;n.food=null;n.sipT=0;n.sayT=0;drawFront(n,px,py,f,false);ctx.restore();Object.assign(n,keep);c=save;}
+return {root,start,portrait,sim:l=>{S.pres=l;},debug:()=>NPC.map(n=>({id:n.id,x:+n.x.toFixed(2),y:+n.y.toFixed(2),pose:n.pose,face:n.face,task:n.task,scene:!!n.inScene,say:n.sayT>0?n.say:''}))};
 }
-return {debug:()=>api?.debug?.(),sim:l=>api?.sim?.(l),render:()=>'<div class="focus-intro"><h2>Kantor Agen AI</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
+return {debug:()=>api?.debug?.(),portrait:(...a)=>api?.portrait?.(...a),sim:l=>api?.sim?.(l),render:()=>'<div class="focus-intro"><h2>Kantor Agen AI</h2><span>Tim forecast hari ini</span></div><div id="kantor-host"></div>',mount(){const h=document.getElementById('kantor-host');if(!h)return;try{api=api||boot();if(api.root.parentNode!==h)h.appendChild(api.root);api.start();}catch(err){console.error(err);h.innerHTML='<p class="workspace-note">Kantor Agen AI belum dapat ditampilkan. Muat ulang halaman.</p>';}}};
 })();

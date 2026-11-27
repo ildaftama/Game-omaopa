@@ -45,7 +45,7 @@ function forecastUserValid(d) {
     && d.name is string && d.name.size() > 0 && d.name.size() <= 40
     && d.status in ['pending','active','disabled']
     && d.role in ['','master','factory','spv','forecaster','analyst','esbadmin','guest']
-    && (!('char' in d) || d.char in ['','f1','f2']);
+    && (!('char' in d) || d.char in ['','f1','f2','ga1','ga2','ga3','gmk','ghr','gbd','gout']);
 }
 // Daftar sendiri: hanya akun @forecast.omaopa.fun miliknya, status menunggu, tanpa peran.
 // Peran, status dan penghapusan hanya oleh Master.

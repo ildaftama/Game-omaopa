@@ -145,7 +145,7 @@ window.ForecastAccountsAPI={
  async create({id,name,role,char,password}){
   if(!window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role))throw Error('Hanya Master yang bisa membuat akun.');
   const sec=getApps().find(a=>a.name==='fu-create')||initializeApp(app.options,'fu-create'),sa=getAuth(sec);
-  try{const c=await createUserWithEmailAndPassword(sa,idEmail(id),password);await setDoc(fuRef(c.user.uid),{id,name,role,status:'active',char:role==='forecaster'?char||'':'',createdAt:serverTimestamp(),approvedBy:auth.currentUser.uid});}
+  try{const c=await createUserWithEmailAndPassword(sa,idEmail(id),password);await setDoc(fuRef(c.user.uid),{id,name,role,status:'active',char:role==='forecaster'||role==='guest'?char||'':'',createdAt:serverTimestamp(),approvedBy:auth.currentUser.uid});}
   finally{await signOut(sa).catch(()=>{});}
  },
  async update(uid,patch){if(!window.ForecastRolePolicy.accountAdmin(window.ForecastAuth?.role))throw Error('Hanya Master yang bisa mengubah akun.');await setDoc(fuRef(uid),{...patch,approvedBy:auth.currentUser.uid},{merge:true});},

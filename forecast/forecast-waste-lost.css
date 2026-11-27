@@ -144,3 +144,6 @@
 .wl-dbar em{display:block;height:100%;border-radius:3px;background:#9aa8b5}
 .wl-detail.lost .wl-dbar.r em{background:#d99a2b}.wl-detail.waste .wl-dbar.r em{background:#c9423a}
 @media (max-width:720px){.wl-dtops{grid-template-columns:1fr}.wl-more{float:none;display:block;margin-top:2px}}
+
+.wl-sel-area{min-width:240px}
+.wl-rank{margin:0 0 6px;padding:8px 12px;background:#fff7e6;border:1px solid #f0d9ae;border-radius:8px;color:#694509;font-size:13px}.wl-rank b{color:#172b42}

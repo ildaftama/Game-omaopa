@@ -8,13 +8,17 @@ window.ForecastAccounts=(()=>{
  const rerender=()=>window.dispatchEvent(new Event('forecast-settings-render'));
  const say=(m,ok=true)=>{msg=m;msgOk=ok;rerender();};
  function ensure(){if(stop||!api())return;stop=api().listen(list=>{users=list;rerender();});}
- const chars=()=>{const p=window.ForecastOfficeData?.people||[];return [['','Tanpa karakter'],['f1',p[0]?`Forecaster ${p[0]}`:'Karakter forecaster 1'],['f2',p[1]?`Forecaster ${p[1]}`:'Karakter forecaster 2']];};
+ // Owner 2026-11-27: akun Tamu memilih avatar per bagian.
+ const GUEST_CHARS=[['','Tamu umum (kacamata hitam)'],['ga1','Tamu Area 1'],['ga2','Tamu Area 2'],['ga3','Tamu Area 3'],['gmk','Tamu Marketing'],['ghr','Tamu HRD'],['gbd','Tamu BD'],['gout','Tamu Outlet']];
+ const hasChar=r=>r==='forecaster'||r==='guest';
+ const chars=role=>{if(role==='guest')return GUEST_CHARS;const p=window.ForecastOfficeData?.people||[];return [['','Tanpa karakter'],['f1',p[0]?`Forecaster ${p[0]}`:'Karakter forecaster 1'],['f2',p[1]?`Forecaster ${p[1]}`:'Karakter forecaster 2']];};
  const roleSelect=(val,attr,dis='')=>`<select ${attr} ${dis}><option value="">Pilih peran</option>${ROLES.map(r=>`<option value="${r}" ${val===r?'selected':''}>${esc(label(r))}</option>`).join('')}</select>`;
- const charSelect=(val,attr,show,dis='')=>`<select ${attr} ${show?'':'hidden'} ${dis} aria-label="Karakter di Kantor">${chars().map(([k,l])=>`<option value="${k}" ${val===k?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
+ const charOpts=(role,val)=>chars(role).map(([k,l])=>`<option value="${k}" ${val===k?'selected':''}>${esc(l)}</option>`).join('');
+ const charSelect=(val,attr,show,dis='',role='forecaster')=>`<select ${attr} ${show?'':'hidden'} ${dis} aria-label="Karakter di Kantor">${chars(role).map(([k,l])=>`<option value="${k}" ${val===k?'selected':''}>${esc(l)}</option>`).join('')}</select>`;
  function row(u){
   const me=u.uid===api()?.me?.(),dis=me||busy?'disabled':'',st=u.status||'pending';
   const acts=me?'<span class="fa-me">Akun Anda</span>':st==='pending'?`<button type="button" class="button fp-primary" data-fa-approve ${dis}>Setujui</button><button type="button" class="button quiet" data-fa-reject ${dis}>Tolak</button>`:st==='active'?`<button type="button" class="button" data-fa-save ${dis}>Simpan</button><button type="button" class="button quiet" data-fa-disable ${dis}>Nonaktifkan</button>`:`<button type="button" class="button" data-fa-enable ${dis}>Aktifkan lagi</button><button type="button" class="button quiet" data-fa-delete ${dis}>Hapus</button>`;
-  return `<div class="fa-row" data-fa-uid="${esc(u.uid)}"><div class="fa-who"><b>${esc(u.name||u.id)}</b><span>ID: ${esc(u.id)} · ${esc(STATUS[st]||st)}</span></div><div class="fa-ctl">${roleSelect(u.role||'','data-fa-role',dis)}${charSelect(u.char||'','data-fa-char',u.role==='forecaster',dis)}</div><div class="fa-acts">${acts}</div></div>`;
+  return `<div class="fa-row" data-fa-uid="${esc(u.uid)}"><div class="fa-who"><b>${esc(u.name||u.id)}</b><span>ID: ${esc(u.id)} · ${esc(STATUS[st]||st)}</span></div><div class="fa-ctl">${roleSelect(u.role||'','data-fa-role',dis)}${charSelect(u.char||'','data-fa-char',hasChar(u.role),dis,u.role)}</div><div class="fa-acts">${acts}</div></div>`;
  }
  function group(title,list,empty){return `<article class="workspace-card fa-card"><h3 class="fs-h3">${title} <small>${list.length}</small></h3>${list.length?list.map(row).join(''):`<p class="fs-use">${empty}</p>`}</article>`;}
  function render(){
@@ -34,13 +38,13 @@ window.ForecastAccounts=(()=>{
    if(!ROLES.includes(role)){say('Pilih peran akun.',false);return true;}
    if(!A.passOk(pw)){say('Password minimal 8 karakter dan harus berisi huruf dan angka.',false);return true;}
    if(pw!==v('fa-new-pass2')){say('Ulangi password belum sama.',false);return true;}
-   if(role==='forecaster'&&char&&(users||[]).some(u=>u.status==='active'&&u.role==='forecaster'&&u.char===char)){say('Karakter itu sudah dipakai akun lain.',false);return true;}
+   if(hasChar(role)&&char&&(users||[]).some(u=>u.status==='active'&&u.role===role&&u.char===char)){say('Karakter itu sudah dipakai akun lain.',false);return true;}
    run(()=>A.create({id,name,role,char,password:pw}),`Akun ${id} dibuat dan langsung aktif.`);return true;
   }
   const rowEl=e.target.closest('[data-fa-uid]');if(!rowEl)return false;
   const uid=rowEl.dataset.faUid,u=(users||[]).find(x=>x.uid===uid);if(!u)return true;
-  const role=rowEl.querySelector('[data-fa-role]')?.value||'',char=role==='forecaster'?rowEl.querySelector('[data-fa-char]')?.value||'':'';
-  const clash=()=>role==='forecaster'&&char&&(users||[]).some(x=>x.uid!==uid&&x.status==='active'&&x.role==='forecaster'&&x.char===char);
+  const role=rowEl.querySelector('[data-fa-role]')?.value||'',char=hasChar(role)?rowEl.querySelector('[data-fa-char]')?.value||'':'';
+  const clash=()=>hasChar(role)&&char&&(users||[]).some(x=>x.uid!==uid&&x.status==='active'&&x.role===role&&x.char===char);
   if(e.target.closest('[data-fa-approve]')){if(!ROLES.includes(role)){say('Pilih peran dulu sebelum menyetujui.',false);return true;}if(clash()){say('Karakter itu sudah dipakai akun lain.',false);return true;}run(()=>A.update(uid,{status:'active',role,char}),`${u.name||u.id} disetujui sebagai ${label(role)}.`);return true;}
   if(e.target.closest('[data-fa-save]')){if(!ROLES.includes(role)){say('Pilih peran akun.',false);return true;}if(clash()){say('Karakter itu sudah dipakai akun lain.',false);return true;}run(()=>A.update(uid,{role,char}),`Perubahan ${u.name||u.id} tersimpan.`);return true;}
   if(e.target.closest('[data-fa-disable]')){if(!confirm(`Nonaktifkan akun ${u.name||u.id}? Akun langsung keluar dari web Forecast.`))return true;run(()=>A.update(uid,{status:'disabled'}),`${u.name||u.id} dinonaktifkan.`);return true;}
@@ -49,6 +53,6 @@ window.ForecastAccounts=(()=>{
   return false;
  }
  // Tampilkan pilihan karakter hanya untuk peran Forecaster.
- document.addEventListener('change',e=>{const s=e.target.closest?.('#fa-root [data-fa-role],#fa-new-role');if(!s)return;const box=s.closest('.fa-row')||s.closest('.fa-new'),c=box?.querySelector('[data-fa-char],#fa-new-char');if(c)c.hidden=s.value!=='forecaster';});
+ document.addEventListener('change',e=>{const s=e.target.closest?.('#fa-root [data-fa-role],#fa-new-role');if(!s)return;const box=s.closest('.fa-row')||s.closest('.fa-new'),c=box?.querySelector('[data-fa-char],#fa-new-char');if(c){c.hidden=!hasChar(s.value);c.innerHTML=charOpts(s.value,'');}});
  return {render,click};
 })();
