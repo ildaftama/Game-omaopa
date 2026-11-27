@@ -1181,8 +1181,10 @@ window.ForecastDashboard=(()=>{
    const html=`<div class="weather-pin ${risk?'risk':''}"><span>${icon}</span><small>${r.today==null?'—':r.today+'%'}</small></div>`;
    const icon2=L.divIcon({className:'',html,iconSize:[40,40],iconAnchor:[20,40],popupAnchor:[0,-38]});
    const existing=leafletMarkers.get(r.id);
-   if(existing){existing.setIcon(icon2);existing.setPopupContent(popupHtml(r));}
-   else{const m=L.marker([o.lat,o.lon],{icon:icon2,title:r.name}).addTo(leafletMap).bindPopup(popupHtml(r));leafletMarkers.set(r.id,m);}
+   // Audit performa 2026-11-27: isi popup (termasuk akurasi outlet) baru dihitung saat pin dibuka; ikon hanya diganti kalau berubah.
+   const pop=()=>popupHtml(r);
+   if(existing){if(existing._fdSig!==html){existing.setIcon(icon2);existing._fdSig=html;}existing.setPopupContent(pop);}
+   else{const m=L.marker([o.lat,o.lon],{icon:icon2,title:r.name}).addTo(leafletMap).bindPopup(pop);m._fdSig=html;leafletMarkers.set(r.id,m);}
   }
   for(const [id,m] of [...leafletMarkers])if(!seen.has(id)){leafletMap.removeLayer(m);leafletMarkers.delete(id);}
   function resetMapView(){
