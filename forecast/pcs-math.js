@@ -1,10 +1,13 @@
 'use strict';
 // Shared browser / Node quantity join. Missing data never becomes a zero sale.
 (function(root){
+ // Indeks date|id per array days, dibuat sekali (perf 2026-11-27): dulu dibangun ulang tiap panggilan (±19 rb baris x 7 produk).
+ const IDX=new WeakMap();
+ const idx=days=>{if(!days)return new Map();const c=IDX.get(days);if(c&&c.n===days.length)return c.m;const m=new Map(days.map(r=>[r.date+'|'+r.id,r]));IDX.set(days,{n:days.length,m});return m;};
  const core={
   pure(sales,orders,ids,product,dates){
    const products=[...new Set(Array.isArray(product)?product:[product])];
-   const sold=new Map((sales?.days||[]).map(r=>[r.date+'|'+r.id,r])),pre=new Map((orders?.days||[]).map(r=>[r.date+'|'+r.id,r])),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]);
+   const sold=idx(sales?.days),pre=idx(orders?.days),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]);
    return dates.map(date=>{let value=0,valid=0,reasons={};
     for(const id of ids){const k=date+'|'+id,s=sold.get(k),o=pre.get(k),qs=products.map(p=>o?o.qty[p]:0);let reason=null;
      if(!s?.complete||products.some(p=>!Number.isSafeInteger(s.qty?.[p])||s.qty[p]<0))reason='sales';
@@ -21,7 +24,7 @@
    });
   },
   sold(sales,ids,product,dates){
-   const pre=new Map((sales?.days||[]).map(r=>[r.date+'|'+r.id,r]));
+   const pre=idx(sales?.days);
    return dates.map(date=>{let value=0,valid=0;for(const id of ids){const r=pre.get(date+'|'+id),q=r?.qty?.[product];if(r?.complete&&Number.isSafeInteger(q)&&q>=0&&(!(product>=4&&product<=6)||(r.mappingVersion||1)>=2)){value+=q;valid++;}}return{date,value:valid?value:null,valid,expected:ids.length,complete:valid===ids.length};});
   },
   partition(sales,orders,ids,product,dates){
@@ -34,7 +37,7 @@
    });
   },
   estimatedPartition(sales,orders,ids,product,dates){
-   const sold=new Map((sales?.days||[]).map(r=>[r.date+'|'+r.id,r])),pre=new Map((orders?.days||[]).map(r=>[r.date+'|'+r.id,r])),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]),history=new Map();
+   const sold=idx(sales?.days),pre=idx(orders?.days),covered=new Set(orders?.coveredDates||[]),blocked=new Set(orders?.blockedDates||[]),history=new Map();
    const integer=q=>Number.isSafeInteger(q)&&q>=0;
    for(const s of sales?.days||[]){
     const q=pre.get(s.date+'|'+s.id)?.qty?.[product],total=s.qty?.[product];
