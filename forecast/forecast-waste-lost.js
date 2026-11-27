@@ -157,16 +157,24 @@ window.ForecastWasteLost=(()=>{
   });
  }
  // Perkembangan per bulan (owner 2026-11-27): lost murni dan waste per bulan, ikut pilihan outlet.
- let trendCache=null;
+ let trendCache=null,chartOn=false;try{chartOn=localStorage.getItem('omaopa-wl-chart')==='1';}catch{}
  function trendView(months){
   const t=today(),key=[selected,months.join(),window.ForecastLostDaily?.updatedAt,LM()?.updatedAt,window.DAILY_RECAP_SUMMARY?.updatedAt].join('|');
   if(trendCache?.key!==key){const rows=months.slice(-12).map(m=>{const c=collect({dates:a=>a.filter(d=>d<t&&d.startsWith(m))});return {m,lost:lostPct(c.total),lostRp:c.total.highRp,waste:c.omzet>0?c.total.nom/c.omzet*100:null,wasteRp:c.total.nom,partial:m===t.slice(0,7)};});trendCache={key,rows};}
   const rows=trendCache.rows.filter(r=>r.lost!=null||r.waste!=null);if(rows.length<2)return '';
-  const sel=new Set(collect().ds.map(d=>d.slice(0,7))),max=Math.max(5,...rows.map(r=>Math.max(r.lost||0,r.waste||0)));
-  const bar=(v,cls,title)=>v==null?`<i class="${cls} none" title="${title}: belum ada data"></i>`:`<i class="${cls}" style="height:${(v/max*100).toFixed(1)}%" title="${title}: ${pc(v,1)}"><b>${pc(v,1).replace('%','')}</b></i>`;
-  const cols=rows.map(r=>`<button type="button" class="wl-tcol${sel.has(r.m)?' on':''}" data-wl-month="${r.m}" title="Klik untuk melihat ${esc(mLabel(r.m,true))}"><span class="wl-tbars">${bar(r.lost,'lost','Lost murni')}${bar(r.waste,'waste','Waste dari omzet')}</span><small>${esc(mLabel(r.m).split(' ')[0])}<br>’${r.m.slice(2,4)}${r.partial?'*':''}</small></button>`).join('');
-  const last=rows.at(-1),prev=rows.at(-2);
-  return `<section class="wl-section wl-trend"><h2>Perkembangan per bulan</h2><p class="wl-note"><span class="wl-key lost"></span>Lost murni (% permintaan) <span class="wl-key waste"></span>Waste (% omzet) · klik bulan untuk melihat rinciannya${last&&prev&&last.lost!=null&&prev.lost!=null?` · lost ${esc(mLabel(last.m))} ${last.lost>prev.lost?'naik':'turun'} ${pc(Math.abs(last.lost-prev.lost),1).replace('%',' poin')} dari ${esc(mLabel(prev.m))}`:''}</p><div class="wl-tchart">${cols}</div><p class="wl-foot">* bulan berjalan, sampai kemarin. Feb–Mar bertepatan Ramadan (jam ramai bergeser ke sore), jadi lost dua bulan itu kurang akurat. Lost Jan–Okt dihitung dari riwayat transaksi per jam; mulai November per 15 menit.</p></section>`;
+  const last=rows.at(-1),prev=rows.at(-2),delta=last&&prev&&last.lost!=null&&prev.lost!=null?` · lost ${esc(mLabel(last.m))} ${last.lost>prev.lost?'naik':'turun'} ${pc(Math.abs(last.lost-prev.lost),1).replace('%',' poin')} dari ${esc(mLabel(prev.m))}`:'';
+  const head=`<div class="wl-trend-head"><h2>Tren lost sales vs waste</h2><button type="button" class="wl-tbtn" data-wl-chart aria-expanded="${chartOn}">${chartOn?'Sembunyikan grafik':'Tampilkan grafik'}</button></div>`;
+  if(!chartOn)return `<section class="wl-section wl-trend">${head}</section>`;
+  // Dua sumbu: kiri lost murni (% permintaan), kanan waste (% omzet), karena skalanya jauh berbeda.
+  const W=720,H=230,L=44,Rr=44,Tp=18,Bt=34,iw=W-L-Rr,ih=H-Tp-Bt,n=rows.length,X=i=>L+(n===1?iw/2:i*iw/(n-1));
+  const up=(v,s)=>Math.max(s,Math.ceil(v/s)*s),lMax=up(Math.max(...rows.map(r=>r.lost||0))*1.1,5),wMax=up(Math.max(...rows.map(r=>r.waste||0))*1.15,1);
+  const YL=v=>Tp+ih-(v/lMax)*ih,YW=v=>Tp+ih-(v/wMax)*ih,num=v=>v.toLocaleString('id-ID',{maximumFractionDigits:1});
+  const path=(k,Y)=>rows.map((r,i)=>r[k]==null?null:[X(i),Y(r[k])]).filter(Boolean).map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  let grid='';for(let g=0;g<=4;g++){const y=Tp+ih*g/4;grid+=`<line x1="${L}" x2="${W-Rr}" y1="${y}" y2="${y}" class="g"/><text x="${L-6}" y="${y+3.5}" class="al">${num(lMax*(1-g/4))}%</text><text x="${W-Rr+6}" y="${y+3.5}" class="ar">${num(wMax*(1-g/4))}%</text>`;}
+  const pts=(k,Y,cls,dy)=>rows.map((r,i)=>r[k]==null?'':`<circle cx="${X(i)}" cy="${Y(r[k])}" r="3.5" class="${cls}"><title>${esc(mLabel(r.m,true))}: ${pc(r[k],1)}</title></circle><text x="${X(i)}" y="${Y(r[k])+dy}" class="v ${cls}">${num(r[k])}</text>`).join('');
+  const xs=rows.map((r,i)=>`<text x="${X(i)}" y="${H-12}" class="x">${esc(mLabel(r.m).split(' ')[0])}${r.partial?'*':''}</text><rect x="${X(i)-iw/(2*Math.max(1,n-1))}" y="${Tp}" width="${iw/Math.max(1,n-1)}" height="${ih+Bt}" class="hit" data-wl-month="${r.m}"><title>Klik untuk melihat ${esc(mLabel(r.m,true))}</title></rect>`).join('');
+  const svg=`<svg class="wl-tsvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tren lost sales murni dan waste per bulan">${grid}<path d="${path('lost',YL)}" class="ln lost"/><path d="${path('waste',YW)}" class="ln waste"/>${pts('lost',YL,'lost',-8)}${pts('waste',YW,'waste',14)}${xs}</svg>`;
+  return `<section class="wl-section wl-trend">${head}<p class="wl-note"><span class="wl-key lost"></span>Lost murni (% permintaan, sumbu kiri) <span class="wl-key waste"></span>Waste (% omzet, sumbu kanan) · klik bulan untuk melihat rinciannya${delta}</p><div class="wl-tchart">${svg}</div><p class="wl-foot">* bulan berjalan, sampai kemarin. Feb–Mar bertepatan Ramadan (jam ramai bergeser ke sore), jadi lost dua bulan itu kurang akurat. Lost Jan–Okt dihitung dari riwayat transaksi per jam; mulai November per 15 menit.</p></section>`;
  }
  function paint(){const el=document.getElementById('wl-root');if(el)el.innerHTML=view();}
  document.addEventListener('change',e=>{const s=e.target.closest?.('#wl-root [data-wl-sel]');if(!s)return;const k=s.dataset.wlSel,cur=today().slice(0,7);
@@ -180,6 +188,6 @@ window.ForecastWasteLost=(()=>{
   for(const d of ds)for(const [id,cells] of Object.entries(LD.days[d]))for(const [k,c] of Object.entries(cells)){const l=labels[+k];pcs+=c[1]||0;sold+=c[0]||0;rpv+=(c[1]||0)*priceFor(prices,id,l);}
   return ds.length?{pcs,rp:rpv,pct:pcs+sold>0?pcs/(pcs+sold)*100:null,from:ds[0],to:ds.at(-1)}:null;
  }
- document.addEventListener('click',e=>{if(e.target.closest?.('[data-wl-go]')){document.querySelector('[data-focus="wastelost"]')?.click();return;}if(!e.target.closest?.('#wl-root'))return;const a=e.target.closest('[data-wl-month]'),b=e.target.closest('[data-wl-area]'),o=e.target.closest('[data-wl-outlet]');if(a){state.period='range';state.from=state.to=a.dataset.wlMonth;state.outlet=null;rememberPeriod();paint();}else if(b){state.area=state.area===b.dataset.wlArea?null:b.dataset.wlArea;state.outlet=null;paint();}else if(o){state.outlet=state.outlet===o.dataset.wlOutlet?null:o.dataset.wlOutlet;paint();}});
+ document.addEventListener('click',e=>{if(e.target.closest?.('[data-wl-go]')){document.querySelector('[data-focus="wastelost"]')?.click();return;}if(!e.target.closest?.('#wl-root'))return;if(e.target.closest('[data-wl-chart]')){chartOn=!chartOn;try{localStorage.setItem('omaopa-wl-chart',chartOn?'1':'0');}catch{}paint();return;}const a=e.target.closest('[data-wl-month]'),b=e.target.closest('[data-wl-area]'),o=e.target.closest('[data-wl-outlet]');if(a){state.period='range';state.from=state.to=a.dataset.wlMonth;state.outlet=null;rememberPeriod();paint();}else if(b){state.area=state.area===b.dataset.wlArea?null:b.dataset.wlArea;state.outlet=null;paint();}else if(o){state.outlet=state.outlet===o.dataset.wlOutlet?null:o.dataset.wlOutlet;paint();}});
  return {lostSummary,health,noticeHtml,criticalFor,confirmPlan,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Waste & Lost Sales</h2><span>Ringkasan per produk dan area</span></div><div id="wl-root">${view()}</div>`;}};
 })();
