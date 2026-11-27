@@ -152,7 +152,8 @@ const NPC=[
  mk('gmk','Tamu Marketing',[18,14],{shirt:'#b6403a',shade:'#8f2e2a',inner:'#1f1f24',skin:'#edc19f',skinS:'#d3a07c',hair:'#2b2120',iris:'#2a1d15',color:'#b6403a',pants:'#2e3c5c',shoes:'#f2efe8',bw:5,tall:.5,spd:1.05,look:{mid:1,top:'flannel'}}),
  mk('ghr','Tamu HRD',[19,14],{shirt:'#6d5a9c',shade:'#54447d',inner:'#f6f3ee',skin:'#f4d3ba',skinS:'#dcae92',hair:'#4a2e26',iris:'#3b2a24',color:'#8f7cc4',pants:'#3a3542',shoes:'#2b2530',bw:4.75,tall:0,spd:1,hj:['#9b3b52','#7a2a3e','#d07a8e'],look:{hijab:1,top:'blazer'}}),
  mk('gbd','Tamu BD',[20,14],{shirt:'#3e5c4b',shade:'#2d4537',inner:'#e9e4da',skin:'#d6a07a',skinS:'#b9835e',hair:'#1a1617',iris:'#2a1d15',color:'#4f8a69',pants:'#2a2d33',shoes:'#efe9df',bw:5.25,tall:1,spd:1,look:{crew:1,top:'jacket'}}),
- mk('gout','Tamu Outlet',[18,15],{shirt:'#f3e7cf',shade:'#dcc9a7',inner:'#f3e7cf',skin:'#e9bd99',skinS:'#cf9f7b',hair:'#2a1f1c',iris:'#3b2a24',color:'#8a5a3b',pants:'#3d3530',shoes:'#2a2224',bw:4.75,tall:0,spd:1,hj:['#2a2a31','#141419','#5c5c68'],look:{hijab:1,top:'apron'}})
+ mk('gout','Tamu Outlet',[18,15],{shirt:'#f3e7cf',shade:'#dcc9a7',inner:'#f3e7cf',skin:'#e9bd99',skinS:'#cf9f7b',hair:'#2a1f1c',iris:'#3b2a24',color:'#8a5a3b',pants:'#3d3530',shoes:'#2a2224',bw:4.75,tall:0,spd:1,hj:['#2a2a31','#141419','#5c5c68'],look:{hijab:1,top:'apron'}}),
+ mk('gfba','Tamu FBA',[19,15],{shirt:'#f7f7f4',shade:'#dcdcd6',inner:'#f7f7f4',skin:'#fcebe0',skinS:'#efcfbd',hair:'#3a2a22',iris:'#3b2a24',color:'#cdb98f',pants:'#5a5048',shoes:'#8a7a66',bw:4.75,tall:0,spd:1,hj:['#e6d6b8','#c7b28c','#f5ecda'],look:{hijab:1,glasses:'round',top:'tunic'}})
 ];
 const DESK={esb:[4*T+5,7*T+6],pawang:[14*T+4,7*T+7],pred:[6*T+5,7*T+7],watch:[10*T+5,7*T+7],f1:[8*T+6,13*T+6],f2:[11*T+3,13*T+6],mgr:[-4*T+5,5*T+7],spv:[-4*T+5,11*T+7]};
 const VOICE={
@@ -166,7 +167,7 @@ const VOICE={
  spv:{want:{kopi:['Kopi dulu, rute nanti.','Isi tenaga sebelum jam kirim.'],snack:['Ngemil sambil cek rute.'],makan:['Makan dulu ya.'],sofa:['Duduk sebentar.'],toilet:['Izin sebentar.']},enjoy:{kopi:['Segar lagi.'],snack:['Enak.'],makan:['Kenyang.'],sofa:['Enaknya.']},wc:['Sebentar ya.'],empty:['Yah, habis.']},
  guest:{want:{kopi:['Boleh minta kopinya?','Kopi dulu, biar melek.'],snack:['Snack-nya kelihatan enak.'],makan:['Numpang makan ya.'],sofa:['Duduk lagi ah.'],toilet:['Permisi, toiletnya di mana?']},enjoy:{kopi:['Enak juga kopi kantor ini.'],snack:['Nyam, mantap.'],makan:['Kenyang.'],sofa:['Sofanya empuk.']},wc:['Sebentar ya.'],empty:['Yah, habis.']}
 };
-const by=id=>NPC.find(n=>n.id===id),ESB=by('esb'),PAW=by('pawang'),PRED=by('pred'),FW=by('f1'),FE=by('f2'),WAT=by('watch'),isF=n=>n===FW||n===FE,MGR=by('mgr'),SPV=by('spv'),GUEST=by('guest'),GIDS=['ga1','ga2','ga3','gmk','ghr','gbd','gout'],GUESTS=GIDS.map(by),isGuest=n=>n===GUEST||GUESTS.includes(n),comes=n=>isF(n)||n===MGR||n===SPV||isGuest(n);let FC=FW;
+const by=id=>NPC.find(n=>n.id===id),ESB=by('esb'),PAW=by('pawang'),PRED=by('pred'),FW=by('f1'),FE=by('f2'),WAT=by('watch'),isF=n=>n===FW||n===FE,MGR=by('mgr'),SPV=by('spv'),GUEST=by('guest'),GIDS=['ga1','ga2','ga3','gmk','ghr','gbd','gout','gfba'],GUESTS=GIDS.map(by),isGuest=n=>n===GUEST||GUESTS.includes(n),comes=n=>isF(n)||n===MGR||n===SPV||isGuest(n);let FC=FW;
 for(const n of [MGR,SPV,GUEST,...GUESTS]){n.present=false;n.pose='away';n.x=4;n.y=15;}
 let SCHEDULE={},officeReady=false;const SHIFT={'7:00':[7,16],'10:30':[10.5,21],'12:00':[12,21]};
 const dateNow=()=>S.date||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(new Date());
@@ -433,7 +434,8 @@ function face(n,x,hy){
  if(n===WAT){brow(lx,by,3.5,st.alert?-.75:-.5,bc);brow(rx,by,3.5,st.alert?.75:.5,bc);}
  if(n.look?.hijab||n.look?.bob){const bw=n.look.bob?n.hair:'#4a3a33';brow(lx,by-.25,3.5,.25,bw,.5);brow(rx,by-.25,3.5,-.25,bw,.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
  if(n.look?.crew||n.look?.mid){brow(lx,by,3.5,0,n.hair,.75);brow(rx,by,3.5,0,n.hair,.75);}
- if(n.look?.glasses){c.strokeStyle='#17202f';c.lineWidth=.6;c.strokeRect(lx-.75,ey-.75,5,4.5);c.strokeRect(rx-.75,ey-.75,5,4.5);R(lx+4.25,ey+.75,1.5,.5,'#17202f');R(lx,ey-.5,1,.5,'rgba(255,255,255,.75)');R(rx,ey-.5,1,.5,'rgba(255,255,255,.75)');}
+ if(n.look?.glasses==='round'){c.strokeStyle='#111114';c.lineWidth=.4;c.beginPath();c.arc(lx+1.75,ey+1.5,2.75,0,7);c.stroke();c.beginPath();c.arc(rx+1.75,ey+1.5,2.75,0,7);c.stroke();R(lx+4.5,ey+1.25,1.75,.4,'#111114');R(lx+.25,ey-.25,.75,.5,'rgba(255,255,255,.7)');R(rx+.25,ey-.25,.75,.5,'rgba(255,255,255,.7)');}
+ else if(n.look?.glasses){c.strokeStyle='#17202f';c.lineWidth=.6;c.strokeRect(lx-.75,ey-.75,5,4.5);c.strokeRect(rx-.75,ey-.75,5,4.5);R(lx+4.25,ey+.75,1.5,.5,'#17202f');R(lx,ey-.5,1,.5,'rgba(255,255,255,.75)');R(rx,ey-.5,1,.5,'rgba(255,255,255,.75)');}
  if(n===FW){brow(lx,by,3.5,.25,bc);brow(rx,by,3.5,-.25,bc);c.strokeStyle='#17202f';c.lineWidth=.6;c.strokeRect(lx-.75,ey-.75,5,4.5);c.strokeRect(rx-.75,ey-.75,5,4.5);R(lx+4.25,ey+.75,1.5,.5,'#17202f');R(lx,ey-.5,1,.5,'rgba(255,255,255,.75)');}
  if(n===FE){brow(lx,by-.25,3.5,.25,'#5b4036',.5);brow(rx,by-.25,3.5,-.25,'#5b4036',.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}
  if(n===SPV){brow(lx,by-.25,3.5,.25,'#4a3a33',.5);brow(rx,by-.25,3.5,-.25,'#4a3a33',.5);R(lx-.5,ey-.5,.75,.75,OL);R(rx+3.25,ey-.5,.75,.75,OL);}

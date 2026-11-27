@@ -45,7 +45,7 @@ function forecastUserValid(d) {
     && d.name is string && d.name.size() > 0 && d.name.size() <= 40
     && d.status in ['pending','active','disabled']
     && d.role in ['','master','factory','spv','forecaster','analyst','esbadmin','guest']
-    && (!('char' in d) || d.char in ['','f1','f2','ga1','ga2','ga3','gmk','ghr','gbd','gout']);
+    && (!('char' in d) || d.char in ['','f1','f2','ga1','ga2','ga3','gmk','ghr','gbd','gout','gfba']);
 }
 // Daftar sendiri: hanya akun @forecast.omaopa.fun miliknya, status menunggu, tanpa peran.
 // Peran, status dan penghapusan hanya oleh Master.
@@ -284,12 +284,12 @@ function forecastOfficeOwner(id) {
     || (id == 'spv' && forecastUserIn(['spv']))
     || (id == 'esb' && forecastUserIn(['esbadmin']))
     || (id == 'guest' && forecastUserIn(['guest']))
-    || (id in ['ga1','ga2','ga3','gmk','ghr','gbd','gout'] && forecastUserIn(['guest']) && get(/databases/$(database)/documents/forecastUsers/$(request.auth.uid)).data.get('char','') == id);
+    || (id in ['ga1','ga2','ga3','gmk','ghr','gbd','gout','gfba'] && forecastUserIn(['guest']) && get(/databases/$(database)/documents/forecastUsers/$(request.auth.uid)).data.get('char','') == id);
 }
 // Kantor Mini: arahan terakhir untuk karakter, supaya gerakannya sama di semua layar.
 match /officeState/{id} {
   allow read: if forecastCommunity();
-  allow create, update: if id in ['f1','f2','pred','mgr','spv','esb','pawang','watch','guest','ga1','ga2','ga3','gmk','ghr','gbd','gout'] && forecastOfficeOwner(id)
+  allow create, update: if id in ['f1','f2','pred','mgr','spv','esb','pawang','watch','guest','ga1','ga2','ga3','gmk','ghr','gbd','gout','gfba'] && forecastOfficeOwner(id)
     && request.resource.data.keys().hasOnly(['act','x','y','at','by','cid'])
     && request.resource.data.act in ['go','kopi','snack','makan','sofa','nap','toilet','kerja']
     && request.resource.data.x is int && request.resource.data.x >= -5 && request.resource.data.x <= 25

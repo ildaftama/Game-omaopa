@@ -9,7 +9,7 @@ window.ForecastAccounts=(()=>{
  const say=(m,ok=true)=>{msg=m;msgOk=ok;rerender();};
  function ensure(){if(stop||!api())return;stop=api().listen(list=>{users=list;rerender();});}
  // Owner 2026-11-27: akun Tamu memilih avatar per bagian.
- const GUEST_CHARS=[['','Tamu umum (kacamata hitam)'],['ga1','Tamu Area 1'],['ga2','Tamu Area 2'],['ga3','Tamu Area 3'],['gmk','Tamu Marketing'],['ghr','Tamu HRD'],['gbd','Tamu BD'],['gout','Tamu Outlet']];
+ const GUEST_CHARS=[['','Tamu umum (kacamata hitam)'],['ga1','Tamu Area 1'],['ga2','Tamu Area 2'],['ga3','Tamu Area 3'],['gmk','Tamu Marketing'],['ghr','Tamu HRD'],['gbd','Tamu BD'],['gout','Tamu Outlet'],['gfba','Tamu FBA']];
  const hasChar=r=>r==='forecaster'||r==='guest';
  const chars=role=>{if(role==='guest')return GUEST_CHARS;const p=window.ForecastOfficeData?.people||[];return [['','Tanpa karakter'],['f1',p[0]?`Forecaster ${p[0]}`:'Karakter forecaster 1'],['f2',p[1]?`Forecaster ${p[1]}`:'Karakter forecaster 2']];};
  const roleSelect=(val,attr,dis='')=>`<select ${attr} ${dis}><option value="">Pilih peran</option>${ROLES.map(r=>`<option value="${r}" ${val===r?'selected':''}>${esc(label(r))}</option>`).join('')}</select>`;
