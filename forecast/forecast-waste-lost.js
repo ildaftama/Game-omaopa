@@ -42,7 +42,7 @@ window.ForecastWasteLost=(()=>{
  const blank=()=>({pcs:0,nom:0,habis:0,low:0,high:0,lowRp:0,highRp:0,omzet:0,days:0,kirim:0,sold:0,est:0});
  // Harga jual untuk rupiah lost: realisasi outlet untuk 4 produk utama, selain itu harga acuan.
  const REF_PRICE={'Mini Ogura':57000/9,'Chiffon Keju':33000,'Chiffon Ekstra Keju':34000,'Chiffon Butter':34000,'Chiffon Lite Ekstra Keju':19000,'Chiffon Lite Keju':18000,'Roti Sosis':6500,'Roti Abon':7000,'Roti Coklat':6000,'Roti Coklat Keju':6000,'Roti Coklat Pisang':6000,'Roti Vanilla':6000,'Sweet Layer 150 ml':14000,'Sweet Layer 300 ml':25000,'Malmil Cheese Less Sugar':17000,'Malmil Choco Less Sugar':18000};
- const priceFor=(prices,id,l)=>(PRICE_NAME[l]?prices[id]?.[PRICE_NAME[l]]?.price:0)||REF_PRICE[l]||({'Ogura Cheese':17000,'Ogura Choco':18000,'Malmil Cheese':17000,'Malmil Choco':18000})[l]||0;
+ const priceFor=(prices,id,l)=>(PRICE_NAME[l]?prices[id]?.[PRICE_NAME[l]]?.price:0)||REF_PRICE[l]||({'Ogura Cheese':56000,'Ogura Choco':56000,'Malmil Cheese':18800,'Malmil Choco':18800})[l]||0;
  const lostSrc=d=>{const s=window.ForecastLostDaily?.src?.[d];return s==='tx'||s==='live';};
  const addTo=(a,b)=>{for(const k of Object.keys(a))a[k]+=b[k]||0;return a;};
  function collect(opt={}){
