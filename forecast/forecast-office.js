@@ -363,7 +363,7 @@ function approach(n){
 function sceneTimes(today){const r=seeded('jadwal-obrolan|'+today),base=Date.parse(today+'T07:00:00+07:00')/1000,end=base+15*3600,out=[];let t=base+20+r()*120;while(t<end){out.push(t);t+=120+Math.pow(r(),1.3)*480;}return out;}
 function endScene(){const sc=TK.scene;TK.scene=null;TK.idx=-1;if(!sc)return;for(const n of sc.people){n.talkUntil=0;n.inScene=false;if(n.held>S.t)n.held=0;if(!asleep()&&(!comes(n)||(n.present&&!n.leaving)))idle(n);}}
 function startScene(i,start,now){
- const api=window.ForecastOfficeTalk,ok=n=>canTalk(n)&&!held(n)&&!['nap','sofa','sleepDesk'].includes(n.pose)&&(!comes(n)||(n.present&&!n.leaving));
+ const api=window.ForecastOfficeTalk,ok=n=>canTalk(n)&&!held(n)&&!['nap','sleepDesk'].includes(n.pose)&&(n.pose!=='sofa'||isGuest(n))&&(!comes(n)||(n.present&&!n.leaving));
  let sc=null;try{TK.at=-99;sc=api.scene(i,talkFacts(),NPC.filter(ok).map(n=>n.id));}catch{sc=null;}
  if(!sc)return;let v=by(sc.lines[0].id),h=by(sc.lines.find(l=>l.id!==v.id)?.id);if(!v||!h)return;
  // Forecaster sedang bekerja, jadi biasanya NPC yang datang ke mejanya.

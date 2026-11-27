@@ -93,6 +93,45 @@ function dataLines(id,f){
   ...on(f.h>=11&&f.h<14,'Jam makan siang, kantinnya di mana ya?'),
   'Kantornya lucu juga ya.','Santai banget suasananya di sini.','Saya cuma mampir sebentar kok.','Timnya kelihatan solid.',
  ];
+ // Tamu per bagian (owner 2026-11-27): obrolan ringan, kadang soal kerjaan bagiannya.
+ if(id==='area')return [
+  ...on(lOut,`${lOut} kemarin sempat kosong sore, anak outletnya sampai telepon saya.`,`Saya mau mampir ke ${lOut}, katanya sering kehabisan.`),
+  ...on(wOut,`${wOut} sisanya lumayan, besok saya cek displaynya.`),
+  ...on(hit,`${hit} di area saya lagi dicari terus.`),
+  ...on(f.areaL,`Area ${f.areaL?.name} paling sering kehabisan. Jangan-jangan area saya.`),
+  ...on(f.weatherKnown&&f.weather==='hujan','Hujan gini outlet pinggir jalan biasanya sepi.'),
+  'Baru balik keliling outlet, macetnya lumayan.','Outlet saya hari ini ramai, alhamdulillah.','Tadi ada pelanggan tanya varian baru.','Anak-anak outlet titip salam buat tim forecast.',
+ ];
+ if(id==='gmk')return [
+  ...on(hit,`${hit} lagi naik, pas banget buat konten minggu ini.`,`Foto ${hit} kemarin yang like-nya paling banyak.`),
+  ...on(f.weekendTomorrow,`Besok ${f.tomorrow}, story promonya sudah saya jadwalkan.`),
+  ...on(f.weatherKnown&&f.weather==='hujan','Hujan gini enaknya posting kue sama teh hangat.'),
+  'Lagi mikirin konten buat akhir pekan.','Cahaya di kantor ini bagus buat foto produk.','Promo bundling kemarin responnya lumayan.','Kalau ada promo, saya kabari dulu biar stoknya siap.',
+ ];
+ if(id==='ghr')return [
+  ...on(f.day==='Jumat','Jumat nih, jangan lupa isi absen sebelum pulang.'),
+  ...on(f.date>=25||f.date<=2,'Gajian sudah dekat, sabar ya semuanya.'),
+  ...on(f.h>=11&&f.h<13,'Sudah jam makan siang, jangan ditunda.'),
+  'Jadwal shift minggu depan sudah saya kirim ke grup.','Ada pelatihan pelayanan buat anak outlet minggu ini.','Kalau ada yang mau cuti, ajukan dari sekarang ya.','Saya cuma mau cek, semua sehat kan?',
+ ];
+ if(id==='gbd')return [
+  ...on(f.areaL,`Area ${f.areaL?.name} sering kehabisan. Bisa jadi tanda butuh outlet tambahan.`),
+  ...on(o,`Omzet hari ini ${o?.text}, bahan bagus buat ngobrol sama calon mitra.`),
+  'Lagi survei lokasi baru, ramai mahasiswa.','Ada kantin kampus yang tertarik kerja sama.','Peta di HP saya penuh pin calon lokasi.','Habis meeting sama calon mitra, mampir ngopi dulu.',
+ ];
+ if(id==='gout')return [
+  ...on(lOut,`${lOut} sore kemarin ludes, banyak pembeli yang kecewa.`),
+  ...on(hit,`${hit} paling sering ditanya pembeli.`,`Pembeli pagi biasanya langsung cari ${hit}.`),
+  ...on(bad,`${bd.label} di etalase jarang dilirik pembeli.`),
+  ...on(f.weatherKnown&&f.weather==='hujan','Kalau hujan, pembeli biasanya pesan lewat ojol.'),
+  'Tadi pagi kiriman datang tepat waktu.','Display kue saya rapikan dulu biar cantik.','Ada pelanggan langganan yang tiap hari mampir.','Kalau ada yang tanya diskon, saya senyum aja.',
+ ];
+ if(id==='gfba')return [
+  ...on(o,`Omzet sementara ${o?.text}, lumayan buat laporan.`),
+  ...on(f.wasteTrend==='naik','Waste kalau dirupiahkan bikin kaget ya, lagi naik pula.'),
+  ...on(f.wasteTrend==='turun','Waste turun, laporan bulan ini lebih enak dibaca.'),
+  'Laporan bulan ini lagi saya rekap.','Angka itu jujur, yang kadang nggak jujur itu catatannya.','Struk belanja jangan lupa dikumpulin ya.','Saya cek angka dulu, baru percaya.',
+ ];
  if(id==='spv')return [
   ...on(f.plan===28,'Rincian kirim besok sudah bisa saya cetak.'),
   ...on(f.plan!=null&&f.plan<28,`Saya tunggu rencana lengkap, baru ${f.plan} outlet.`),
@@ -120,6 +159,12 @@ const TIPS={
  pred:['Jangan lihat satu hari saja, lihat polanya.','Bandingkan dengan hari yang sama minggu lalu.','Rata-rata bisa menipu, median lebih jujur.','Satu outlier jangan langsung jadi kesimpulan.','Kalau ragu, cek 4 minggu terakhir dulu.','Prediksi itu alat bantu. Keputusan tetap di kamu.','Tanggal merah dan gajian bisa mengubah pola, dicek ya.'],
  watch:['Waste kecil tiap hari kalau dikumpulin jadi besar.','Cek outlet yang sisanya berulang, bukan yang sekali saja.','Kirim lebih bukan solusi kalau outletnya memang sepi.','Jangan cuma kejar waste rendah, lost juga kerugian.','Produk tidak laku jangan ditambah karena kasihan.','Stok akhir nol belum tentu bagus, cek jam habisnya.'],
  guest:['Jangan lupa istirahat ya, kerja terus nanti capek.','Minum air putih juga, jangan kopi terus.'],
+ area:['Kalau stok mau habis, kabari lebih awal ya, biar sempat transfer.','Cek outlet yang sepi juga, bukan cuma yang ramai.'],
+ gmk:['Kalau mau naikin stok buat promo, bilang dulu ke saya ya.','Kue yang rapi di etalase itu promosi gratis.'],
+ ghr:['Istirahat itu hak, jangan dilewatin.','Kalau capek, bilang. Jangan dipendam.'],
+ gbd:['Outlet baru itu harus dilihat dari data dulu, bukan feeling.','Lokasi ramai belum tentu laku, cek jam ramainya juga.'],
+ gout:['Kalau kiriman kurang, saya kabari pagi-pagi ya.','Pembeli sore itu yang paling banyak, jangan sampai kosong.'],
+ gfba:['Catat semuanya, nanti gampang dicocokkan.','Waste dan lost itu dua-duanya uang, lho.'],
  mgr:['Keputusan pakai data, bukan perasaan.','Laporkan kendala lebih awal.','Waste dan lost sama-sama biaya.'],
  spv:['Rincian kirim dicek dua kali sebelum dicetak.','Konfirmasi jam berangkat ke driver.','Transfer antar outlet diatur sebelum sore.'],
  f:['Cek ulang angka sebelum klik simpan.','Mulai dari outlet besar dulu, biar cepat kelihatan.','Catat alasan kalau ubah angka, besok pasti lupa.','Lihat Rincian kirim sebelum dibagikan ke dapur.','Kalau pusing, tutup sheet dua menit.'],
@@ -151,6 +196,12 @@ const FUN={
  pred:['Peluang saya ngopi lagi: 94 persen.','Secara statistik, kamu butuh istirahat.','Rambut ungu ini tidak memengaruhi akurasi.','Saya tidak menebak. Saya menghitung, lalu berharap.','Korelasi saya dengan kopi sangat kuat.'],
  watch:['Saya melihat semuanya. Termasuk snack kedua kamu.','Remah di meja itu juga waste.','Saya tidak galak, standar saya saja tinggi.','Donat itu dihabiskan ya. Nol waste.','Jangan tatap saya begitu, tatap datanya.'],
  guest:['Kacamata ini bukan gaya, silau aja.','Saya tamu, tapi berasa kayak di rumah.'],
+ area:['Kilometer motor saya lebih banyak dari langkah kaki.','Saya hafal semua lampu merah di area saya.'],
+ gmk:['Caption sudah, fotonya belum. Klasik.','Kalau kuenya cantik, feed-nya aman.'],
+ ghr:['Saya hafal ulang tahun semua orang, kecuali punya saya sendiri.','Kalau ada yang bilang nggak capek, itu bohong.'],
+ gbd:['Kalau lihat ruko kosong, refleks saya langsung mikir outlet.','Meeting saya lebih banyak dari kopi saya. Eh, sama banyak.'],
+ gout:['Bau kue tiap pagi itu bonus kerja di outlet.','Saya bisa hitung kue di etalase sambil merem.'],
+ gfba:['Kalkulator saya lebih sering dipakai daripada HP.','Selisih seratus rupiah pun saya kejar.'],
  mgr:['Kopi ketiga hari ini, jangan tanya kenapa.','Rapat lima menit itu cuma mitos.'],
  spv:['Rute terpendek belum tentu tercepat, kata macet.','Driver saya lebih hafal jalan daripada peta.'],
  f:['Kalau ada revisi lagi, aku pura-pura offline.','Sheet ini lama-lama muncul di mimpi.','Aku bisa hitung 28 outlet, tapi nggak bisa hitung utang kopi.','Hidup ini cuma simpan, revisi, simpan lagi.','Tolong jangan tambah kolom baru.'],
@@ -175,7 +226,7 @@ const FC_REPLY={
 };
 
 function reply(id,f,ctx,memo){
- const role=id==='f1'||id==='f2'?'f':id,seen=memo[id]||(memo[id]=[]),r=Math.random;
+ const role=id==='f1'||id==='f2'?'f':/^ga\d$/.test(id)?'area':id,seen=memo[id]||(memo[id]=[]),r=Math.random;
  const fresh=a=>{const x=a.filter(t=>!seen.includes(t));return x.length?x:a;};
  const take=(arr,tag)=>{const c=fresh(arr),text=c[Math.floor(r()*c.length)];seen.push(text);if(seen.length>18)seen.shift();return {text,tag};};
  if(ctx.asleep)return take(STATE.night,'state');
@@ -183,7 +234,7 @@ function reply(id,f,ctx,memo){
  if(ctx.state&&r()<.55)return take(STATE[ctx.state],'state');
  const data=dataLines(role,f),warn=data.filter(t=>/hati-hati|waste|lost|tidak laku|kurang laku|keberatan|habis|cek/i.test(t)),plain=data.filter(t=>!warn.includes(t));
  const task=ctx.task&&!/Kembali|Bersiap|diarahkan/i.test(ctx.task)?[`Lagi ${low(ctx.task)} nih.`,`Bentar ya, aku lagi ${low(ctx.task)}.`,`Progres: masih ${low(ctx.task)}.`]:[];
- const bag=[[plain,'data',.34],[warn,'warn',role==='watch'?.42:.22],[TIPS[role],'tip',.14],[CARE,'care',.1],[timeLines(f),'time',.12],[FUN[role],'fun',.12],[task,'state',.06]].filter(x=>x[0].length);
+ const bag=[[plain,'data',.34],[warn,'warn',role==='watch'?.42:.22],[TIPS[role]||TIPS.guest,'tip',.14],[CARE,'care',.1],[timeLines(f),'time',.12],[FUN[role]||FUN.guest,'fun',.12],[task,'state',.06]].filter(x=>x[0]&&x[0].length);
  let w=bag.reduce((s,x)=>s+x[2],0)*r();for(const x of bag){w-=x[2];if(w<=0){const res=take(x[0],x[1]);if((x[1]==='tip'||x[1]==='care')&&f.who&&r()<.3)res.text=call(f)+res.text[0].toLowerCase()+res.text.slice(1);return res;}}
  return take(CARE,'care');
 }
@@ -234,16 +285,41 @@ const SCENES=[
  S(['mgr','pred'],f=>f.trend,(f)=>[['mgr','Tren omzet minggu ini?'],['pred',f.trend.dir==='naik'?`Naik ${f.trend.pct}%.`:f.trend.dir==='turun'?`Turun ${f.trend.pct}%.`:'Stabil.'],['mgr','Saran kamu?'],['pred',f.trend.dir==='turun'?'Tahan kiriman dulu.':'Jaga stok outlet yang sering habis.'],['mgr','Oke, jalankan.']]),
  S(['guest','f'],()=>true,(f,P)=>[['guest',P('Halo, lagi sibuk ya?','Permisi, numpang duduk ya.')],['f',P('Iya nih, lagi susun rencana besok.','Silakan, santai aja.')],['guest','Semangat ya, kuenya selalu enak.'],['f','Makasih!']]),
  S(['guest','esb'],()=>true,(f,P)=>[['esb','Ada yang bisa dibantu?'],['guest','Cuma lihat-lihat kok.'],['esb',P('Silakan, jangan sentuh kabelnya ya.','Oke, kopi ada di pantry.')],['guest','Siap, aman.']]),
+ // ===== Tamu (owner 2026-11-27): ringan, natural, kadang soal kerjaan =====
+ S(['G','H'],()=>true,(f,P,R)=>[['G','Eh, kamu dari tim mana?'],['H',`Aku dari ${R.dept('H')}. Kamu?`],['G',`${R.dept('G')}. Sering ke sini juga?`],['H',P('Lumayan, kalau ada urusan.','Baru-baru ini aja, betah ternyata.')],['G','Sama, kopinya bikin betah.']]),
+ S(['G','H'],()=>true,(f,P)=>[['G','Kopinya enak ya di sini.'],['H',P('Iya, tapi jangan bilang Pemantau Produk.','Enak, apalagi gratis.')],['G','Kenapa?'],['H','Nanti ampasnya dicatat jadi waste.'],['G','Hahaha, serius banget kantor ini.']]),
+ S(['G','H'],f=>f.h>=11&&f.h<14,(f,P)=>[['G','Udah makan siang belum?'],['H',P('Belum, nunggu yang lain.','Barusan, kamu?')],['G','Yuk bareng, sekalian ngobrol.'],['H','Gas, tapi jangan bahas kerjaan ya.'],['G','Dikit aja, janji.']]),
+ S(['G','H'],f=>f.weatherKnown&&f.weather==='hujan',()=>[['G','Di luar masih hujan?'],['H','Masih, deras banget.'],['G','Ya sudah, di sini dulu aja.'],['H','Setuju, sofanya juga empuk.']]),
+ S(['GA','GO'],()=>true,(f,P)=>[['GA','Stok outletmu aman hari ini?'],['GO',P(f.laris[0]?`${f.laris[0]} sudah tinggal sedikit.`:'Aman, tapi sore biasanya kurang.','Pagi aman, nggak tahu nanti sore.')],['GA','Nanti kabari aku ya, biar kuurus transfernya.'],['GO','Siap, makasih.']]),
+ S(['GM','GO'],()=>true,(f,P)=>[['GM','Pembeli belakangan paling suka varian apa?'],['GO',f.laris[0]?`${f.laris[0]}, sering habis duluan.`:'Ogura masih juara.'],['GM','Oke, itu yang kujadikan konten minggu ini.'],['GO','Tapi stoknya ditambah juga ya, jangan cuma kontennya.'],['GM','Hahaha, nanti kubilang ke tim forecast.']]),
+ S(['GH','G'],()=>true,(f,P)=>[['GH','Kamu sudah istirahat belum?'],['G',P('Belum, nanti habis ini.','Sudah tadi, sebentar.')],['GH','Jangan nanti-nanti, nanti lupa.'],['G','Iya, iya. Perhatian banget.'],['GH','Itu kerjaan saya.']]),
+ S(['GB','GA'],()=>true,(f,P)=>[['GB','Area kamu kira-kira masih bisa buka outlet baru?'],['GA',P('Bisa, dekat kampus masih ramai.','Hmm, mending perkuat yang ada dulu.')],['GB','Oke, kucatat buat survei minggu depan.'],['GA','Ajak aku ya, aku hafal jalannya.']]),
+ S(['GF','pred'],()=>true,(f,P)=>[['GF','Omzet bulan ini kira-kira tembus target?'],['pred',f.trend?(f.trend.dir==='naik'?`Trennya naik ${f.trend.pct}%, peluangnya bagus.`:f.trend.dir==='turun'?`Lagi turun ${f.trend.pct}%, perlu dikejar.`:'Stabil, aman kalau bertahan.'):'Masih saya hitung.'],['GF','Sip, laporanku jadi tenang.'],['pred','Tapi tetap lihat rentangnya ya.']]),
+ S(['GF','watch'],()=>true,(f,P)=>[['watch','Waste bulan ini sudah kamu rupiahkan?'],['GF',P('Sudah, angkanya bikin mikir.','Lagi, tinggal dicocokkan.')],['watch','Bagus. Itu yang bikin orang sadar.'],['GF','Kita satu tim ternyata.']]),
+ S(['G','f'],()=>true,(f,P,R)=>[['G',P('Rencana kirim besok sudah aman?','Lagi sibuk nyusun rencana ya?')],['f',f.plan===28?'Sudah lengkap semua, tinggal cek rincian.':f.plan!=null&&f.plan>0?`Baru ${f.plan} outlet, sebentar lagi.`:'Masih kususun, doakan ya.'],['G',P('Mantap, semangat ya.',R.is('G','gout')?'Nanti kalau outletku kurang, aku kabari ya.':'Kalau butuh info dari bagianku, bilang aja.')],['f','Siap, makasih.']]),
+ S(['G','f'],()=>true,(f,P)=>[['f','Eh, mampir ke sini ada urusan apa?'],['G',P('Cuma mau ngopi sama lihat data.','Ada yang mau kutanya, tapi kopi dulu.')],['f','Santai, ambil aja di pantry.'],['G','Makasih, kantornya enak banget.']]),
+ S(['G','watch'],()=>true,(f,P)=>[['watch','Kamu bawa makanan dari luar?'],['G','Cuma roti, kenapa?'],['watch','Bungkusnya jangan ditinggal. Itu waste juga.'],['G','Siap, nggak berani.']]),
+ S(['G','esb'],()=>true,(f,P)=>[['G','Data penjualan masuk jam berapa sih?'],['esb',f.pull?`Terakhir jam ${f.pull}, tiap jam kutarik.`:'Tiap jam, tunggu aja.'],['G','Cepat juga ya.'],['esb','Aku kan lari, bukan jalan.']]),
+ S(['G','pawang'],f=>f.tomorrowW,(f,P)=>[['G','Besok hujan nggak?'],['pawang',f.tomorrowW==='hujan'?'Kayaknya iya, siapkan payung.':f.tomorrowW==='mendung'?'Mendung, bisa iya bisa nggak.':'Cerah, tenang aja.'],['G','Oke, makasih ramalannya.'],['pawang','Gratis, asal jangan diprotes kalau meleset.']]),
+ S(['G','pred'],f=>f.laris[0],(f,P)=>[['G',`Katanya ${f.laris[0]} lagi laris ya?`],['pred','Iya, datanya konsisten seminggu ini.'],['G','Pantas sering habis.'],['pred','Makanya stoknya kami naikkan pelan-pelan.']]),
+ S(['G','mgr'],()=>true,(f,P)=>[['mgr','Ada kendala di bagianmu?'],['G',P('Aman, Pak.','Ada sedikit, nanti saya laporkan.')],['mgr','Baik, kabari lebih awal.'],['G','Siap, Pak.']]),
+ S(['G','spv'],()=>true,(f,P)=>[['spv','Kiriman ke outlet tadi sampai jam berapa?'],['G',P('Sebelum jam sembilan, aman.','Agak telat sedikit, tapi masih oke.')],['spv','Baik, saya catat buat driver.'],['G','Makasih, Bu.']]),
  S(['spv','watch'],f=>f.lostOutlets[0],(f)=>[['watch',`${f.lostOutlets[0]} sering kehabisan.`],['spv','Saya siapkan transfer lebih awal ke sana.'],['watch','Bagus, saya pantau hasilnya.']]),
 ];
 function scene(k,f,avail){
  const rng=seeded(`scene|${f.today}|${k}`),P=(...a)=>a[Math.floor(rng()*a.length)];
  if(rng()>.82)return null;
- const fa=avail.find(x=>x==='f1'||x==='f2'),fb=avail.find(x=>(x==='f1'||x==='f2')&&x!==fa),real=w=>w==='f'?fa:w==='g'?fb:w;
- const list=SCENES.map((s,i)=>({s,i,o:seeded(`order|${f.today}|${i}`)()})).sort((a,b)=>a.o-b.o).filter(({s})=>s.need.every(w=>real(w)&&avail.includes(real(w)))&&s.when(f)).filter(({s})=>!s.need.some(w=>w==='mgr'||w==='spv'||w==='guest')||rng()<.25);
+ const fa=avail.find(x=>x==='f1'||x==='f2'),fb=avail.find(x=>(x==='f1'||x==='f2')&&x!==fa);
+ const GID=['ga1','ga2','ga3','gmk','ghr','gbd','gout','gfba','guest'],gs=avail.filter(x=>GID.includes(x)).map(x=>[x,rng()]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
+ const TYPE={GA:x=>/^ga\d$/.test(x),GO:x=>x==='gout',GM:x=>x==='gmk',GH:x=>x==='ghr',GB:x=>x==='gbd',GF:x=>x==='gfba'};
+ const typed={};for(const k in TYPE)typed[k]=gs.find(TYPE[k]);
+ const used=new Set(Object.values(typed).filter(Boolean)),G=gs.find(x=>!used.has(x))||gs[0],H=gs.find(x=>x!==G);
+ const real=w=>w==='f'?fa:w==='g'?fb:w==='G'?(typed.GH&&G===typed.GH?gs.find(x=>x!==typed.GH):G):w==='H'?H:TYPE[w]?typed[w]:w;
+ const DEPT={ga1:'Area 1',ga2:'Area 2',ga3:'Area 3',gmk:'Marketing',ghr:'HRD',gbd:'BD',gout:'outlet',gfba:'FBA',guest:'luar kantor'},R={dept:w=>DEPT[real(w)]||'tim lain',is:(w,id)=>real(w)===id};
+ const list=SCENES.map((s,i)=>({s,i,o:seeded(`order|${f.today}|${i}`)()})).sort((a,b)=>a.o-b.o).filter(({s})=>s.need.every(w=>real(w)&&avail.includes(real(w)))&&s.when(f)).filter(({s})=>new Set(s.need.map(real)).size===s.need.length).filter(({s})=>!s.need.some(w=>w==='mgr'||w==='spv'||w==='guest')||rng()<.25);
  if(!list.length)return null;
- const data=list.filter(x=>x.s.when.length>0&&x.s.when.toString()!=='()=>true'),pool=data.length&&rng()<.7?data:list,sc=pool[k%pool.length].s;
- const lines=sc.lines(f,P).map(([w,text])=>({id:real(w),text,dur:dur(text)+.5}));
+ const isG=x=>x.s.need.some(w=>/^G[AOMHBF]?$|^H$/.test(w)),gl=list.filter(isG),data=list.filter(x=>x.s.when.length>0&&x.s.when.toString()!=='()=>true'),pool=gl.length&&rng()<.5?gl:data.length&&rng()<.7?data:list,sc=pool[k%pool.length].s;
+ const lines=sc.lines(f,P,R).map(([w,text])=>({id:real(w),text,dur:dur(text)+.5}));
  const total=lines.reduce((s,l)=>s+l.dur,0);
  return {lines,total,offset:4+rng()*Math.max(1,82-total)};
 }
