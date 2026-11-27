@@ -100,6 +100,51 @@ export function computeDay(live, { profile, history } = {}) {
   }
   return out;
 }
+// LOST SETELAH TRANSFER: stok nyata termasuk transfer (Daily Report = jumlah, catatan web = jam).
+export function computeDayTf(live, { transfers = [], profile, history } = {}) {
+  const date = live?.date, out = {};
+  if (!date) return out;
+  const snaps = (live.snaps || []).map(s => ({ h: toH(s.t), s: s.s })).sort((a, b) => a.h - b.h), last = snaps.at(-1);
+  const webEv = new Map(), add = (id, lab, h, q) => { const k = id + '|' + lab; if (!webEv.has(k)) webEv.set(k, []); webEv.get(k).push({ h, d: q }); };
+  for (const t of transfers) if (t.date === date) { const h = Math.min(Math.max(toH(t.time), MODEL.open), MODEL.close); for (const [k, q] of Object.entries(t.items || {})) { add(t.from, +k, h, -q); add(t.to, +k, h, +q); } }
+  for (const [id, day] of Object.entries(live.daily || {})) {
+    const soldNow = [...snaps].reverse().find(s => s.s[id])?.s[id] || null, wasteIn = Object.values(day).some(x => x[4] > 0 || x[5] != null), cells = {};
+    for (let lab = 0; lab < 21; lab++) {
+      const x = day[lab], S = soldNow?.[lab] || 0, W = webEv.get(id + '|' + lab) || [];
+      if (!x) continue;
+      const [awal, kirim, tfIn, tfOut, waste] = x, old = wasteIn ? Math.max(0, awal - waste) : MALMIL.has(lab) ? 0 : awal;
+      const ev = mergeTf(W, tfIn, tfOut), base = old + kirim, sell = base + ev.reduce((s, e) => s + e.d, 0);
+      if (sell <= 0 && !S) continue;
+      const p = shares(profile, id, lab, date), D0 = prior(history, id, lab, date), left = sell - S;
+      if (NO_SALES.has(lab) || !p || !D0) { cells[lab] = [Math.round(S), 0, 0, left <= 0 && sell > 0 ? 1 : 0]; continue; }
+      const stockAt = (h, v) => base + ev.reduce((s, e) => s + (e.h <= h ? e.d : 0), 0) - v, gaps = [];
+      let start = null, prev = MODEL.open;
+      for (const s of snaps) {
+        const v = s.s[id]?.[lab]; if (v == null) continue;
+        const st = stockAt(s.h, v);
+        if (st <= 0 && start == null) start = (prev + s.h) / 2;
+        else if (st > 0 && start != null) { const inn = ev.find(e => e.d > 0 && e.h > prev - 1e-9 && e.h <= s.h); gaps.push([start, Math.max(start, inn ? inn.h : (prev + s.h) / 2)]); start = null; }
+        prev = s.h;
+      }
+      let hAt = null;
+      if (left <= 0 && sell > 0) hAt = start ?? (last?.h || MODEL.close);
+      else if (start != null) { const inn = ev.find(e => e.d > 0 && e.h > prev - 1e-9); gaps.push([start, Math.max(start, inn ? inn.h : MODEL.close)]); }
+      const gapSh = gaps.reduce((s, [a, b]) => s + cum(p, b) - cum(p, a), 0);
+      const cAt = Math.max(0, (hAt != null ? cum(p, hAt) : 1) - gapSh), a = MODEL.priorWeight * D0;
+      const D = (Math.min(S, Math.max(sell, 0)) + a) / (cAt + a / D0);
+      const lost = D * gapSh + (hAt != null ? D * (1 - cum(p, hAt)) : 0);
+      cells[lab] = [Math.round(S), r1(Math.max(0, lost)), hAt != null ? Math.round(hAt * 100) : 0, hAt != null ? 1 : 0];
+    }
+    if (Object.keys(cells).length) out[id] = cells;
+  }
+  return out;
+}
+// Gabungan: sel [terjual, lost murni, jam habis murni x100, habis murni, lost setelah transfer].
+export function computeDayBoth(live,{transfers=[],profile,history}={}){
+  const m=computeDay(live,{profile,history}),t=computeDayTf(live,{transfers,profile,history});
+  for(const [id,cells] of Object.entries(m))for(const [lab,c] of Object.entries(cells))c[4]=t[id]?.[lab]?.[1]??0;
+  return m;
+}
 // Simpan satu hari ke riwayat. Hari dari riwayat transaksi (src 'tx') tidak ditimpa hitungan otomatis.
 export function mergeLostDay(doc, date, cells, src = 'live', now = new Date()) {
   const base = doc?.kind === 'lost-daily' ? doc : { schemaVersion: 1, kind: 'lost-daily', days: {}, src: {} };

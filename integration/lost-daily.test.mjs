@@ -45,3 +45,10 @@ test('hari dari riwayat transaksi tidak ditimpa hitungan otomatis',()=>{
  const next=mergeLostDay(doc,'2026-11-20',{a:{0:[5,9,1500,1]}},'live');
  assert.equal(next.days['2026-11-20'].a[0][1],1);
 });
+
+test('gabungan murni + setelah transfer: penerima transfer tidak habis setelah transfer masuk',async()=>{
+ const {computeDayBoth}=await import('./lost-daily.mjs');
+ const live={date,daily:{a:{0:[0,4,5,0,0,null]}},snaps:[{t:'09:45',s:{a:[2]}},{t:'12:00',s:{a:[6]}},{t:'19:45',s:{a:[8]}}]};
+ const c=computeDayBoth(live,{profile,history}).a[0];
+ assert.ok(c[1]>0,'murni habis');assert.equal(c[4],0,'setelah transfer tidak habis');
+});

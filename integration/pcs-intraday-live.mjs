@@ -9,7 +9,7 @@ import {collect} from './pcs-sales.mjs';
 import {signIn,readLiveIntraday,writeLiveIntraday,readSmallDoc,writeSmallDoc} from './pack-forecast-reference.mjs';
 import {refreshOffice,OFFICE_KEY} from './office-status.mjs';
 import {STOCK_LIVE_KEY,mergeStockLive,pullDailyToday} from './stock-live.mjs';
-import {LOST_DAILY_KEY,HOUR_PROFILE_KEY,computeDay,mergeLostDay} from './lost-daily.mjs';
+import {LOST_DAILY_KEY,HOUR_PROFILE_KEY,computeDayBoth,mergeLostDay,readTransfers} from './lost-daily.mjs';
 
 // Outlet yang gagal terbaca kali ini tetap memakai angka tarikan sebelumnya pada hari yang sama.
 export function mergeLive(previous,results,date,asOf){
@@ -43,7 +43,8 @@ async function main(){
   if(prev?.date&&prev.date<today){
    try{
     const [profile,history]=await Promise.all([readSmallDoc(HOUR_PROFILE_KEY,idToken),readSmallDoc(LOST_DAILY_KEY,idToken)]);
-    const cells=computeDay(prev,{profile,history});// lost murni; versi setelah transfer menyusul
+    let transfers=[];try{transfers=await readTransfers(prev.date,idToken);}catch{console.log('Catatan transfer belum terbaca, lost setelah transfer memakai Daily Report saja.');}
+    const cells=computeDayBoth(prev,{transfers,profile,history});
     await writeSmallDoc(LOST_DAILY_KEY,mergeLostDay(history,prev.date,cells,'live'),idToken,uid);
     console.log('Lost sales hari sebelumnya tersimpan: '+Object.keys(cells).length+' outlet.');
    }catch{console.log('::warning::Lost sales hari sebelumnya belum tersimpan.');}

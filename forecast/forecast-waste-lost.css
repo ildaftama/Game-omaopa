@@ -147,3 +147,11 @@
 
 .wl-sel-area{min-width:240px}
 .wl-rank{margin:0 0 6px;padding:8px 12px;background:#fff7e6;border:1px solid #f0d9ae;border-radius:8px;color:#694509;font-size:13px}.wl-rank b{color:#172b42}
+
+/* Lost setelah transfer (owner 2026-11-27). */
+.wl-hero>.lost.tf{border-left-color:#3a6fc9;border-style:solid;background:#fff}
+.wl-hero>.lost.tf strong{color:#172b42}
+.wl-key.tf{background:#3a6fc9}
+.wl-tsvg .ln.tf{stroke:#3a6fc9;stroke-dasharray:5 4}
+.wl-tsvg circle.tf{fill:#3a6fc9}.wl-tsvg .v.tf{fill:#2c55a0}
+.wl-detail.lost.tf{border-top-color:#3a6fc9}.wl-detail.lost.tf .wl-dbar.r em{background:#3a6fc9}
