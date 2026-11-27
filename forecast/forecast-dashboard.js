@@ -1160,8 +1160,10 @@ window.ForecastDashboard=(()=>{
  // containernya ELEMEN BARU (innerHTML diganti total), instance lama (sudah yatim, terlepas
  // dari DOM) dibuang dan peta baru dibuat.
  function mountWeatherMap(){
-  const el=document.getElementById('weather-leaflet-map');
+  let el=document.getElementById('weather-leaflet-map');
   if(!el||typeof L==='undefined')return;
+  // Audit performa 2026-11-27: pakai ulang peta yang sudah dibuat (membuat ulang Leaflet ±350 ms tiap render).
+  if(leafletMap&&leafletContainerEl&&leafletContainerEl!==el&&!leafletContainerEl.isConnected){el.replaceWith(leafletContainerEl);el=leafletContainerEl;}
   if(leafletContainerEl!==el){
    if(leafletMap){try{leafletMap.remove();}catch{}}
    leafletContainerEl=el;leafletFitted=false;leafletMarkers=new Map();
