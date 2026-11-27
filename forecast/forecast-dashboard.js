@@ -590,7 +590,12 @@ window.ForecastDashboard=(()=>{
   const v={pct:Math.round(pct*10)/10,pctV1:Math.round(pctV1*10)/10,kind,wastePct,wasteMtd,waste7,lostPct,monthly:wDates[0]>=monthStart,from:wDates[0]||null,to:wDates.at(-1)||null};
   perfCache.set(key,v);return v;
  }
- function revenueTrend(outletId){
+ // Owner 2026-11-27 (audit performa): hasil berat disimpan sampai data/rencana/pengaturan berubah.
+ let dashVer=0;const memo=new Map();
+ for(const ev of ['pcs-data-loaded','forecast-operations-changed','forecast-plans-changed','forecast-sources-loaded','forecast-settings-changed','forecast-intraday','forecast-data-refreshed','forecast-lost-daily'])window.addEventListener(ev,()=>{dashVer++;memo.clear();});
+ const cached=(name,key,f)=>{const k=[name,key,dashVer,settingsSig,new Date().toISOString().slice(0,13)].join('|');if(memo.has(k))return memo.get(k);const v=f();if(memo.size>60)memo.clear();memo.set(k,v);return v;};
+ function revenueTrend(outletId){return cached('rev',outletId,()=>revenueTrendRaw(outletId));}
+ function revenueTrendRaw(outletId){
   const panels=window.PcsPanels.data(),planner=window.ForecastPlanner,cloud=window.ForecastPlanCloud,math=window.PcsMath;
   if(!panels.sales||!panels.orders)return null;
   const list=outletIds(outletId,panels.sales),expected=list.length;
@@ -1315,7 +1320,8 @@ window.ForecastDashboard=(()=>{
   const p=est.w/est.sv*100,pt=wt/est.sv*100,bad=p>WASTE_THRESHOLD;
   return `<p class="fd-est-waste ${bad?'bad':''}"><b>Estimasi waste dari rencana tim: ${pct1(p)}</b> (${Math.round(est.pcs).toLocaleString('id-ID')} pcs · ${moneyBig(est.w)}, ${est.n} rencana) — rencana terakhir dikurangi total terjual, nominal pakai HPP outlet, <b>tanpa transfer</b> antar outlet. Kalau semua kelebihan bisa ditransfer: ±${pct1(pt)}. Ambang ${W_TH}. Waste real biasanya di antara kedua angka ini.</p>`;
  }
- function accuracyCard(trend,outletId){
+ function accuracyCard(trend,outletId){return cached('acc',outletId,()=>accuracyCardRaw(trend,outletId));}
+ function accuracyCardRaw(trend,outletId){
   const days=trend.rows.filter(r=>r.date.startsWith(trend.ym)&&trend.lastActual&&r.date<=trend.lastActual&&r.actualTotal!=null&&r.forecastTotal!=null);
   if(!days.length)return '';
   const rows=[];let est=null;
@@ -1400,7 +1406,7 @@ window.ForecastDashboard=(()=>{
    ${(()=>{const accHtml=show.accuracy?__tm('accuracyCard',()=>accuracyCard(trend,outletId)):'';return `${__tm('notice',()=>window.ForecastWasteLost?.noticeHtml?.())||''}${__tm('briefCard',()=>briefCard(trend,outletId))}
    ${__tm('intradayCard',()=>intradayCard(trend,outletId))}
    ${accHtml}`;})()}
-   ${fold('mon','Monitoring rencana tim','rencana vs penjualan per tanggal, outlet & produk · performa bulanan',__tm('monitor',()=>window.ForecastWorkspace?.monitorSection?.())||'')}
+   ${fold('mon','Monitoring rencana tim','rencana vs penjualan per tanggal, outlet & produk · performa bulanan',()=>__tm('monitor',()=>window.ForecastWorkspace?.monitorSection?.())||'<p class="workspace-note">Data monitoring belum tersedia.</p>')}
    ${show.trend&&outletId==='__all__'?fold('trend','Kondisi outlet','omzet, waste & lost sales naik/turun 3 hari terakhir',__tm('trendWatchCard',()=>trendWatchCard(trend.trendNow))):''}
    ${show.wasteLost?fold('wl','Waste & lost sales per outlet','bulan berjalan · outlet di atas batas',__tm('wasteLostCard',()=>wasteLostCard(outletId))):''}
    <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?__tm('chart',()=>chart(trend)):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${__tm('monthSummaryHtml',()=>monthSummaryHtml(trend))}</article>
@@ -1456,8 +1462,9 @@ window.ForecastDashboard=(()=>{
  // dilipat dan status buka/tutupnya diingat selama halaman terbuka.
  const foldOpen=new Set();
  let pendingFold=null;
- document.addEventListener('toggle',e=>{const d=e.target;if(d?.dataset?.fold){d.open?foldOpen.add(d.dataset.fold):foldOpen.delete(d.dataset.fold);if(d.open&&d.dataset.fold==='area')setTimeout(()=>window.ForecastAreas?.mount?.(),60);}},true);
- const fold=(id,title,sub,body)=>body?`<details class="fd-fold" data-fold="${id}" ${foldOpen.has(id)?'open':''}><summary><span class="fd-fold-t">${title}</span>${sub?`<span class="fd-fold-s">${sub}</span>`:''}<span class="fd-fold-c" aria-hidden="true">⌄</span></summary><div class="fd-fold-b">${body}</div></details>`:'';
+ document.addEventListener('toggle',e=>{const d=e.target;if(d?.dataset?.fold){d.open?foldOpen.add(d.dataset.fold):foldOpen.delete(d.dataset.fold);if(d.open){const lz=d.querySelector(':scope>[data-fold-lazy]');if(lz){const f=LAZY[lz.dataset.foldLazy];lz.removeAttribute('data-fold-lazy');lz.innerHTML=f?f():'';}}if(d.open&&d.dataset.fold==='area')setTimeout(()=>window.ForecastAreas?.mount?.(),60);}},true);
+ const LAZY={};
+ const fold=(id,title,sub,body)=>{if(typeof body==='function'){LAZY[id]=body;if(foldOpen.has(id))body=body();else return `<details class="fd-fold" data-fold="${id}"><summary><span class="fd-fold-t">${title}</span>${sub?`<span class="fd-fold-s">${sub}</span>`:''}<span class="fd-fold-c" aria-hidden="true">⌄</span></summary><div class="fd-fold-b" data-fold-lazy="${id}"></div></details>`;}return body?`<details class="fd-fold" data-fold="${id}" ${foldOpen.has(id)?'open':''}><summary><span class="fd-fold-t">${title}</span>${sub?`<span class="fd-fold-s">${sub}</span>`:''}<span class="fd-fold-c" aria-hidden="true">⌄</span></summary><div class="fd-fold-b">${body}</div></details>`:'';};
  function briefCard(trend,outletId){
   const H=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],P=window.ForecastPlanner,t1=P.shift(today(),1);
   const nx=trend.rows.find(r=>r.date===t1),acc=briefAcc?.rows?.find(r=>r.label==='Prediksi sistem');
