@@ -79,3 +79,10 @@
 .wl-confirm-ask{margin:0 0 14px;color:#172b42;font-size:15px;font-weight:700}
 .wl-confirm-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
 @media(max-width:640px){.wl-alert-row{grid-template-columns:minmax(0,1fr)}.wl-alert-row em{white-space:normal}.wl-hero{grid-template-columns:minmax(0,1fr)}.wl-hero strong{font-size:28px}.wl-prods,.wl-areas{grid-template-columns:minmax(0,1fr)}.wl-outlet>button{grid-template-columns:repeat(2,minmax(0,1fr))}.wl-oname{grid-column:1/-1}.wl-stat>strong{font-size:21px}}
+
+/* Lost murni vs setelah transfer (owner 2026-11-27). */
+.wl-hero{grid-template-columns:repeat(3,minmax(0,1fr))}
+.wl-hero>.lost.tf.pending{border-left-color:#c4ccd4;border-style:dashed;background:#fafbfc}
+.wl-hero>.lost.tf.pending strong{color:#9aa8b5}
+.wl-help{display:inline-grid;place-items:center;width:15px;height:15px;margin-left:4px;border-radius:50%;background:#e0e7ed;color:#4b5b6a;font-size:10px;font-style:normal;cursor:help}
+@media (max-width:900px){.wl-hero{grid-template-columns:minmax(0,1fr)}}

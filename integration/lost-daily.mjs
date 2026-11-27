@@ -1,6 +1,6 @@
 // Riwayat lost sales harian per outlet x produk (owner 2026-11-27).
 // Dihitung dari stok berjalan (Daily Report + penjualan ESB per 15 menit) dan catatan transfer web, dengan
-// model yang sama seperti tab Stok & Transfer: pola jual per jam outlet itu sendiri, permintaan dari penjualan
+// model yang sama seperti tab Stok & Transfer (versi LOST MURNI, tanpa transfer): pola jual per jam outlet itu sendiri, permintaan dari penjualan
 // sebelum habis dicampur rata-rata 28 hari, lost = permintaan pada jam-jam stok kosong sampai tutup 20.00.
 // Kalibrasi 1-26 Nov (uji balik 11.813 kasus, semua hari): bobot acuan 1,0 dan hari habis x1,15 -> bias -2%.
 // Repo publik: log hanya berisi jumlah, tidak ada angka per outlet.
@@ -50,40 +50,51 @@ export function mergeTf(W, tin, tout) {
   return out.sort((a, b) => a.h - b.h);
 }
 const r1 = v => Math.round(v * 10) / 10;
-// Satu hari penuh dari dokumen stok berjalan hari itu.
-export function computeDay(live, { transfers = [], profile, history } = {}) {
+// Jam ketika bagian kumulatif pola mencapai `target`.
+export function atShare(p, target) {
+  if (target <= 0) return MODEL.open;
+  let s = 0;
+  for (let k = 0; k < p.length; k++) { if (s + p[k] >= target) return MODEL.open + k + (p[k] > 0 ? (target - s) / p[k] : 0); s += p[k]; }
+  return MODEL.close;
+}
+const est = (S, h, p, D0) => { const a = MODEL.priorWeight * D0; return (S + a) / (cum(p, h) + a / D0); };
+// Owner 2026-11-27: LOST MURNI = seandainya tidak ada transfer. Stok sendiri = sisa layak jual + kiriman
+// pabrik. Outlet penerima transfer habis lebih cepat (saat penjualan kumulatif melewati stok sendiri);
+// outlet pengirim yang aslinya habis diperpanjang dengan stok yang dikirim keluar. Lost setelah transfer
+// (memakai jam catatan transfer) menyusul setelah catatan transfer lengkap.
+export function computeDay(live, { profile, history } = {}) {
   const date = live?.date, out = {};
   if (!date) return out;
-  const snaps = (live.snaps || []).map(s => ({ h: toH(s.t), s: s.s })).sort((a, b) => a.h - b.h), last = snaps.at(-1);
-  const webEv = new Map(), add = (id, lab, h, q) => { const k = id + '|' + lab; if (!webEv.has(k)) webEv.set(k, []); webEv.get(k).push({ h, d: q }); };
-  for (const t of transfers) if (t.date === date) { const h = Math.min(Math.max(toH(t.time), MODEL.open), MODEL.close); for (const [k, q] of Object.entries(t.items || {})) { add(t.from, +k, h, -q); add(t.to, +k, h, +q); } }
+  const snaps = (live.snaps || []).map(s => ({ h: toH(s.t), s: s.s })).sort((a, b) => a.h - b.h);
   for (const [id, day] of Object.entries(live.daily || {})) {
     const soldNow = [...snaps].reverse().find(s => s.s[id])?.s[id] || null, wasteIn = Object.values(day).some(x => x[4] > 0 || x[5] != null), cells = {};
     for (let lab = 0; lab < 21; lab++) {
-      const x = day[lab], S = soldNow?.[lab] || 0, W = webEv.get(id + '|' + lab) || [];
+      const x = day[lab], S = soldNow?.[lab] || 0;
       if (!x) continue;
       const [awal, kirim, tfIn, tfOut, waste] = x, old = wasteIn ? Math.max(0, awal - waste) : MALMIL.has(lab) ? 0 : awal;
-      const ev = mergeTf(W, tfIn, tfOut), base = old + kirim, sell = base + ev.reduce((s, e) => s + e.d, 0);
-      if (sell <= 0 && !S) continue;
-      const p = shares(profile, id, lab, date), D0 = prior(history, id, lab, date), left = sell - S;
-      if (NO_SALES.has(lab) || !p || !D0) { cells[lab] = [Math.round(S), 0, 0, left <= 0 && sell > 0 ? 1 : 0]; continue; }
-      const stockAt = (h, v) => base + ev.reduce((s, e) => s + (e.h <= h ? e.d : 0), 0) - v, gaps = [];
-      let start = null, prev = MODEL.open;
-      for (const s of snaps) {
+      const base = old + kirim, actual = base + tfIn - tfOut;
+      if (base <= 0 && actual <= 0 && !S) continue;
+      const p = shares(profile, id, lab, date), D0 = prior(history, id, lab, date);
+      if (NO_SALES.has(lab) || !p || !D0) { cells[lab] = [Math.round(S), 0, 0, actual - S <= 0 && actual > 0 ? 1 : 0]; continue; }
+      // Jam stok sendiri habis: interpolasi di antara dua tarikan.
+      let hM = base <= 0 ? MODEL.open : null, prevH = MODEL.open, prevV = 0;
+      if (hM == null) for (const s of snaps) {
         const v = s.s[id]?.[lab]; if (v == null) continue;
-        const st = stockAt(s.h, v);
-        if (st <= 0 && start == null) start = (prev + s.h) / 2;
-        else if (st > 0 && start != null) { const inn = ev.find(e => e.d > 0 && e.h > prev - 1e-9 && e.h <= s.h); gaps.push([start, Math.max(start, inn ? inn.h : (prev + s.h) / 2)]); start = null; }
-        prev = s.h;
+        if (v >= base) { hM = prevH + (v > prevV ? (base - prevV) / (v - prevV) : 1) * (s.h - prevH); break; }
+        prevH = s.h; prevV = v;
       }
-      let hAt = null;
-      if (left <= 0 && sell > 0) hAt = start ?? (last?.h || MODEL.close);
-      else if (start != null) { const inn = ev.find(e => e.d > 0 && e.h > prev - 1e-9); gaps.push([start, Math.max(start, inn ? inn.h : MODEL.close)]); }
-      const gapSh = gaps.reduce((s, [a, b]) => s + cum(p, b) - cum(p, a), 0);
-      const cAt = Math.max(0, (hAt != null ? cum(p, hAt) : 1) - gapSh), a = MODEL.priorWeight * D0;
-      const D = (Math.min(S, Math.max(sell, 0)) + a) / (cAt + a / D0);
-      const lost = D * gapSh + (hAt != null ? D * (1 - cum(p, hAt)) : 0);
-      cells[lab] = [Math.round(S), r1(Math.max(0, lost)), hAt != null ? Math.round(hAt * 100) : 0, hAt != null ? 1 : 0];
+      let Sobs = Math.min(S, Math.max(base, 0));
+      if (hM == null && tfOut > 0 && actual - S <= 0) {
+        // Pengirim yang aslinya habis: cari jam habis nyata, lalu perpanjang dengan stok yang dikirim keluar.
+        let hR = null, ph = MODEL.open, pv = 0;
+        for (const s of snaps) { const v = s.s[id]?.[lab]; if (v == null) continue; if (v >= actual) { hR = ph + (v > pv ? (actual - pv) / (v - pv) : 1) * (s.h - ph); break; } ph = s.h; pv = v; }
+        hR = hR ?? (snaps.at(-1)?.h || MODEL.close);
+        const D = est(S, hR, p, D0), extra = Math.max(0, base - S);
+        hM = D > 0 ? atShare(p, cum(p, hR) + extra / D) : MODEL.close; Sobs = S + extra;
+      }
+      let lost = 0;
+      if (hM != null && hM < MODEL.close - 0.25) { const D = est(Sobs, hM, p, D0); lost = Math.max(0, D * (1 - cum(p, hM))); }
+      cells[lab] = [Math.round(S), r1(lost), lost > 0 ? Math.round(hM * 100) : 0, lost > 0 ? 1 : 0];
     }
     if (Object.keys(cells).length) out[id] = cells;
   }
@@ -92,7 +103,7 @@ export function computeDay(live, { transfers = [], profile, history } = {}) {
 // Simpan satu hari ke riwayat. Hari dari riwayat transaksi (src 'tx') tidak ditimpa hitungan otomatis.
 export function mergeLostDay(doc, date, cells, src = 'live', now = new Date()) {
   const base = doc?.kind === 'lost-daily' ? doc : { schemaVersion: 1, kind: 'lost-daily', days: {}, src: {} };
-  const next = { ...base, days: { ...base.days }, src: { ...(base.src || {}) }, model: 'v1 bobot 1,0 · habis x1,15 · tutup 20.00', updatedAt: now.toISOString() };
+  const next = { ...base, days: { ...base.days }, src: { ...(base.src || {}) }, model: 'murni v2 (tanpa transfer) · bobot 1,0 · habis x1,15 · tutup 20.00', updatedAt: now.toISOString() };
   if (next.src[date] === 'tx' && src !== 'tx') return next;
   next.days[date] = cells; next.src[date] = src;
   const floor = shift(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(now), -MODEL.keepDays);

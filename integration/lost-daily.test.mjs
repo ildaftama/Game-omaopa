@@ -16,8 +16,8 @@ test('acuan permintaan dari riwayat, hari habis dinaikkan',()=>{
 test('habis jam 14 dengan pola rata: lost = setengah hari',()=>{
  const live={date,daily:{a:{0:[0,6,0,0,0,null]}},snaps:[{t:'11:00',s:{a:[3]}},{t:'13:45',s:{a:[5]}},{t:'14:15',s:{a:[6]}},{t:'19:00',s:{a:[6]}}]};
  const c=computeDay(live,{profile,history}).a[0];
- assert.equal(c[0],6);assert.equal(c[3],1);assert.equal(c[2],1400);
- assert.ok(Math.abs(c[1]-6)<0.6,`lost ${c[1]}`);
+ assert.equal(c[0],6);assert.equal(c[3],1);assert.ok(c[2]>=1375&&c[2]<=1425,`jam ${c[2]}`);
+ assert.ok(Math.abs(c[1]-6)<0.8,`lost ${c[1]}`);
 });
 
 test('tidak habis: lost 0',()=>{
@@ -25,13 +25,16 @@ test('tidak habis: lost 0',()=>{
  assert.deepEqual(computeDay(live,{profile,history}).a[0],[12,0,0,0]);
 });
 
-test('kosong lalu terisi transfer: lost hanya selama kosong',()=>{
- const live={date,daily:{a:{0:[0,4,0,0,0,null]},b:{0:[0,30,0,0,0,null]}},snaps:[{t:'09:45',s:{a:[2],b:[1]}},{t:'10:15',s:{a:[4],b:[1]}},{t:'12:15',s:{a:[4],b:[2]}},{t:'19:45',s:{a:[9],b:[10]}}]};
- const c=computeDay(live,{profile,history,transfers:[{date,time:'12:00',from:'b',to:'a',items:{0:5}}]}).a[0];
- assert.equal(c[3],1);// habis lagi di akhir hari (4+5 terjual 9)
- assert.ok(c[1]>0);
+test('lost murni: penerima transfer habis saat penjualan melewati stok sendiri',()=>{
+ const live={date,daily:{a:{0:[0,4,5,0,0,null]}},snaps:[{t:'09:45',s:{a:[2]}},{t:'12:00',s:{a:[6]}},{t:'19:45',s:{a:[9]}}]};
+ const c=computeDay(live,{profile,history}).a[0];
+ assert.equal(c[3],1);assert.ok(c[2]>=1000&&c[2]<=1200,`jam ${c[2]}`);assert.ok(c[1]>5,`lost ${c[1]}`);
 });
-
+test('lost murni: pengirim yang habis diperpanjang dengan stok yang dikirim keluar',()=>{
+ const live={date,daily:{a:{0:[0,12,0,4,0,null]}},snaps:[{t:'11:00',s:{a:[4]}},{t:'14:00',s:{a:[8]}},{t:'19:45',s:{a:[8]}}]};
+ const c=computeDay(live,{profile,history}).a[0];
+ assert.equal(c[3],1);assert.ok(c[2]>1400,`jam ${c[2]}`);
+});
 test('Daily Report menentukan jumlah, web menentukan jam',()=>{
  const ev=mergeTf([{h:13,d:5}],8,0);assert.deepEqual(ev,[{h:13,d:8}]);
  assert.deepEqual(mergeTf([],3,0),[{h:8,d:3}]);

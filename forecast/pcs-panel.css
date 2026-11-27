@@ -1233,3 +1233,5 @@ input,select,textarea{transition:border-color .2s,box-shadow .2s}
 .ft-prog.ok{background:#e8f6ec;border-color:#b6e0c2}.ft-prog.ok .ft-prog-fill{background:#2e8b57}.ft-prog.ok .ft-prog-label{color:#1f6b40}
 .ft-prog.err{background:#fdecec;border-color:#f2c0c0}.ft-prog.err .ft-prog-fill{background:#c0392b}.ft-prog.err .ft-prog-label{color:#9b2c22}
 @media (prefers-reduced-motion:reduce){.ft-prog-fill{transition:none}.ft-prog.run .ft-prog-fill{animation:none}}
+
+.fd-kpi.pending{border-style:dashed;background:#fafbfc}.fd-kpi.pending strong{color:#9aa8b5}
