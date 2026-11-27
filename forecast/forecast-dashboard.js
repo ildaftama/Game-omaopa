@@ -1164,8 +1164,7 @@ window.ForecastDashboard=(()=>{
   if(!el||typeof L==='undefined')return;
   // Audit performa 2026-11-27: pakai ulang peta yang sudah dibuat (membuat ulang Leaflet ±350 ms tiap render).
   if(leafletMap&&leafletContainerEl&&leafletContainerEl!==el&&!leafletContainerEl.isConnected){el.replaceWith(leafletContainerEl);el=leafletContainerEl;}
-  if(!leafletMap&&!mountWeatherMap.later){mountWeatherMap.later=true;setTimeout(()=>{mountWeatherMap.later=false;mountWeatherMap();},60);return;}
-  if(!leafletMap&&mountWeatherMap.later)return;
+  if(!leafletMap&&!mountWeatherMap.go){if(!mountWeatherMap.later){mountWeatherMap.later=true;setTimeout(()=>{mountWeatherMap.later=false;mountWeatherMap.go=true;mountWeatherMap();},60);}return;}
   if(leafletContainerEl!==el){
    if(leafletMap){try{leafletMap.remove();}catch{}}
    leafletContainerEl=el;leafletFitted=false;leafletMarkers=new Map();
