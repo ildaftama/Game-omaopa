@@ -207,6 +207,8 @@ async function sofaSit(n){const c=free(n,SPOT.sofa)||[19,13];await walk(n,c);if(
 async function sitDown(n){if(isGuest(n))return sofaSit(n);await walk(n,n.seat);n.pose='sit';n.face=1;if(n.food?.where==='hand'){n.food.where='desk';n.sipT=0;n.food.cd=4;}}
 function give(n,kind){const left=nrnd(n,36,50);n.food={kind,left,total:left,where:'hand',cd:3};}
 function foodTick(n,dt){const f=n.food;if(!f)return;f.left-=dt;n.sipT=Math.max(0,(n.sipT||0)-dt);if(f.left<=0){n.food=null;n.sipT=0;if(n.pose==='sit'&&f.kind==='cup')chat(n,VOICE[n.id].empty,.3);return;}f.cd-=dt;if(f.cd<=0&&!n.carry&&n.pose!=='toilet'&&(f.where==='hand'||n.pose==='sit')){n.sipT=1.3;f.cd=5+(f.left*7)%4;}}
+const WANDER=[[[7,10],'Melihat forecaster bekerja',1],[[12,9],'Melihat-lihat kantor',0],[[15,10],'Lihat papan grafik',0],[[4,9],'Lihat rak server',0],[[9,15],'Lihat tanaman',1],[[13,15],'Jalan-jalan sebentar',1],[[5,11],'Menyapa tim',1],[[16,4],'Lihat ke luar jendela',0],[[10,4],'Baca papan pengumuman',0],[[20,9],'Mampir ke pantry',0]];
+async function guestWander(n,times=1){for(let i=0;i<times;i++){const [c,label,face]=npick(n,WANDER),cell=nearestFree(c[0],c[1]);await standAt(n,cell,face);await doing(n,label,nrnd(n,5,9),'stand');if(nr(n)()<.25)speak(n,npick(n,['Kantornya rapi ya.','Seru juga lihat orang kerja.','Wah, grafiknya naik.','Pantry-nya lengkap banget.','Rame juga ya hari ini.']));}}
 async function standAt(n,cell,face=1,fast=false){await walk(n,cell,fast);n.pose='stand';n.face=face;}
 async function doing(n,label,sec,action='type',tick){n.task=label;n.action=action;await timer(n,sec,p=>{n.p=p;tick?.(p);});n.p=null;}
 function assign(n){n.busy=true;cancel(n);}
@@ -258,14 +260,18 @@ const WORK={
   async n=>{await standAt(n,PLACE.toFc,0);await doing(n,'Mengecek meja forecaster',5,'point');if(nr(n)()<.3)speak(n,['Rencana besok sudah aman?','Jangan lupa cek cuaca.','Kalau ada kendala, kabari saya.']);await sitDown(n);await doing(n,'Membaca laporan',8);}],
  spv:[async n=>{await sitDown(n);await doing(n,'Mengatur rute kirim',10);if(nr(n)()<.35)speak(n,['Rute pagi sudah siap.','Driver sudah saya kabari.','Jam kirim jangan molor ya.']);await doing(n,'Mengecek jadwal driver',7);},
   async n=>{await standAt(n,PLACE.printer,1);S.printing++;try{await doing(n,'Mencetak rincian kirim',4,'stand');}finally{S.printing=Math.max(0,S.printing-1);}n.carry='paper';n.task='Membawa rincian kirim';await sitDown(n);n.carry=null;await doing(n,'Memeriksa rincian kirim',8);}],
- guest:[async n=>{await sitDown(n);await doing(n,'Santai di sofa',14,'rest');},
-  async n=>{await standAt(n,npick(n,[[7,10],[12,9],[15,10],[19,7],[4,9],[9,15]]),0);await doing(n,'Melihat-lihat kantor',6,'stand');await sitDown(n);await doing(n,'Main HP',8,'rest');}],
+ // Owner 2026-11-27: tamu lebih sering keliling dan ke dapur, sofa hanya sesekali.
+ guest:[async n=>{await guestWander(n,2);},
+  async n=>{await activity(n,npick(n,['kopi','snack','makan']));await guestWander(n,1);},
+  async n=>{await guestWander(n,1);await activity(n,npick(n,['kopi','snack']));},
+  async n=>{await sitDown(n);await doing(n,'Santai di sofa',nrnd(n,6,10),'rest');}],
 };
 const forecasterWork=[async n=>{await sitDown(n);n.filled=0;await doing(n,'Menyusun rencana kirim',12,'type',p=>{n.filled=p;});n.filled=1;const c=planCount();speak(n,c==null?realLines(n):`Rencana besok sudah ${c} dari 28 outlet.`);await doing(n,'Mengecek ulang rencana',5);},
  async n=>{await sitDown(n);await doing(n,'Mengecek selisih stok',8);speak(n,realLines(n));await doing(n,'Meninjau rencana besok',6);}];
 async function runSlot(n,g){
  try{
   const roll=nr(n)(),jobs=isF(n)?forecasterWork:WORK[n.id],job=jobs[Math.floor(nr(n)()*jobs.length)],boss=n===MGR||n===SPV,brk=npick(n,isGuest(n)?['kopi','snack','toilet']:boss?(n.food?['sofa','toilet']:['kopi','kopi','makan','sofa','toilet']):n.food?['sofa','nap','toilet']:['kopi','kopi','snack','makan','sofa','nap','toilet']);
+  if(isGuest(n)){await job(n);while(g===n.gen){const r=nr(n)();if(r<.42)await guestWander(n,1);else if(r<.78){const ok=await activity(n,npick(n,['kopi','kopi','snack','makan','makan','toilet']));if(ok===false)await guestWander(n,1);}else{await sitDown(n);await doing(n,npick(n,IDLE[n.id]),nrnd(n,6,10),'rest');}}return;}
   if(roll<(boss?.85:.72))await job(n);else{await activity(n,brk);await sitDown(n);}
   await sitDown(n);while(g===n.gen)await doing(n,npick(n,IDLE[n.id]),8,n.id==='guest'?'rest':'type');
  }catch(e){if(e!==CANCEL)throw e;}
