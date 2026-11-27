@@ -43,3 +43,12 @@
 
 /* Owner 2026-11-27: karakter login-only yang tidak hadir disembunyikan dari daftar. */
 .kt-roster button[hidden]{display:none}
+
+/* Petunjuk kendali karakter (owner 2026-11-27). */
+.kt-guide{margin-top:10px;background:var(--k-panel,#fff);border:1px solid rgba(58,45,63,.15);border-radius:10px}
+.kt-guide summary{padding:10px 14px;font-weight:700;cursor:pointer;color:var(--k-ink,#2b2130)}
+.kt-guide-b{padding:0 14px 12px;font-size:13.5px;line-height:1.55;color:var(--k-ink,#2b2130)}
+.kt-guide-b p{margin:0 0 6px}
+.kt-guide-b ol{margin:0 0 8px;padding-left:20px}
+.kt-guide-b li{margin:3px 0}
+.kt-guide-note{color:#6b5f73;font-size:12.5px}
