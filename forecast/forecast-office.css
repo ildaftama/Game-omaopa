@@ -40,3 +40,6 @@
 .focus-tabs .office-tab{margin-left:auto}
 .fs-office-link{display:grid;gap:8px;margin-bottom:12px}.fs-office-link input{width:100%;min-height:38px;padding:7px 10px;border:1px solid #d6dfe6;border-radius:7px;font:inherit}.fs-office-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.fs-office-ok{color:#23835a;font-weight:700}.fs-office-bad{color:#c9423a;font-weight:700}
 .ft-boost{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;margin:0 0 8px;padding:9px 11px;border:1px solid #f0c98a;border-radius:8px;background:#fff7e8;color:#6b4708;font-size:13px}.ft-boost.done{border-color:#a9dcc4;background:#ecf9f3;color:#1f6b4a}
+
+/* Owner 2026-11-27: karakter login-only yang tidak hadir disembunyikan dari daftar. */
+.kt-roster button[hidden]{display:none}
