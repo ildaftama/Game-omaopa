@@ -205,7 +205,7 @@ window.ForecastWasteLost=(()=>{
  document.addEventListener('change',e=>{const s=e.target.closest?.('#wl-root [data-wl-sel]');if(!s)return;const k=s.dataset.wlSel,cur=today().slice(0,7);
   if(k==='period'){state.period=s.value;if(s.value==='range'&&!state.from){state.from=shiftM(cur,-2);state.to=cur;}}else state[k]=s.value;
   state.outlet=null;rememberPeriod();paint();});
- window.addEventListener?.('forecast-lost-daily',()=>{cache=null;healthCache=null;trendCache=null;paint();});
+ window.addEventListener?.('forecast-lost-daily',()=>{cache=null;healthCache=null;trendCache=null;paint();const d=document.querySelector('.focus-tabs [data-focus="dashboard"].active');if(d&&document.getElementById('workspace-content')&&!document.querySelector('#workspace-content input:focus,#workspace-content select:focus'))d.click();});
  // Ringkasan lost bulan berjalan untuk Dashboard: semua outlet, semua produk, hari yang sudah selesai.
  function lostSummary(){
   const LD=window.ForecastLostDaily;if(!LD?.days)return null;const t=today(),m=t.slice(0,7),prices=window.FORECAST_REALIZED_PRICES?.outlets||{},labels=window.STOCK_DAILY?.labels;if(!labels)return null;

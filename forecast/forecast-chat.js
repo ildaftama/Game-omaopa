@@ -18,11 +18,15 @@ window.ForecastChat=(()=>{
  const markRead=()=>{const t=lastAt();try{localStorage.setItem(readKey(),String(t));}catch{}window.ForecastMarkSeen?.('chatRead',t);unread=0;badge();};
  // Penerima = akun yang aktif 30 hari terakhir selain pengirim. Sudah baca bila tanda bacanya >= waktu pesan.
  let rcptOpen=null;
+ // Jam baca: catatan pertama yang mencakup pesan ini (chatReads/noticeReads di status online pembaca).
+ const readTime=(p,at,keys=['chatReads'])=>{const t=ms(at);let best=null;for(const k of keys)for(const e of p[k]||[])if(e&&e.m>=t&&(best==null||e.s<best))best=e.s;return best;};
+ const fmtRead=v=>{const d=new Date(v),f=x=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta'}).format(x),hm=d.toLocaleTimeString('id-ID',{timeZone:'Asia/Jakarta',hour:'2-digit',minute:'2-digit'});return f(d)===f(new Date())?hm:d.toLocaleDateString('id-ID',{timeZone:'Asia/Jakarta',day:'numeric',month:'short'})+' '+hm;};
+ const readAt=(p,at,keys)=>{const v=readTime(p,at,keys);return v?` <small class="fc-rtime">${fmtRead(v)}</small>`:'';};
  const audience=by=>pres.filter(p=>p.uid!==by&&(isOnline(p)||Date.now()-ms(p.at)<30*864e5));
- function receipt(id,by,at,isRead){
+ function receipt(id,by,at,isRead,keys=['chatReads']){
   const all=audience(by);if(!all.length)return '';const done=all.filter(isRead),wait=all.filter(p=>!isRead(p)),full=done.length===all.length;
   const label=full?'Dibaca semua':done.length?`Dibaca ${done.length} dari ${all.length}`:'Terkirim, belum dibaca';
-  const det=rcptOpen===id?`<div class="fc-rcpt-det">${done.length?`<span><b>Sudah:</b> ${done.map(p=>esc(p.name)).join(', ')}</span>`:''}${wait.length?`<span><b>Belum:</b> ${wait.map(p=>esc(p.name)).join(', ')}</span>`:''}</div>`:'';
+  const det=rcptOpen===id?`<div class="fc-rcpt-det">${done.length?`<span><b>Sudah:</b> ${[...done].sort((a,b)=>(readTime(a,at,keys)||9e15)-(readTime(b,at,keys)||9e15)).map(p=>esc(p.name)+readAt(p,at,keys)).join(', ')}</span>`:''}${wait.length?`<span><b>Belum:</b> ${wait.map(p=>esc(p.name)).join(', ')}</span>`:''}</div>`:'';
   return `<button type="button" class="fc-rcpt ${full?'all':done.length?'some':''}" data-fc-rcpt="${esc(id)}" aria-expanded="${rcptOpen===id}" title="Klik untuk lihat siapa saja"><i aria-hidden="true">${done.length?'✓✓':'✓'}</i>${label}</button>${det}`;
  }
  function ting(){
@@ -43,7 +47,7 @@ window.ForecastChat=(()=>{
   return `<div class="fc-people"><span class="fc-count">${on} online</span>${list.map(p=>`<span class="fc-person ${isOnline(p)?'on':''}" title="${esc(isOnline(p)?'Sedang membuka web':'Terakhir '+ago(p.at))}"><i></i>${esc(p.name)}${p.uid===me()?' (Anda)':''}<small>${esc(ROLE[p.role]||'')}</small></span>`).join('')}</div>`;
  }
  function sysMsg(n,master){
-  const lab=N()?.linkLabel?.(n.link),t=ms(n.at),rc=master||n.by===me()?receipt('n:'+n.id,n.by,n.at,p=>(n.chat&&ms(p.chatRead)>=t)||(n.notif&&ms(p.noticeRead)>=t)):'';
+  const lab=N()?.linkLabel?.(n.link),t=ms(n.at),rc=master||n.by===me()?receipt('n:'+n.id,n.by,n.at,p=>(n.chat&&ms(p.chatRead)>=t)||(n.notif&&ms(p.noticeRead)>=t),['chatReads','noticeReads']):'';
   return `<div class="fc-sys"><div class="fc-sys-head"><b>System</b><span>Pengumuman</span><time>${hhmm(n.at)}</time>${master?`<button type="button" data-fc-ndel="${esc(n.id)}">Hapus</button>`:''}</div>${n.title?`<strong>${esc(n.title)}</strong>`:''}<p>${rich(n.text)}</p>${lab?`<button type="button" class="fc-go" data-fn-go="${esc(n.link)}">Buka ${esc(lab)} →</button>`:''}${rc}</div>`;
  }
  function list(){
