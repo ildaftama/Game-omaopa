@@ -202,6 +202,7 @@ const seenSent={};
 const seenLog={},LOGK={chatRead:'chatReads',noticeRead:'noticeReads'};
 window.ForecastMarkSeen=async(field,t)=>{if(!['chatRead','noticeRead'].includes(field)||!(t>0)||t<=(seenSent[field]||0)||!auth.currentUser)return;seenSent[field]=t;const k=LOGK[field];
  if(!seenLog[k]){try{const d=await getDoc(presRef(auth.currentUser.uid));seenLog[k]=(d.data()?.[k]||[]).filter(x=>x&&x.m>0).slice(-30);}catch{seenLog[k]=[];}}
+ if((seenLog[k].at(-1)?.m||0)>=Math.floor(t))return beat(true,{[field]:Timestamp.fromMillis(Math.floor(t))});
  seenLog[k]=[...seenLog[k],{m:Math.floor(t),s:Date.now()}].slice(-30);
  const base={name:myName(),role:myRole(),char:String(window.ForecastAuth?.role?.char||''),at:serverTimestamp(),online:true,[field]:Timestamp.fromMillis(Math.floor(t))};
  return setDoc(presRef(auth.currentUser.uid),{...base,[k]:seenLog[k]},{merge:true}).catch(()=>setDoc(presRef(auth.currentUser.uid),base,{merge:true}).catch(()=>{}));};
