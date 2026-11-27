@@ -1235,3 +1235,6 @@ input,select,textarea{transition:border-color .2s,box-shadow .2s}
 @media (prefers-reduced-motion:reduce){.ft-prog-fill{transition:none}.ft-prog.run .ft-prog-fill{animation:none}}
 
 .fd-kpi.pending{border-style:dashed;background:#fafbfc}.fd-kpi.pending strong{color:#9aa8b5}
+
+.fd-acc-wait{min-height:120px;border-radius:12px;background:linear-gradient(90deg,#f3f5f7,#eaeef2,#f3f5f7);background-size:200% 100%;animation:fdwait 1.2s linear infinite;margin-bottom:14px}
+@keyframes fdwait{to{background-position:-200% 0}}

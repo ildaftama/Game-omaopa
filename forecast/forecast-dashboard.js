@@ -1164,6 +1164,8 @@ window.ForecastDashboard=(()=>{
   if(!el||typeof L==='undefined')return;
   // Audit performa 2026-11-27: pakai ulang peta yang sudah dibuat (membuat ulang Leaflet ±350 ms tiap render).
   if(leafletMap&&leafletContainerEl&&leafletContainerEl!==el&&!leafletContainerEl.isConnected){el.replaceWith(leafletContainerEl);el=leafletContainerEl;}
+  if(!leafletMap&&!mountWeatherMap.later){mountWeatherMap.later=true;setTimeout(()=>{mountWeatherMap.later=false;mountWeatherMap();},60);return;}
+  if(!leafletMap&&mountWeatherMap.later)return;
   if(leafletContainerEl!==el){
    if(leafletMap){try{leafletMap.remove();}catch{}}
    leafletContainerEl=el;leafletFitted=false;leafletMarkers=new Map();
@@ -1324,7 +1326,12 @@ window.ForecastDashboard=(()=>{
   const p=est.w/est.sv*100,pt=wt/est.sv*100,bad=p>WASTE_THRESHOLD;
   return `<p class="fd-est-waste ${bad?'bad':''}"><b>Estimasi waste dari rencana tim: ${pct1(p)}</b> (${Math.round(est.pcs).toLocaleString('id-ID')} pcs · ${moneyBig(est.w)}, ${est.n} rencana) — rencana terakhir dikurangi total terjual, nominal pakai HPP outlet, <b>tanpa transfer</b> antar outlet. Kalau semua kelebihan bisa ditransfer: ±${pct1(pt)}. Ambang ${W_TH}. Waste real biasanya di antara kedua angka ini.</p>`;
  }
- function accuracyCard(trend,outletId){return cached('acc',outletId,()=>accuracyCardRaw(trend,outletId));}
+ function accuracyCard(trend,outletId){
+  const k=['acc',outletId,dashVer,settingsSig,new Date().toISOString().slice(0,13)].join('|');if(memo.has(k))return memo.get(k);
+  // Audit performa 2026-11-27: hitungan akurasi (±300 ms) dijalankan setelah halaman tampil.
+  setTimeout(()=>{const html=cached('acc',outletId,()=>accuracyCardRaw(trend,outletId)),slot=document.getElementById('fd-acc-slot');if(slot)slot.outerHTML=html||'';},30);
+  return '<div id="fd-acc-slot" class="fd-acc-wait" aria-busy="true"></div>';
+ }
  function accuracyCardRaw(trend,outletId){
   const days=trend.rows.filter(r=>r.date.startsWith(trend.ym)&&trend.lastActual&&r.date<=trend.lastActual&&r.actualTotal!=null&&r.forecastTotal!=null);
   if(!days.length)return '';
