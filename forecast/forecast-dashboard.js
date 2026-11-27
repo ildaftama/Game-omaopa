@@ -1386,25 +1386,27 @@ window.ForecastDashboard=(()=>{
   return sum;
  }
  function todaySnapshot(){const it=intradayNow();if(!it)return null;const all=revenueTrend('__all__'),sum=liveNet(it.rows,all);const pred=all?.rows.find(x=>x.date===it.date)?.forecastTotal;return {sum,pct:pred>0?sum/pred*100:null,outlets:it.rows.length,asOf:it.asOf};}
+ // Pengukur waktu render per bagian (window.__dashT), untuk audit performa. Biayanya hanya beberapa pemanggilan performance.now().
+ const __tm=(k,f)=>{const t=performance.now(),r=f();(window.__dashT||(window.__dashT={}))[k]=Math.round(performance.now()-t);return r;};
  function render(outletId){
   applySettings();
   const show=window.ForecastSettings?.get().display||{trend:true,wasteLost:true,accuracy:true,weather:true,events:true,operations:true};
-  const trend=revenueTrend(outletId);
+  const trend=__tm('revenueTrend',()=>revenueTrend(outletId));
   if(!trend)return `<div class="workspace-empty">${esc(window.PcsPanels.data().error||'Memuat data penjualan & pesanan…')}</div>`;
   lastTrend=trend;
   if(show.weather)ensureWeather(outletId);
   const monthName=m=>months[Number(m.slice(5,7))-1]+' '+m.slice(0,4);
   return `<div class="focus-intro"><h2>Dashboard</h2><span>${outletId==='__all__'?'Seluruh outlet':''} · ${monthName(trend.ym)} & ${monthName(trend.ymNext)}</span></div>
-   ${(()=>{const accHtml=show.accuracy?accuracyCard(trend,outletId):'';return `${window.ForecastWasteLost?.noticeHtml?.()||''}${briefCard(trend,outletId)}
-   ${intradayCard(trend,outletId)}
+   ${(()=>{const accHtml=show.accuracy?__tm('accuracyCard',()=>accuracyCard(trend,outletId)):'';return `${__tm('notice',()=>window.ForecastWasteLost?.noticeHtml?.())||''}${__tm('briefCard',()=>briefCard(trend,outletId))}
+   ${__tm('intradayCard',()=>intradayCard(trend,outletId))}
    ${accHtml}`;})()}
-   ${fold('mon','Monitoring rencana tim','rencana vs penjualan per tanggal, outlet & produk · performa bulanan',window.ForecastWorkspace?.monitorSection?.()||'')}
-   ${show.trend&&outletId==='__all__'?fold('trend','Kondisi outlet','omzet, waste & lost sales naik/turun 3 hari terakhir',trendWatchCard(trend.trendNow)):''}
-   ${show.wasteLost?fold('wl','Waste & lost sales per outlet','bulan berjalan · outlet di atas batas',wasteLostCard(outletId)):''}
-   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?chart(trend):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${monthSummaryHtml(trend)}</article>
+   ${fold('mon','Monitoring rencana tim','rencana vs penjualan per tanggal, outlet & produk · performa bulanan',__tm('monitor',()=>window.ForecastWorkspace?.monitorSection?.())||'')}
+   ${show.trend&&outletId==='__all__'?fold('trend','Kondisi outlet','omzet, waste & lost sales naik/turun 3 hari terakhir',__tm('trendWatchCard',()=>trendWatchCard(trend.trendNow))):''}
+   ${show.wasteLost?fold('wl','Waste & lost sales per outlet','bulan berjalan · outlet di atas batas',__tm('wasteLostCard',()=>wasteLostCard(outletId))):''}
+   <article class="workspace-card pcs-main-chart"><div class="pcs-chart-title"><h3>Tren omzet · ${monthName(trend.ym)} &amp; ${monthName(trend.ymNext)}</h3>${trendBadgeHtml(trend.trendNow)}</div><div id="fd-chart-slot">${trend.hasHistory?__tm('chart',()=>chart(trend)):'<div class="pcs-chart-empty"><p>Riwayat penjualan belum cukup untuk grafik.</p></div>'}</div>${__tm('monthSummaryHtml',()=>monthSummaryHtml(trend))}</article>
    ${show.weather?`<article class="workspace-card weather-card"><span class="micro-label">CUACA HARI INI &amp; BESOK</span>${weatherHtml}</article>`:''}
-   ${show.events?`<div class="product-comparison"><article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${eventsSoon(outletId)}</article></div>`:''}
-   ${show.operations?operationalSummary(outletId):''}
+   ${show.events?`<div class="product-comparison"><article class="workspace-card"><span class="micro-label">KEGIATAN 7 HARI KE DEPAN</span>${__tm('eventsSoon',()=>eventsSoon(outletId))}</article></div>`:''}
+   ${show.operations?__tm('operationalSummary',()=>operationalSummary(outletId)):''}
    ${outletDetailId?outletDetailHtml(outletDetailId):''}`;
  }
  function click(e){
