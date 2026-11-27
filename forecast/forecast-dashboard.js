@@ -477,11 +477,13 @@ window.ForecastDashboard=(()=>{
  function buildEngine(series,planner){
   const valueByDate=new Map(series.map(r=>[r.date,r.value]));
   const lastDate=series.length?series[series.length-1].date:null;
-  const baseWin=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-56)):[];
+  // Batas tanggal dihitung sekali (bukan per baris) -- perf 2026-11-27: ±1,3 dtk di render pertama.
+  const c56=lastDate&&planner.shift(lastDate,-56),c14=lastDate&&planner.shift(lastDate,-14),c28=lastDate&&planner.shift(lastDate,-28),c180=lastDate&&planner.shift(lastDate,-180);
+  const baseWin=lastDate?series.filter(r=>r.date>=c56):[];
   const baselineLevel=baseWin.length?planner.quantile(baseWin.map(r=>r.value),.5):null;
-  const trendRecent=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-14)).map(r=>r.value):[],trendPrior=lastDate?series.filter(r=>r.date<planner.shift(lastDate,-14)&&r.date>=planner.shift(lastDate,-28)).map(r=>r.value):[];
+  const trendRecent=lastDate?series.filter(r=>r.date>=c14).map(r=>r.value):[],trendPrior=lastDate?series.filter(r=>r.date<c14&&r.date>=c28).map(r=>r.value):[];
   const trendA=planner.quantile(trendRecent,.5),trendB=planner.quantile(trendPrior,.5),trendFactor=trendA!==null&&trendB>0?Math.max(.85,Math.min(1.15,trendA/trendB)):1;
-  const wideWin=lastDate?series.filter(r=>r.date>=planner.shift(lastDate,-180)):[],wideMedian=wideWin.length?planner.quantile(wideWin.map(r=>r.value),.5):baselineLevel;
+  const wideWin=lastDate?series.filter(r=>r.date>=c180):[],wideMedian=wideWin.length?planner.quantile(wideWin.map(r=>r.value),.5):baselineLevel;
   function weekdayShape(date){
    const wd=new Date(date+'T12:00:00Z').getUTCDay(),sameDay=wideWin.filter(r=>new Date(r.date+'T12:00:00Z').getUTCDay()===wd).map(r=>r.value);
    return sameDay.length>=3&&wideMedian>0?Math.max(.5,Math.min(1.8,planner.quantile(sameDay,.5)/wideMedian)):1;

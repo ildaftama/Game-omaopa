@@ -23,7 +23,8 @@
    const same=rows.filter(r=>day(r.date).getUTCDay()===day(target).getUTCDay());
    const selected=same.length>=3?same:rows.slice(-14),values=selected.map(r=>r.value);
    if(!values.length)return {name,low:null,high:null,central:null,samples:0,through:null,estimated:true};
-   const recent=rows.filter(r=>r.date>=shift(target,-14)).map(r=>r.value),prior=rows.filter(r=>r.date<shift(target,-14)&&r.date>=shift(target,-28)).map(r=>r.value);
+   const t14=shift(target,-14),t28=shift(target,-28);
+   const recent=rows.filter(r=>r.date>=t14).map(r=>r.value),prior=rows.filter(r=>r.date<t14&&r.date>=t28).map(r=>r.value);
    const a=quantile(recent,.5),b=quantile(prior,.5),trend=a!==null&&b>0?Math.max(.85,Math.min(1.15,a/b)):1;
    const central=Math.round(quantile(values,.5)*trend),low=Math.max(0,Math.floor(Math.min(central,quantile(values,.2)*trend))),high=Math.max(central,Math.ceil(quantile(values,.8)*trend));
    return {name,low,high,central,samples:values.length,through:rows.at(-1).date,estimated:selected.some(r=>r.estimated),fallback:same.length<3};
