@@ -67,3 +67,15 @@
 
 .forecast-login-card .fg-link{display:block;width:100%;margin-top:4px;padding:6px 0;background:none;color:#205f70;font-size:12px;text-decoration:underline;text-align:center}
 .forecast-login-card .fg-note{margin:18px 0 -8px;padding:8px 10px;border-radius:8px;background:#fff4e5;color:#8a5806;font-size:12px}
+
+/* Performa forecaster: rincian per area/outlet/produk (owner 2026-11-27). */
+.fpf-table thead th small{display:block;font-weight:400;color:#8a97a4;font-size:10.5px}
+.fpf-table th[scope=row] small{display:block;color:#7a8896;font-size:11px;font-weight:400}
+.fpf-name{padding:0;border:0;background:none;color:#172b42;font:700 13.5px inherit;font-family:inherit;cursor:pointer;text-align:left}
+.fpf-name:hover,.fpf-name.on{color:#205f70;text-decoration:underline}
+.fpf-who{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}
+.fpf-who button{min-height:30px;padding:3px 12px;border:1px solid #d5dee6;border-radius:999px;background:#fff;color:#33434f;font:600 12.5px inherit;font-family:inherit;cursor:pointer}
+.fpf-who button.on{background:#205f70;border-color:#205f70;color:#fff}
+.fpf-break{margin-top:14px;padding-top:12px;border-top:1px solid #edf1f4}
+.fpf-break h4{margin:0}
+.fpf-note{margin:8px 0 0;padding:8px 10px;border-radius:8px;background:#fff7ec;color:#5a4318;font-size:13px}
