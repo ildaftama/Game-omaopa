@@ -1,6 +1,8 @@
 // Tab Waste & Lost Sales (owner 2026-11-24). Masih tahap dibangun sampai seluruh data dipastikan.
 // Waste dari tab WASTE tim. Stok dari Daily Report: kolom waste hari ini adalah sisa kemarin, jadi
 // produk dianggap habis bila stok setelah waste masih ada, lalu stok akhir 0 tanpa transfer keluar.
+// Owner 2026-11-27: lost sales dari riwayat lost harian (dokumen privat _5): jam habis x pola jual per jam outlet,
+// semua produk. 1-26 Nov dari transaksi ESB, sesudahnya otomatis dari stok berjalan 15 menit.
 window.ForecastWasteLost=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const nf=v=>Math.round(v||0).toLocaleString('id-ID'),pc=(v,d=2)=>v==null||!Number.isFinite(v)?'—':v.toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d})+'%';
@@ -37,7 +39,11 @@ window.ForecastWasteLost=(()=>{
   const map=new Map();for(const [m,a] of raw){if(a.length<4)continue;a.sort((x,y)=>x-y);map.set(m,[quant(a,.75),quant(a,.9)]);}
   cache={key,map};return map;
  }
- const blank=()=>({pcs:0,nom:0,habis:0,low:0,high:0,lowRp:0,highRp:0,omzet:0,days:0,kirim:0});
+ const blank=()=>({pcs:0,nom:0,habis:0,low:0,high:0,lowRp:0,highRp:0,omzet:0,days:0,kirim:0,sold:0,est:0});
+ // Harga jual untuk rupiah lost: realisasi outlet untuk 4 produk utama, selain itu harga acuan.
+ const REF_PRICE={'Mini Ogura':57000/9,'Chiffon Keju':33000,'Chiffon Ekstra Keju':34000,'Chiffon Butter':34000,'Chiffon Lite Ekstra Keju':19000,'Chiffon Lite Keju':18000,'Roti Sosis':6500,'Roti Abon':7000,'Roti Coklat':6000,'Roti Coklat Keju':6000,'Roti Coklat Pisang':6000,'Roti Vanilla':6000,'Sweet Layer 150 ml':14000,'Sweet Layer 300 ml':25000,'Malmil Cheese Less Sugar':17000,'Malmil Choco Less Sugar':18000};
+ const priceFor=(prices,id,l)=>(PRICE_NAME[l]?prices[id]?.[PRICE_NAME[l]]?.price:0)||REF_PRICE[l]||({'Ogura Cheese':17000,'Ogura Choco':18000,'Malmil Cheese':17000,'Malmil Choco':18000})[l]||0;
+ const lostSrc=d=>{const s=window.ForecastLostDaily?.src?.[d];return s==='tx'||s==='live';};
  const addTo=(a,b)=>{for(const k of Object.keys(a))a[k]+=b[k]||0;return a;};
  function collect(opt={}){
   const recap=window.DAILY_RECAP_SUMMARY,stock=window.STOCK_DAILY,items=recap?.wasteItems||window.WASTE_LOST_ITEMS||{},avail=Object.keys(items).filter(d=>Object.keys(items[d]).length),ds=opt.dates?opt.dates(avail):dates(avail);
@@ -48,9 +54,9 @@ window.ForecastWasteLost=(()=>{
   for(const d of ds)for(const [id,o] of out){o.omzet+=gross.get(d+'|'+id)||0;(grossProduct.get(d+'|'+id)||[]).forEach((v,p)=>{const l=SALES_LABEL[p];if(l&&v)P(l).omzet+=v;});
    for(const [l,[pcs,nom]] of Object.entries(items[d]?.[id]||{}))for(const x of [P(l),I(o,l),o.sum]){x.pcs+=pcs;x.nom+=nom;}
    const day=stock?.days?.[d]?.[id];if(!day)continue;
-   for(const [k,v] of Object.entries(day)){const l=stock.labels[+k];if(!l)continue;const f=flow(v);P(l).kirim+=v[1];if(v[5]===1&&f.sell>0)P(l).days++;if(!f.empty)continue;
-    const q=PRICE_NAME[l]?base.get(`${id}|${l}|${dayType(d)}`):null,price=PRICE_NAME[l]?prices[id]?.[PRICE_NAME[l]]?.price||0:0,low=q?Math.max(0,q[0]-f.sold):0,high=q?Math.max(0,q[1]-f.sold):0;
-    for(const x of [P(l),I(o,l),o.sum]){x.habis++;x.low+=low;x.high+=high;x.lowRp+=low*price;x.highRp+=high*price;}}
+   for(const [k,v] of Object.entries(day)){const l=stock.labels[+k];if(!l)continue;const f=flow(v);P(l).kirim+=v[1];if(v[5]===1&&f.sell>0)P(l).days++;if(f.empty)for(const x of [P(l),I(o,l),o.sum])x.habis++;}
+   const ld=lostSrc(d)?window.ForecastLostDaily.days?.[d]?.[id]:null;
+   if(ld)for(const [k,c] of Object.entries(ld)){const l=stock.labels[+k];if(!l)continue;const lost=c[1]||0,price=priceFor(prices,id,l);for(const x of [P(l),I(o,l),o.sum]){x.est=1;x.sold+=c[0]||0;x.low+=lost;x.high+=lost;x.lowRp+=lost*price;x.highRp+=lost*price;}}
   }
   const rows=[...out.values()],total=rows.reduce((a,r)=>addTo(a,r.sum),blank()),omzet=rows.reduce((s,r)=>s+r.omzet,0);
   return {ds,rows,prod,total,omzet};
@@ -63,7 +69,8 @@ window.ForecastWasteLost=(()=>{
   push('Lainnya','Lainnya','Belum masuk area',c.rows.map(r=>r.id));
   return groups.sort((a,b)=>b.sum.nom-a.sum.nom);
  }
- const lostStat=x=>x.high>0?`<strong>${range(x.low,x.high)}</strong><small>pcs · ${rpRange(x.lowRp,x.highRp)}</small>`:'<strong class="na">—</strong><small>belum diestimasi</small>';
+ const lostPct=x=>x.sold+x.high>0?x.high/(x.sold+x.high)*100:null;
+ const lostStat=x=>x.high>0?`<strong>${rp(x.highRp)}</strong><small>${nf(x.high)} pcs · ${pc(lostPct(x),1)} permintaan</small>`:x.est?'<strong>0</strong><small>tidak pernah habis</small>':'<strong class="na">—</strong><small>belum diestimasi</small>';
  const stat=(label,body,cls='')=>`<div class="wl-stat ${cls}"><span>${label}</span>${body}</div>`;
 
  function status(p,lim){const wr=p.omzet>0?p.nom/p.omzet*100:null,hr=p.days?p.habis/p.days*100:0;if(wr==null)return ['Belum terbaca','none'];if(wr>lim&&hr<SOLD_OUT_OFTEN&&p.kirim>0&&p.pcs/p.kirim>=NOT_SELLING)return ['Tidak laku','bad'];if(wr<=lim)return hr>=SOLD_OUT_OFTEN?['Laris','win']:['Stabil','calm'];return hr>=SOLD_OUT_OFTEN?['Cek penempatan','place']:['Kurang laku','slow'];}
@@ -73,18 +80,18 @@ window.ForecastWasteLost=(()=>{
   return `<section class="wl-section"><h2>Per produk</h2><p class="wl-legend"><span><b class="wl-tag bad">Tidak laku</b> minimal separuh kiriman jadi waste</span><span><b class="wl-tag win">Laris</b> waste rendah, sering habis</span><span><b class="wl-tag place">Cek penempatan</b> waste tinggi, tetapi sering habis juga</span><span><b class="wl-tag slow">Kurang laku</b> waste tinggi, jarang habis</span><span><b class="wl-tag calm">Stabil</b> waste rendah, jarang habis</span></p>${html||'<p class="wl-note">Belum ada data pada periode ini.</p>'}</section>`;
  }
  function outletDetail(r){
-  const rows=ORDER.filter(l=>r.items[l]&&(r.items[l].pcs||r.items[l].habis)).map(l=>{const p=r.items[l];return `<li><span>${esc(l)}</span><b>${nf(p.pcs)} pcs</b><em>${p.high>0?`lost ${range(p.low,p.high)}`:p.habis?`habis ${nf(p.habis)} hari`:''}</em></li>`;}).join('');
+  const rows=ORDER.filter(l=>r.items[l]&&(r.items[l].pcs||r.items[l].habis)).map(l=>{const p=r.items[l];return `<li><span>${esc(l)}</span><b>${nf(p.pcs)} pcs</b><em>${p.high>0?`lost ${nf(p.high)} pcs · ${pc(lostPct(p),0)}`:p.habis?`habis ${nf(p.habis)} hari`:''}</em></li>`;}).join('');
   return `<ul class="wl-items">${rows||'<li><span>Tidak ada data produk.</span></li>'}</ul>`;
  }
  function areaPanel(a,L){
   const rows=[...a.rows].sort((x,y)=>y.sum.nom-x.sum.nom).map(r=>{const open=state.outlet===r.id,wp=r.omzet>0?r.sum.nom/r.omzet*100:null,center=a.centers.includes(r.id);
-   return `<div class="wl-outlet ${open?'open':''}"><button type="button" data-wl-outlet="${esc(r.id)}" aria-expanded="${open}"><span class="wl-oname">${open?'▾':'▸'} ${esc(name(r.id))}${center?' <i>Center</i>':''}</span><span class="wl-onum"><small>Waste</small><b>${nf(r.sum.pcs)} pcs</b><em>${rp(r.sum.nom)} · <u class="${tone(wp,L.waste)}">${pc(wp,1)}</u></em></span><span class="wl-onum"><small>Est. lost</small><b>${r.sum.high>0?range(r.sum.low,r.sum.high)+' pcs':'—'}</b><em>${r.sum.high>0?rpRange(r.sum.lowRp,r.sum.highRp):'belum diestimasi'}</em></span></button>${open?outletDetail(r):''}</div>`;}).join('');
+   return `<div class="wl-outlet ${open?'open':''}"><button type="button" data-wl-outlet="${esc(r.id)}" aria-expanded="${open}"><span class="wl-oname">${open?'▾':'▸'} ${esc(name(r.id))}${center?' <i>Center</i>':''}</span><span class="wl-onum"><small>Waste</small><b>${nf(r.sum.pcs)} pcs</b><em>${rp(r.sum.nom)} · <u class="${tone(wp,L.waste)}">${pc(wp,1)}</u></em></span><span class="wl-onum"><small>Est. lost</small><b>${r.sum.high>0?nf(r.sum.high)+' pcs':r.sum.est?'0':'—'}</b><em>${r.sum.high>0?`${rp(r.sum.highRp)} · ${pc(lostPct(r.sum),1)}`:r.sum.est?'tidak pernah habis':'belum diestimasi'}</em></span></button>${open?outletDetail(r):''}</div>`;}).join('');
   return `<div class="wl-panel"><h3>${esc(a.title)} <small>${a.rows.length} outlet</small></h3>${rows}</div>`;
  }
  function areaView(c,L){
   const groups=areaGroups(c);if(selected!=='__all__'&&groups[0])state.area=groups[0].key;
   const active=groups.find(a=>a.key===state.area);
-  const cards=groups.map(a=>{const on=a===active,wp=a.omzet>0?a.sum.nom/a.omzet*100:null;return `<button type="button" class="wl-area ${on?'on':''}" data-wl-area="${esc(a.key)}" aria-expanded="${on}"><span class="wl-atitle">${esc(a.title)}</span><span class="wl-asub">${esc(a.sub)} · ${a.rows.length} outlet</span><span class="wl-pair">${stat('Waste',`<strong>${rp(a.sum.nom)}</strong><small>${nf(a.sum.pcs)} pcs · <u class="${tone(wp,L.waste)}">${pc(wp,1)}</u></small>`,'waste')}${stat('Est. lost',a.sum.high>0?`<strong>${rp((a.sum.lowRp+a.sum.highRp)/2)}</strong><small>${range(a.sum.low,a.sum.high)} pcs</small>`:'<strong class="na">—</strong><small>belum diestimasi</small>','lost')}</span></button>`;}).join('');
+  const cards=groups.map(a=>{const on=a===active,wp=a.omzet>0?a.sum.nom/a.omzet*100:null;return `<button type="button" class="wl-area ${on?'on':''}" data-wl-area="${esc(a.key)}" aria-expanded="${on}"><span class="wl-atitle">${esc(a.title)}</span><span class="wl-asub">${esc(a.sub)} · ${a.rows.length} outlet</span><span class="wl-pair">${stat('Waste',`<strong>${rp(a.sum.nom)}</strong><small>${nf(a.sum.pcs)} pcs · <u class="${tone(wp,L.waste)}">${pc(wp,1)}</u></small>`,'waste')}${stat('Est. lost',lostStat(a.sum),'lost')}</span></button>`;}).join('');
   return `<section class="wl-section"><h2>Per area</h2><p class="wl-note">Klik area untuk melihat outlet di dalamnya.</p><div class="wl-areas">${cards}</div>${active?areaPanel(active,L):''}</section>`;
  }
  function view(){
@@ -93,9 +100,9 @@ window.ForecastWasteLost=(()=>{
   const per=[['mtd','Bulan ini'],['7','7 hari terakhir'],['prev','Bulan lalu']].map(([k,t])=>`<button type="button" data-wl-period="${k}" aria-pressed="${state.period===k}" class="${state.period===k?'on':''}">${t}</button>`).join('');
   return `<div class="wl-build" role="status"><b>🚧 Sedang dibangun</b><span>Angka masih diperiksa. Untuk keputusan, tetap cocokkan dengan sheet tim.</span></div>
   <div class="wl-bar"><div class="wl-periods" role="group" aria-label="Periode">${per}</div><span>${esc(selected==='__all__'?'Semua outlet':name(selected))} · ${span(c.ds)}</span></div>
-  <div class="wl-hero"><div class="waste"><span>Total waste</span><strong>${rp(c.total.nom)}</strong><small>${nf(c.total.pcs)} pcs · <u class="${tone(wp,L.waste)}">${pc(wp)} dari omzet</u></small></div><div class="lost"><span>Estimasi lost sales</span><strong>${c.total.high>0?rpRange(c.total.lowRp,c.total.highRp):'—'}</strong><small>${c.total.high>0?`${range(c.total.low,c.total.high)} pcs · Ogura dan Malmil utama`:'Menunggu data stok terbaru'}</small></div></div>
+  <div class="wl-hero"><div class="waste"><span>Total waste</span><strong>${rp(c.total.nom)}</strong><small>${nf(c.total.pcs)} pcs · <u class="${tone(wp,L.waste)}">${pc(wp)} dari omzet</u></small></div><div class="lost"><span>Estimasi lost sales</span><strong>${c.total.high>0?rp(c.total.highRp):'—'}</strong><small>${c.total.high>0?`${nf(c.total.high)} pcs · ${pc(lostPct(c.total),1)} dari permintaan · semua produk`:c.total.est?'Tidak ada kue habis pada periode ini':'Belum ada estimasi untuk periode ini'}</small></div></div>
   ${productView(c,L)}${areaView(c,L)}
-  <p class="wl-foot">Estimasi lost membandingkan penjualan di hari stok habis dengan penjualan normal outlet tersebut, jadi berupa rentang, bukan angka pasti. Varian lain belum diestimasi karena penjualannya terlalu kecil untuk diukur dari data harian. Sering habis berarti habis di minimal ${SOLD_OUT_OFTEN}% hari berstok, waste tinggi berarti di atas batas ${pc(L.waste,1)} dari omzet produk. Omzet Roti belum memuat penjualan paket, jadi persennya bisa terlihat lebih tinggi.</p>`;
+  <p class="wl-foot">Lost sales = perkiraan penjualan sejak kue habis sampai tutup 20.00, mengikuti ramainya tiap jam di outlet itu sendiri (pagi sepi, sore ramai). Jam habis 1–26 Nov dari transaksi terakhir saat stok akhir 0; mulai 27 Nov dari stok berjalan 15 menit dan catatan transfer, dihitung otomatis tiap pagi untuk hari sebelumnya. Hari dengan transfer keluar tanpa catatan jam tidak dihitung. Uji balik November: total meleset ±2%, per outlet-produk-hari bisa meleset ±50%, jadi baca sebagai jumlah, bukan angka per hari. Produk baru (riwayat kurang dari 20 hari di outlet itu) belum diestimasi. Sering habis berarti habis di minimal ${SOLD_OUT_OFTEN}% hari berstok, waste tinggi berarti di atas batas ${pc(L.waste,1)} dari omzet produk. Omzet Roti belum memuat penjualan paket, jadi persennya bisa terlihat lebih tinggi.</p>`;
  }
  // Peringatan produk: selalu 28 hari terakhir seluruh outlet, tidak ikut filter di tab ini.
  const HEALTH_DAYS=28,low=s=>String(s||'').trim().toLowerCase();
@@ -107,7 +114,7 @@ window.ForecastWasteLost=(()=>{
  function health(){
   const L=limits(),key=[window.STOCK_DAILY?.updatedAt,today(),L.waste].join('|');if(healthCache?.key===key)return healthCache.value;
   const c=collect({all:true,dates:a=>a.filter(d=>d<today()).sort().slice(-HEALTH_DAYS)});
-  const items=ORDER.filter(l=>c.prod[l]&&(c.prod[l].pcs||c.prod[l].kirim)).map(l=>{const p=c.prod[l],[st,cls]=status(p,L.waste);return {label:l,status:st,cls,critical:cls==='bad',pcs:p.pcs,nom:p.nom,kirim:p.kirim,wasteOfShip:p.kirim?p.pcs/p.kirim*100:null,wasteOfOmzet:p.omzet>0?p.nom/p.omzet*100:null,habisRate:p.days?p.habis/p.days*100:null,lostLow:p.low,lostHigh:p.high,lostRp:(p.lowRp+p.highRp)/2};});
+  const items=ORDER.filter(l=>c.prod[l]&&(c.prod[l].pcs||c.prod[l].kirim)).map(l=>{const p=c.prod[l],[st,cls]=status(p,L.waste);return {label:l,status:st,cls,critical:cls==='bad',pcs:p.pcs,nom:p.nom,kirim:p.kirim,wasteOfShip:p.kirim?p.pcs/p.kirim*100:null,wasteOfOmzet:p.omzet>0?p.nom/p.omzet*100:null,habisRate:p.days?p.habis/p.days*100:null,lostLow:p.low,lostHigh:p.high,lostRp:(p.lowRp+p.highRp)/2,lostPct:lostPct(p)};});
   const mid=s=>({wasteRp:s.sum.nom,lostPcs:(s.sum.low+s.sum.high)/2,lostRp:(s.sum.lowRp+s.sum.highRp)/2,habis:s.sum.habis,wastePct:s.omzet>0?s.sum.nom/s.omzet*100:null});
   const value={from:c.ds[0],to:c.ds.at(-1),items,outlets:c.rows.map(r=>({id:r.id,name:name(r.id),...mid(r)})),areas:areaGroups(c).filter(a=>a.key!=='Lainnya').map(a=>({name:a.title,...mid(a)}))};if(c.ds.length)healthCache={key,value};return value;
  }
@@ -138,6 +145,14 @@ window.ForecastWasteLost=(()=>{
   });
  }
  function paint(){const el=document.getElementById('wl-root');if(el)el.innerHTML=view();}
+ window.addEventListener?.('forecast-lost-daily',()=>{cache=null;healthCache=null;paint();});
+ // Ringkasan lost bulan berjalan untuk Dashboard: semua outlet, semua produk, hari yang sudah selesai.
+ function lostSummary(){
+  const LD=window.ForecastLostDaily;if(!LD?.days)return null;const t=today(),m=t.slice(0,7),prices=window.FORECAST_REALIZED_PRICES?.outlets||{},labels=window.STOCK_DAILY?.labels;if(!labels)return null;
+  let pcs=0,sold=0,rpv=0;const ds=Object.keys(LD.days).filter(d=>d<t&&d.startsWith(m)&&lostSrc(d)).sort();
+  for(const d of ds)for(const [id,cells] of Object.entries(LD.days[d]))for(const [k,c] of Object.entries(cells)){const l=labels[+k];pcs+=c[1]||0;sold+=c[0]||0;rpv+=(c[1]||0)*priceFor(prices,id,l);}
+  return ds.length?{pcs,rp:rpv,pct:pcs+sold>0?pcs/(pcs+sold)*100:null,from:ds[0],to:ds.at(-1)}:null;
+ }
  document.addEventListener('click',e=>{if(e.target.closest?.('[data-wl-go]')){document.querySelector('[data-focus="wastelost"]')?.click();return;}if(!e.target.closest?.('#wl-root'))return;const a=e.target.closest('[data-wl-period]'),b=e.target.closest('[data-wl-area]'),o=e.target.closest('[data-wl-outlet]');if(a){state.period=a.dataset.wlPeriod;state.outlet=null;paint();}else if(b){state.area=state.area===b.dataset.wlArea?null:b.dataset.wlArea;state.outlet=null;paint();}else if(o){state.outlet=state.outlet===o.dataset.wlOutlet?null:o.dataset.wlOutlet;paint();}});
- return {health,noticeHtml,criticalFor,confirmPlan,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Waste & Lost Sales</h2><span>Ringkasan per produk dan area</span></div><div id="wl-root">${view()}</div>`;}};
+ return {lostSummary,health,noticeHtml,criticalFor,confirmPlan,render(id){selected=id||'__all__';return `<div class="focus-intro"><h2>Waste & Lost Sales</h2><span>Ringkasan per produk dan area</span></div><div id="wl-root">${view()}</div>`;}};
 })();

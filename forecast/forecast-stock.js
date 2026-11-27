@@ -20,7 +20,8 @@ window.ForecastStock=(()=>{
  // Harga jual: harga realisasi outlet (4 produk utama), selain itu harga acuan Dashboard (PRICE_REFS).
  const REF=[0,0,0,0,0,0,57000/9,33000,34000,34000,0,19000,18000,6500,7000,6000,6000,6000,6000,14000,25000],SAME=[0,1,2,3,2,3];
  const priceOf=(prices,id,lab)=>(lab<6?prices[id]?.[PRICE[SAME[lab]]]?.price:0)||REF[lab]||0;
- const OPEN=8,CLOSE=20,PRIOR_W=.3,KURANG=.8,STALE_MIN=40;
+ // PRIOR_W 1,0: kalibrasi 1-26 Nov (uji balik semua hari, 11.813 kasus) -> bias -2%.
+ const OPEN=8,CLOSE=20,PRIOR_W=1,KURANG=.8,STALE_MIN=40;
  const ST={habis:['Habis','habis'],kurang:['Kurang stok','kurang'],normal:['Normal','normal'],over:['Over stok','over'],na:['Belum terbaca','na'],baru:['Produk baru','baru']};
  const state={view:'stok',area:'all',group:'all',status:null,outlet:null};try{const v=JSON.parse(localStorage.getItem('omaopa-stock-ui')||'{}');for(const k of ['view','area','group'])if(typeof v[k]==='string')state[k]=v[k];}catch{}
  const remember=()=>{try{localStorage.setItem('omaopa-stock-ui',JSON.stringify({view:state.view,area:state.area,group:state.group}));}catch{}};let selected='__all__',baseCache=null;

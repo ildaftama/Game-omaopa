@@ -9,6 +9,7 @@ import {collect} from './pcs-sales.mjs';
 import {signIn,readLiveIntraday,writeLiveIntraday,readSmallDoc,writeSmallDoc} from './pack-forecast-reference.mjs';
 import {refreshOffice,OFFICE_KEY} from './office-status.mjs';
 import {STOCK_LIVE_KEY,mergeStockLive,pullDailyToday} from './stock-live.mjs';
+import {LOST_DAILY_KEY,HOUR_PROFILE_KEY,computeDay,mergeLostDay,readTransfers} from './lost-daily.mjs';
 
 // Outlet yang gagal terbaca kali ini tetap memakai angka tarikan sebelumnya pada hari yang sama.
 export function mergeLive(previous,results,date,asOf){
@@ -38,6 +39,16 @@ async function main(){
   try{const office=await readSmallDoc(OFFICE_KEY,idToken);if(office?.dailyFolder){const d=await pullDailyToday(office.dailyFolder);daily=d.daily;dailyAt=new Date().toISOString();console.log('Daily Report hari ini terbaca: '+d.read+'/'+d.tabs+' tab, '+Object.keys(d.daily).length+' outlet berisi.');}}
   catch{console.log('Daily Report hari ini belum terbaca, memakai data tarikan sebelumnya.');}
   const prev=await readSmallDoc(STOCK_LIVE_KEY,idToken);
+  // Hari baru: hitung lost sales final hari sebelumnya dari stok berjalan yang masih tersimpan.
+  if(prev?.date&&prev.date<today){
+   try{
+    const [profile,history]=await Promise.all([readSmallDoc(HOUR_PROFILE_KEY,idToken),readSmallDoc(LOST_DAILY_KEY,idToken)]);
+    let transfers=[];try{transfers=await readTransfers(prev.date,idToken);}catch{console.log('Catatan transfer belum terbaca, lost dihitung tanpa jam transfer.');}
+    const cells=computeDay(prev,{transfers,profile,history});
+    await writeSmallDoc(LOST_DAILY_KEY,mergeLostDay(history,prev.date,cells,'live'),idToken,uid);
+    console.log('Lost sales hari sebelumnya tersimpan: '+Object.keys(cells).length+' outlet.');
+   }catch{console.log('::warning::Lost sales hari sebelumnya belum tersimpan.');}
+  }
   await writeSmallDoc(STOCK_LIVE_KEY,mergeStockLive(prev,{date:today,asOf:new Date().toISOString(),results,daily,dailyAt}),idToken,uid);
   console.log('Stok berjalan tersimpan.');
  }catch{console.log('::warning::Stok berjalan belum tersimpan.');}

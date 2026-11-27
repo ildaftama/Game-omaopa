@@ -1022,7 +1022,7 @@ window.ForecastDashboard=(()=>{
   };
   const cell=(v,over,txt)=>`<td class="${v==null?'fd-wl-stale':over?'fd-wl-bad':'fd-wl-good'}">${txt}</td>`;
   const row=r=>{const [k,l]=status(r);return `<tr><td><button type="button" class="fd-wl-link" data-outlet-detail="${esc(r.id)}">${esc(r.name)}</button></td>${cell(r.wastePct,r.wasteOver,pct1(r.wastePct))}${cell(r.lostPerDay,r.lostOver,r.lostPerDay!=null?Math.round(r.lostPerDay)+' mnt':'—')}<td><span class="fd-wl-pill ${k}">${l}</span></td><td class="fd-wl-advice">${esc(shortAdvice(r))}</td></tr>`;};
-  const head='<thead><tr><th>Outlet</th><th>Waste</th><th>Habis stok/hari</th><th>Status</th><th>Saran</th></tr></thead>';
+  const head='<thead><tr><th>Outlet</th><th>Waste</th><th>Habis stok/hari <small>(sheet tim)</small></th><th>Status</th><th>Saran</th></tr></thead>';
   const TOP=8,top=attention.slice(0,TOP),rest=attention.slice(TOP);
   const tableHtml=list=>`<div class="fd-outlet-table-wrap"><table class="fd-outlet-table fd-wl-table fd-wl-attn">${head}<tbody>${list.map(row).join('')}</tbody></table></div>`;
   const table=attention.length?`<span class="fd-trend-group-title">Perlu perhatian · klik nama untuk rincian</span>${tableHtml(top)}${rest.length?`<details class="fd-trend-full"><summary>Lihat ${rest.length} outlet lain yang perlu perhatian</summary>${tableHtml(rest)}</details>`:''}`:'';
@@ -1466,7 +1466,7 @@ window.ForecastDashboard=(()=>{
    kpi(`Prediksi besok · ${H[new Date(t1+'T12:00:00Z').getUTCDay()]}`,nx?.forecastTotal!=null?moneyBig(nx.forecastTotal):'—',nx?.forecastPure!=null?`reguler ${moneyBig(nx.forecastPure)}`:''),
    acc?kpi('Akurasi prediksi bulan ini',pct1(acc.acc),`${acc.bias>=0?'+':''}${pct1(acc.bias)} dari real`,acc.acc>=90?'ok':'warn'):'',
    net.wastePct!=null?kpi('Waste bulan ini',pct1(net.wastePct),`batas ${W_TH}`,net.wastePct>WASTE_THRESHOLD?'bad':'ok'):'',
-   net.lostPerDay!=null?kpi('Habis stok',Math.round(net.lostPerDay)+' mnt',`per outlet per hari · batas ${L_TH}`,net.lostPct>LOST_SALES_THRESHOLD?'bad':'ok'):'',
+   (()=>{const L=window.ForecastWasteLost?.lostSummary?.();return L&&L.pct!=null?kpi('Lost sales bulan ini',pct1(L.pct),`${moneyBig(L.rp)} · ${Math.round(L.pcs).toLocaleString('id-ID')} pcs, semua produk`,'warn'):net.lostPerDay!=null?kpi('Habis stok (sheet tim)',Math.round(net.lostPerDay)+' mnt',`per outlet per hari · batas ${L_TH}`,net.lostPct>LOST_SALES_THRESHOLD?'bad':'ok'):'';})(),
    briefAcc?.est?kpi('Est. sisa kiriman rencana tim',pct1(briefAcc.est.pct),'tanpa transfer, nominal HPP',briefAcc.est.pct>WASTE_THRESHOLD?'warn':'ok'):'',
   ].join('');
   const items=[];
